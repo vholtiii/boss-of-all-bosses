@@ -43,7 +43,7 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
   selectedBusiness,
   playerFamily 
 }) => {
-  const hexRadius = 25;
+  const hexRadius = 35;
   const hexWidth = hexRadius * 2;
   const hexHeight = Math.sqrt(3) * hexRadius;
 
@@ -262,7 +262,7 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
       <svg 
         width="100%" 
         height="100%" 
-        viewBox={`-500 -400 1000 800`}
+        viewBox={`-600 -500 1200 1000`}
         className="absolute inset-0"
       >
         <defs>
@@ -294,12 +294,20 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
                 )}
               />
               
-              {/* Territory label */}
+              {/* Territory label with background */}
+              <rect
+                x={center.x - 60}
+                y={center.y + hexRadius * 3 - 12}
+                width="120"
+                height="20"
+                rx="10"
+                className="fill-background/80 stroke-border stroke-1"
+              />
               <text
                 x={center.x}
-                y={center.y + hexRadius * 3}
+                y={center.y + hexRadius * 3 + 2}
                 textAnchor="middle"
-                className="text-sm fill-foreground select-none font-source font-semibold"
+                className="text-base fill-foreground select-none font-source font-bold drop-shadow-lg"
               >
                 {territory.district}
               </text>
