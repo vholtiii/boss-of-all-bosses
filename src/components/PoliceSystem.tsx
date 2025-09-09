@@ -98,7 +98,11 @@ export const PoliceSystem = ({ policeHeat, cleanMoney, onAction }: PoliceSystemP
               <div className="text-2xl font-bold text-blue-400">
                 -{policeHeat.reductionPerTurn}
               </div>
-              <div className="text-sm text-muted-foreground">Heat Reduction/Turn</div>
+              <div className="text-sm text-muted-foreground">
+                <div>Heat</div>
+                <div>Reduction</div>
+                <div>/Turn</div>
+              </div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-red-400">
