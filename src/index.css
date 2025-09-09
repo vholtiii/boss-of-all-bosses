@@ -8,33 +8,51 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Military Command Center Theme */
+    --background: 210 15% 8%;
+    --foreground: 120 20% 85%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 210 12% 12%;
+    --card-foreground: 120 15% 80%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 210 12% 10%;
+    --popover-foreground: 120 15% 85%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 120 60% 45%;
+    --primary-foreground: 210 15% 8%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 210 10% 20%;
+    --secondary-foreground: 120 15% 75%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 210 8% 15%;
+    --muted-foreground: 120 10% 60%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 45 95% 50%;
+    --accent-foreground: 210 15% 8%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 0 0% 95%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 210 12% 25%;
+    --input: 210 12% 15%;
+    --ring: 120 60% 45%;
+
+    /* Military specific colors */
+    --tactical-green: 120 60% 45%;
+    --tactical-amber: 45 95% 50%;
+    --steel-dark: 210 12% 12%;
+    --steel-light: 210 15% 25%;
+    --command-blue: 210 80% 40%;
+    
+    /* Gradients */
+    --gradient-tactical: linear-gradient(135deg, hsl(var(--tactical-green)), hsl(var(--command-blue)));
+    --gradient-steel: linear-gradient(180deg, hsl(var(--steel-light)), hsl(var(--steel-dark)));
+    --gradient-command: linear-gradient(90deg, hsl(var(--background)), hsl(var(--steel-dark)));
+    
+    /* Shadows */
+    --shadow-tactical: 0 0 20px hsl(var(--tactical-green) / 0.3);
+    --shadow-steel: 0 4px 12px hsl(210 15% 5% / 0.4);
+    --shadow-glow: 0 0 30px hsl(var(--tactical-amber) / 0.2);
 
     --radius: 0.5rem;
 
