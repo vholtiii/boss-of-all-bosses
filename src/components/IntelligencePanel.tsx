@@ -110,7 +110,7 @@ export const IntelligencePanel = ({
                       </Badge>
                     </div>
                     <div className="text-muted-foreground mt-1">
-                      ${official.monthlyBribe.toLocaleString()}/turn • -{official.heatReduction} heat
+                      <span className="font-medium text-yellow-400">{official.territory}</span> • ${official.monthlyBribe.toLocaleString()}/turn • -{official.heatReduction} heat
                     </div>
                     <div className="text-blue-400 text-xs">
                       Access: {official.permissions.join(', ')}

@@ -77,6 +77,7 @@ export interface BribedOfficial {
   monthlyBribe: number;
   heatReduction: number; // Heat reduction per turn
   permissions: string[]; // What this bribe unlocks
+  territory: string; // Which territory/district they're stationed in
 }
 
 export interface BusinessAction {
