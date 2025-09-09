@@ -72,9 +72,23 @@ const BusinessManagement: React.FC<BusinessManagementProps> = ({
           </div>
           <div className="text-center">
             <div className="text-xl font-bold text-red-400">
+              -${finances.totalExpenses.toLocaleString()}
+            </div>
+            <div className="text-sm text-muted-foreground">Total Expenses</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div className="text-center">
+            <div className="text-lg font-bold text-yellow-400">
               ${finances.dirtyMoney.toLocaleString()}
             </div>
-            <div className="text-sm text-muted-foreground">Dirty Money</div>
+            <div className="text-sm text-muted-foreground">Dirty Money (Unlaundered)</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-bold text-purple-400">
+              ${finances.totalIncome.toLocaleString()}
+            </div>
+            <div className="text-sm text-muted-foreground">Total Income</div>
           </div>
         </div>
       </Card>
@@ -144,7 +158,7 @@ const BusinessManagement: React.FC<BusinessManagementProps> = ({
                   <div className="text-sm font-medium text-blue-400">
                     +${business.monthlyIncome.toLocaleString()}
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-red-400">
                     -${business.monthlyExpenses.toLocaleString()}
                   </div>
                 </div>
@@ -233,7 +247,7 @@ const BusinessManagement: React.FC<BusinessManagementProps> = ({
                   <div className="text-sm font-medium text-orange-400">
                     +${business.monthlyIncome.toLocaleString()}
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-red-400">
                     -${business.monthlyExpenses.toLocaleString()}
                   </div>
                 </div>
