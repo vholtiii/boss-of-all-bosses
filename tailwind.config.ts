@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        'playfair': ['Playfair Display', 'serif'],
+        'source': ['Source Sans Pro', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -47,16 +51,21 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        tactical: {
-          green: "hsl(var(--tactical-green))",
-          amber: "hsl(var(--tactical-amber))",
+        families: {
+          gambino: "hsl(var(--gambino-gold))",
+          genovese: "hsl(var(--genovese-green))",
+          lucchese: "hsl(var(--lucchese-blue))",
+          bonanno: "hsl(var(--bonanno-red))",
+          colombo: "hsl(var(--colombo-purple))",
         },
-        steel: {
-          dark: "hsl(var(--steel-dark))",
-          light: "hsl(var(--steel-light))",
+        noir: {
+          dark: "hsl(var(--noir-dark))",
+          light: "hsl(var(--noir-light))",
         },
-        command: {
-          blue: "hsl(var(--command-blue))",
+        mafia: {
+          gold: "hsl(var(--vintage-gold))",
+          blood: "hsl(var(--blood-red))",
+          smoke: "hsl(var(--smoke-gray))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

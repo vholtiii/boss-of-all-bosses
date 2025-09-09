@@ -8,51 +8,58 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Military Command Center Theme */
-    --background: 210 15% 8%;
-    --foreground: 120 20% 85%;
+    /* Mafia Noir Theme */
+    --background: 20 15% 8%;
+    --foreground: 45 20% 85%;
 
-    --card: 210 12% 12%;
-    --card-foreground: 120 15% 80%;
+    --card: 20 12% 12%;
+    --card-foreground: 45 15% 80%;
 
-    --popover: 210 12% 10%;
-    --popover-foreground: 120 15% 85%;
+    --popover: 20 12% 10%;
+    --popover-foreground: 45 15% 85%;
 
-    --primary: 120 60% 45%;
-    --primary-foreground: 210 15% 8%;
+    --primary: 45 85% 55%;
+    --primary-foreground: 20 15% 8%;
 
-    --secondary: 210 10% 20%;
-    --secondary-foreground: 120 15% 75%;
+    --secondary: 20 10% 20%;
+    --secondary-foreground: 45 15% 75%;
 
-    --muted: 210 8% 15%;
-    --muted-foreground: 120 10% 60%;
+    --muted: 20 8% 15%;
+    --muted-foreground: 45 10% 60%;
 
-    --accent: 45 95% 50%;
-    --accent-foreground: 210 15% 8%;
+    --accent: 45 95% 60%;
+    --accent-foreground: 20 15% 8%;
 
     --destructive: 0 75% 50%;
     --destructive-foreground: 0 0% 95%;
 
-    --border: 210 12% 25%;
-    --input: 210 12% 15%;
-    --ring: 120 60% 45%;
+    --border: 20 12% 25%;
+    --input: 20 12% 15%;
+    --ring: 45 85% 55%;
 
-    /* Military specific colors */
-    --tactical-green: 120 60% 45%;
-    --tactical-amber: 45 95% 50%;
-    --steel-dark: 210 12% 12%;
-    --steel-light: 210 15% 25%;
-    --command-blue: 210 80% 40%;
+    /* Five Families Colors */
+    --gambino-gold: 45 85% 55%;
+    --genovese-green: 140 60% 45%;
+    --lucchese-blue: 220 70% 50%;
+    --bonanno-red: 0 70% 55%;
+    --colombo-purple: 270 60% 55%;
+    
+    /* Mafia specific colors */
+    --noir-dark: 20 12% 12%;
+    --noir-light: 20 15% 25%;
+    --blood-red: 0 70% 45%;
+    --vintage-gold: 45 85% 55%;
+    --smoke-gray: 0 0% 40%;
     
     /* Gradients */
-    --gradient-tactical: linear-gradient(135deg, hsl(var(--tactical-green)), hsl(var(--command-blue)));
-    --gradient-steel: linear-gradient(180deg, hsl(var(--steel-light)), hsl(var(--steel-dark)));
-    --gradient-command: linear-gradient(90deg, hsl(var(--background)), hsl(var(--steel-dark)));
+    --gradient-mafia: linear-gradient(135deg, hsl(var(--vintage-gold)), hsl(var(--blood-red)));
+    --gradient-noir: linear-gradient(180deg, hsl(var(--noir-light)), hsl(var(--noir-dark)));
+    --gradient-family: linear-gradient(90deg, hsl(var(--background)), hsl(var(--noir-dark)));
     
     /* Shadows */
-    --shadow-tactical: 0 0 20px hsl(var(--tactical-green) / 0.3);
-    --shadow-steel: 0 4px 12px hsl(210 15% 5% / 0.4);
-    --shadow-glow: 0 0 30px hsl(var(--tactical-amber) / 0.2);
+    --shadow-gold: 0 0 20px hsl(var(--vintage-gold) / 0.4);
+    --shadow-noir: 0 4px 12px hsl(20 15% 5% / 0.6);
+    --shadow-blood: 0 0 30px hsl(var(--blood-red) / 0.3);
 
     --radius: 0.5rem;
 
