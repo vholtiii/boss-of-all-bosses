@@ -77,7 +77,7 @@ const BusinessManagement: React.FC<BusinessManagementProps> = ({
             <div className="text-sm text-muted-foreground">Total Expenses</div>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <div className="text-center">
             <div className="text-lg font-bold text-yellow-400">
               ${finances.dirtyMoney.toLocaleString()}
@@ -89,6 +89,12 @@ const BusinessManagement: React.FC<BusinessManagementProps> = ({
               ${finances.totalIncome.toLocaleString()}
             </div>
             <div className="text-sm text-muted-foreground">Total Income</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-bold text-red-400">
+              -${finances.legalCosts.toLocaleString()}
+            </div>
+            <div className="text-sm text-muted-foreground">Legal Costs/Turn</div>
           </div>
         </div>
       </Card>

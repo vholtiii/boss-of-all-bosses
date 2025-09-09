@@ -5,8 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { Business, BusinessFinances, BusinessAction } from '@/types/business';
+import { Business, BusinessFinances, BusinessAction, LegalStatus } from '@/types/business';
 import BusinessManagement from '@/components/BusinessManagement';
+import LegalSystem from '@/components/LegalSystem';
 
 interface MafiaGameState {
   playerFamily: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
@@ -41,6 +42,7 @@ interface MafiaGameState {
   };
   businesses: Business[];
   finances: BusinessFinances;
+  legalStatus: LegalStatus;
 }
 
 interface MafiaHudProps {
@@ -90,8 +92,9 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction, onB
         <Button 
           onClick={onEndTurn}
           className="w-full bg-mafia-gold hover:bg-mafia-gold/90 text-background font-bold font-playfair"
+          disabled={gameState.legalStatus.jailTime > 0}
         >
-          END TURN
+          {gameState.legalStatus.jailTime > 0 ? `IMPRISONED (${gameState.legalStatus.jailTime} turns)` : 'END TURN'}
         </Button>
       </Card>
 
@@ -135,9 +138,10 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction, onB
       {/* Main Content Tabs */}
       <div className="flex-1">
         <Tabs defaultValue="territory" className="h-full">
-          <TabsList className="grid w-full grid-cols-3 bg-noir-dark">
+          <TabsList className="grid w-full grid-cols-4 bg-noir-dark">
             <TabsTrigger value="territory" className="text-xs">Territory</TabsTrigger>
             <TabsTrigger value="business" className="text-xs">Business</TabsTrigger>
+            <TabsTrigger value="legal" className="text-xs">Legal</TabsTrigger>
             <TabsTrigger value="intel" className="text-xs">Intel</TabsTrigger>
           </TabsList>
           
@@ -215,6 +219,7 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction, onB
                     size="sm" 
                     className="w-full border-mafia-gold text-mafia-gold hover:bg-mafia-gold hover:text-background"
                     onClick={() => onAction('takeover')}
+                    disabled={gameState.legalStatus.jailTime > 0}
                   >
                     TAKE OVER
                   </Button>
@@ -223,6 +228,7 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction, onB
                     size="sm" 
                     className="w-full"
                     onClick={() => onAction('negotiate')}
+                    disabled={gameState.legalStatus.jailTime > 0}
                   >
                     NEGOTIATE
                   </Button>
@@ -231,6 +237,7 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction, onB
                     size="sm" 
                     className="w-full"
                     onClick={() => onAction('sabotage')}
+                    disabled={gameState.legalStatus.jailTime > 0}
                   >
                     SABOTAGE
                   </Button>
@@ -277,6 +284,16 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction, onB
               />
             </div>
           </TabsContent>
+
+          <TabsContent value="legal" className="flex-1 mt-4">
+            <div className="h-[600px] overflow-y-auto pr-2">
+              <LegalSystem
+                legalStatus={gameState.legalStatus}
+                legalProfit={gameState.finances.legalProfit}
+                onLegalAction={onBusinessAction}
+              />
+            </div>
+          </TabsContent>
           
           <TabsContent value="intel" className="flex-1 mt-4">
             {/* Activity Log */}
@@ -288,12 +305,21 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction, onB
                 <div className="text-mafia-gold">• "Keep your friends close, but your enemies closer" - Sun Tzu</div>
                 <div>• Rival families are planning their next moves...</div>
                 <div className="text-mafia-blood">• Blood money flows through the streets of New York</div>
+                {gameState.legalStatus.jailTime > 0 && (
+                  <div className="text-red-400">• You are currently imprisoned! Operations are limited.</div>
+                )}
+                {gameState.legalStatus.prosecutionRisk > 50 && (
+                  <div className="text-yellow-400">• High prosecution risk! Consider hiring a lawyer.</div>
+                )}
                 {gameState.businesses.length > 0 && (
                   <>
                     <div>• Business operations are generating revenue...</div>
                     <div className="text-green-400">• Total businesses: {gameState.businesses.length}</div>
                     {gameState.finances.dirtyMoney > 0 && (
                       <div className="text-orange-400">• ${gameState.finances.dirtyMoney.toLocaleString()} in dirty money needs laundering</div>
+                    )}
+                    {gameState.finances.legalCosts > 0 && (
+                      <div className="text-red-400">• Legal costs: ${gameState.finances.legalCosts.toLocaleString()}/turn</div>
                     )}
                   </>
                 )}

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Business, BusinessFinances, BusinessAction } from '@/types/business';
+import { Business, BusinessFinances, BusinessAction, LegalStatus, Charge, Lawyer } from '@/types/business';
 
 interface Territory {
   q: number;
@@ -52,6 +52,7 @@ interface MafiaGameState {
   };
   businesses: Business[];
   finances: BusinessFinances;
+  legalStatus: LegalStatus;
 }
 
 const initialGameState: MafiaGameState = {
@@ -81,7 +82,15 @@ const initialGameState: MafiaGameState = {
     illegalProfit: 0,
     totalProfit: 0,
     dirtyMoney: 0,
-    cleanMoney: 0
+    cleanMoney: 0,
+    legalCosts: 0
+  },
+  legalStatus: {
+    charges: [],
+    lawyer: null,
+    jailTime: 0,
+    prosecutionRisk: 0,
+    totalLegalCosts: 0
   }
 };
 
@@ -91,6 +100,23 @@ export const useMafiaGameState = () => {
   const endTurn = useCallback(() => {
     setGameState(prevState => {
       const newState = { ...prevState };
+      
+      // If in jail, apply penalties
+      if (newState.legalStatus.jailTime > 0) {
+        newState.legalStatus.jailTime -= 1;
+        // Jail penalties per turn
+        newState.resources.money = Math.max(0, newState.resources.money - 5000);
+        newState.resources.influence = Math.max(0, newState.resources.influence - 2);
+        newState.resources.soldiers = Math.max(0, newState.resources.soldiers - 1);
+        
+        if (newState.legalStatus.jailTime === 0) {
+          // Released from jail, clear all charges
+          newState.legalStatus.charges = [];
+        }
+        
+        // Skip normal turn processing while in jail
+        return newState;
+      }
       
       // Advance turn
       newState.turn += 1;
@@ -109,14 +135,49 @@ export const useMafiaGameState = () => {
         const extortionBonus = b.isExtorted ? baseProfit * b.extortionRate : 0;
         return sum + baseProfit + extortionBonus;
       }, 0);
-      newState.resources.money += legalIncome;
-      newState.finances.cleanMoney += legalIncome;
+      
+      // Subtract lawyer fees from legal income
+      const netLegalIncome = legalIncome - newState.legalStatus.totalLegalCosts;
+      if (netLegalIncome > 0) {
+        newState.resources.money += netLegalIncome;
+        newState.finances.cleanMoney += netLegalIncome;
+      }
 
       // Illegal business income (goes to dirty money)
       const illegalIncome = illegalBusinesses.reduce((sum, b) => 
         sum + (b.monthlyIncome - b.monthlyExpenses), 0
       );
       newState.finances.dirtyMoney += illegalIncome;
+
+      // Check for prosecution if no lawyer and have prosecution risk
+      if (!newState.legalStatus.lawyer && newState.legalStatus.prosecutionRisk > 0) {
+        const prosecutionChance = Math.random() * 100;
+        if (prosecutionChance < newState.legalStatus.prosecutionRisk) {
+          // Generate a charge based on illegal businesses
+          const chargeTypes = ['racketeering', 'tax_evasion', 'extortion', 'money_laundering'];
+          if (illegalBusinesses.some(b => b.category === 'drug_trafficking')) chargeTypes.push('drug_trafficking');
+          
+          const randomCharge = chargeTypes[Math.floor(Math.random() * chargeTypes.length)];
+          const severity = randomCharge === 'murder' || randomCharge === 'drug_trafficking' ? 'federal' : 'felony';
+          
+          const newCharge: Charge = {
+            id: `charge_${Date.now()}`,
+            type: randomCharge as Charge['type'],
+            severity: severity as Charge['severity'],
+            evidence: Math.floor(Math.random() * 60) + 20, // 20-80% evidence
+            penalty: {
+              jailTime: severity === 'federal' ? 8 : severity === 'felony' ? 4 : 2,
+              fine: severity === 'federal' ? 100000 : severity === 'felony' ? 50000 : 10000
+            }
+          };
+          
+          newState.legalStatus.charges.push(newCharge);
+          
+          // Immediate conviction without lawyer
+          newState.legalStatus.jailTime = newCharge.penalty.jailTime;
+          newState.resources.money = Math.max(0, newState.resources.money - newCharge.penalty.fine);
+        }
+      }
       
       // Slightly adjust family control (simulate AI moves)
       const families: (keyof typeof newState.familyControl)[] = ['genovese', 'lucchese', 'bonanno', 'colombo'];
@@ -257,7 +318,8 @@ export const useMafiaGameState = () => {
                 launderingCapacity: action.type === 'build_legal' ? Math.floor(cost * 0.1) : 0,
                 extortionRate: 0,
                 isExtorted: false,
-                district: districts[Math.floor(Math.random() * districts.length)]
+                district: districts[Math.floor(Math.random() * districts.length)],
+                heatLevel: action.type === 'build_illegal' ? 15 : 5
               };
               
               newState.businesses.push(newBusiness);
@@ -313,6 +375,26 @@ export const useMafiaGameState = () => {
               newState.resources.respect += 1;
             }
           }
+        case 'hire_lawyer':
+          if (action.lawyerId) {
+            const availableLawyers = [
+              { id: 'public_defender', name: 'Public Defender', tier: 'public_defender' as const, monthlyFee: 0, skillLevel: 30, specialties: ['racketeering' as const, 'tax_evasion' as const] },
+              { id: 'local_attorney', name: 'Tommy "The Shark" Rosetti', tier: 'local' as const, monthlyFee: 5000, skillLevel: 60, specialties: ['extortion' as const, 'racketeering' as const, 'money_laundering' as const] },
+              { id: 'prestigious_firm', name: 'Goldman & Associates', tier: 'prestigious' as const, monthlyFee: 15000, skillLevel: 85, specialties: ['tax_evasion' as const, 'money_laundering' as const, 'racketeering' as const] },
+              { id: 'elite_counsel', name: 'Clarence "The Fixer" Mitchell', tier: 'elite' as const, monthlyFee: 35000, skillLevel: 95, specialties: ['murder' as const, 'drug_trafficking' as const, 'racketeering' as const, 'money_laundering' as const] }
+            ];
+            
+            const lawyer = availableLawyers.find(l => l.id === action.lawyerId);
+            if (lawyer && (lawyer.monthlyFee === 0 || newState.finances.legalProfit >= lawyer.monthlyFee)) {
+              newState.legalStatus.lawyer = lawyer;
+              newState.legalStatus.totalLegalCosts = lawyer.monthlyFee;
+            }
+          }
+          break;
+
+        case 'fire_lawyer':
+          newState.legalStatus.lawyer = null;
+          newState.legalStatus.totalLegalCosts = 0;
           break;
       }
 
@@ -324,7 +406,7 @@ export const useMafiaGameState = () => {
         const baseProfit = b.monthlyIncome - b.monthlyExpenses;
         const extortionBonus = b.isExtorted ? baseProfit * b.extortionRate : 0;
         return sum + baseProfit + extortionBonus;
-      }, 0);
+      }, 0) - newState.legalStatus.totalLegalCosts; // Subtract lawyer fees from legal profit
 
       newState.finances.illegalProfit = illegalBusinesses.reduce((sum, b) => 
         sum + (b.monthlyIncome - b.monthlyExpenses), 0
@@ -332,7 +414,12 @@ export const useMafiaGameState = () => {
 
       newState.finances.totalProfit = newState.finances.legalProfit + newState.finances.illegalProfit;
       newState.finances.totalIncome = newState.businesses.reduce((sum, b) => sum + b.monthlyIncome, 0);
-      newState.finances.totalExpenses = newState.businesses.reduce((sum, b) => sum + b.monthlyExpenses, 0);
+      newState.finances.totalExpenses = newState.businesses.reduce((sum, b) => sum + b.monthlyExpenses, 0) + newState.legalStatus.totalLegalCosts;
+      newState.finances.legalCosts = newState.legalStatus.totalLegalCosts;
+
+      // Calculate prosecution risk based on illegal businesses and heat levels
+      const totalHeat = illegalBusinesses.reduce((sum, b) => sum + b.heatLevel, 0);
+      newState.legalStatus.prosecutionRisk = Math.min(100, totalHeat / 2);
 
       return newState;
     });
