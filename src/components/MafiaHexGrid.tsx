@@ -53,51 +53,89 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
   ];
 
   const generateTerritories = (): Territory[] => {
-    const territories: Territory[] = [];
-    const mapRadius = Math.min(width, height) / 2;
+    const families: Territory['family'][] = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
+    const businessTypes = ['casino', 'speakeasy', 'restaurant', 'docks', 'protection'];
     
-    for (let q = -mapRadius; q <= mapRadius; q++) {
-      const r1 = Math.max(-mapRadius, -q - mapRadius);
-      const r2 = Math.min(mapRadius, -q + mapRadius);
-      for (let r = r1; r <= r2; r++) {
-        const s = -q - r;
-        
-        // Assign districts based on position
-        const districts = ['Little Italy', 'Bronx', 'Brooklyn', 'Queens', 'Manhattan', 'Staten Island'];
-        const district = districts[Math.abs(q + r) % districts.length] as Territory['district'];
-        
-        // Assign families (some neutral territories)
-        const families: Territory['family'][] = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
-        const family = Math.random() > 0.3 ? families[Math.abs(q * r) % families.length] : 'neutral';
-        
-        // Add businesses
-        let business;
-        if (Math.random() > 0.6) {
-          const businessTypes = ['casino', 'speakeasy', 'restaurant', 'docks', 'protection'];
-          business = {
-            type: businessTypes[Math.floor(Math.random() * businessTypes.length)] as any,
-            income: Math.floor(Math.random() * 5000) + 1000
+    // Define the 6 territories with their specific positions
+    const territories: Territory[] = [
+      // Manhattan - top left quadrant
+      {
+        q: -2, r: 1, s: 1,
+        district: 'Manhattan',
+        family: families[0],
+        business: {
+          type: businessTypes[0] as any,
+          income: Math.floor(Math.random() * 5000) + 1000
+        }
+      },
+      // The Bronx - top middle quadrant  
+      {
+        q: 0, r: -2, s: 2,
+        district: 'Bronx',
+        family: families[1],
+        business: {
+          type: businessTypes[1] as any,
+          income: Math.floor(Math.random() * 5000) + 1000
+        }
+      },
+      // Brooklyn - bottom middle quadrant
+      {
+        q: 0, r: 2, s: -2,
+        district: 'Brooklyn', 
+        family: families[2],
+        business: {
+          type: businessTypes[2] as any,
+          income: Math.floor(Math.random() * 5000) + 1000
+        }
+      },
+      // Staten Island - bottom left quadrant
+      {
+        q: -2, r: 2, s: 0,
+        district: 'Staten Island',
+        family: families[3],
+        business: {
+          type: businessTypes[3] as any,
+          income: Math.floor(Math.random() * 5000) + 1000
+        }
+      },
+      // Queens - right quadrant
+      {
+        q: 2, r: -1, s: -1,
+        district: 'Queens',
+        family: families[4],
+        business: {
+          type: businessTypes[4] as any,
+          income: Math.floor(Math.random() * 5000) + 1000
+        }
+      },
+      // Little Italy - middle quadrant
+      {
+        q: 0, r: 0, s: 0,
+        district: 'Little Italy',
+        family: playerFamily, // Player starts controlling Little Italy
+        business: {
+          type: 'restaurant' as any,
+          income: Math.floor(Math.random() * 5000) + 1000
+        }
+      }
+    ];
+
+    // Add capos to some territories
+    territories.forEach((territory, index) => {
+      if (Math.random() > 0.5) {
+        const availableFigures = mafiaFigures.filter(f => f.family === territory.family);
+        if (availableFigures.length > 0) {
+          const figure = availableFigures[Math.floor(Math.random() * availableFigures.length)];
+          territory.capo = {
+            name: figure.name,
+            loyalty: Math.floor(Math.random() * 40) + 60,
+            strength: Math.floor(Math.random() * 50) + 50,
+            family: territory.family as any
           };
         }
-        
-        // Add capos/lieutenants
-        let capo;
-        if (family !== 'neutral' && Math.random() > 0.7) {
-          const availableFigures = mafiaFigures.filter(f => f.family === family);
-          if (availableFigures.length > 0) {
-            const figure = availableFigures[Math.floor(Math.random() * availableFigures.length)];
-            capo = {
-              name: figure.name,
-              loyalty: Math.floor(Math.random() * 40) + 60,
-              strength: Math.floor(Math.random() * 50) + 50,
-              family: family as any
-            };
-          }
-        }
-        
-        territories.push({ q, r, s, district, family, business, capo });
       }
-    }
+    });
+
     return territories;
   };
 
