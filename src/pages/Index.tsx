@@ -1,6 +1,7 @@
 import React from 'react';
 import MafiaHexGrid from '@/components/MafiaHexGrid';
 import MafiaHud from '@/components/MafiaHud';
+import { IntelligencePanel } from '@/components/IntelligencePanel';
 import { useMafiaGameState } from '@/hooks/useMafiaGameState';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -105,6 +106,15 @@ const Index = () => {
             </div>
           </div>
         </div>
+        
+        {/* Right Intelligence Panel */}
+        <IntelligencePanel
+          businesses={gameState.businesses}
+          policeHeat={gameState.policeHeat}
+          currentTurn={gameState.turn}
+          familyControl={gameState.familyControl}
+          onAction={performBusinessAction}
+        />
       </div>
     </div>
   );
