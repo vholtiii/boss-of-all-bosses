@@ -109,7 +109,7 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction }) =
             <Badge variant="secondary">{gameState.resources.soldiers}</Badge>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">🗽 Influence</span>
+            <span className="text-sm text-muted-foreground">🗽 Street Influence</span>
             <Badge variant="secondary">{gameState.resources.influence}</Badge>
           </div>
           <div className="flex justify-between items-center">
