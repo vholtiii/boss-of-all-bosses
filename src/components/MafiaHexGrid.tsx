@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Business } from '@/types/business';
+import { Button } from '@/components/ui/button';
+import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
 interface BusinessHex {
   q: number;
@@ -46,6 +48,24 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
   const hexRadius = 35;
   const hexWidth = hexRadius * 2;
   const hexHeight = Math.sqrt(3) * hexRadius;
+  
+  // Zoom state
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const minZoom = 0.5;
+  const maxZoom = 3;
+  const zoomStep = 0.25;
+
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + zoomStep, maxZoom));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - zoomStep, minZoom));
+  };
+
+  const handleZoomReset = () => {
+    setZoomLevel(1);
+  };
 
   // Famous mafia figures and capos
   const mafiaFigures = [
@@ -310,6 +330,36 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-noir-dark rounded-lg border-2 border-noir-light">
+      {/* Zoom Controls */}
+      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleZoomIn}
+          disabled={zoomLevel >= maxZoom}
+          className="w-10 h-10 p-0 bg-background/90 hover:bg-background border-mafia-gold/30"
+        >
+          <ZoomIn className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleZoomOut}
+          disabled={zoomLevel <= minZoom}
+          className="w-10 h-10 p-0 bg-background/90 hover:bg-background border-mafia-gold/30"
+        >
+          <ZoomOut className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleZoomReset}
+          className="w-10 h-10 p-0 bg-background/90 hover:bg-background border-mafia-gold/30"
+        >
+          <RotateCcw className="h-4 w-4" />
+        </Button>
+      </div>
+      
       <svg 
         width="100%" 
         height="100%" 
@@ -329,6 +379,9 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
             <rect width="1" height="4" fill="rgba(255,255,255,0.05)"/>
           </pattern>
         </defs>
+        
+        {/* Zoomable content group */}
+        <g transform={`scale(${zoomLevel})`}>
         
         {/* Render territory boundaries first (lighter background) */}
         {territories.map((territory, territoryIndex) => {
@@ -471,6 +524,7 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
             </g>
           );
         })}
+        </g>
       </svg>
       
       {/* Vintage overlay effect */}
