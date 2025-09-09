@@ -91,6 +91,7 @@ const Index = () => {
             />
             
             <MafiaHexGrid 
+              key={`hex-grid-${gameState.turn}`}
               width={12}
               height={12}
               onBusinessClick={(business) => {
