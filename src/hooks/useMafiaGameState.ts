@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Business, BusinessFinances, BusinessAction, LegalStatus, Charge, Lawyer } from '@/types/business';
+import { Business, BusinessFinances, BusinessAction, LegalStatus, Charge, Lawyer, PoliceHeat, BribedOfficial } from '@/types/business';
 
 interface Territory {
   q: number;
@@ -53,6 +53,7 @@ interface MafiaGameState {
   businesses: Business[];
   finances: BusinessFinances;
   legalStatus: LegalStatus;
+  policeHeat: PoliceHeat;
 }
 
 const initialGameState: MafiaGameState = {
@@ -91,6 +92,11 @@ const initialGameState: MafiaGameState = {
     jailTime: 0,
     prosecutionRisk: 0,
     totalLegalCosts: 0
+  },
+  policeHeat: {
+    level: 20,
+    reductionPerTurn: 0,
+    bribedOfficials: []
   }
 };
 
@@ -120,6 +126,13 @@ export const useMafiaGameState = () => {
       
       // Advance turn
       newState.turn += 1;
+      
+      // Apply police heat reduction from bribes
+      newState.policeHeat.level = Math.max(0, newState.policeHeat.level - newState.policeHeat.reductionPerTurn);
+      
+      // Pay bribe costs from clean money
+      const totalBribeCosts = newState.policeHeat.bribedOfficials.reduce((sum, official) => sum + official.monthlyBribe, 0);
+      newState.resources.money -= totalBribeCosts;
       
       // Generate income from controlled territories
       const incomeBonus = Math.floor(prevState.familyControl.gambino * 500);
@@ -298,7 +311,20 @@ export const useMafiaGameState = () => {
       switch (action.type) {
         case 'build_legal':
         case 'build_illegal':
-          if (action.businessType) {
+            if (action.businessType) {
+            // Check police permissions for certain business types
+            const hasOfficerBribe = newState.policeHeat.bribedOfficials.some(o => o.permissions.includes('run_prostitution'));
+            const hasCaptainBribe = newState.policeHeat.bribedOfficials.some(o => o.permissions.includes('run_gambling') || o.permissions.includes('run_loan_sharking'));
+            
+            if (action.businessType === 'prostitution' && !hasOfficerBribe) {
+              console.log('Need to bribe police officers to run prostitution businesses');
+              return newState;
+            }
+            if ((action.businessType === 'gambling' || action.businessType === 'loan_sharking') && !hasCaptainBribe) {
+              console.log('Need to bribe a captain to run gambling/loan sharking businesses');
+              return newState;
+            }
+            
             const costs = {
               restaurant: 25000, laundromat: 15000, casino: 50000, construction: 40000,
               drug_trafficking: 30000, gambling: 20000, prostitution: 15000, loan_sharking: 10000
@@ -320,6 +346,11 @@ export const useMafiaGameState = () => {
                 isExtorted: false,
                 district: districts[Math.floor(Math.random() * districts.length)],
                 heatLevel: action.type === 'build_illegal' ? 15 : 5
+              };
+              
+              // Add police heat when building illegal businesses
+              if (action.type === 'build_illegal') {
+                newState.policeHeat.level += Math.floor(Math.random() * 10) + 5; // 5-15 heat increase
               };
               
               newState.businesses.push(newBusiness);
@@ -395,6 +426,53 @@ export const useMafiaGameState = () => {
         case 'fire_lawyer':
           newState.legalStatus.lawyer = null;
           newState.legalStatus.totalLegalCosts = 0;
+          break;
+
+        case 'bribe_official':
+          if (action.officialId) {
+            const availableOfficials = [
+              { id: 'officer_murphy', rank: 'officer' as const, name: 'Officer Murphy', monthlyBribe: 2000, heatReduction: 1, permissions: ['run_prostitution'] },
+              { id: 'sergeant_kowalski', rank: 'sergeant' as const, name: 'Sergeant Kowalski', monthlyBribe: 5000, heatReduction: 2, permissions: ['patrol_protection'] },
+              { id: 'captain_rodriguez', rank: 'captain' as const, name: 'Captain Rodriguez', monthlyBribe: 12000, heatReduction: 4, permissions: ['run_gambling', 'run_loan_sharking'] },
+              { id: 'chief_sullivan', rank: 'chief' as const, name: 'Chief Sullivan', monthlyBribe: 30000, heatReduction: 8, permissions: ['rival_intelligence'] },
+              { id: 'mayor_thompson', rank: 'mayor' as const, name: 'Mayor Thompson', monthlyBribe: 75000, heatReduction: 15, permissions: ['shutdown_rivals'] }
+            ];
+            
+            const official = availableOfficials.find(o => o.id === action.officialId);
+            if (official && newState.resources.money >= official.monthlyBribe && 
+                !newState.policeHeat.bribedOfficials.some(b => b.id === official.id)) {
+              newState.policeHeat.bribedOfficials.push(official);
+              newState.policeHeat.reductionPerTurn += official.heatReduction;
+              newState.resources.respect += 2;
+            }
+          }
+          break;
+
+        case 'stop_bribe':
+          if (action.officialId) {
+            const officialIndex = newState.policeHeat.bribedOfficials.findIndex(o => o.id === action.officialId);
+            if (officialIndex !== -1) {
+              const official = newState.policeHeat.bribedOfficials[officialIndex];
+              newState.policeHeat.reductionPerTurn -= official.heatReduction;
+              newState.policeHeat.bribedOfficials.splice(officialIndex, 1);
+              newState.policeHeat.level += 10; // Heat spike from ending corruption
+            }
+          }
+          break;
+
+        case 'rival_info':
+          // Show intelligence about rival families (implement UI notification)
+          console.log('Rival family intelligence gathered');
+          break;
+
+        case 'shutdown_rival':
+          if (action.rivalFamily && newState.policeHeat.bribedOfficials.some(o => o.permissions.includes('shutdown_rivals'))) {
+            // Reduce rival family control
+            const rivalFamily = action.rivalFamily as keyof typeof newState.familyControl;
+            newState.familyControl[rivalFamily] = Math.max(0, newState.familyControl[rivalFamily] - 5);
+            newState.familyControl.gambino += 2;
+            newState.resources.respect += 3;
+          }
           break;
       }
 

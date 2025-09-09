@@ -53,11 +53,28 @@ export interface BusinessFinances {
   legalCosts: number; // lawyer fees and legal expenses
 }
 
+export interface PoliceHeat {
+  level: number; // 0-100, how much attention you have from law enforcement
+  reductionPerTurn: number; // How much heat reduces each turn based on bribes
+  bribedOfficials: BribedOfficial[];
+}
+
+export interface BribedOfficial {
+  id: string;
+  rank: 'officer' | 'sergeant' | 'captain' | 'chief' | 'mayor';
+  name: string;
+  monthlyBribe: number;
+  heatReduction: number; // Heat reduction per turn
+  permissions: string[]; // What this bribe unlocks
+}
+
 export interface BusinessAction {
-  type: 'build_legal' | 'build_illegal' | 'upgrade' | 'extort' | 'launder' | 'collect' | 'hire_lawyer' | 'fire_lawyer';
+  type: 'build_legal' | 'build_illegal' | 'upgrade' | 'extort' | 'launder' | 'collect' | 'hire_lawyer' | 'fire_lawyer' | 'bribe_official' | 'stop_bribe' | 'rival_info' | 'shutdown_rival';
   businessId?: string;
   businessType?: Business['category'];
   district?: string;
   amount?: number;
   lawyerId?: string;
+  officialId?: string;
+  rivalFamily?: string;
 }

@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { Business, BusinessFinances, BusinessAction, LegalStatus } from '@/types/business';
+import { Business, BusinessFinances, BusinessAction, LegalStatus, PoliceHeat } from '@/types/business';
 import BusinessManagement from '@/components/BusinessManagement';
 import LegalSystem from '@/components/LegalSystem';
+import { PoliceSystem } from '@/components/PoliceSystem';
 
 interface MafiaGameState {
   playerFamily: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
@@ -43,6 +44,7 @@ interface MafiaGameState {
   businesses: Business[];
   finances: BusinessFinances;
   legalStatus: LegalStatus;
+  policeHeat: PoliceHeat;
 }
 
 interface MafiaHudProps {
@@ -142,7 +144,7 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction, onB
             <TabsTrigger value="territory" className="text-xs">Territory</TabsTrigger>
             <TabsTrigger value="business" className="text-xs">Business</TabsTrigger>
             <TabsTrigger value="legal" className="text-xs">Legal</TabsTrigger>
-            <TabsTrigger value="intel" className="text-xs">Intel</TabsTrigger>
+            <TabsTrigger value="police" className="text-xs">Police</TabsTrigger>
           </TabsList>
           
           <TabsContent value="territory" className="flex-1 space-y-4 mt-4">
@@ -295,6 +297,16 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction, onB
             </div>
           </TabsContent>
           
+          <TabsContent value="police" className="flex-1 mt-4">
+            <div className="h-[600px] overflow-y-auto pr-2">
+              <PoliceSystem
+                policeHeat={gameState.policeHeat}
+                cleanMoney={gameState.finances.cleanMoney}
+                onAction={onBusinessAction}
+              />
+            </div>
+          </TabsContent>
+          
           <TabsContent value="intel" className="flex-1 mt-4">
             {/* Activity Log */}
             <Card className="bg-noir-dark border-noir-light p-4">
@@ -310,6 +322,9 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction, onB
                 )}
                 {gameState.legalStatus.prosecutionRisk > 50 && (
                   <div className="text-yellow-400">• High prosecution risk! Consider hiring a lawyer.</div>
+                )}
+                {gameState.policeHeat.level > 70 && (
+                  <div className="text-red-400">• High police heat! Law enforcement is watching closely.</div>
                 )}
                 {gameState.businesses.length > 0 && (
                   <>
