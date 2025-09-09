@@ -62,6 +62,7 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
   ];
 
   const generateTerritories = (): Territory[] => {
+    console.log('🏙️ Generating territories...');
     const families: ('gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo')[] = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
     const legalBusinessTypes: Business['category'][] = ['restaurant', 'laundromat', 'casino', 'construction'];
     const illegalBusinessTypes: Business['category'][] = ['drug_trafficking', 'gambling', 'prostitution', 'loan_sharking'];
@@ -235,6 +236,10 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
       }
     });
 
+    console.log('🏙️ Generated territories:', territories.length);
+    territories.forEach(t => {
+      console.log(`📍 ${t.district}: ${t.businesses.length} businesses (${t.businesses.filter(b => b.family === 'neutral').length} neutral)`);
+    });
     return territories;
   };
 
@@ -247,6 +252,9 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
   
   // Flatten all businesses for easier rendering
   const allBusinesses = territories.flatMap(t => t.businesses);
+  
+  console.log('🎯 Total businesses to render:', allBusinesses.length);
+  console.log('🎯 Neutral businesses:', allBusinesses.filter(b => b.family === 'neutral').length);
 
   const hexToPixel = (business: BusinessHex) => {
     const x = hexRadius * (3/2 * business.q);

@@ -91,10 +91,11 @@ const Index = () => {
             />
             
             <MafiaHexGrid 
-              key={`hex-grid-${gameState.turn}`}
+              key={`hex-grid-refresh-${Date.now()}`}
               width={12}
               height={12}
               onBusinessClick={(business) => {
+                console.log('🏢 Business clicked:', business);
                 // For now, we'll adapt the business selection to territory selection
                 selectTerritory({
                   q: business.q,
