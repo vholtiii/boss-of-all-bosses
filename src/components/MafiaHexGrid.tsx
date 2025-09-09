@@ -176,7 +176,7 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
       <svg 
         width="100%" 
         height="100%" 
-        viewBox={`-300 -300 600 600`}
+        viewBox={`-350 -350 700 700`}
         className="absolute inset-0"
       >
         <defs>
