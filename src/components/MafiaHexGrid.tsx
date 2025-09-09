@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Business } from '@/types/business';
 
@@ -196,7 +196,12 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
     return territories;
   };
 
-  const [territories] = useState<Territory[]>(generateTerritories);
+  const [territories, setTerritories] = useState<Territory[]>(generateTerritories);
+  
+  // Force refresh of territories
+  useEffect(() => {
+    setTerritories(generateTerritories());
+  }, [playerFamily]);
   
   // Flatten all businesses for easier rendering
   const allBusinesses = territories.flatMap(t => t.businesses);
@@ -257,7 +262,7 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
       <svg 
         width="100%" 
         height="100%" 
-        viewBox={`-400 -300 800 600`}
+        viewBox={`-500 -400 1000 800`}
         className="absolute inset-0"
       >
         <defs>
