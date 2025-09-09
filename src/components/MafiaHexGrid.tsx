@@ -56,11 +56,11 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
     const families: Territory['family'][] = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
     const businessTypes = ['casino', 'speakeasy', 'restaurant', 'docks', 'protection'];
     
-    // Define the 6 territories with their specific positions
+    // Define the 6 territories with their specific positions - adjusted for better visibility
     const territories: Territory[] = [
       // Manhattan - top left quadrant
       {
-        q: -2, r: 1, s: 1,
+        q: -1, r: -1, s: 2,
         district: 'Manhattan',
         family: families[0],
         business: {
@@ -90,7 +90,7 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
       },
       // Staten Island - bottom left quadrant
       {
-        q: -2, r: 2, s: 0,
+        q: -1, r: 1, s: 0,
         district: 'Staten Island',
         family: families[3],
         business: {
@@ -100,7 +100,7 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
       },
       // Queens - right quadrant
       {
-        q: 2, r: -1, s: -1,
+        q: 2, r: 0, s: -2,
         district: 'Queens',
         family: families[4],
         business: {
@@ -108,7 +108,7 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
           income: Math.floor(Math.random() * 5000) + 1000
         }
       },
-      // Little Italy - middle quadrant
+      // Little Italy - middle quadrant (center)
       {
         q: 0, r: 0, s: 0,
         district: 'Little Italy',
@@ -136,6 +136,7 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
       }
     });
 
+    console.log('Generated territories:', territories); // Debug log
     return territories;
   };
 
@@ -175,7 +176,7 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
       <svg 
         width="100%" 
         height="100%" 
-        viewBox={`-350 -350 700 700`}
+        viewBox={`-200 -200 400 400`}
         className="absolute inset-0"
       >
         <defs>
