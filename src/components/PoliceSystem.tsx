@@ -8,6 +8,7 @@ import { Shield, AlertTriangle, Eye, X, DollarSign, Lock } from "lucide-react";
 interface PoliceSystemProps {
   policeHeat: PoliceHeat;
   cleanMoney: number;
+  dirtyMoney: number;
   currentTurn: number;
   loyalty: number;
   onAction: (action: BusinessAction) => void;
@@ -56,7 +57,7 @@ const AVAILABLE_OFFICIALS = [
   }
 ];
 
-export const PoliceSystem = ({ policeHeat, cleanMoney, currentTurn, loyalty, onAction }: PoliceSystemProps) => {
+export const PoliceSystem = ({ policeHeat, cleanMoney, dirtyMoney, currentTurn, loyalty, onAction }: PoliceSystemProps) => {
   const getHeatColor = (level: number) => {
     if (level < 30) return "text-green-400";
     if (level < 70) return "text-yellow-400";
@@ -70,7 +71,14 @@ export const PoliceSystem = ({ policeHeat, cleanMoney, currentTurn, loyalty, onA
   };
 
   const totalMonthlyCosts = policeHeat.bribedOfficials.reduce((sum, official) => sum + official.monthlyBribe, 0);
-  const canAffordBribe = (amount: number) => cleanMoney >= amount;
+  const canAffordBribe = (amount: number, officialRank: string) => {
+    // Mayor can only be bribed with clean money
+    if (officialRank === 'mayor') {
+      return cleanMoney >= amount;
+    }
+    // Others can be bribed with clean or dirty money
+    return (cleanMoney + dirtyMoney) >= amount;
+  };
   
   const activeArrests = policeHeat.arrests.filter(arrest => 
     currentTurn - arrest.turn < arrest.sentence
@@ -249,7 +257,9 @@ export const PoliceSystem = ({ policeHeat, cleanMoney, currentTurn, loyalty, onA
           <div className="space-y-3">
             {AVAILABLE_OFFICIALS.map((official) => {
               const isAlreadyBribed = policeHeat.bribedOfficials.some(b => b.id === official.id);
-              const canAfford = canAffordBribe(official.monthlyBribe);
+              const canAfford = canAffordBribe(official.monthlyBribe, official.rank);
+              const totalMoney = cleanMoney + dirtyMoney;
+              const onlyLegalMoney = official.rank === 'mayor';
 
               return (
                 <div key={official.id} className="flex items-center justify-between p-3 bg-card border rounded-lg">
@@ -272,9 +282,17 @@ export const PoliceSystem = ({ policeHeat, cleanMoney, currentTurn, loyalty, onA
                       <div className="text-red-400 font-medium">
                         ${official.monthlyBribe.toLocaleString()}/turn
                       </div>
+                      {onlyLegalMoney && (
+                        <div className="text-xs text-yellow-400">
+                          Legal money only
+                        </div>
+                      )}
                       {!canAfford && (
                         <div className="text-xs text-muted-foreground">
-                          Need ${(official.monthlyBribe - cleanMoney).toLocaleString()} more
+                          {onlyLegalMoney 
+                            ? `Need $${(official.monthlyBribe - cleanMoney).toLocaleString()} clean money`
+                            : `Need $${(official.monthlyBribe - totalMoney).toLocaleString()} more`
+                          }
                         </div>
                       )}
                     </div>

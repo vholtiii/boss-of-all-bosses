@@ -526,11 +526,32 @@ export const useMafiaGameState = () => {
             ];
             
             const official = availableOfficials.find(o => o.id === action.officialId);
-            if (official && newState.resources.money >= official.monthlyBribe && 
-                !newState.policeHeat.bribedOfficials.some(b => b.id === official.id)) {
-              newState.policeHeat.bribedOfficials.push(official);
-              newState.policeHeat.reductionPerTurn += official.heatReduction;
-              newState.resources.respect += 2;
+            if (official && !newState.policeHeat.bribedOfficials.some(b => b.id === official.id)) {
+              // Mayor can only be bribed with clean money
+              if (official.rank === 'mayor') {
+                if (newState.finances.cleanMoney >= official.monthlyBribe) {
+                  newState.finances.cleanMoney -= official.monthlyBribe;
+                  newState.policeHeat.bribedOfficials.push(official);
+                  newState.policeHeat.reductionPerTurn += official.heatReduction;
+                  newState.resources.respect += 2;
+                }
+              } else {
+                // Others can be bribed with dirty or clean money
+                const totalMoney = newState.finances.cleanMoney + newState.finances.dirtyMoney;
+                if (totalMoney >= official.monthlyBribe) {
+                  // Use dirty money first, then clean money
+                  if (newState.finances.dirtyMoney >= official.monthlyBribe) {
+                    newState.finances.dirtyMoney -= official.monthlyBribe;
+                  } else {
+                    const remainingCost = official.monthlyBribe - newState.finances.dirtyMoney;
+                    newState.finances.dirtyMoney = 0;
+                    newState.finances.cleanMoney -= remainingCost;
+                  }
+                  newState.policeHeat.bribedOfficials.push(official);
+                  newState.policeHeat.reductionPerTurn += official.heatReduction;
+                  newState.resources.respect += 2;
+                }
+              }
             }
           }
           break;

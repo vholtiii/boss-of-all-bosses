@@ -299,13 +299,14 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction, onB
           
           <TabsContent value="police" className="flex-1 mt-4">
             <div className="h-[600px] overflow-y-auto pr-2">
-              <PoliceSystem
-                policeHeat={gameState.policeHeat}
-                cleanMoney={gameState.finances.cleanMoney}
-                currentTurn={gameState.turn}
-                loyalty={gameState.resources.loyalty}
-                onAction={onBusinessAction}
-              />
+            <PoliceSystem 
+              policeHeat={gameState.policeHeat}
+              cleanMoney={gameState.finances.cleanMoney}
+              dirtyMoney={gameState.finances.dirtyMoney}
+              currentTurn={gameState.turn}
+              loyalty={gameState.resources.loyalty}
+              onAction={onBusinessAction}
+            />
             </div>
           </TabsContent>
           
