@@ -76,6 +76,13 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
           { q: 0, r: 0, s: 0, businessId: 'li_1', businessType: 'restaurant', isLegal: true, income: 3500, district: 'Little Italy', family: playerFamily },
           { q: 1, r: -1, s: 0, businessId: 'li_2', businessType: 'laundromat', isLegal: true, income: 2800, district: 'Little Italy', family: playerFamily },
           { q: 0, r: 1, s: -1, businessId: 'li_3', businessType: 'loan_sharking', isLegal: false, income: 4200, district: 'Little Italy', family: playerFamily, isExtorted: true },
+          { q: -1, r: 0, s: 1, businessId: 'li_4', businessType: 'casino', isLegal: true, income: 6500, district: 'Little Italy', family: playerFamily },
+          { q: 1, r: 0, s: -1, businessId: 'li_5', businessType: 'construction', isLegal: true, income: 5200, district: 'Little Italy', family: playerFamily },
+          { q: 0, r: -1, s: 1, businessId: 'li_6', businessType: 'gambling', isLegal: false, income: 3800, district: 'Little Italy', family: playerFamily },
+          { q: -1, r: 1, s: 0, businessId: 'li_7', businessType: 'prostitution', isLegal: false, income: 4100, district: 'Little Italy', family: playerFamily, isExtorted: true },
+          { q: 2, r: -1, s: -1, businessId: 'li_8', businessType: 'restaurant', isLegal: true, income: 3200, district: 'Little Italy', family: playerFamily },
+          { q: 1, r: 1, s: -2, businessId: 'li_9', businessType: 'drug_trafficking', isLegal: false, income: 7800, district: 'Little Italy', family: playerFamily },
+          { q: -1, r: -1, s: 2, businessId: 'li_10', businessType: 'laundromat', isLegal: true, income: 2600, district: 'Little Italy', family: playerFamily }
         ]
       },
       
@@ -88,6 +95,12 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
           { q: -2, r: -1, s: 3, businessId: 'man_2', businessType: 'construction', isLegal: true, income: 6200, district: 'Manhattan', family: families[0] },
           { q: -4, r: 1, s: 3, businessId: 'man_3', businessType: 'gambling', isLegal: false, income: 7800, district: 'Manhattan', family: families[0], isExtorted: true },
           { q: -3, r: 1, s: 2, businessId: 'man_4', businessType: 'prostitution', isLegal: false, income: 5500, district: 'Manhattan', family: families[0] },
+          { q: -4, r: 0, s: 4, businessId: 'man_5', businessType: 'restaurant', isLegal: true, income: 4800, district: 'Manhattan', family: families[0] },
+          { q: -2, r: 0, s: 2, businessId: 'man_6', businessType: 'laundromat', isLegal: true, income: 3400, district: 'Manhattan', family: families[0] },
+          { q: -3, r: -1, s: 4, businessId: 'man_7', businessType: 'drug_trafficking', isLegal: false, income: 9200, district: 'Manhattan', family: families[0], isExtorted: true },
+          { q: -5, r: 1, s: 4, businessId: 'man_8', businessType: 'loan_sharking', isLegal: false, income: 6800, district: 'Manhattan', family: families[0] },
+          { q: -4, r: 2, s: 2, businessId: 'man_9', businessType: 'casino', isLegal: true, income: 7200, district: 'Manhattan', family: families[0] },
+          { q: -2, r: 1, s: 1, businessId: 'man_10', businessType: 'construction', isLegal: true, income: 5800, district: 'Manhattan', family: families[0] }
         ]
       },
       
@@ -100,6 +113,12 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
           { q: 4, r: -3, s: -1, businessId: 'bx_2', businessType: 'drug_trafficking', isLegal: false, income: 9200, district: 'Bronx', family: families[1], isExtorted: true },
           { q: 2, r: -2, s: 0, businessId: 'bx_3', businessType: 'laundromat', isLegal: true, income: 3300, district: 'Bronx', family: families[1] },
           { q: 3, r: -2, s: -1, businessId: 'bx_4', businessType: 'gambling', isLegal: false, income: 6800, district: 'Bronx', family: families[1] },
+          { q: 5, r: -4, s: -1, businessId: 'bx_5', businessType: 'casino', isLegal: true, income: 7500, district: 'Bronx', family: families[1] },
+          { q: 4, r: -2, s: -2, businessId: 'bx_6', businessType: 'construction', isLegal: true, income: 5600, district: 'Bronx', family: families[1] },
+          { q: 2, r: -3, s: 1, businessId: 'bx_7', businessType: 'prostitution', isLegal: false, income: 4800, district: 'Bronx', family: families[1], isExtorted: true },
+          { q: 5, r: -3, s: -2, businessId: 'bx_8', businessType: 'loan_sharking', isLegal: false, income: 6200, district: 'Bronx', family: families[1] },
+          { q: 3, r: -4, s: 1, businessId: 'bx_9', businessType: 'restaurant', isLegal: true, income: 3900, district: 'Bronx', family: families[1] },
+          { q: 4, r: -4, s: 0, businessId: 'bx_10', businessType: 'gambling', isLegal: false, income: 7100, district: 'Bronx', family: families[1] }
         ]
       },
       
@@ -112,6 +131,12 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
           { q: 4, r: 0, s: -4, businessId: 'bk_2', businessType: 'casino', isLegal: true, income: 8800, district: 'Brooklyn', family: families[2] },
           { q: 2, r: 1, s: -3, businessId: 'bk_3', businessType: 'loan_sharking', isLegal: false, income: 5200, district: 'Brooklyn', family: families[2] },
           { q: 3, r: 1, s: -4, businessId: 'bk_4', businessType: 'prostitution', isLegal: false, income: 4900, district: 'Brooklyn', family: families[2], isExtorted: true },
+          { q: 5, r: 0, s: -5, businessId: 'bk_5', businessType: 'restaurant', isLegal: true, income: 4300, district: 'Brooklyn', family: families[2] },
+          { q: 4, r: 1, s: -5, businessId: 'bk_6', businessType: 'drug_trafficking', isLegal: false, income: 8600, district: 'Brooklyn', family: families[2], isExtorted: true },
+          { q: 2, r: 0, s: -2, businessId: 'bk_7', businessType: 'laundromat', isLegal: true, income: 3100, district: 'Brooklyn', family: families[2] },
+          { q: 3, r: 2, s: -5, businessId: 'bk_8', businessType: 'gambling', isLegal: false, income: 6500, district: 'Brooklyn', family: families[2] },
+          { q: 5, r: 1, s: -6, businessId: 'bk_9', businessType: 'casino', isLegal: true, income: 7800, district: 'Brooklyn', family: families[2] },
+          { q: 4, r: 2, s: -6, businessId: 'bk_10', businessType: 'construction', isLegal: true, income: 6800, district: 'Brooklyn', family: families[2] }
         ]
       },
       
@@ -123,6 +148,13 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
           { q: 0, r: 3, s: -3, businessId: 'q_1', businessType: 'restaurant', isLegal: true, income: 3800, district: 'Queens', family: families[3] },
           { q: 1, r: 3, s: -4, businessId: 'q_2', businessType: 'laundromat', isLegal: true, income: 2900, district: 'Queens', family: families[3] },
           { q: -1, r: 4, s: -3, businessId: 'q_3', businessType: 'drug_trafficking', isLegal: false, income: 8900, district: 'Queens', family: families[3], isExtorted: true },
+          { q: 0, r: 4, s: -4, businessId: 'q_4', businessType: 'casino', isLegal: true, income: 7600, district: 'Queens', family: families[3] },
+          { q: 2, r: 3, s: -5, businessId: 'q_5', businessType: 'construction', isLegal: true, income: 5400, district: 'Queens', family: families[3] },
+          { q: -1, r: 5, s: -4, businessId: 'q_6', businessType: 'gambling', isLegal: false, income: 6300, district: 'Queens', family: families[3] },
+          { q: 1, r: 4, s: -5, businessId: 'q_7', businessType: 'prostitution', isLegal: false, income: 4600, district: 'Queens', family: families[3], isExtorted: true },
+          { q: -2, r: 5, s: -3, businessId: 'q_8', businessType: 'loan_sharking', isLegal: false, income: 5800, district: 'Queens', family: families[3] },
+          { q: 0, r: 5, s: -5, businessId: 'q_9', businessType: 'restaurant', isLegal: true, income: 4000, district: 'Queens', family: families[3] },
+          { q: 2, r: 4, s: -6, businessId: 'q_10', businessType: 'laundromat', isLegal: true, income: 3200, district: 'Queens', family: families[3] }
         ]
       },
       
@@ -134,6 +166,13 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
           { q: -3, r: 3, s: 0, businessId: 'si_1', businessType: 'construction', isLegal: true, income: 5800, district: 'Staten Island', family: families[4] },
           { q: -4, r: 3, s: 1, businessId: 'si_2', businessType: 'casino', isLegal: true, income: 7500, district: 'Staten Island', family: families[4] },
           { q: -2, r: 3, s: -1, businessId: 'si_3', businessType: 'gambling', isLegal: false, income: 6200, district: 'Staten Island', family: families[4] },
+          { q: -3, r: 4, s: -1, businessId: 'si_4', businessType: 'restaurant', isLegal: true, income: 4200, district: 'Staten Island', family: families[4] },
+          { q: -5, r: 4, s: 1, businessId: 'si_5', businessType: 'drug_trafficking', isLegal: false, income: 8400, district: 'Staten Island', family: families[4], isExtorted: true },
+          { q: -4, r: 4, s: 0, businessId: 'si_6', businessType: 'laundromat', isLegal: true, income: 3000, district: 'Staten Island', family: families[4] },
+          { q: -2, r: 4, s: -2, businessId: 'si_7', businessType: 'prostitution', isLegal: false, income: 4700, district: 'Staten Island', family: families[4] },
+          { q: -3, r: 5, s: -2, businessId: 'si_8', businessType: 'loan_sharking', isLegal: false, income: 5900, district: 'Staten Island', family: families[4], isExtorted: true },
+          { q: -5, r: 5, s: 0, businessId: 'si_9', businessType: 'casino', isLegal: true, income: 7100, district: 'Staten Island', family: families[4] },
+          { q: -4, r: 5, s: -1, businessId: 'si_10', businessType: 'construction', isLegal: true, income: 6400, district: 'Staten Island', family: families[4] }
         ]
       }
     ];
