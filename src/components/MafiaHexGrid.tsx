@@ -1,16 +1,25 @@
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { Business } from '@/types/business';
 
-interface Territory {
+interface BusinessHex {
   q: number;
   r: number;
   s: number;
+  businessId: string;
+  businessType: Business['category'];
+  isLegal: boolean;
+  income: number;
   district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
   family: 'neutral' | 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
-  business?: {
-    type: 'casino' | 'speakeasy' | 'restaurant' | 'docks' | 'protection';
-    income: number;
-  };
+  isExtorted?: boolean;
+  heatLevel?: number;
+}
+
+interface Territory {
+  district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
+  family: 'neutral' | 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
+  businesses: BusinessHex[];
   capo?: {
     name: string;
     loyalty: number;
@@ -22,19 +31,19 @@ interface Territory {
 interface MafiaHexGridProps {
   width: number;
   height: number;
-  onTerritoryClick: (territory: Territory) => void;
-  selectedTerritory?: Territory | null;
+  onBusinessClick: (business: BusinessHex) => void;
+  selectedBusiness?: BusinessHex | null;
   playerFamily: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
 }
 
 const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({ 
   width, 
   height, 
-  onTerritoryClick, 
-  selectedTerritory,
+  onBusinessClick, 
+  selectedBusiness,
   playerFamily 
 }) => {
-  const hexRadius = 35;
+  const hexRadius = 25;
   const hexWidth = hexRadius * 2;
   const hexHeight = Math.sqrt(3) * hexRadius;
 
@@ -53,76 +62,85 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
   ];
 
   const generateTerritories = (): Territory[] => {
-    const families: Territory['family'][] = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
-    const businessTypes = ['casino', 'speakeasy', 'restaurant', 'docks', 'protection'];
+    const families: ('gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo')[] = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
+    const legalBusinessTypes: Business['category'][] = ['restaurant', 'laundromat', 'casino', 'construction'];
+    const illegalBusinessTypes: Business['category'][] = ['drug_trafficking', 'gambling', 'prostitution', 'loan_sharking'];
     
-    // Define the 6 territories with their specific positions - adjusted for better visibility
+    // Define territories with their base positions and businesses arranged in hexagonal clusters
     const territories: Territory[] = [
-      // Manhattan - top left quadrant
+      // Little Italy - Center (player starts here)
       {
-        q: -1, r: -1, s: 2,
+        district: 'Little Italy',
+        family: playerFamily,
+        businesses: [
+          { q: 0, r: 0, s: 0, businessId: 'li_1', businessType: 'restaurant', isLegal: true, income: 3500, district: 'Little Italy', family: playerFamily },
+          { q: 1, r: -1, s: 0, businessId: 'li_2', businessType: 'laundromat', isLegal: true, income: 2800, district: 'Little Italy', family: playerFamily },
+          { q: 0, r: 1, s: -1, businessId: 'li_3', businessType: 'loan_sharking', isLegal: false, income: 4200, district: 'Little Italy', family: playerFamily, isExtorted: true },
+        ]
+      },
+      
+      // Manhattan - Upper Left
+      {
         district: 'Manhattan',
         family: families[0],
-        business: {
-          type: businessTypes[0] as any,
-          income: Math.floor(Math.random() * 5000) + 1000
-        }
+        businesses: [
+          { q: -3, r: 0, s: 3, businessId: 'man_1', businessType: 'casino', isLegal: true, income: 8500, district: 'Manhattan', family: families[0] },
+          { q: -2, r: -1, s: 3, businessId: 'man_2', businessType: 'construction', isLegal: true, income: 6200, district: 'Manhattan', family: families[0] },
+          { q: -4, r: 1, s: 3, businessId: 'man_3', businessType: 'gambling', isLegal: false, income: 7800, district: 'Manhattan', family: families[0], isExtorted: true },
+          { q: -3, r: 1, s: 2, businessId: 'man_4', businessType: 'prostitution', isLegal: false, income: 5500, district: 'Manhattan', family: families[0] },
+        ]
       },
-      // The Bronx - top middle quadrant  
+      
+      // Bronx - Upper Right  
       {
-        q: 0, r: -2, s: 2,
         district: 'Bronx',
         family: families[1],
-        business: {
-          type: businessTypes[1] as any,
-          income: Math.floor(Math.random() * 5000) + 1000
-        }
+        businesses: [
+          { q: 3, r: -3, s: 0, businessId: 'bx_1', businessType: 'restaurant', isLegal: true, income: 4100, district: 'Bronx', family: families[1] },
+          { q: 4, r: -3, s: -1, businessId: 'bx_2', businessType: 'drug_trafficking', isLegal: false, income: 9200, district: 'Bronx', family: families[1], isExtorted: true },
+          { q: 2, r: -2, s: 0, businessId: 'bx_3', businessType: 'laundromat', isLegal: true, income: 3300, district: 'Bronx', family: families[1] },
+          { q: 3, r: -2, s: -1, businessId: 'bx_4', businessType: 'gambling', isLegal: false, income: 6800, district: 'Bronx', family: families[1] },
+        ]
       },
-      // Brooklyn - bottom middle quadrant
+      
+      // Brooklyn - Lower Right
       {
-        q: 0, r: 2, s: -2,
         district: 'Brooklyn', 
         family: families[2],
-        business: {
-          type: businessTypes[2] as any,
-          income: Math.floor(Math.random() * 5000) + 1000
-        }
+        businesses: [
+          { q: 3, r: 0, s: -3, businessId: 'bk_1', businessType: 'construction', isLegal: true, income: 7200, district: 'Brooklyn', family: families[2] },
+          { q: 4, r: 0, s: -4, businessId: 'bk_2', businessType: 'casino', isLegal: true, income: 8800, district: 'Brooklyn', family: families[2] },
+          { q: 2, r: 1, s: -3, businessId: 'bk_3', businessType: 'loan_sharking', isLegal: false, income: 5200, district: 'Brooklyn', family: families[2] },
+          { q: 3, r: 1, s: -4, businessId: 'bk_4', businessType: 'prostitution', isLegal: false, income: 4900, district: 'Brooklyn', family: families[2], isExtorted: true },
+        ]
       },
-      // Staten Island - bottom left quadrant
+      
+      // Queens - Right Side
       {
-        q: -1, r: 1, s: 0,
-        district: 'Staten Island',
-        family: families[3],
-        business: {
-          type: businessTypes[3] as any,
-          income: Math.floor(Math.random() * 5000) + 1000
-        }
-      },
-      // Queens - right quadrant
-      {
-        q: 2, r: 0, s: -2,
         district: 'Queens',
-        family: families[4],
-        business: {
-          type: businessTypes[4] as any,
-          income: Math.floor(Math.random() * 5000) + 1000
-        }
+        family: families[3],
+        businesses: [
+          { q: 0, r: 3, s: -3, businessId: 'q_1', businessType: 'restaurant', isLegal: true, income: 3800, district: 'Queens', family: families[3] },
+          { q: 1, r: 3, s: -4, businessId: 'q_2', businessType: 'laundromat', isLegal: true, income: 2900, district: 'Queens', family: families[3] },
+          { q: -1, r: 4, s: -3, businessId: 'q_3', businessType: 'drug_trafficking', isLegal: false, income: 8900, district: 'Queens', family: families[3], isExtorted: true },
+        ]
       },
-      // Little Italy - middle quadrant (center)
+      
+      // Staten Island - Lower Left
       {
-        q: 0, r: 0, s: 0,
-        district: 'Little Italy',
-        family: playerFamily, // Player starts controlling Little Italy
-        business: {
-          type: 'restaurant' as any,
-          income: Math.floor(Math.random() * 5000) + 1000
-        }
+        district: 'Staten Island',
+        family: families[4],
+        businesses: [
+          { q: -3, r: 3, s: 0, businessId: 'si_1', businessType: 'construction', isLegal: true, income: 5800, district: 'Staten Island', family: families[4] },
+          { q: -4, r: 3, s: 1, businessId: 'si_2', businessType: 'casino', isLegal: true, income: 7500, district: 'Staten Island', family: families[4] },
+          { q: -2, r: 3, s: -1, businessId: 'si_3', businessType: 'gambling', isLegal: false, income: 6200, district: 'Staten Island', family: families[4] },
+        ]
       }
     ];
 
     // Add capos to some territories
-    territories.forEach((territory, index) => {
-      if (Math.random() > 0.5) {
+    territories.forEach((territory) => {
+      if (Math.random() > 0.4 && territory.family !== 'neutral') {
         const availableFigures = mafiaFigures.filter(f => f.family === territory.family);
         if (availableFigures.length > 0) {
           const figure = availableFigures[Math.floor(Math.random() * availableFigures.length)];
@@ -130,21 +148,23 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
             name: figure.name,
             loyalty: Math.floor(Math.random() * 40) + 60,
             strength: Math.floor(Math.random() * 50) + 50,
-            family: territory.family as any
+            family: territory.family as 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo'
           };
         }
       }
     });
 
-    console.log('Generated territories:', territories); // Debug log
     return territories;
   };
 
   const [territories] = useState<Territory[]>(generateTerritories);
+  
+  // Flatten all businesses for easier rendering
+  const allBusinesses = territories.flatMap(t => t.businesses);
 
-  const hexToPixel = (territory: Territory) => {
-    const x = hexRadius * (3/2 * territory.q);
-    const y = hexRadius * (Math.sqrt(3)/2 * territory.q + Math.sqrt(3) * territory.r);
+  const hexToPixel = (business: BusinessHex) => {
+    const x = hexRadius * (3/2 * business.q);
+    const y = hexRadius * (Math.sqrt(3)/2 * business.q + Math.sqrt(3) * business.r);
     return { x, y };
   };
 
@@ -159,16 +179,38 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
     }
   };
 
-  const getBusinessIcon = (business: Territory['business']) => {
-    if (!business) return null;
+  const getBusinessIcon = (business: BusinessHex) => {
     const icons = {
-      casino: '🎰',
-      speakeasy: '🍸',
       restaurant: '🍝',
-      docks: '⚓',
-      protection: '🛡️'
+      laundromat: '🧺',
+      casino: '🎰',
+      construction: '🏗️',
+      drug_trafficking: '💊',
+      gambling: '🎲',
+      prostitution: '💃',
+      loan_sharking: '💰'
     };
-    return icons[business.type];
+    return icons[business.businessType];
+  };
+
+  const getBusinessBorderColor = (business: BusinessHex) => {
+    if (business.isLegal) {
+      return 'stroke-green-400';
+    } else {
+      return business.isExtorted ? 'stroke-red-500' : 'stroke-orange-400';
+    }
+  };
+
+  // Get territory center for capo placement
+  const getTerritoryCenter = (territory: Territory) => {
+    if (territory.businesses.length === 0) return { x: 0, y: 0 };
+    
+    const avgQ = territory.businesses.reduce((sum, b) => sum + b.q, 0) / territory.businesses.length;
+    const avgR = territory.businesses.reduce((sum, b) => sum + b.r, 0) / territory.businesses.length;
+    
+    const x = hexRadius * (3/2 * avgQ);
+    const y = hexRadius * (Math.sqrt(3)/2 * avgQ + Math.sqrt(3) * avgR);
+    return { x, y };
   };
 
   return (
@@ -176,7 +218,7 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
       <svg 
         width="100%" 
         height="100%" 
-        viewBox={`-350 -350 700 700`}
+        viewBox={`-400 -300 800 600`}
         className="absolute inset-0"
       >
         <defs>
@@ -193,14 +235,75 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
           </pattern>
         </defs>
         
-        {territories.map((territory, index) => {
-          const { x, y } = hexToPixel(territory);
-          const isSelected = selectedTerritory && 
-            selectedTerritory.q === territory.q && selectedTerritory.r === territory.r;
-          const isPlayerTerritory = territory.family === playerFamily;
+        {/* Render territory boundaries first (lighter background) */}
+        {territories.map((territory, territoryIndex) => {
+          const center = getTerritoryCenter(territory);
+          return (
+            <g key={`territory-${territoryIndex}`}>
+              <circle
+                cx={center.x}
+                cy={center.y}
+                r={hexRadius * 2.5}
+                className={cn(
+                  getFamilyColor(territory.family),
+                  'opacity-20 stroke-noir-light stroke-1'
+                )}
+              />
+              
+              {/* Territory label */}
+              <text
+                x={center.x}
+                y={center.y + hexRadius * 3}
+                textAnchor="middle"
+                className="text-sm fill-foreground select-none font-source font-semibold"
+              >
+                {territory.district}
+              </text>
+              
+              {/* Capo indicator for territory */}
+              {territory.capo && (
+                <g>
+                  <circle
+                    cx={center.x}
+                    cy={center.y - hexRadius * 2.8}
+                    r="12"
+                    className={cn(
+                      'stroke-2',
+                      `fill-families-${territory.capo.family}`,
+                      `stroke-families-${territory.capo.family}`
+                    )}
+                  />
+                  <text
+                    x={center.x}
+                    y={center.y - hexRadius * 2.5}
+                    textAnchor="middle"
+                    className="text-sm font-bold fill-background select-none"
+                  >
+                    👤
+                  </text>
+                  <text
+                    x={center.x}
+                    y={center.y - hexRadius * 2}
+                    textAnchor="middle"
+                    className="text-xs fill-foreground select-none"
+                  >
+                    {territory.capo.name.split(' ')[0]}
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
+        
+        {/* Render business hexagons */}
+        {allBusinesses.map((business, index) => {
+          const { x, y } = hexToPixel(business);
+          const isSelected = selectedBusiness && 
+            selectedBusiness.businessId === business.businessId;
+          const isPlayerBusiness = business.family === playerFamily;
           
           return (
-            <g key={index} className="cursor-pointer">
+            <g key={business.businessId} className="cursor-pointer">
               <polygon
                 points={`
                   ${x + hexRadius},${y}
@@ -211,78 +314,56 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
                   ${x + hexRadius/2},${y - hexHeight/2}
                 `}
                 className={cn(
-                  getFamilyColor(territory.family),
-                  'stroke-noir-light stroke-1 transition-all duration-300',
-                  isSelected && 'stroke-mafia-gold stroke-3 filter brightness-125',
-                  isPlayerTerritory && 'stroke-mafia-gold stroke-2',
+                  getFamilyColor(business.family),
+                  'stroke-2 transition-all duration-300',
+                  getBusinessBorderColor(business),
+                  isSelected && 'stroke-mafia-gold stroke-4 filter brightness-125',
+                  isPlayerBusiness && 'stroke-mafia-gold stroke-3',
                   'hover:stroke-mafia-gold hover:brightness-110'
                 )}
-                fill={territory.family !== 'neutral' ? undefined : 'url(#pinstripe)'}
                 filter={isSelected ? "url(#mafiaGlow)" : undefined}
-                onClick={() => onTerritoryClick(territory)}
+                onClick={() => onBusinessClick(business)}
               />
               
-              {/* Business indicator */}
-              {territory.business && (
-                <g>
-                  <circle
-                    cx={x - 15}
-                    cy={y - 15}
-                    r="8"
-                    className="fill-mafia-gold stroke-background stroke-1"
-                  />
-                  <text
-                    x={x - 15}
-                    y={y - 10}
-                    textAnchor="middle"
-                    className="text-xs fill-background select-none"
-                  >
-                    {getBusinessIcon(territory.business)}
-                  </text>
-                </g>
-              )}
-              
-              {/* Capo indicator */}
-              {territory.capo && (
-                <g>
-                  <circle
-                    cx={x + 15}
-                    cy={y - 15}
-                    r="10"
-                    className={cn(
-                      'stroke-2',
-                      `fill-families-${territory.capo.family}`,
-                      `stroke-families-${territory.capo.family}`
-                    )}
-                  />
-                  <text
-                    x={x + 15}
-                    y={y - 10}
-                    textAnchor="middle"
-                    className="text-xs font-bold fill-background select-none"
-                  >
-                    👤
-                  </text>
-                </g>
-              )}
-              
-              {/* Territory coordinates and district */}
+              {/* Business icon */}
               <text
                 x={x}
-                y={y + 5}
+                y={y + 4}
                 textAnchor="middle"
-                className="text-xs fill-foreground select-none opacity-70 font-source"
+                className="text-lg select-none pointer-events-none"
               >
-                {territory.district.split(' ')[0]}
+                {getBusinessIcon(business)}
               </text>
               
+              {/* Legal/Illegal indicator */}
+              <circle
+                cx={x - 15}
+                cy={y - 15}
+                r="4"
+                className={cn(
+                  business.isLegal ? 'fill-green-400' : 'fill-red-400',
+                  'stroke-background stroke-1'
+                )}
+              />
+              
+              {/* Extortion indicator */}
+              {business.isExtorted && (
+                <circle
+                  cx={x + 15}
+                  cy={y - 15}
+                  r="4"
+                  className="fill-yellow-400 stroke-background stroke-1"
+                />
+              )}
+              
+              {/* Income display */}
               <text
                 x={x}
                 y={y + 20}
                 textAnchor="middle"
-                className="text-xs fill-muted-foreground select-none opacity-50"
+                className="text-xs fill-muted-foreground select-none opacity-70"
               >
-                {territory.q},{territory.r}
+                ${(business.income / 1000).toFixed(1)}k
               </text>
             </g>
           );

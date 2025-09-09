@@ -7,6 +7,19 @@ import { useMafiaGameState } from '@/hooks/useMafiaGameState';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
+// Territory interface for backward compatibility with selectTerritory
+interface Territory {
+  q: number;
+  r: number;
+  s: number;
+  district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
+  family: 'neutral' | 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
+  business?: {
+    type: 'casino' | 'speakeasy' | 'restaurant' | 'docks' | 'protection';
+    income: number;
+  };
+}
+
 const Index = () => {
   const { 
     gameState, 
@@ -80,12 +93,21 @@ const Index = () => {
             <MafiaHexGrid 
               width={12}
               height={12}
-              onTerritoryClick={selectTerritory}
-              selectedTerritory={gameState.selectedTerritory ? {
-                q: 0, r: 0, s: 0, // These will be overridden by the actual selection logic
-                district: gameState.selectedTerritory.district as any,
-                family: gameState.selectedTerritory.family as any
-              } : null}
+              onBusinessClick={(business) => {
+                // For now, we'll adapt the business selection to territory selection
+                selectTerritory({
+                  q: business.q,
+                  r: business.r,
+                  s: business.s,
+                  district: business.district,
+                  family: business.family,
+                  business: {
+                    type: business.businessType as any,
+                    income: business.income
+                  }
+                });
+              }}
+              selectedBusiness={null} // We'll need to adapt the selection logic later
               playerFamily={gameState.playerFamily}
             />
           </div>
