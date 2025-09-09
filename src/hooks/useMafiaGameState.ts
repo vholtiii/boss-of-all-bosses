@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { Business, BusinessFinances, BusinessAction } from '@/types/business';
 
 interface Territory {
   q: number;
@@ -49,6 +50,8 @@ interface MafiaGameState {
     bonanno: number;
     colombo: number;
   };
+  businesses: Business[];
+  finances: BusinessFinances;
 }
 
 const initialGameState: MafiaGameState = {
@@ -69,6 +72,16 @@ const initialGameState: MafiaGameState = {
     lucchese: 18,
     bonanno: 20,
     colombo: 15
+  },
+  businesses: [],
+  finances: {
+    totalIncome: 0,
+    totalExpenses: 0,
+    legalProfit: 0,
+    illegalProfit: 0,
+    totalProfit: 0,
+    dirtyMoney: 0,
+    cleanMoney: 0
   }
 };
 
@@ -85,6 +98,25 @@ export const useMafiaGameState = () => {
       // Generate income from controlled territories
       const incomeBonus = Math.floor(prevState.familyControl.gambino * 500);
       newState.resources.money += incomeBonus;
+      
+      // Business income generation
+      const legalBusinesses = newState.businesses.filter(b => b.type === 'legal');
+      const illegalBusinesses = newState.businesses.filter(b => b.type === 'illegal');
+
+      // Legal business income (goes directly to clean money)
+      const legalIncome = legalBusinesses.reduce((sum, b) => {
+        const baseProfit = b.monthlyIncome - b.monthlyExpenses;
+        const extortionBonus = b.isExtorted ? baseProfit * b.extortionRate : 0;
+        return sum + baseProfit + extortionBonus;
+      }, 0);
+      newState.resources.money += legalIncome;
+      newState.finances.cleanMoney += legalIncome;
+
+      // Illegal business income (goes to dirty money)
+      const illegalIncome = illegalBusinesses.reduce((sum, b) => 
+        sum + (b.monthlyIncome - b.monthlyExpenses), 0
+      );
+      newState.finances.dirtyMoney += illegalIncome;
       
       // Slightly adjust family control (simulate AI moves)
       const families: (keyof typeof newState.familyControl)[] = ['genovese', 'lucchese', 'bonanno', 'colombo'];
@@ -186,11 +218,132 @@ export const useMafiaGameState = () => {
     return gameState.familyControl.gambino >= 60;
   }, [gameState.familyControl.gambino]);
 
+  const performBusinessAction = useCallback((action: BusinessAction) => {
+    setGameState(prevState => {
+      const newState = { ...prevState };
+      const businessNames = {
+        restaurant: ['Tony\'s Pizzeria', 'Mama Mia Restaurant', 'Little Italy Bistro'],
+        laundromat: ['Clean Slate Laundry', 'Fresh Start Cleaners', 'Spotless Services'],
+        casino: ['Lucky Seven Casino', 'Golden Dice Club', 'Royal Flush Palace'],
+        construction: ['Concrete Kings LLC', 'Steel & Stone Co', 'Foundation Masters'],
+        drug_trafficking: ['Street Pharmacy', 'The Corner Store', 'Blue Magic Supply'],
+        gambling: ['Back Room Poker', 'Numbers Game HQ', 'High Stakes Club'],
+        prostitution: ['Gentleman\'s Club', 'VIP Escorts', 'Diamond Dolls'],
+        loan_sharking: ['Fast Cash Solutions', 'Money Now Services', 'Quick Loan Express']
+      };
+
+      const districts = ['Little Italy', 'Bronx', 'Brooklyn', 'Queens', 'Manhattan', 'Staten Island'];
+
+      switch (action.type) {
+        case 'build_legal':
+        case 'build_illegal':
+          if (action.businessType) {
+            const costs = {
+              restaurant: 25000, laundromat: 15000, casino: 50000, construction: 40000,
+              drug_trafficking: 30000, gambling: 20000, prostitution: 15000, loan_sharking: 10000
+            };
+            
+            const cost = costs[action.businessType];
+            if (newState.resources.money >= cost) {
+              const newBusiness: Business = {
+                id: `${action.businessType}_${Date.now()}`,
+                name: businessNames[action.businessType][Math.floor(Math.random() * businessNames[action.businessType].length)],
+                type: action.type === 'build_legal' ? 'legal' : 'illegal',
+                category: action.businessType,
+                level: 1,
+                monthlyIncome: action.type === 'build_legal' ? 
+                  Math.floor(cost * 0.15) : Math.floor(cost * 0.25),
+                monthlyExpenses: Math.floor(cost * 0.05),
+                launderingCapacity: action.type === 'build_legal' ? Math.floor(cost * 0.1) : 0,
+                extortionRate: 0,
+                isExtorted: false,
+                district: districts[Math.floor(Math.random() * districts.length)]
+              };
+              
+              newState.businesses.push(newBusiness);
+              newState.resources.money -= cost;
+              newState.resources.respect += 2;
+            }
+          }
+          break;
+
+        case 'upgrade':
+          if (action.businessId) {
+            const business = newState.businesses.find(b => b.id === action.businessId);
+            if (business && business.level < 5) {
+              const upgradeCost = business.level * 15000;
+              if (newState.resources.money >= upgradeCost) {
+                business.level += 1;
+                business.monthlyIncome = Math.floor(business.monthlyIncome * 1.4);
+                business.launderingCapacity = Math.floor(business.launderingCapacity * 1.3);
+                newState.resources.money -= upgradeCost;
+              }
+            }
+          }
+          break;
+
+        case 'extort':
+          if (action.businessId) {
+            const business = newState.businesses.find(b => b.id === action.businessId);
+            if (business && !business.isExtorted) {
+              business.isExtorted = true;
+              business.extortionRate = newState.resources.respect >= 50 ? 0.5 : 0.25;
+              newState.resources.respect += 3;
+            }
+          }
+          break;
+
+        case 'launder':
+          const totalLaunderingCapacity = newState.businesses
+            .filter(b => b.type === 'legal')
+            .reduce((sum, b) => sum + b.launderingCapacity, 0);
+          
+          const amountToLaunder = Math.min(newState.finances.dirtyMoney, totalLaunderingCapacity);
+          newState.finances.dirtyMoney -= amountToLaunder;
+          newState.finances.cleanMoney += amountToLaunder;
+          newState.resources.money += amountToLaunder;
+          break;
+
+        case 'collect':
+          if (action.businessId) {
+            const business = newState.businesses.find(b => b.id === action.businessId);
+            if (business && business.type === 'illegal') {
+              const profit = business.monthlyIncome - business.monthlyExpenses;
+              newState.finances.dirtyMoney += profit;
+              newState.resources.respect += 1;
+            }
+          }
+          break;
+      }
+
+      // Recalculate finances
+      const legalBusinesses = newState.businesses.filter(b => b.type === 'legal');
+      const illegalBusinesses = newState.businesses.filter(b => b.type === 'illegal');
+
+      newState.finances.legalProfit = legalBusinesses.reduce((sum, b) => {
+        const baseProfit = b.monthlyIncome - b.monthlyExpenses;
+        const extortionBonus = b.isExtorted ? baseProfit * b.extortionRate : 0;
+        return sum + baseProfit + extortionBonus;
+      }, 0);
+
+      newState.finances.illegalProfit = illegalBusinesses.reduce((sum, b) => 
+        sum + (b.monthlyIncome - b.monthlyExpenses), 0
+      );
+
+      newState.finances.totalProfit = newState.finances.legalProfit + newState.finances.illegalProfit;
+      newState.finances.totalIncome = newState.businesses.reduce((sum, b) => sum + b.monthlyIncome, 0);
+      newState.finances.totalExpenses = newState.businesses.reduce((sum, b) => sum + b.monthlyExpenses, 0);
+
+      return newState;
+    });
+  }, []);
+
   return {
     gameState,
     endTurn,
     selectTerritory,
     performAction,
+    performBusinessAction,
     checkWinCondition,
     isWinner: checkWinCondition()
   };

@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { Business, BusinessFinances, BusinessAction } from '@/types/business';
+import BusinessManagement from '@/components/BusinessManagement';
 
 interface MafiaGameState {
   playerFamily: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
@@ -36,15 +39,18 @@ interface MafiaGameState {
     bonanno: number;
     colombo: number;
   };
+  businesses: Business[];
+  finances: BusinessFinances;
 }
 
 interface MafiaHudProps {
   gameState: MafiaGameState;
   onEndTurn: () => void;
   onAction: (action: string) => void;
+  onBusinessAction: (action: BusinessAction) => void;
 }
 
-const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction }) => {
+const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction, onBusinessAction }) => {
   const familyNames = {
     gambino: 'Gambino Family',
     genovese: 'Genovese Family', 
@@ -126,141 +132,176 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction }) =
         </div>
       </Card>
 
-      {/* Territory Info Panel */}
-      {gameState.selectedTerritory ? (
-        <Card className="bg-noir-dark border-noir-light p-4">
-          <h3 className="text-lg font-semibold text-mafia-gold mb-3 font-playfair">TERRITORY INTEL</h3>
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">District</span>
-              <Badge variant="outline" className="capitalize">
-                {gameState.selectedTerritory.district}
-              </Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Controlled by</span>
-              <Badge 
-                variant="outline" 
-                className={cn(
-                  "capitalize",
-                  gameState.selectedTerritory.family !== 'neutral' 
-                    ? familyColors[gameState.selectedTerritory.family as keyof typeof familyColors]
-                    : 'text-muted-foreground border-muted'
-                )}
-              >
-                {gameState.selectedTerritory.family === 'neutral' ? 'Nobody' : 
-                 familyNames[gameState.selectedTerritory.family as keyof typeof familyNames]}
-              </Badge>
-            </div>
-            
-            {gameState.selectedTerritory.business && (
-              <>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Business</span>
-                  <Badge variant="outline" className="capitalize">
-                    {gameState.selectedTerritory.business.type}
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">💰 Income</span>
-                  <Badge variant="secondary">${gameState.selectedTerritory.business.income}/turn</Badge>
-                </div>
-              </>
-            )}
-            
-            {gameState.selectedTerritory.capo && (
-              <>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">👤 Capo</span>
-                  <Badge variant="outline" className="font-playfair">
-                    {gameState.selectedTerritory.capo.name}
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">🤝 Loyalty</span>
-                  <div className="w-20 bg-muted rounded-full h-2">
-                    <div 
-                      className="bg-mafia-gold h-2 rounded-full transition-all"
-                      style={{ width: `${gameState.selectedTerritory.capo.loyalty}%` }}
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">💪 Strength</span>
-                  <Badge variant="secondary">{gameState.selectedTerritory.capo.strength}</Badge>
-                </div>
-              </>
-            )}
-          </div>
+      {/* Main Content Tabs */}
+      <div className="flex-1">
+        <Tabs defaultValue="territory" className="h-full">
+          <TabsList className="grid w-full grid-cols-3 bg-noir-dark">
+            <TabsTrigger value="territory" className="text-xs">Territory</TabsTrigger>
+            <TabsTrigger value="business" className="text-xs">Business</TabsTrigger>
+            <TabsTrigger value="intel" className="text-xs">Intel</TabsTrigger>
+          </TabsList>
           
-          <div className="mt-4 space-y-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full border-mafia-gold text-mafia-gold hover:bg-mafia-gold hover:text-background"
-              onClick={() => onAction('takeover')}
-            >
-              TAKE OVER
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full"
-              onClick={() => onAction('negotiate')}
-            >
-              NEGOTIATE
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full"
-              onClick={() => onAction('sabotage')}
-            >
-              SABOTAGE
-            </Button>
-          </div>
-        </Card>
-      ) : (
-        <Card className="bg-noir-dark border-noir-light p-4">
-          <h3 className="text-lg font-semibold text-muted-foreground mb-3 font-playfair">NO TARGET SELECTED</h3>
-          <p className="text-sm text-muted-foreground">
-            Click on a territory to view intel and plan your next move.
-          </p>
-        </Card>
-      )}
+          <TabsContent value="territory" className="flex-1 space-y-4 mt-4">
+            {/* Territory Info Panel */}
+            {gameState.selectedTerritory ? (
+              <Card className="bg-noir-dark border-noir-light p-4">
+                <h3 className="text-lg font-semibold text-mafia-gold mb-3 font-playfair">TERRITORY INTEL</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">District</span>
+                    <Badge variant="outline" className="capitalize">
+                      {gameState.selectedTerritory.district}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Controlled by</span>
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        "capitalize",
+                        gameState.selectedTerritory.family !== 'neutral' 
+                          ? familyColors[gameState.selectedTerritory.family as keyof typeof familyColors]
+                          : 'text-muted-foreground border-muted'
+                      )}
+                    >
+                      {gameState.selectedTerritory.family === 'neutral' ? 'Nobody' : 
+                       familyNames[gameState.selectedTerritory.family as keyof typeof familyNames]}
+                    </Badge>
+                  </div>
+                  
+                  {gameState.selectedTerritory.business && (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Business</span>
+                        <Badge variant="outline" className="capitalize">
+                          {gameState.selectedTerritory.business.type}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">💰 Income</span>
+                        <Badge variant="secondary">${gameState.selectedTerritory.business.income}/turn</Badge>
+                      </div>
+                    </>
+                  )}
+                  
+                  {gameState.selectedTerritory.capo && (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">👤 Capo</span>
+                        <Badge variant="outline" className="font-playfair">
+                          {gameState.selectedTerritory.capo.name}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">🤝 Loyalty</span>
+                        <div className="w-20 bg-muted rounded-full h-2">
+                          <div 
+                            className="bg-mafia-gold h-2 rounded-full transition-all"
+                            style={{ width: `${gameState.selectedTerritory.capo.loyalty}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">💪 Strength</span>
+                        <Badge variant="secondary">{gameState.selectedTerritory.capo.strength}</Badge>
+                      </div>
+                    </>
+                  )}
+                </div>
+                
+                <div className="mt-4 space-y-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full border-mafia-gold text-mafia-gold hover:bg-mafia-gold hover:text-background"
+                    onClick={() => onAction('takeover')}
+                  >
+                    TAKE OVER
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => onAction('negotiate')}
+                  >
+                    NEGOTIATE
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => onAction('sabotage')}
+                  >
+                    SABOTAGE
+                  </Button>
+                </div>
+              </Card>
+            ) : (
+              <Card className="bg-noir-dark border-noir-light p-4">
+                <h3 className="text-lg font-semibold text-muted-foreground mb-3 font-playfair">NO TARGET SELECTED</h3>
+                <p className="text-sm text-muted-foreground">
+                  Click on a territory to view intel and plan your next move.
+                </p>
+              </Card>
+            )}
 
-      {/* Family Control Panel */}
-      <Card className="bg-noir-dark border-noir-light p-4">
-        <h3 className="text-lg font-semibold text-mafia-gold mb-3 font-playfair">FAMILY POWER</h3>
-        <div className="space-y-2">
-          {Object.entries(gameState.familyControl).map(([family, control]) => (
-            <div key={family} className="flex justify-between items-center">
-              <span className={cn("text-sm capitalize", familyColors[family as keyof typeof familyColors])}>
-                {familyNames[family as keyof typeof familyNames].split(' ')[0]}
-              </span>
-              <div className="flex items-center space-x-2">
-                <Progress 
-                  value={control} 
-                  className="w-20 h-2"
-                />
-                <Badge variant="secondary" className="text-xs">{control}%</Badge>
+            {/* Family Control Panel */}
+            <Card className="bg-noir-dark border-noir-light p-4">
+              <h3 className="text-lg font-semibold text-mafia-gold mb-3 font-playfair">FAMILY POWER</h3>
+              <div className="space-y-2">
+                {Object.entries(gameState.familyControl).map(([family, control]) => (
+                  <div key={family} className="flex justify-between items-center">
+                    <span className={cn("text-sm capitalize", familyColors[family as keyof typeof familyColors])}>
+                      {familyNames[family as keyof typeof familyNames].split(' ')[0]}
+                    </span>
+                    <div className="flex items-center space-x-2">
+                      <Progress 
+                        value={control} 
+                        className="w-20 h-2"
+                      />
+                      <Badge variant="secondary" className="text-xs">{control}%</Badge>
+                    </div>
+                  </div>
+                ))}
               </div>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="business" className="flex-1 mt-4">
+            <div className="h-[600px] overflow-y-auto pr-2">
+              <BusinessManagement
+                businesses={gameState.businesses}
+                finances={gameState.finances}
+                onBusinessAction={onBusinessAction}
+                playerMoney={gameState.resources.money}
+              />
             </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Activity Log */}
-      <Card className="bg-noir-dark border-noir-light p-4 flex-1">
-        <h3 className="text-lg font-semibold text-mafia-gold mb-3 font-playfair">THE WORD ON THE STREET</h3>
-        <div className="space-y-1 text-xs text-muted-foreground max-h-32 overflow-y-auto">
-          <div>• Year 1955, Turn {gameState.turn} - {familyNames[gameState.playerFamily]} making moves</div>
-          <div>• The Commission watches your every decision...</div>
-          <div className="text-mafia-gold">• "Keep your friends close, but your enemies closer" - Sun Tzu</div>
-          <div>• Rival families are planning their next moves...</div>
-          <div className="text-mafia-blood">• Blood money flows through the streets of New York</div>
-        </div>
-      </Card>
+          </TabsContent>
+          
+          <TabsContent value="intel" className="flex-1 mt-4">
+            {/* Activity Log */}
+            <Card className="bg-noir-dark border-noir-light p-4">
+              <h3 className="text-lg font-semibold text-mafia-gold mb-3 font-playfair">THE WORD ON THE STREET</h3>
+              <div className="space-y-1 text-xs text-muted-foreground max-h-96 overflow-y-auto">
+                <div>• Year 1955, Turn {gameState.turn} - {familyNames[gameState.playerFamily]} making moves</div>
+                <div>• The Commission watches your every decision...</div>
+                <div className="text-mafia-gold">• "Keep your friends close, but your enemies closer" - Sun Tzu</div>
+                <div>• Rival families are planning their next moves...</div>
+                <div className="text-mafia-blood">• Blood money flows through the streets of New York</div>
+                {gameState.businesses.length > 0 && (
+                  <>
+                    <div>• Business operations are generating revenue...</div>
+                    <div className="text-green-400">• Total businesses: {gameState.businesses.length}</div>
+                    {gameState.finances.dirtyMoney > 0 && (
+                      <div className="text-orange-400">• ${gameState.finances.dirtyMoney.toLocaleString()} in dirty money needs laundering</div>
+                    )}
+                  </>
+                )}
+              </div>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 };

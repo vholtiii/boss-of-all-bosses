@@ -6,7 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 const Index = () => {
-  const { gameState, endTurn, selectTerritory, performAction, isWinner } = useMafiaGameState();
+  const { 
+    gameState, 
+    endTurn, 
+    selectTerritory, 
+    performAction, 
+    performBusinessAction,
+    isWinner 
+  } = useMafiaGameState();
 
   if (isWinner) {
     return (
@@ -32,11 +39,12 @@ const Index = () => {
       <div className="flex h-screen">
         {/* Left Sidebar - Mafia HUD */}
         <div className="w-80 p-4 bg-gradient-to-b from-noir-dark via-background to-noir-dark border-r border-noir-light">
-          <MafiaHud 
-            gameState={gameState}
-            onEndTurn={endTurn}
-            onAction={performAction}
-          />
+        <MafiaHud 
+          gameState={gameState} 
+          onEndTurn={endTurn} 
+          onAction={performAction}
+          onBusinessAction={performBusinessAction}
+        />
         </div>
         
         {/* Main Game Area */}
