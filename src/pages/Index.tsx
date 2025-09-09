@@ -1,5 +1,5 @@
 import React from 'react';
-import MafiaHexGrid from '@/components/MafiaHexGrid';
+import MafiaNYCMap from '@/components/MafiaNYCMap';
 import MafiaHud from '@/components/MafiaHud';
 import { useMafiaGameState } from '@/hooks/useMafiaGameState';
 import { Badge } from '@/components/ui/badge';
@@ -66,9 +66,7 @@ const Index = () => {
                  }} 
             />
             
-            <MafiaHexGrid 
-              width={12}
-              height={12}
+            <MafiaNYCMap 
               onTerritoryClick={selectTerritory}
               selectedTerritory={gameState.selectedTerritory ? {
                 q: 0, r: 0, s: 0, // These will be overridden by the actual selection logic
