@@ -302,6 +302,8 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction, onB
               <PoliceSystem
                 policeHeat={gameState.policeHeat}
                 cleanMoney={gameState.finances.cleanMoney}
+                currentTurn={gameState.turn}
+                loyalty={gameState.resources.loyalty}
                 onAction={onBusinessAction}
               />
             </div>

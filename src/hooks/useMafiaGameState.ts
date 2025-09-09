@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Business, BusinessFinances, BusinessAction, LegalStatus, Charge, Lawyer, PoliceHeat, BribedOfficial } from '@/types/business';
+import { Business, BusinessFinances, BusinessAction, LegalStatus, Charge, Lawyer, PoliceHeat, BribedOfficial, Arrest } from '@/types/business';
 
 interface Territory {
   q: number;
@@ -96,7 +96,9 @@ const initialGameState: MafiaGameState = {
   policeHeat: {
     level: 20,
     reductionPerTurn: 0,
-    bribedOfficials: []
+    bribedOfficials: [],
+    arrests: [],
+    rattingRisk: 0
   }
 };
 
@@ -134,6 +136,86 @@ export const useMafiaGameState = () => {
       const totalBribeCosts = newState.policeHeat.bribedOfficials.reduce((sum, official) => sum + official.monthlyBribe, 0);
       newState.resources.money -= totalBribeCosts;
       
+      // Police Heat Arrest System
+      const heatThreshold = Math.floor(newState.policeHeat.level / 10); // 0-10 scale
+      const arrestNames = [
+        'Tony "The Fish" Marconi', 'Sal "Fingers" Romano', 'Mickey "The Nose" Castellano',
+        'Vince "Scarface" Torrino', 'Rocco "The Bull" Santangelo', 'Paulie "Knuckles" DeLuca'
+      ];
+      
+      // Street arrests (1-4 heat threshold) - affects soldiers
+      if (heatThreshold >= 1 && heatThreshold <= 4 && Math.random() < 0.3) {
+        const streetArrest: Arrest = {
+          id: `arrest_${Date.now()}`,
+          type: 'street',
+          target: arrestNames[Math.floor(Math.random() * arrestNames.length)],
+          turn: newState.turn,
+          sentence: Math.floor(Math.random() * 3) + 1, // 1-3 turns
+          impactOnProfit: 5 // 5% profit reduction
+        };
+        newState.policeHeat.arrests.push(streetArrest);
+        newState.resources.soldiers = Math.max(0, newState.resources.soldiers - 1);
+      }
+      
+      // Management arrests (5-7 heat threshold) - affects business profits
+      if (heatThreshold >= 5 && heatThreshold <= 7 && Math.random() < 0.4) {
+        const managementArrest: Arrest = {
+          id: `arrest_${Date.now()}`,
+          type: 'management',
+          target: arrestNames[Math.floor(Math.random() * arrestNames.length)] + ' (Capo)',
+          turn: newState.turn,
+          sentence: Math.floor(Math.random() * 4) + 2, // 2-5 turns
+          impactOnProfit: 15 // 15% profit reduction
+        };
+        newState.policeHeat.arrests.push(managementArrest);
+        newState.resources.influence = Math.max(0, newState.resources.influence - 2);
+      }
+      
+      // Player arrest (8-10 heat threshold) - major profit impact
+      if (heatThreshold >= 8 && heatThreshold <= 10 && Math.random() < 0.5) {
+        if (newState.legalStatus.jailTime === 0) { // Only if not already in jail
+          const playerArrest: Arrest = {
+            id: `arrest_${Date.now()}`,
+            type: 'player',
+            target: 'You (Boss)',
+            turn: newState.turn,
+            sentence: Math.floor(Math.random() * 3) + 3, // 3-5 turns
+            impactOnProfit: 30 // 30% profit reduction
+          };
+          newState.policeHeat.arrests.push(playerArrest);
+          newState.legalStatus.jailTime = playerArrest.sentence;
+        }
+      }
+      
+      // Calculate ratting risk based on arrests and loyalty
+      const recentArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn <= 3).length;
+      const loyaltyFactor = (100 - newState.resources.loyalty) / 100; // Lower loyalty = higher risk
+      newState.policeHeat.rattingRisk = Math.min(100, recentArrests * 15 * loyaltyFactor);
+      
+      // Check for ratting (turning state's witness)
+      if (newState.policeHeat.rattingRisk > 50 && Math.random() < newState.policeHeat.rattingRisk / 100) {
+        // Someone rats - major consequences
+        newState.policeHeat.level += 25; // Heat spike
+        newState.resources.loyalty = Math.max(0, newState.resources.loyalty - 15);
+        newState.resources.respect = Math.max(0, newState.resources.respect - 10);
+        
+        // Add federal charges
+        const federalCharge: Charge = {
+          id: `federal_${Date.now()}`,
+          type: 'racketeering',
+          severity: 'federal',
+          evidence: Math.floor(Math.random() * 40) + 60, // 60-100% evidence
+          penalty: {
+            jailTime: 10,
+            fine: 200000
+          }
+        };
+        newState.legalStatus.charges.push(federalCharge);
+        
+        // Reset ratting risk after it happens
+        newState.policeHeat.rattingRisk = 0;
+      }
+      
       // Generate income from controlled territories
       const incomeBonus = Math.floor(prevState.familyControl.gambino * 500);
       newState.resources.money += incomeBonus;
@@ -142,12 +224,17 @@ export const useMafiaGameState = () => {
       const legalBusinesses = newState.businesses.filter(b => b.type === 'legal');
       const illegalBusinesses = newState.businesses.filter(b => b.type === 'illegal');
 
+      // Calculate arrest impact on profits
+      const activeArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn < a.sentence);
+      const totalArrestImpact = activeArrests.reduce((sum, arrest) => sum + arrest.impactOnProfit, 0);
+      const profitMultiplier = Math.max(0, (100 - totalArrestImpact) / 100);
+      
       // Legal business income (goes directly to clean money)
       const legalIncome = legalBusinesses.reduce((sum, b) => {
         const baseProfit = b.monthlyIncome - b.monthlyExpenses;
         const extortionBonus = b.isExtorted ? baseProfit * b.extortionRate : 0;
         return sum + baseProfit + extortionBonus;
-      }, 0);
+      }, 0) * profitMultiplier;
       
       // Subtract lawyer fees from legal income
       const netLegalIncome = legalIncome - newState.legalStatus.totalLegalCosts;
@@ -159,7 +246,7 @@ export const useMafiaGameState = () => {
       // Illegal business income (goes to dirty money)
       const illegalIncome = illegalBusinesses.reduce((sum, b) => 
         sum + (b.monthlyIncome - b.monthlyExpenses), 0
-      );
+      ) * profitMultiplier;
       newState.finances.dirtyMoney += illegalIncome;
 
       // Check for prosecution if no lawyer and have prosecution risk

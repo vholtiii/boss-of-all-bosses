@@ -57,6 +57,17 @@ export interface PoliceHeat {
   level: number; // 0-100, how much attention you have from law enforcement
   reductionPerTurn: number; // How much heat reduces each turn based on bribes
   bribedOfficials: BribedOfficial[];
+  arrests: Arrest[];
+  rattingRisk: number; // 0-100, chance someone will turn state's witness
+}
+
+export interface Arrest {
+  id: string;
+  type: 'street' | 'management' | 'player';
+  target: string; // Name of arrested person
+  turn: number; // When arrest happened
+  sentence: number; // Turns in jail
+  impactOnProfit: number; // Percentage reduction in profits
 }
 
 export interface BribedOfficial {

@@ -2,12 +2,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { PoliceHeat, BribedOfficial, BusinessAction } from "@/types/business";
-import { Shield, AlertTriangle, Eye, X, DollarSign } from "lucide-react";
+import { PoliceHeat, BribedOfficial, BusinessAction, Arrest } from "@/types/business";
+import { Shield, AlertTriangle, Eye, X, DollarSign, Lock } from "lucide-react";
 
 interface PoliceSystemProps {
   policeHeat: PoliceHeat;
   cleanMoney: number;
+  currentTurn: number;
+  loyalty: number;
   onAction: (action: BusinessAction) => void;
 }
 
@@ -54,7 +56,7 @@ const AVAILABLE_OFFICIALS = [
   }
 ];
 
-export const PoliceSystem = ({ policeHeat, cleanMoney, onAction }: PoliceSystemProps) => {
+export const PoliceSystem = ({ policeHeat, cleanMoney, currentTurn, loyalty, onAction }: PoliceSystemProps) => {
   const getHeatColor = (level: number) => {
     if (level < 30) return "text-green-400";
     if (level < 70) return "text-yellow-400";
@@ -69,6 +71,25 @@ export const PoliceSystem = ({ policeHeat, cleanMoney, onAction }: PoliceSystemP
 
   const totalMonthlyCosts = policeHeat.bribedOfficials.reduce((sum, official) => sum + official.monthlyBribe, 0);
   const canAffordBribe = (amount: number) => cleanMoney >= amount;
+  
+  const activeArrests = policeHeat.arrests.filter(arrest => 
+    currentTurn - arrest.turn < arrest.sentence
+  );
+  
+  const getRattingColor = (risk: number) => {
+    if (risk < 25) return "text-green-400";
+    if (risk < 50) return "text-yellow-400";
+    return "text-red-400";
+  };
+  
+  const getArrestTypeIcon = (type: Arrest['type']) => {
+    switch (type) {
+      case 'street': return '👮';
+      case 'management': return '🕴️';
+      case 'player': return '👑';
+      default: return '⚖️';
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -84,7 +105,7 @@ export const PoliceSystem = ({ policeHeat, cleanMoney, onAction }: PoliceSystemP
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <div className="text-center">
               <div className={`text-2xl font-bold ${getHeatColor(policeHeat.level)}`}>
                 {policeHeat.level}%
@@ -110,18 +131,72 @@ export const PoliceSystem = ({ policeHeat, cleanMoney, onAction }: PoliceSystemP
               </div>
               <div className="text-sm text-muted-foreground">Monthly Bribes</div>
             </div>
+            <div className="text-center">
+              <div className={`text-2xl font-bold ${getRattingColor(policeHeat.rattingRisk)}`}>
+                {policeHeat.rattingRisk}%
+              </div>
+              <div className="text-sm text-muted-foreground">
+                <div>Ratting</div>
+                <div>Risk</div>
+              </div>
+            </div>
           </div>
 
           {policeHeat.level > 80 && (
             <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
               <AlertTriangle className="h-4 w-4 text-red-400" />
               <span className="text-sm text-red-400">
-                High heat increases prosecution risk and limits illegal operations!
+                High heat increases prosecution risk and arrests are imminent!
+              </span>
+            </div>
+          )}
+          
+          {policeHeat.rattingRisk > 50 && (
+            <div className="flex items-center gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-yellow-400" />
+              <span className="text-sm text-yellow-400">
+                High ratting risk! Someone might turn state's witness. Improve loyalty!
               </span>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Active Arrests */}
+      {activeArrests.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              Active Arrests
+            </CardTitle>
+            <CardDescription>Current arrests affecting your operations</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {activeArrests.map((arrest) => {
+                const turnsLeft = arrest.sentence - (currentTurn - arrest.turn);
+                return (
+                  <div key={arrest.id} className="flex items-center justify-between p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{getArrestTypeIcon(arrest.type)}</span>
+                        <span className="font-medium text-red-400">{arrest.target}</span>
+                        <Badge variant="destructive" className="capitalize">
+                          {arrest.type} Arrest
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        Arrested Turn {arrest.turn} • {turnsLeft} turns remaining • -{arrest.impactOnProfit}% profit impact
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Current Bribes */}
       {policeHeat.bribedOfficials.length > 0 && (
