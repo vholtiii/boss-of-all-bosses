@@ -26,6 +26,8 @@ interface MafiaGameState {
     respect: number;
     soldiers: number;
     influence: number;
+    politicalPower: number;
+    loyalty: number;
   };
   selectedTerritory?: {
     district: string;
@@ -56,7 +58,9 @@ const initialGameState: MafiaGameState = {
     money: 50000,
     respect: 25,
     soldiers: 15,
-    influence: 10
+    influence: 10,
+    politicalPower: 30,
+    loyalty: 75
   },
   selectedTerritory: null,
   familyControl: {

@@ -13,6 +13,8 @@ interface MafiaGameState {
     respect: number;
     soldiers: number;
     influence: number;
+    politicalPower: number;
+    loyalty: number;
   };
   selectedTerritory?: {
     district: string;
@@ -109,6 +111,17 @@ const MafiaHud: React.FC<MafiaHudProps> = ({ gameState, onEndTurn, onAction }) =
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">🗽 Influence</span>
             <Badge variant="secondary">{gameState.resources.influence}</Badge>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">🏛️ Political Power</span>
+            <Badge variant="secondary">{gameState.resources.politicalPower}</Badge>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">🤝 Loyalty</span>
+            <div className="flex items-center space-x-2">
+              <Progress value={gameState.resources.loyalty} className="w-16 h-2" />
+              <Badge variant="secondary">{gameState.resources.loyalty}%</Badge>
+            </div>
           </div>
         </div>
       </Card>
