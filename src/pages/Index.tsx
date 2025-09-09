@@ -2,6 +2,7 @@ import React from 'react';
 import MafiaHexGrid from '@/components/MafiaHexGrid';
 import MafiaHud from '@/components/MafiaHud';
 import { IntelligencePanel } from '@/components/IntelligencePanel';
+import ReputationPanel from '@/components/ReputationPanel';
 import { useMafiaGameState } from '@/hooks/useMafiaGameState';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -13,6 +14,7 @@ const Index = () => {
     selectTerritory, 
     performAction, 
     performBusinessAction,
+    performReputationAction,
     isWinner 
   } = useMafiaGameState();
 
@@ -107,14 +109,24 @@ const Index = () => {
           </div>
         </div>
         
-        {/* Right Intelligence Panel */}
-        <IntelligencePanel
-          businesses={gameState.businesses}
-          policeHeat={gameState.policeHeat}
-          currentTurn={gameState.turn}
-          familyControl={gameState.familyControl}
-          onAction={performBusinessAction}
-        />
+        {/* Right Sidebar - Intelligence & Reputation Panels */}
+        <div className="w-80 p-4 bg-gradient-to-b from-noir-dark via-background to-noir-dark border-l border-noir-light overflow-y-auto">
+          <IntelligencePanel
+            businesses={gameState.businesses}
+            policeHeat={gameState.policeHeat}
+            currentTurn={gameState.turn}
+            familyControl={gameState.familyControl}
+            onAction={performBusinessAction}
+          />
+          <div className="mt-4">
+            <ReputationPanel
+              reputation={gameState.reputation}
+              violentActions={gameState.violentActions}
+              resources={{ money: gameState.resources.money, soldiers: gameState.resources.soldiers }}
+              onReputationAction={performReputationAction}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Business, BusinessFinances, BusinessAction, LegalStatus, Charge, Lawyer, PoliceHeat, BribedOfficial, Arrest } from '@/types/business';
+import { ReputationSystem, ViolentAction, ReputationFactors, ReputationAction, REPUTATION_WEIGHTS } from '@/types/reputation';
 
 interface Territory {
   q: number;
@@ -30,6 +31,8 @@ interface MafiaGameState {
     politicalPower: number;
     loyalty: number;
   };
+  reputation: ReputationSystem;
+  violentActions: ViolentAction[];
   selectedTerritory?: {
     district: string;
     family: string;
@@ -67,6 +70,14 @@ const initialGameState: MafiaGameState = {
     politicalPower: 30,
     loyalty: 75
   },
+  reputation: {
+    respect: 25,
+    reputation: 20,
+    loyalty: 75,
+    fear: 15,
+    streetInfluence: 10
+  },
+  violentActions: [],
   selectedTerritory: null,
   familyControl: {
     gambino: 25, // Player starts with some control
@@ -128,6 +139,39 @@ export const useMafiaGameState = () => {
       
       // Advance turn
       newState.turn += 1;
+      
+      // Clean up old violent actions (keep only last 10 turns)
+      newState.violentActions = newState.violentActions.filter(a => newState.turn - a.turn <= 10);
+      
+      // Update reputation system at end of turn
+      const extortedProfits = newState.businesses
+        .filter(b => b.isExtorted)
+        .reduce((sum, b) => sum + (b.monthlyIncome * b.extortionRate), 0);
+      
+      // Base calculations
+      const soldierReputation = newState.resources.soldiers * REPUTATION_WEIGHTS.SOLDIERS_MULTIPLIER;
+      const politicalReputation = newState.resources.politicalPower * REPUTATION_WEIGHTS.POLITICAL_POWER_MULTIPLIER;
+      const businessRespect = newState.businesses.length * REPUTATION_WEIGHTS.BUSINESS_MULTIPLIER;
+      const territoryRespect = newState.familyControl.gambino * REPUTATION_WEIGHTS.TERRITORY_RESPECT_MULTIPLIER;
+      const extortionFear = extortedProfits * REPUTATION_WEIGHTS.EXTORTION_FEAR_MULTIPLIER;
+      
+      // Recent violent actions (last 5 turns)
+      const recentActions = newState.violentActions.filter(a => newState.turn - a.turn <= 5);
+      const violentActionBonus = recentActions.reduce((sum, action) => {
+        if (action.success) {
+          return sum + action.consequences.fearChange + action.consequences.reputationChange;
+        }
+        return sum;
+      }, 0);
+      
+      // Calculate final values with decay
+      let respect = Math.max(0, Math.min(100, businessRespect + territoryRespect + (newState.resources.respect || 0) - REPUTATION_WEIGHTS.REPUTATION_DECAY));
+      let reputation = Math.max(0, Math.min(100, soldierReputation + politicalReputation + violentActionBonus - REPUTATION_WEIGHTS.REPUTATION_DECAY));
+      let fear = Math.max(0, Math.min(100, extortionFear + violentActionBonus - REPUTATION_WEIGHTS.FEAR_DECAY));
+      let loyalty = Math.min(100, (newState.resources.loyalty || 75) + REPUTATION_WEIGHTS.LOYALTY_RECOVERY);
+      let streetInfluence = Math.max(0, Math.min(100, (newState.resources.influence || 0) + (violentActionBonus * 0.5)));
+      
+      newState.reputation = { respect, reputation, loyalty, fear, streetInfluence };
       
       // Apply police heat reduction from bribes
       newState.policeHeat.level = Math.max(0, newState.policeHeat.level - newState.policeHeat.reductionPerTurn);
@@ -617,6 +661,155 @@ export const useMafiaGameState = () => {
     selectTerritory,
     performAction,
     performBusinessAction,
+    performReputationAction: useCallback((action: ReputationAction) => {
+      setGameState(prevState => {
+        const newState = { ...prevState };
+        
+        // Check requirements
+        if (action.cost && newState.resources.money < action.cost) {
+          console.log('Not enough money for this action');
+          return prevState;
+        }
+        
+        if (action.requiredSoldiers && newState.resources.soldiers < action.requiredSoldiers) {
+          console.log('Not enough soldiers for this action');
+          return prevState;
+        }
+        
+        // Generate random names for targets
+        const targetNames = {
+          rival_soldier: ['Tony "The Fish"', 'Sal "Knuckles"', 'Mickey "The Rat"', 'Vince "Scar"'],
+          rival_capo: ['Big Paulie', 'Fat Tony', 'Johnny "The Gun"', 'Rocco "The Bull"'],
+          rival_boss: ['Don Corleone', 'Don Barzini', 'Don Tattaglia', 'Don Stracci'],
+          own_soldier: ['Little Pete', 'Skinny Joe', 'Fast Eddie', 'Quiet Sal'],
+          own_capo: ['Cousin Vinny', 'Uncle Tony', 'Brother Mike', 'Old Rocco'],
+          civilian: ['Local Shop Owner', 'Witness', 'Informant', 'Rival Business Owner'],
+          police: ['Detective Murphy', 'Officer Johnson', 'Sergeant Williams', 'Captain Brown']
+        };
+        
+        const targetName = targetNames[action.targetType][Math.floor(Math.random() * targetNames[action.targetType].length)];
+        
+        // Calculate success chance based on soldiers and action type
+        const baseSuccessChance = action.type === 'beat_up' ? 0.8 : 
+                                 action.type === 'execute_hit' ? 0.7 : 
+                                 action.type === 'assassinate' ? 0.6 : 0.9;
+        
+        const soldierBonus = Math.min(0.2, newState.resources.soldiers * 0.01);
+        const successChance = Math.min(0.95, baseSuccessChance + soldierBonus);
+        const success = Math.random() < successChance;
+        
+        // Calculate consequences
+        let respectChange = 0;
+        let reputationChange = 0;
+        let loyaltyChange = 0;
+        let fearChange = 0;
+        let streetInfluenceChange = 0;
+        let policeHeatIncrease = 0;
+        
+        if (success) {
+          switch (action.type) {
+            case 'beat_up':
+              respectChange = action.targetType.startsWith('own_') ? -2 : 3;
+              fearChange = action.targetType.startsWith('own_') ? REPUTATION_WEIGHTS.OWN_FAMILY_FEAR_BONUS : REPUTATION_WEIGHTS.BEATING_FEAR_BONUS;
+              streetInfluenceChange = action.targetType.startsWith('own_') ? REPUTATION_WEIGHTS.OWN_FAMILY_STREET_BONUS : 2;
+              loyaltyChange = action.targetType.startsWith('own_') ? REPUTATION_WEIGHTS.OWN_FAMILY_LOYALTY_PENALTY : 0;
+              policeHeatIncrease = 5;
+              break;
+              
+            case 'execute_hit':
+              respectChange = action.targetType.startsWith('own_') ? -5 : 8;
+              reputationChange = action.targetType.startsWith('own_') ? -3 : 5;
+              fearChange = action.targetType.startsWith('own_') ? REPUTATION_WEIGHTS.OWN_FAMILY_FEAR_BONUS * 2 : REPUTATION_WEIGHTS.HIT_FEAR_BONUS;
+              streetInfluenceChange = action.targetType.startsWith('own_') ? REPUTATION_WEIGHTS.OWN_FAMILY_STREET_BONUS * 1.5 : 5;
+              loyaltyChange = action.targetType.startsWith('own_') ? REPUTATION_WEIGHTS.OWN_FAMILY_LOYALTY_PENALTY : 1;
+              policeHeatIncrease = action.targetType === 'police' ? 25 : 15;
+              break;
+              
+            case 'assassinate':
+              respectChange = action.targetType.startsWith('own_') ? -10 : 15;
+              reputationChange = action.targetType.startsWith('own_') ? -8 : 12;
+              fearChange = action.targetType.startsWith('own_') ? REPUTATION_WEIGHTS.OWN_FAMILY_FEAR_BONUS * 3 : REPUTATION_WEIGHTS.ASSASSINATION_FEAR_BONUS;
+              streetInfluenceChange = action.targetType.startsWith('own_') ? REPUTATION_WEIGHTS.OWN_FAMILY_STREET_BONUS * 2 : 8;
+              loyaltyChange = action.targetType.startsWith('own_') ? REPUTATION_WEIGHTS.OWN_FAMILY_LOYALTY_PENALTY * 1.5 : 2;
+              policeHeatIncrease = action.targetType === 'police' ? 40 : 25;
+              break;
+          }
+        } else {
+          // Failed action consequences
+          respectChange = -3;
+          reputationChange = -2;
+          loyaltyChange = -5; // Soldiers lose confidence in failed operations
+          policeHeatIncrease = Math.floor(policeHeatIncrease / 2); // Less heat for failed attempts
+        }
+        
+        // Apply costs
+        if (action.cost) newState.resources.money -= action.cost;
+        if (action.requiredSoldiers) newState.resources.soldiers -= action.requiredSoldiers;
+        
+        // Apply consequences
+        newState.resources.respect = Math.max(0, Math.min(100, newState.resources.respect + respectChange));
+        newState.resources.loyalty = Math.max(0, Math.min(100, newState.resources.loyalty + loyaltyChange));
+        newState.resources.influence = Math.max(0, Math.min(100, newState.resources.influence + streetInfluenceChange));
+        newState.policeHeat.level = Math.min(100, newState.policeHeat.level + policeHeatIncrease);
+        
+        // Create violent action record
+        const violentAction: ViolentAction = {
+          id: `action_${Date.now()}`,
+          type: action.type === 'beat_up' ? 'beating' : action.type === 'execute_hit' ? 'hit' : 'assassination',
+          target: targetName,
+          targetType: action.targetType,
+          success,
+          turn: newState.turn,
+          consequences: {
+            respectChange,
+            reputationChange,
+            loyaltyChange,
+            fearChange,
+            streetInfluenceChange,
+            policeHeatIncrease
+          }
+        };
+        
+        newState.violentActions.push(violentAction);
+        
+        // Calculate reputation metrics
+        const extortedProfits = newState.businesses
+          .filter(b => b.isExtorted)
+          .reduce((sum, b) => sum + (b.monthlyIncome * b.extortionRate), 0);
+        
+        // Base calculations
+        const soldierReputation = newState.resources.soldiers * REPUTATION_WEIGHTS.SOLDIERS_MULTIPLIER;
+        const politicalReputation = newState.resources.politicalPower * REPUTATION_WEIGHTS.POLITICAL_POWER_MULTIPLIER;
+        const businessRespect = newState.businesses.length * REPUTATION_WEIGHTS.BUSINESS_MULTIPLIER;
+        const territoryRespect = newState.familyControl.gambino * REPUTATION_WEIGHTS.TERRITORY_RESPECT_MULTIPLIER;
+        const extortionFear = extortedProfits * REPUTATION_WEIGHTS.EXTORTION_FEAR_MULTIPLIER;
+        
+        // Recent violent actions (last 5 turns)
+        const recentActions = newState.violentActions.filter(a => newState.turn - a.turn <= 5);
+        const violentActionBonus = recentActions.reduce((sum, action) => {
+          if (action.success) {
+            return sum + action.consequences.fearChange + action.consequences.reputationChange;
+          }
+          return sum;
+        }, 0);
+        
+        // Calculate final values
+        let respect = Math.min(100, businessRespect + territoryRespect + (newState.resources.respect || 0));
+        let reputation = Math.min(100, soldierReputation + politicalReputation + violentActionBonus);
+        let fear = Math.min(100, extortionFear + violentActionBonus);
+        let loyalty = newState.resources.loyalty || 75;
+        let streetInfluence = Math.min(100, (newState.resources.influence || 0) + (violentActionBonus * 0.5));
+        
+        // Apply decay
+        respect = Math.max(0, respect - REPUTATION_WEIGHTS.REPUTATION_DECAY);
+        fear = Math.max(0, fear - REPUTATION_WEIGHTS.FEAR_DECAY);
+        loyalty = Math.min(100, loyalty + REPUTATION_WEIGHTS.LOYALTY_RECOVERY);
+        
+        newState.reputation = { respect, reputation, loyalty, fear, streetInfluence };
+        
+        return newState;
+      });
+    }, []),
     checkWinCondition,
     isWinner: checkWinCondition()
   };
