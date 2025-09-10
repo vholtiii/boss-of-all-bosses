@@ -524,6 +524,71 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
             </g>
           );
         })}
+        
+        {/* Territory names */}
+        {territories.map((territory, territoryIndex) => {
+          // Calculate center position for each territory
+          const centerBusiness = territory.businesses.find(b => b.family === territory.family);
+          if (!centerBusiness) return null;
+          
+          const centerX = (centerBusiness.q * (hexWidth * 0.75)) + width / 2;
+          const centerY = (centerBusiness.r * hexHeight + centerBusiness.q * (hexHeight / 2)) + height / 2;
+          
+          const familyColors = {
+            gambino: '#8B5A3C',
+            genovese: '#1E3A8A', 
+            lucchese: '#7C2D12',
+            bonanno: '#166534',
+            colombo: '#7C1D6F',
+            neutral: '#6B7280'
+          };
+          
+          return (
+            <g key={`territory-label-${territoryIndex}`}>
+              {/* Background for better text readability */}
+              <rect
+                x={centerX - 60}
+                y={centerY - 25}
+                width={120}
+                height={50}
+                rx={8}
+                fill="rgba(0, 0, 0, 0.8)"
+                stroke={familyColors[territory.family]}
+                strokeWidth="1"
+                className="opacity-90"
+              />
+              
+              {/* District name */}
+              <text
+                x={centerX}
+                y={centerY - 8}
+                textAnchor="middle"
+                className="fill-mafia-gold text-sm font-bold tracking-wide"
+                style={{ 
+                  textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                  fontSize: `${12 / zoomLevel}px`
+                }}
+              >
+                {territory.district}
+              </text>
+              
+              {/* Family name */}
+              <text
+                x={centerX}
+                y={centerY + 8}
+                textAnchor="middle"
+                className="text-xs font-semibold tracking-wider uppercase"
+                fill={familyColors[territory.family]}
+                style={{ 
+                  textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                  fontSize: `${10 / zoomLevel}px`
+                }}
+              >
+                {territory.family === 'neutral' ? 'NEUTRAL' : `${territory.family.toUpperCase()} FAMILY`}
+              </text>
+            </g>
+          );
+        })}
         </g>
       </svg>
       
