@@ -700,7 +700,7 @@ export const useEnhancedMafiaGameState = () => {
   };
 
   // Check for victory condition
-  const isWinner = gameState.familyControl[gameState.playerFamily] >= 80;
+  const isWinner = gameState.familyControl ? gameState.familyControl[gameState.playerFamily] >= 80 : false;
 
   return {
     gameState,
