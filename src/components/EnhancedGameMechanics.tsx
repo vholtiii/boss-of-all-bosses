@@ -322,11 +322,11 @@ const AIPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: 
                 <div className="flex gap-1">
                   {Object.entries(opponent.relationships).map(([family, score]) => (
                     <Badge
-                      key={family}
-                      variant={score > 0 ? 'default' : score < 0 ? 'destructive' : 'secondary'}
-                      className="text-xs"
-                    >
-                      {family}: {score > 0 ? '+' : ''}{score}
+                       key={family}
+                       variant={Number(score) > 0 ? 'default' : Number(score) < 0 ? 'destructive' : 'secondary'}
+                       className="text-xs"
+                     >
+                       {family}: {Number(score) > 0 ? '+' : ''}{score}
                     </Badge>
                   ))}
                 </div>

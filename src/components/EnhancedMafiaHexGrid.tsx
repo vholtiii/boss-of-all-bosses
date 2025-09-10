@@ -41,8 +41,8 @@ interface EnhancedMafiaHexGridProps {
 }
 
 const familyColors = {
-  gambino: '#D4AF37', // Gold
-  genovese: '#228B22', // Forest Green
+  gambino: '#42D3F2', // Light Blue
+  genovese: '#2AA63E', // Green
   lucchese: '#4169E1', // Royal Blue
   bonanno: '#DC143C', // Crimson
   colombo: '#8A2BE2', // Blue Violet
@@ -51,15 +51,13 @@ const familyColors = {
 
 const businessIcons = {
   casino: '🎰',
-  speakeasy: '🍺',
   restaurant: '🍝',
-  docks: '⚓',
-  protection: '🛡️',
+  laundromat: '🧽',
+  construction: '🏗️',
+  drug_trafficking: '💊',
   gambling: '🎲',
-  smuggling: '📦',
-  loan_shark: '💰',
   prostitution: '💄',
-  drugs: '💊',
+  loan_sharking: '💰',
 };
 
 const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({ 
@@ -84,7 +82,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     const businesses: BusinessHex[] = [];
     const districts: Array<BusinessHex['district']> = ['Little Italy', 'Bronx', 'Brooklyn', 'Queens', 'Manhattan', 'Staten Island'];
     const families: Array<BusinessHex['family']> = ['neutral', 'gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
-    const businessTypes: Array<Business['category']> = ['casino', 'speakeasy', 'restaurant', 'docks', 'protection', 'gambling', 'smuggling', 'loan_shark', 'prostitution', 'drugs'];
+    const businessTypes: Array<Business['category']> = ['casino', 'restaurant', 'laundromat', 'construction', 'drug_trafficking', 'gambling', 'prostitution', 'loan_sharking'];
 
     for (let q = -width/2; q <= width/2; q++) {
       for (let r = -height/2; r <= height/2; r++) {

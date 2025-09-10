@@ -21,6 +21,7 @@ export interface RecruitmentAction {
     streetInfluence?: number;
     reputation?: number;
     money?: number;
+    soldiers?: number;
   };
   effects: {
     soldiers?: number;
@@ -119,10 +120,10 @@ export class SoldierRecruitmentManager {
         type: 'train_soldier',
         cost: 3000,
         time: 1,
-        requirements: {
-          soldiers: 1, // Need at least 1 soldier to train
-          money: 3000
-        },
+      requirements: {
+        money: 5000,
+        reputation: 10,
+      },
         effects: {
           loyalty: 1, // Training increases loyalty
           streetInfluence: 1 // Training increases street influence
@@ -132,12 +133,10 @@ export class SoldierRecruitmentManager {
         type: 'promote_soldier',
         cost: 8000,
         time: 2,
-        requirements: {
-          soldiers: 3, // Need at least 3 soldiers to promote
-          loyalty: 40,
-          streetInfluence: 30,
-          money: 8000
-        },
+      requirements: {
+        money: 15000,
+        reputation: 25,
+      },
         effects: {
           loyalty: 3, // Promoting increases loyalty significantly
           streetInfluence: 2, // Promoting increases street influence

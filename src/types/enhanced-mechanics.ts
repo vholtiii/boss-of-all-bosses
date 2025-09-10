@@ -196,7 +196,13 @@ export interface EventConsequence {
 }
 
 // Enhanced Reputation System
-export interface EnhancedReputationSystem extends ReputationSystem {
+export interface EnhancedReputationSystem {
+  // Base reputation properties
+  respect: number; // 0-100, based on successful operations and territory control
+  reputation: number; // 0-100, overall standing in criminal underworld
+  loyalty: number; // 0-100, loyalty of your own soldiers and capos
+  fear: number; // 0-100, how much other families fear you
+  streetInfluence: number; // 0-100, influence on the streets
   // Family relationships
   familyRelationships: {
     [family: string]: number; // -100 to 100

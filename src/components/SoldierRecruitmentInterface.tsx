@@ -148,7 +148,7 @@ const SoldierRecruitmentInterface: React.FC<SoldierRecruitmentInterfaceProps> = 
                 (!action.requirements.loyalty || reputationSystem.loyalty >= action.requirements.loyalty) &&
                 (!action.requirements.streetInfluence || reputationSystem.streetInfluence >= action.requirements.streetInfluence) &&
                 (!action.requirements.reputation || reputationSystem.reputation >= action.requirements.reputation) &&
-                (!action.requirements.soldiers || soldierStats.totalSoldiers >= action.requirements.soldiers);
+                (!action.requirements.soldiers || soldierStats.totalSoldiers >= (action.requirements.soldiers || 0));
 
               return (
                 <motion.div

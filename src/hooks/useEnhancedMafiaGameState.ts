@@ -13,7 +13,7 @@ import {
 import { Business, BusinessFinances, LegalStatus, PoliceHeat } from '@/types/business';
 import { ViolentAction } from '@/types/reputation';
 
-interface EnhancedMafiaGameState {
+export interface EnhancedMafiaGameState {
   // Core game state
   playerFamily: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
   turn: number;
@@ -52,6 +52,15 @@ interface EnhancedMafiaGameState {
   selectedTerritory?: any;
   activeEvent?: GameEvent;
   showMissionBoard: boolean;
+  
+  // Family control (territory control percentages)
+  familyControl: {
+    gambino: number;
+    genovese: number;
+    lucchese: number;
+    bonanno: number;
+    colombo: number;
+  };
 }
 
 const initialEnhancedGameState: EnhancedMafiaGameState = {
@@ -221,7 +230,7 @@ const initialEnhancedGameState: EnhancedMafiaGameState = {
         cost: 15000,
         researchTime: 3,
         prerequisites: [],
-        effects: { intelligence: 20 },
+        effects: { combat: 20 },
         unlocked: false,
       },
       {
@@ -292,6 +301,14 @@ const initialEnhancedGameState: EnhancedMafiaGameState = {
   selectedTerritory: null,
   activeEvent: null,
   showMissionBoard: false,
+  
+  familyControl: {
+    gambino: 20,
+    genovese: 20,
+    lucchese: 20,
+    bonanno: 20,
+    colombo: 20,
+  },
 };
 
 export const useEnhancedMafiaGameState = () => {

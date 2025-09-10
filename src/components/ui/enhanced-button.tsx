@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
-import { motion } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
@@ -15,15 +15,11 @@ const buttonVariants = cva(
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        mafia: "bg-gradient-to-r from-mafia-gold to-mafia-blood text-background hover:from-mafia-gold/90 hover:to-mafia-blood/90 shadow-lg",
-        danger: "bg-gradient-to-r from-mafia-blood to-red-600 text-white hover:from-mafia-blood/90 hover:to-red-600/90 shadow-lg",
-        success: "bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-600/90 hover:to-emerald-600/90 shadow-lg",
       },
       size: {
         default: "h-10 px-4 py-2",
         sm: "h-9 rounded-md px-3",
         lg: "h-11 rounded-md px-8",
-        xl: "h-12 rounded-lg px-10 text-base",
         icon: "h-10 w-10",
       },
     },
@@ -39,9 +35,11 @@ export interface EnhancedButtonProps
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
   loading?: boolean;
+  icon?: React.ReactNode;
+  pulse?: boolean;
   success?: boolean;
   error?: boolean;
-  pulse?: boolean;
+  loadingText?: string;
 }
 
 const EnhancedButton = React.forwardRef<HTMLButtonElement, EnhancedButtonProps>(
@@ -51,71 +49,44 @@ const EnhancedButton = React.forwardRef<HTMLButtonElement, EnhancedButtonProps>(
     size, 
     asChild = false, 
     loading = false,
+    icon,
+    pulse = false,
     success = false,
     error = false,
-    pulse = false,
+    loadingText,
     children,
     disabled,
     ...props 
   }, ref) => {
-    const Comp = asChild ? Slot : motion.button;
+    const Comp = asChild ? Slot : "button";
     
-    const buttonProps = asChild ? {} : {
-      whileHover: { scale: 1.02 },
-      whileTap: { scale: 0.98 },
-      animate: {
-        ...(pulse && { scale: [1, 1.05, 1] }),
-        ...(success && { backgroundColor: ["hsl(var(--primary))", "hsl(142, 76%, 36%)", "hsl(var(--primary))"] }),
-        ...(error && { backgroundColor: ["hsl(var(--primary))", "hsl(0, 84%, 60%)", "hsl(var(--primary))"] }),
-      },
-      transition: {
-        scale: { duration: 0.1 },
-        ...(pulse && { scale: { duration: 1, repeat: Infinity } }),
-        ...(success && { backgroundColor: { duration: 0.5 } }),
-        ...(error && { backgroundColor: { duration: 0.5 } }),
-      }
+    const getVariant = () => {
+      if (success) return "default";
+      if (error) return "destructive";
+      return variant;
     };
 
     return (
       <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
+        className={cn(
+          buttonVariants({ variant: getVariant(), size, className }),
+          pulse && "animate-pulse",
+          loading && "cursor-not-allowed"
+        )}
         ref={ref}
         disabled={disabled || loading}
-        {...buttonProps}
         {...props}
       >
         {loading && (
-          <motion.div
-            className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          />
+          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
         )}
-        {success && (
-          <motion.div
-            className="mr-2 h-4 w-4"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.2 }}
-          >
-            ✓
-          </motion.div>
-        )}
-        {error && (
-          <motion.div
-            className="mr-2 h-4 w-4"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.2 }}
-          >
-            ✕
-          </motion.div>
-        )}
-        {children}
+        {!loading && icon && <span className="mr-2">{icon}</span>}
+        {loading && loadingText ? loadingText : children}
       </Comp>
     );
   }
 );
+
 EnhancedButton.displayName = "EnhancedButton";
 
 export { EnhancedButton, buttonVariants };
