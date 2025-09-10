@@ -49,8 +49,13 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
   const hexWidth = hexRadius * 2;
   const hexHeight = Math.sqrt(3) * hexRadius;
   
-  // Zoom state
+  // Zoom and pan state
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
+  
   const minZoom = 0.5;
   const maxZoom = 3;
   const zoomStep = 0.25;
@@ -65,6 +70,48 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
 
   const handleZoomReset = () => {
     setZoomLevel(1);
+    setPanX(0);
+    setPanY(0);
+  };
+
+  // Pan handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Don't start drag if clicking on a business hex (to allow business selection)
+    const target = e.target as SVGElement;
+    if (target.tagName === 'polygon' && target.getAttribute('data-business-id')) {
+      return;
+    }
+    
+    setIsDragging(true);
+    setLastMousePos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    
+    const deltaX = e.clientX - lastMousePos.x;
+    const deltaY = e.clientY - lastMousePos.y;
+    
+    setPanX(prev => prev + deltaX);
+    setPanY(prev => prev + deltaY);
+    
+    setLastMousePos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  // Handle business clicks without interfering with panning
+  const handleBusinessClick = (business: BusinessHex, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isDragging) {
+      onBusinessClick(business);
+    }
   };
 
   // Famous mafia figures and capos
@@ -364,7 +411,15 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
         width="100%" 
         height="100%" 
         viewBox={`-600 -500 1200 1000`}
-        className="absolute inset-0"
+        className={cn(
+          "absolute inset-0",
+          isDragging ? "cursor-grabbing" : "cursor-grab"
+        )}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        style={{ userSelect: 'none' }}
       >
         <defs>
           <filter id="mafiaGlow">
@@ -380,8 +435,8 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
           </pattern>
         </defs>
         
-        {/* Zoomable content group */}
-        <g transform={`scale(${zoomLevel})`}>
+        {/* Zoomable and pannable content group */}
+        <g transform={`translate(${panX / zoomLevel}, ${panY / zoomLevel}) scale(${zoomLevel})`}>
         
         {/* Render territory boundaries first (lighter background) */}
         {territories.map((territory, territoryIndex) => {
@@ -476,10 +531,11 @@ const MafiaHexGrid: React.FC<MafiaHexGridProps> = ({
                   isSelected && 'stroke-mafia-gold stroke-4 filter brightness-125',
                   isPlayerBusiness && 'stroke-mafia-gold stroke-3',
                   'hover:stroke-mafia-gold hover:brightness-110'
-                )}
-                filter={isSelected ? "url(#mafiaGlow)" : undefined}
-                onClick={() => onBusinessClick(business)}
-              />
+                 )}
+                 filter={isSelected ? "url(#mafiaGlow)" : undefined}
+                 onClick={(e) => handleBusinessClick(business, e)}
+                 data-business-id={business.businessId}
+               />
               
               {/* Business icon */}
               <text
