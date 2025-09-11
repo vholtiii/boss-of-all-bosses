@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, memo, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   Sword, 
   TrendingUp, 
@@ -17,25 +18,39 @@ import {
   DollarSign,
   Shield,
   Eye,
-  AlertTriangle
+  AlertTriangle,
+  Plus,
+  Minus,
+  Info,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Star
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
+import { useSoundSystem } from '@/hooks/useSoundSystem';
 
 interface EnhancedGameMechanicsProps {
   gameState: EnhancedMafiaGameState;
   onAction: (action: any) => void;
 }
 
-const EnhancedGameMechanics: React.FC<EnhancedGameMechanicsProps> = ({ 
+const EnhancedGameMechanics: React.FC<EnhancedGameMechanicsProps> = memo(({ 
   gameState, 
   onAction 
 }) => {
   const [activeTab, setActiveTab] = useState('combat');
+  const { playSound } = useSoundSystem();
+
+  const handleTabChange = useCallback((value: string) => {
+    playSound('click');
+    setActiveTab(value);
+  }, [playSound]);
 
   return (
     <div className="space-y-4">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="combat" className="flex items-center gap-2">
             <Sword className="h-4 w-4" />
@@ -89,14 +104,46 @@ const EnhancedGameMechanics: React.FC<EnhancedGameMechanicsProps> = ({
       </Tabs>
     </div>
   );
-};
+});
 
 // Combat Panel Component
-const CombatPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: any) => void }> = ({ 
+const CombatPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: any) => void }> = memo(({ 
   gameState, 
   onAction 
 }) => {
-  const { combat } = gameState;
+  const { combat, resources } = gameState;
+  const [selectedAction, setSelectedAction] = useState<string | null>(null);
+  const { playSound } = useSoundSystem();
+
+  const combatActions = useMemo(() => [
+    {
+      id: 'attack_territory',
+      name: 'Attack Territory',
+      cost: 15000,
+      soldiers: 2,
+      description: 'Launch an attack on rival territory',
+      icon: <Sword className="h-4 w-4" />,
+      risk: 60,
+    },
+    {
+      id: 'train_soldiers',
+      name: 'Train Soldiers',
+      cost: 8000,
+      soldiers: 0,
+      description: 'Improve soldier combat effectiveness',
+      icon: <Users className="h-4 w-4" />,
+      risk: 0,
+    },
+    {
+      id: 'upgrade_equipment',
+      name: 'Upgrade Equipment',
+      cost: 12000,
+      soldiers: 0,
+      description: 'Purchase better weapons and armor',
+      icon: <Shield className="h-4 w-4" />,
+      risk: 0,
+    },
+  ], []);
 
   return (
     <div className="space-y-4">
@@ -110,17 +157,38 @@ const CombatPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (acti
         <CardContent className="space-y-4">
           {/* Soldier Training */}
           <div>
-            <h4 className="font-semibold mb-2">Soldier Training</h4>
+            <h4 className="font-semibold mb-2 flex items-center gap-2">
+              Soldier Training
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Higher training levels increase combat effectiveness</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Training Level</p>
-                <Badge variant="outline" className="mt-1">
-                  Level {combat.soldierTraining.level}
-                </Badge>
+                <motion.div
+                  initial={{ scale: 0.8 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200 }}
+                >
+                  <Badge variant="outline" className="mt-1">
+                    Level {combat.soldierTraining.level}
+                  </Badge>
+                </motion.div>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Experience</p>
                 <Progress value={combat.soldierTraining.experience} className="mt-1" />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {combat.soldierTraining.experience}/100 XP
+                </p>
               </div>
             </div>
           </div>
@@ -129,24 +197,97 @@ const CombatPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (acti
           <div>
             <h4 className="font-semibold mb-2">Equipment</h4>
             <div className="grid grid-cols-3 gap-2">
-              <div className="text-center p-2 border rounded">
-                <p className="text-xs text-muted-foreground">Weapons</p>
-                <Badge variant="secondary" className="text-xs">
-                  {combat.soldierTraining.equipment.weapons.replace('_', ' ')}
-                </Badge>
-              </div>
-              <div className="text-center p-2 border rounded">
-                <p className="text-xs text-muted-foreground">Armor</p>
-                <Badge variant="secondary" className="text-xs">
-                  {combat.soldierTraining.equipment.armor.replace('_', ' ')}
-                </Badge>
-              </div>
-              <div className="text-center p-2 border rounded">
-                <p className="text-xs text-muted-foreground">Vehicles</p>
-                <Badge variant="secondary" className="text-xs">
-                  {combat.soldierTraining.equipment.vehicles.replace('_', ' ')}
-                </Badge>
-              </div>
+              {[
+                { type: 'weapons', label: 'Weapons', value: combat.soldierTraining.equipment.weapons },
+                { type: 'armor', label: 'Armor', value: combat.soldierTraining.equipment.armor },
+                { type: 'vehicles', label: 'Vehicles', value: combat.soldierTraining.equipment.vehicles },
+              ].map((equipment, index) => (
+                <motion.div
+                  key={equipment.type}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="text-center p-2 border rounded hover:bg-muted/50 transition-colors"
+                >
+                  <p className="text-xs text-muted-foreground">{equipment.label}</p>
+                  <Badge variant="secondary" className="text-xs mt-1">
+                    {equipment.value.replace('_', ' ')}
+                  </Badge>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+          {/* Combat Actions */}
+          <div>
+            <h4 className="font-semibold mb-2">Combat Actions</h4>
+            <div className="space-y-2">
+              {combatActions.map((action, index) => (
+                <motion.div
+                  key={action.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className={cn(
+                    "p-3 border rounded cursor-pointer transition-all",
+                    selectedAction === action.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                  )}
+                  onClick={() => setSelectedAction(selectedAction === action.id ? null : action.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {action.icon}
+                      <span className="font-medium">{action.name}</span>
+                      {action.risk > 0 && (
+                        <Badge variant="destructive" className="text-xs">
+                          {action.risk}% Risk
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        ${action.cost.toLocaleString()}
+                      </span>
+                      {action.soldiers > 0 && (
+                        <span className="text-sm text-muted-foreground">
+                          {action.soldiers} soldiers
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <AnimatePresence>
+                    {selectedAction === action.id && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-2 pt-2 border-t"
+                      >
+                        <p className="text-sm text-muted-foreground mb-2">{action.description}</p>
+                        <Button
+                          size="sm"
+                          disabled={resources.money < action.cost || resources.soldiers < action.soldiers}
+                          onClick={() => {
+                            if (action.id === 'attack_territory') {
+                              playSound('combat');
+                            } else if (action.id === 'train_soldiers') {
+                              playSound('success');
+                            } else {
+                              playSound('money');
+                            }
+                            onAction({ type: action.id });
+                            setSelectedAction(null);
+                          }}
+                          className="w-full"
+                        >
+                          Execute {action.name}
+                        </Button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              ))}
             </div>
           </div>
 
@@ -161,13 +302,20 @@ const CombatPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (acti
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className="p-2 border rounded text-sm"
+                    className="p-2 border rounded text-sm hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex justify-between items-center">
                       <span>{battle.territory}</span>
-                      <Badge variant={battle.outcome === 'victory' ? 'default' : 'destructive'}>
-                        {battle.outcome}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        {battle.outcome === 'victory' ? (
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-red-500" />
+                        )}
+                        <Badge variant={battle.outcome === 'victory' ? 'default' : 'destructive'}>
+                          {battle.outcome}
+                        </Badge>
+                      </div>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Turn {battle.turn} • {battle.casualties.attacking} vs {battle.casualties.defending}
@@ -176,21 +324,62 @@ const CombatPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (acti
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No recent battles</p>
+              <div className="text-center p-4 border rounded border-dashed">
+                <Target className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">No recent battles</p>
+                <p className="text-xs text-muted-foreground">Launch attacks to expand your territory</p>
+              </div>
             )}
           </div>
         </CardContent>
       </Card>
     </div>
   );
-};
+});
+
+CombatPanel.displayName = 'CombatPanel';
 
 // Economy Panel Component
-const EconomyPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: any) => void }> = ({ 
+const EconomyPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: any) => void }> = memo(({ 
   gameState, 
   onAction 
 }) => {
-  const { economy } = gameState;
+  const { economy, resources } = gameState;
+  const [selectedInvestment, setSelectedInvestment] = useState<string | null>(null);
+  const { playSound } = useSoundSystem();
+
+  const investmentOptions = useMemo(() => [
+    {
+      id: 'stocks',
+      name: 'Stock Market',
+      cost: 20000,
+      expectedReturn: 1.15,
+      duration: 5,
+      description: 'Invest in legitimate businesses',
+      icon: <TrendingUp className="h-4 w-4" />,
+      risk: 'Low',
+    },
+    {
+      id: 'real_estate',
+      name: 'Real Estate',
+      cost: 50000,
+      expectedReturn: 1.25,
+      duration: 8,
+      description: 'Purchase property for long-term gains',
+      icon: <DollarSign className="h-4 w-4" />,
+      risk: 'Medium',
+    },
+    {
+      id: 'crypto',
+      name: 'Cryptocurrency',
+      cost: 15000,
+      expectedReturn: 1.40,
+      duration: 3,
+      description: 'High-risk, high-reward digital currency',
+      icon: <Zap className="h-4 w-4" />,
+      risk: 'High',
+    },
+  ], []);
 
   return (
     <div className="space-y-4">
@@ -202,26 +391,38 @@ const EconomyPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (act
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {economy.marketConditions.map((condition, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="flex justify-between items-center p-2 border rounded mb-2"
-            >
-              <div>
-                <p className="font-medium">{condition.sector} Market</p>
-                <p className="text-sm text-muted-foreground">{condition.description}</p>
-              </div>
-              <div className="text-right">
-                <Badge variant={condition.modifier >= 0 ? 'default' : 'destructive'}>
-                  {condition.modifier > 0 ? '+' : ''}{condition.modifier}%
-                </Badge>
-                <p className="text-xs text-muted-foreground">{condition.duration} turns</p>
-              </div>
-            </motion.div>
-          ))}
+          {economy.marketConditions.length > 0 ? (
+            <div className="space-y-2">
+              {economy.marketConditions.map((condition, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="flex justify-between items-center p-3 border rounded hover:bg-muted/50 transition-colors"
+                >
+                  <div>
+                    <p className="font-medium">{condition.sector} Market</p>
+                    <p className="text-sm text-muted-foreground">{condition.description}</p>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant={condition.modifier >= 0 ? 'default' : 'destructive'}>
+                      {condition.modifier > 0 ? '+' : ''}{condition.modifier}%
+                    </Badge>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      <Clock className="h-3 w-3 inline mr-1" />
+                      {condition.duration} turns
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center p-4 border rounded border-dashed">
+              <TrendingUp className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Market conditions stable</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -229,7 +430,87 @@ const EconomyPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (act
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-yellow-500" />
-            Investments
+            Investment Opportunities
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {investmentOptions.map((investment, index) => (
+              <motion.div
+                key={investment.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className={cn(
+                  "p-3 border rounded cursor-pointer transition-all",
+                  selectedInvestment === investment.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                )}
+                onClick={() => setSelectedInvestment(selectedInvestment === investment.id ? null : investment.id)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {investment.icon}
+                    <span className="font-medium">{investment.name}</span>
+                    <Badge 
+                      variant={investment.risk === 'Low' ? 'default' : investment.risk === 'Medium' ? 'secondary' : 'destructive'}
+                      className="text-xs"
+                    >
+                      {investment.risk} Risk
+                    </Badge>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-medium">${investment.cost.toLocaleString()}</span>
+                    <p className="text-xs text-muted-foreground">
+                      {Math.round((investment.expectedReturn - 1) * 100)}% return
+                    </p>
+                  </div>
+                </div>
+                
+                <AnimatePresence>
+                  {selectedInvestment === investment.id && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-2 pt-2 border-t"
+                    >
+                      <p className="text-sm text-muted-foreground mb-2">{investment.description}</p>
+                      <div className="flex justify-between text-xs text-muted-foreground mb-2">
+                        <span>Duration: {investment.duration} turns</span>
+                        <span>Expected: ${Math.round(investment.cost * investment.expectedReturn).toLocaleString()}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        disabled={resources.money < investment.cost}
+                        onClick={() => {
+                          playSound('money');
+                          onAction({ 
+                            type: 'make_investment', 
+                            investmentType: investment.id,
+                            amount: investment.cost,
+                            expectedReturn: investment.expectedReturn,
+                            duration: investment.duration
+                          });
+                          setSelectedInvestment(null);
+                        }}
+                        className="w-full"
+                      >
+                        Invest ${investment.cost.toLocaleString()}
+                      </Button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Star className="h-5 w-5 text-purple-500" />
+            Active Investments
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -241,25 +522,44 @@ const EconomyPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (act
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="p-2 border rounded"
+                  className="p-3 border rounded hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">{investment.type.replace('_', ' ')}</span>
-                    <span className="text-green-600">${investment.currentValue.toLocaleString()}</span>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-medium capitalize">{investment.type.replace('_', ' ')}</span>
+                    <div className="text-right">
+                      <span className="text-green-600 font-medium">
+                        ${investment.currentValue.toLocaleString()}
+                      </span>
+                      <p className="text-xs text-muted-foreground">
+                        +${(investment.currentValue - investment.amount).toLocaleString()} profit
+                      </p>
+                    </div>
                   </div>
-                  <Progress value={(investment.duration / investment.duration) * 100} className="mt-1" />
-                  <p className="text-xs text-muted-foreground">{investment.duration} turns remaining</p>
+                  <Progress 
+                    value={((investment.duration - investment.duration) / investment.duration) * 100} 
+                    className="mb-1" 
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{investment.duration} turns remaining</span>
+                    <span>Started turn {investment.startTurn}</span>
+                  </div>
                 </motion.div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No active investments</p>
+            <div className="text-center p-4 border rounded border-dashed">
+              <Star className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">No active investments</p>
+              <p className="text-xs text-muted-foreground">Make investments to grow your wealth</p>
+            </div>
           )}
         </CardContent>
       </Card>
     </div>
   );
-};
+});
+
+EconomyPanel.displayName = 'EconomyPanel';
 
 // AI Panel Component
 const AIPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: any) => void }> = ({ 
@@ -596,6 +896,8 @@ const TechnologyPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (
       )}
     </div>
   );
-};
+});
+
+TechnologyPanel.displayName = 'TechnologyPanel';
 
 export default EnhancedGameMechanics;

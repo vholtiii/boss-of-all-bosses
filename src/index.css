@@ -127,4 +127,24 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Prevent browser zoom issues */
+  html {
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+  }
+
+  /* Improve zoom performance */
+  .hex-grid-container {
+    transform-origin: center center;
+    will-change: transform;
+  }
+
+  /* Prevent text selection during zoom */
+  .hex-grid-container * {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+  }
 }

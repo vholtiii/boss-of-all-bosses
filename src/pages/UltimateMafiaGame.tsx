@@ -9,6 +9,9 @@ import ResponsiveLayout, { MobileTabBar, MobileFloatingActionButton } from '@/co
 import EnhancedMafiaHexGrid from '@/components/EnhancedMafiaHexGrid';
 import EnhancedGameMechanics from '@/components/EnhancedGameMechanics';
 import { useEnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
+import { useSoundSystem } from '@/hooks/useSoundSystem';
+import SaveLoadDialog from '@/components/SaveLoadDialog';
+import TutorialSystem from '@/components/TutorialSystem';
 import { 
   Play, 
   Settings, 
@@ -36,9 +39,19 @@ const GameContent: React.FC = () => {
     isWinner 
   } = useEnhancedMafiaGameState();
 
+  const { playSound, playSoundSequence } = useSoundSystem();
   const [activeMobileTab, setActiveMobileTab] = useState('map');
   const [showSettings, setShowSettings] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const { notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
+
+  // Handle loading a saved game
+  const handleLoadGame = (loadedGameState: any) => {
+    // This would need to be implemented in the game state hook
+    // For now, we'll just show a notification
+    console.log('Loading game:', loadedGameState);
+    playSound('success');
+  };
 
   const mobileTabs = [
     {
@@ -71,6 +84,8 @@ const GameContent: React.FC = () => {
             }}
             selectedBusiness={null}
             playerFamily={gameState.playerFamily}
+            gameState={gameState}
+            onAction={handleAction}
           />
         </div>
       )
@@ -247,6 +262,18 @@ const GameContent: React.FC = () => {
           transition={{ duration: 1.5, repeat: Infinity }}
           className="w-3 h-3 bg-mafia-blood rounded-full"
         />
+        <SaveLoadDialog 
+          gameState={gameState} 
+          onLoadGame={handleLoadGame}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowTutorial(true)}
+        >
+          <Info className="h-4 w-4 mr-2" />
+          Tutorial
+        </Button>
       </div>
     </>
   );
@@ -317,34 +344,46 @@ const GameContent: React.FC = () => {
   );
 
   return (
-    <ResponsiveLayout
-      leftSidebar={leftSidebar}
-      rightSidebar={rightSidebar}
-      mainContent={mainContent}
-      topBar={topBar}
-      bottomBar={bottomBar}
-    >
-      {/* Mobile-specific content */}
-      <div className="lg:hidden">
-        <div className="h-full flex flex-col">
-          <div className="flex-1 overflow-hidden">
-            {mobileTabs.find(tab => tab.id === activeMobileTab)?.content}
+    <>
+      <ResponsiveLayout
+        leftSidebar={leftSidebar}
+        rightSidebar={rightSidebar}
+        mainContent={mainContent}
+        topBar={topBar}
+        bottomBar={bottomBar}
+      >
+        {/* Mobile-specific content */}
+        <div className="lg:hidden">
+          <div className="h-full flex flex-col">
+            <div className="flex-1 overflow-hidden">
+              {mobileTabs.find(tab => tab.id === activeMobileTab)?.content}
+            </div>
+            <MobileTabBar
+              tabs={mobileTabs}
+              activeTab={activeMobileTab}
+              onTabChange={setActiveMobileTab}
+            />
           </div>
-          <MobileTabBar
-            tabs={mobileTabs}
-            activeTab={activeMobileTab}
-            onTabChange={setActiveMobileTab}
+          
+          <MobileFloatingActionButton
+            onClick={() => {
+              playSound('notification');
+              endTurn();
+            }}
+            icon={<Play className="h-5 w-5" />}
+            label="End Turn"
+            position="bottom-right"
           />
         </div>
-        
-        <MobileFloatingActionButton
-          onClick={endTurn}
-          icon={<Play className="h-5 w-5" />}
-          label="End Turn"
-          position="bottom-right"
-        />
-      </div>
-    </ResponsiveLayout>
+      </ResponsiveLayout>
+
+      {/* Tutorial System */}
+      <TutorialSystem
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+        onComplete={() => setShowTutorial(false)}
+      />
+    </>
   );
 };
 
