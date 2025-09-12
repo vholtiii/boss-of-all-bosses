@@ -2,8 +2,10 @@
 
 ## 📋 Table of Contents
 - [Core Gameplay Loop](#core-gameplay-loop)
+- [Headquarters System](#headquarters-system)
 - [Territory Control System](#territory-control-system)
 - [Personnel Management](#personnel-management)
+- [Movement & Deployment](#movement--deployment)
 - [Economy & Business](#economy--business)
 - [Combat & Conflict](#combat--conflict)
 - [Reputation & Heat](#reputation--heat)
@@ -27,6 +29,38 @@ The game follows a **turn-based strategy** model where each turn represents one 
 - **Processing Phase**: AI opponents act, events occur, income calculated
 - **Resolution Phase**: Consequences applied, reputation updated
 - **Advancement**: Turn counter increases, new opportunities arise
+
+---
+
+## 🏛️ Headquarters System
+
+### Headquarters Locations
+Each of the five families has a headquarters located on opposite quadrants of the map:
+
+- **Gambino Family**: Little Italy (Northwest quadrant)
+- **Genovese Family**: Brooklyn Heights (Southeast quadrant)  
+- **Lucchese Family**: Queens (Southwest quadrant)
+- **Bonanno Family**: Staten Island (Northeast quadrant)
+- **Colombo Family**: Manhattan (Center)
+
+### Initial Unit Setup
+**Each family starts with:**
+- **3 Soldiers**: Can move to adjacent hexagons only
+- **1 Capo**: Can fly up to 5 hexagons away
+- **1 Boss**: Stays at headquarters permanently
+
+### Headquarters Information Panel
+**Click on any headquarters to view:**
+- **Financial Overview**: Legal profits, illegal profits, total profits
+- **Unit Status**: Soldiers and capos at HQ vs deployed
+- **Business Count**: Number of controlled businesses
+- **Deploy Actions**: Deploy units during movement phase (player only)
+
+### Headquarters Features
+- **Visual Distinction**: Gold highlighting for player HQ, brown for others
+- **Special Icon**: 🏛️ building icon to distinguish from regular businesses
+- **Unit Management**: All units start at headquarters before deployment
+- **Strategic Value**: Headquarters cannot be captured or destroyed
 
 ---
 
@@ -76,11 +110,23 @@ The game follows a **turn-based strategy** model where each turn represents one 
 
 ## 👥 Personnel Management
 
+### Initial Unit Setup
+**Each family starts with:**
+- **3 Soldiers**: Start at headquarters, can be deployed
+- **1 Capo**: Start at headquarters, can be deployed  
+- **1 Boss**: Permanently stationed at headquarters
+
 ### Soldier System
 **Deployment:**
-- Deploy to any territory
-- Visual representation on map
-- Can be used for multiple actions
+- Start at headquarters, must be deployed first
+- Deploy to adjacent hexagons only (1 hexagon away)
+- Visual representation on map with movement highlighting
+- Can be used for multiple actions after deployment
+
+**Movement Rules:**
+- **Range**: Adjacent hexagons only
+- **Moves Per Turn**: 2 movements
+- **Restrictions**: Cannot fly or jump over hexagons
 
 **Combat Effectiveness:**
 - Numbers matter (outnumbering = higher success)
@@ -94,9 +140,15 @@ The game follows a **turn-based strategy** model where each turn represents one 
 
 ### Capo System
 **Deployment:**
-- Only to your controlled territories
+- Start at headquarters, must be deployed first
+- Can fly up to 5 hexagons away from deployment point
+- Only to your controlled territories after deployment
 - Replaces soldiers in that territory
-- Provides maximum income (100%)
+
+**Movement Rules:**
+- **Range**: Up to 5 hexagons away (flying)
+- **Moves Per Turn**: 3 movements
+- **Advantage**: Can fly over other hexagons
 
 **Capo Benefits:**
 - **Name**: Each capo has a unique name
@@ -119,6 +171,50 @@ The game follows a **turn-based strategy** model where each turn represents one 
 - Special characters with unique names
 - Higher cost than soldiers
 - Permanent deployment
+
+---
+
+## 🎯 Movement & Deployment
+
+### Movement Phase
+**Starting Movement:**
+- Click "Movement" button to enter movement phase
+- Select units from headquarters or deployed units
+- Move units according to movement rules
+- End movement phase when done
+
+### Unit Movement Rules
+**Soldiers:**
+- **Movement Range**: Adjacent hexagons only (1 hexagon away)
+- **Moves Per Turn**: 2 movements
+- **Restrictions**: Cannot fly or jump over hexagons
+- **Visual**: Light green highlighting for available moves
+
+**Capos:**
+- **Movement Range**: Up to 5 hexagons away (flying)
+- **Moves Per Turn**: 3 movements  
+- **Advantage**: Can fly over other hexagons
+- **Visual**: Light green highlighting for available moves
+
+### Deployment System
+**From Headquarters:**
+1. **Click Headquarters**: Select your family's headquarters
+2. **Choose Unit Type**: Click "Deploy Soldier" or "Deploy Capo"
+3. **Select Location**: Click on available hexagons (sky blue highlighting)
+4. **Unit Deployed**: Unit is now on the field and ready for movement
+
+**Visual Indicators:**
+- **Gold**: Selected unit or headquarters
+- **Sky Blue**: Available deployment targets
+- **Light Green**: Available movement targets
+- **"DEPLOY" Label**: Shows on available deployment hexagons
+- **"MOVE" Label**: Shows on available movement hexagons
+
+### Movement Status Display
+**Bottom Bar Shows:**
+- **Deployment Mode**: "Deploying [unit type] - Click available hexagons"
+- **Movement Mode**: "Moving [unit type] ([moves] moves left)"
+- **Clear Distinction**: Different messages for deployment vs movement
 
 ---
 

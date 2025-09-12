@@ -39,6 +39,8 @@ npm run build
 ### 🗺️ **Interactive Hex Grid Map**
 - **Zoom & Pan**: Smooth navigation with mouse wheel and drag
 - **Territory Control**: Visual representation of family territories
+- **Headquarters System**: Each family has headquarters on opposite quadrants
+- **Unit Deployment**: Deploy soldiers and capos from headquarters
 - **Real-time Updates**: Dynamic map changes as you expand
 - **Mobile Responsive**: Touch-friendly controls for mobile devices
 
@@ -49,8 +51,10 @@ npm run build
 - **Casualty System**: Realistic combat losses based on odds
 
 ### 👥 **Personnel Management**
-- **Soldier Deployment**: Deploy soldiers to any territory
-- **Capo System**: Deploy capos for maximum income (replaces soldiers)
+- **Headquarters System**: Each family starts with 3 soldiers + 1 capo at headquarters
+- **Unit Deployment**: Deploy units from headquarters using movement rules
+- **Movement Mechanics**: Soldiers move to adjacent hexagons, capos can fly up to 5 hexagons
+- **Boss System**: Boss stays at headquarters and never moves
 - **AI Opponents**: 5 rival families with unique personalities and strategies
 - **Recruitment**: Grow your army through strategic investments
 
@@ -140,6 +144,7 @@ src/
 
 For detailed information about game mechanics, strategies, and systems, see:
 - **[GAME_MECHANICS.md](./GAME_MECHANICS.md)** - Comprehensive game mechanics guide
+- **[HEADQUARTERS_SYSTEM_GUIDE.md](./HEADQUARTERS_SYSTEM_GUIDE.md)** - Headquarters and unit deployment guide
 - **[COMBAT_SYSTEM_GUIDE.md](./COMBAT_SYSTEM_GUIDE.md)** - Combat system documentation
 - **[SOLDIER_RECRUITMENT_GUIDE.md](./SOLDIER_RECRUITMENT_GUIDE.md)** - Personnel management guide
 
