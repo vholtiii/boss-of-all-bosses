@@ -541,7 +541,7 @@ const EconomyPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (act
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{investment.duration} turns remaining</span>
-                    <span>Started turn {investment.startTurn}</span>
+                    <span>Started turn {investment.duration}</span>
                   </div>
                 </motion.div>
               ))}
@@ -780,7 +780,7 @@ const WeatherPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (act
 };
 
 // Technology Panel Component
-const TechnologyPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: any) => void }> = ({ 
+const TechnologyPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: any) => void }> = memo(({ 
   gameState, 
   onAction 
 }) => {

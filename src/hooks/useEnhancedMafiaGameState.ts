@@ -647,35 +647,35 @@ export const useEnhancedMafiaGameState = () => {
     const events = [
       {
         id: `economic-${Date.now()}`,
-        type: 'market_boom',
+        type: 'boom' as const,
         title: 'Market Boom',
         description: 'Legal businesses are thriving, increasing income by 20%',
         duration: 3,
         effects: {
-          incomeMultiplier: 1.2,
-          policeHeatReduction: 5,
+          money: 2000,
+          heat: -5,
         },
       },
       {
         id: `economic-${Date.now()}`,
-        type: 'recession',
+        type: 'market_crash' as const,
         title: 'Economic Recession',
         description: 'Tough times reduce all income by 15%',
         duration: 4,
         effects: {
-          incomeMultiplier: 0.85,
-          policeHeatIncrease: 10,
+          money: -1000,
+          heat: 10,
         },
       },
       {
         id: `economic-${Date.now()}`,
-        type: 'police_crackdown',
+        type: 'regulation' as const,
         title: 'Police Crackdown',
         description: 'Increased police presence raises heat levels',
         duration: 2,
         effects: {
-          policeHeatIncrease: 20,
-          illegalIncomeReduction: 0.3,
+          heat: 20,
+          money: -500,
         },
       },
     ];
@@ -683,7 +683,9 @@ export const useEnhancedMafiaGameState = () => {
     const event = events[Math.floor(Math.random() * events.length)];
     state.economy.economicEvents.push({
       ...event,
-      startTurn: state.turn,
+      turn: state.turn,
+      expires: state.turn + event.duration,
+      choices: [],
     });
   };
 
@@ -1274,7 +1276,7 @@ export const useEnhancedMafiaGameState = () => {
           id: `spring-${Date.now()}`,
           title: 'Spring Cleaning',
           description: 'Time to clean up loose ends and strengthen alliances',
-          effects: { policeHeatReduction: 10, reputationIncrease: 5 },
+          effects: { heat: -10, reputation: 5 },
         },
       ],
       summer: [
@@ -1282,7 +1284,7 @@ export const useEnhancedMafiaGameState = () => {
           id: `summer-${Date.now()}`,
           title: 'Summer Heat',
           description: 'Hot weather increases tensions and police activity',
-          effects: { policeHeatIncrease: 15, aggressionModifier: 1.2 },
+          effects: { heat: 15, business: -10 },
         },
       ],
       fall: [
@@ -1290,7 +1292,7 @@ export const useEnhancedMafiaGameState = () => {
           id: `fall-${Date.now()}`,
           title: 'Harvest Season',
           description: 'Time to collect debts and expand operations',
-          effects: { incomeMultiplier: 1.3, debtCollectionBonus: 20 },
+          effects: { business: 30, reputation: 5 },
         },
       ],
       winter: [
@@ -1298,7 +1300,7 @@ export const useEnhancedMafiaGameState = () => {
           id: `winter-${Date.now()}`,
           title: 'Winter Solstice',
           description: 'Cold weather brings opportunities for indoor operations',
-          effects: { illegalIncomeBonus: 25, policeHeatReduction: 8 },
+          effects: { business: 25, heat: -8 },
         },
       ],
     };
@@ -1308,8 +1310,11 @@ export const useEnhancedMafiaGameState = () => {
       const event = events[Math.floor(Math.random() * events.length)];
       state.seasonalEvents.push({
         ...event,
-        startTurn: state.turn,
+        turn: state.turn,
         duration: 3,
+        name: event.title,
+        season: state.season,
+        specialActions: [],
       });
     }
   };
@@ -1372,6 +1377,7 @@ export const useEnhancedMafiaGameState = () => {
     const events = [
       {
         id: `event-${Date.now()}`,
+        type: 'random' as const,
         title: 'Police Raid',
         description: 'The police are planning a raid on your operations. What do you do?',
         choices: [
@@ -1379,31 +1385,34 @@ export const useEnhancedMafiaGameState = () => {
             id: 'bribe',
             text: 'Bribe the officers ($10,000)',
             consequences: [
-              { type: 'money', amount: -10000 },
-              { type: 'policeHeat', amount: -15 },
+              { type: 'money' as const, value: -10000, description: 'Paid bribe to officers' },
+              { type: 'heat' as const, value: -15, description: 'Reduced police heat' },
             ],
           },
           {
             id: 'hide',
             text: 'Hide evidence and lay low',
             consequences: [
-              { type: 'policeHeat', amount: -5 },
-              { type: 'income', amount: -0.2 },
+              { type: 'heat' as const, value: -5, description: 'Reduced police heat' },
+              { type: 'money' as const, value: -2000, description: 'Lost income from laying low' },
             ],
           },
           {
             id: 'fight',
             text: 'Stand your ground',
             consequences: [
-              { type: 'policeHeat', amount: 20 },
-              { type: 'reputation', amount: 10 },
+              { type: 'heat' as const, value: 20, description: 'Increased police heat' },
+              { type: 'reputation' as const, value: 10, description: 'Gained respect' },
             ],
           },
         ],
+        consequences: [],
+        turn: state.turn,
         expires: state.turn + 2,
       },
       {
         id: `event-${Date.now()}`,
+        type: 'random' as const,
         title: 'Rival Family Meeting',
         description: 'A rival family wants to discuss territory boundaries.',
         choices: [
@@ -1411,26 +1420,28 @@ export const useEnhancedMafiaGameState = () => {
             id: 'negotiate',
             text: 'Negotiate peacefully',
             consequences: [
-              { type: 'reputation', amount: 5 },
-              { type: 'familyRelationship', family: 'genovese', amount: 10 },
+              { type: 'reputation' as const, value: 5, description: 'Gained reputation' },
+              { type: 'relationship' as const, value: 10, description: 'Improved relationship with Genovese' },
             ],
           },
           {
             id: 'threaten',
             text: 'Make threats',
             consequences: [
-              { type: 'fear', amount: 15 },
-              { type: 'familyRelationship', family: 'genovese', amount: -20 },
+              { type: 'reputation' as const, value: 15, description: 'Increased fear' },
+              { type: 'relationship' as const, value: -20, description: 'Damaged relationship with Genovese' },
             ],
           },
           {
             id: 'ignore',
             text: 'Ignore the meeting',
             consequences: [
-              { type: 'familyRelationship', family: 'genovese', amount: -10 },
+              { type: 'relationship' as const, value: -10, description: 'Damaged relationship with Genovese' },
             ],
           },
         ],
+        consequences: [],
+        turn: state.turn,
         expires: state.turn + 1,
       },
     ];
@@ -1521,7 +1532,7 @@ export const useEnhancedMafiaGameState = () => {
           ...state.resources,
           soldiers: state.resources.soldiers - Math.floor(playerSoldiersInTerritory * 0.2), // 20% casualties
           money: state.resources.money + 5000, // Territory income
-          reputation: state.resources.reputation + 10
+          respect: state.resources.respect + 10
         }
       };
     } else {
@@ -1587,7 +1598,7 @@ export const useEnhancedMafiaGameState = () => {
           ...state.resources,
           soldiers: state.resources.soldiers - Math.floor(playerSoldiersInTerritory * 0.1), // 10% casualties
           money: state.resources.money + 3000, // Territory income
-          reputation: state.resources.reputation + 5
+          respect: state.resources.respect + 5
         }
       };
     } else {
@@ -1743,7 +1754,7 @@ export const useEnhancedMafiaGameState = () => {
         expectedReturn: expectedReturn,
         duration: duration,
         currentValue: amount,
-        startTurn: state.turn,
+        risk: 10,
       });
     }
   };
@@ -1756,11 +1767,12 @@ export const useEnhancedMafiaGameState = () => {
       state.resources.money -= amount;
       state.policeHeat.bribedOfficials.push({
         id: `official-${Date.now()}`,
-        type: officialType,
-        amount: amount,
-        effectiveness: 0.8,
-        duration: 10,
-        startTurn: state.turn,
+        rank: 'officer' as const,
+        name: `Officer ${Math.floor(Math.random() * 1000)}`,
+        monthlyBribe: amount,
+        heatReduction: 10,
+        permissions: ['reduced_heat'],
+        territory: 'Manhattan',
       });
       
       // Immediate effect
@@ -1777,12 +1789,17 @@ export const useEnhancedMafiaGameState = () => {
       state.resources.money -= cost;
       state.businesses.push({
         id: `business-${Date.now()}`,
-        type: action.businessType || 'restaurant',
-        location: action.location || 'Little Italy',
-        income: income,
+        name: `Business ${Math.floor(Math.random() * 1000)}`,
+        type: action.legal !== false ? 'legal' : 'illegal',
+        category: action.businessType || 'restaurant',
         level: 1,
-        family: state.playerFamily,
-        legal: action.legal !== false,
+        monthlyIncome: income,
+        monthlyExpenses: income * 0.3,
+        launderingCapacity: action.legal !== false ? 0 : income * 0.5,
+        extortionRate: 0,
+        isExtorted: false,
+        district: action.location || 'Little Italy',
+        heatLevel: 0,
       });
       
       // Update finances
@@ -1802,10 +1819,10 @@ export const useEnhancedMafiaGameState = () => {
     if (business && state.resources.money >= upgradeCost) {
       state.resources.money -= upgradeCost;
       business.level += 1;
-      business.income = Math.round(business.income * 1.5);
+      business.monthlyIncome = Math.round(business.monthlyIncome * 1.5);
       
       // Update finances
-      state.finances.totalIncome += business.income * 0.5;
+      state.finances.totalIncome += business.monthlyIncome * 0.5;
     }
   };
 
@@ -1857,8 +1874,17 @@ export const useEnhancedMafiaGameState = () => {
           id: `violent-${Date.now()}`,
           type: action.violenceType || 'intimidation',
           target: action.target || 'unknown',
+          targetType: 'civilian',
           turn: state.turn,
           success: true,
+          consequences: {
+            respectChange: 5,
+            reputationChange: 5,
+            loyaltyChange: 0,
+            fearChange: 15,
+            streetInfluenceChange: 0,
+            policeHeatIncrease: 25,
+          },
         });
       } else {
         // Failed violent action
