@@ -53,6 +53,32 @@ export interface EnhancedMafiaGameState {
   activeEvent?: GameEvent;
   showMissionBoard: boolean;
   
+  // Movement state
+  movementPhase: boolean;
+  selectedUnit: {
+    type: 'soldier' | 'capo' | null;
+    location: { q: number; r: number; s: number } | null;
+    remainingMoves: number;
+  };
+  availableMoves: Array<{ q: number; r: number; s: number; distance: number }>;
+  
+  // Headquarters and Units System
+  headquarters: {
+    [family: string]: {
+      q: number;
+      r: number;
+      s: number;
+      district: string;
+    };
+  };
+  units: {
+    [family: string]: {
+      soldiers: Array<{ q: number; r: number; s: number; id: string }>;
+      capos: Array<{ q: number; r: number; s: number; id: string }>;
+      boss: { q: number; r: number; s: number; id: string };
+    };
+  };
+  
   // Family control (territory control percentages)
   familyControl: {
     gambino: number;
@@ -329,6 +355,81 @@ const initialEnhancedGameState: EnhancedMafiaGameState = {
   selectedTerritory: null,
   activeEvent: null,
   showMissionBoard: false,
+  
+  // Movement state
+  movementPhase: false,
+  selectedUnit: {
+    type: null,
+    location: null,
+    remainingMoves: 0,
+  },
+  availableMoves: [],
+  
+  // Headquarters and Units System
+  headquarters: {
+    gambino: { q: -5, r: 5, s: 0, district: 'Little Italy' },
+    genovese: { q: 5, r: -5, s: 0, district: 'Brooklyn Heights' },
+    lucchese: { q: -5, r: -5, s: 10, district: 'Queens' },
+    bonanno: { q: 5, r: 5, s: -10, district: 'Staten Island' },
+    colombo: { q: 0, r: 0, s: 0, district: 'Manhattan' },
+  },
+  units: {
+    gambino: {
+      soldiers: [
+        { q: -5, r: 5, s: 0, id: 'gambino-soldier-1' },
+        { q: -5, r: 5, s: 0, id: 'gambino-soldier-2' },
+        { q: -5, r: 5, s: 0, id: 'gambino-soldier-3' }
+      ],
+      capos: [
+        { q: -5, r: 5, s: 0, id: 'gambino-capo-1' }
+      ],
+      boss: { q: -5, r: 5, s: 0, id: 'gambino-boss' }
+    },
+    genovese: {
+      soldiers: [
+        { q: 5, r: -5, s: 0, id: 'genovese-soldier-1' },
+        { q: 5, r: -5, s: 0, id: 'genovese-soldier-2' },
+        { q: 5, r: -5, s: 0, id: 'genovese-soldier-3' }
+      ],
+      capos: [
+        { q: 5, r: -5, s: 0, id: 'genovese-capo-1' }
+      ],
+      boss: { q: 5, r: -5, s: 0, id: 'genovese-boss' }
+    },
+    lucchese: {
+      soldiers: [
+        { q: -5, r: -5, s: 10, id: 'lucchese-soldier-1' },
+        { q: -5, r: -5, s: 10, id: 'lucchese-soldier-2' },
+        { q: -5, r: -5, s: 10, id: 'lucchese-soldier-3' }
+      ],
+      capos: [
+        { q: -5, r: -5, s: 10, id: 'lucchese-capo-1' }
+      ],
+      boss: { q: -5, r: -5, s: 10, id: 'lucchese-boss' }
+    },
+    bonanno: {
+      soldiers: [
+        { q: 5, r: 5, s: -10, id: 'bonanno-soldier-1' },
+        { q: 5, r: 5, s: -10, id: 'bonanno-soldier-2' },
+        { q: 5, r: 5, s: -10, id: 'bonanno-soldier-3' }
+      ],
+      capos: [
+        { q: 5, r: 5, s: -10, id: 'bonanno-capo-1' }
+      ],
+      boss: { q: 5, r: 5, s: -10, id: 'bonanno-boss' }
+    },
+    colombo: {
+      soldiers: [
+        { q: 0, r: 0, s: 0, id: 'colombo-soldier-1' },
+        { q: 0, r: 0, s: 0, id: 'colombo-soldier-2' },
+        { q: 0, r: 0, s: 0, id: 'colombo-soldier-3' }
+      ],
+      capos: [
+        { q: 0, r: 0, s: 0, id: 'colombo-capo-1' }
+      ],
+      boss: { q: 0, r: 0, s: 0, id: 'colombo-boss' }
+    },
+  },
   
   familyControl: {
     gambino: 20,
@@ -1917,6 +2018,228 @@ export const useEnhancedMafiaGameState = () => {
     }
   };
 
+  // Movement functions
+  const startMovementPhase = useCallback(() => {
+    setGameState(prev => ({
+      ...prev,
+      movementPhase: true,
+      selectedUnit: { type: null, location: null, remainingMoves: 0 },
+      availableMoves: [],
+    }));
+  }, []);
+
+  const selectUnit = useCallback((unitType: 'soldier' | 'capo', location: { q: number; r: number; s: number }) => {
+    setGameState(prev => {
+      const remainingMoves = unitType === 'soldier' ? 2 : 3;
+      const availableMoves = calculateAvailableMoves(location, unitType, remainingMoves);
+      
+      return {
+        ...prev,
+        selectedUnit: {
+          type: unitType,
+          location,
+          remainingMoves,
+        },
+        availableMoves,
+      };
+    });
+  }, []);
+
+  const moveUnit = useCallback((targetLocation: { q: number; r: number; s: number }) => {
+    setGameState(prev => {
+      if (!prev.selectedUnit.type || !prev.selectedUnit.location) return prev;
+      
+      const newState = { ...prev };
+      const distance = calculateDistance(prev.selectedUnit.location, targetLocation);
+      
+      // Check if move is valid
+      if (distance > 1 && prev.selectedUnit.type !== 'capo') {
+        return prev; // Soldiers can't fly
+      }
+      
+      if (distance > 5) {
+        return prev; // Capos can't fly more than 5 hexagons
+      }
+      
+      if (prev.selectedUnit.remainingMoves <= 0) {
+        return prev; // No moves remaining
+      }
+      
+      // Update territories with the moved unit
+      newState.territories = newState.territories.map(territory => ({
+        ...territory,
+        businesses: territory.businesses.map(business => {
+          if (business.q === prev.selectedUnit.location?.q && 
+              business.r === prev.selectedUnit.location?.r && 
+              business.s === prev.selectedUnit.location?.s) {
+            // Remove unit from current location
+            if (prev.selectedUnit.type === 'soldier') {
+              return { ...business, soldiers: undefined };
+            } else {
+              return { ...business, capo: undefined };
+            }
+          }
+          
+          if (business.q === targetLocation.q && 
+              business.r === targetLocation.r && 
+              business.s === targetLocation.s) {
+            // Add unit to new location
+            if (prev.selectedUnit.type === 'soldier') {
+              return {
+                ...business,
+                soldiers: {
+                  count: 1,
+                  family: 'gambino' as const,
+                },
+              };
+            } else {
+              return {
+                ...business,
+                capo: {
+                  name: 'Capo',
+                  family: 'gambino' as const,
+                  level: 1,
+                },
+              };
+            }
+          }
+          
+          return business;
+        }),
+      }));
+      
+      // Update selected unit
+      newState.selectedUnit = {
+        ...prev.selectedUnit,
+        location: targetLocation,
+        remainingMoves: prev.selectedUnit.remainingMoves - 1,
+      };
+      
+      // Recalculate available moves
+      newState.availableMoves = calculateAvailableMoves(
+        targetLocation, 
+        prev.selectedUnit.type, 
+        newState.selectedUnit.remainingMoves
+      );
+      
+      return newState;
+    });
+  }, []);
+
+  const endMovementPhase = useCallback(() => {
+    setGameState(prev => ({
+      ...prev,
+      movementPhase: false,
+      selectedUnit: { type: null, location: null, remainingMoves: 0 },
+      availableMoves: [],
+    }));
+  }, []);
+
+  // Headquarters and Unit Management
+  const selectHeadquarters = useCallback((family: string) => {
+    setGameState(prev => {
+      const headquarters = prev.headquarters[family];
+      if (!headquarters) return prev;
+
+      return {
+        ...prev,
+        selectedUnit: {
+          type: null,
+          location: headquarters,
+          remainingMoves: 0,
+        },
+        availableMoves: [],
+      };
+    });
+  }, []);
+
+  const selectUnitFromHeadquarters = useCallback((unitType: 'soldier' | 'capo', family: string) => {
+    setGameState(prev => {
+      const headquarters = prev.headquarters[family];
+      if (!headquarters) return prev;
+
+      const remainingMoves = unitType === 'soldier' ? 2 : 3;
+      const availableMoves = calculateAvailableMoves(headquarters, unitType, remainingMoves);
+      
+      return {
+        ...prev,
+        selectedUnit: {
+          type: unitType,
+          location: headquarters,
+          remainingMoves,
+        },
+        availableMoves,
+      };
+    });
+  }, []);
+
+  const deployUnit = useCallback((unitType: 'soldier' | 'capo', targetLocation: { q: number; r: number; s: number }, family: string) => {
+    setGameState(prev => {
+      const newState = { ...prev };
+      const headquarters = prev.headquarters[family];
+      if (!headquarters) return prev;
+
+      // Find available unit at headquarters
+      const availableUnits = prev.units[family][unitType === 'soldier' ? 'soldiers' : 'capos'];
+      const unitToDeploy = availableUnits.find(unit => 
+        unit.q === headquarters.q && unit.r === headquarters.r && unit.s === headquarters.s
+      );
+      
+      if (!unitToDeploy) return prev;
+
+      // Move unit to target location
+      newState.units = {
+        ...prev.units,
+        [family]: {
+          ...prev.units[family],
+          [unitType === 'soldier' ? 'soldiers' : 'capos']: prev.units[family][unitType === 'soldier' ? 'soldiers' : 'capos'].map(unit =>
+            unit.id === unitToDeploy.id ? { ...unit, ...targetLocation } : unit
+          )
+        }
+      };
+
+      // Update selected unit
+      newState.selectedUnit = {
+        type: unitType,
+        location: targetLocation,
+        remainingMoves: unitType === 'soldier' ? 2 : 3,
+      };
+
+      // Recalculate available moves
+      newState.availableMoves = calculateAvailableMoves(
+        targetLocation, 
+        unitType, 
+        newState.selectedUnit.remainingMoves
+      );
+
+      return newState;
+    });
+  }, []);
+
+  // Helper functions for movement calculations
+  const calculateDistance = (from: { q: number; r: number; s: number }, to: { q: number; r: number; s: number }) => {
+    return (Math.abs(from.q - to.q) + Math.abs(from.r - to.r) + Math.abs(from.s - to.s)) / 2;
+  };
+
+  const calculateAvailableMoves = (location: { q: number; r: number; s: number }, unitType: 'soldier' | 'capo', remainingMoves: number) => {
+    const moves: Array<{ q: number; r: number; s: number; distance: number }> = [];
+    const maxDistance = unitType === 'capo' ? 5 : 1;
+    
+    // Generate all possible moves within range
+    for (let q = location.q - maxDistance; q <= location.q + maxDistance; q++) {
+      for (let r = location.r - maxDistance; r <= location.r + maxDistance; r++) {
+        const s = -q - r;
+        const distance = calculateDistance(location, { q, r, s });
+        
+        if (distance <= maxDistance && distance > 0) {
+          moves.push({ q, r, s, distance });
+        }
+      }
+    }
+    
+    return moves;
+  };
+
   // Check for victory condition
   const isWinner = gameState.familyControl ? gameState.familyControl[gameState.playerFamily] >= 80 : false;
 
@@ -1928,6 +2251,13 @@ export const useEnhancedMafiaGameState = () => {
     performBusinessAction,
     performReputationAction,
     handleEventChoice,
+    startMovementPhase,
+    selectUnit,
+    moveUnit,
+    endMovementPhase,
+    selectHeadquarters,
+    selectUnitFromHeadquarters,
+    deployUnit,
     isWinner,
   };
 };

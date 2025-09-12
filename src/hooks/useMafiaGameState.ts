@@ -537,6 +537,7 @@ export const useMafiaGameState = () => {
               newState.resources.respect += 1;
             }
           }
+          break;
         case 'hire_lawyer':
           if (action.lawyerId) {
             const availableLawyers = [

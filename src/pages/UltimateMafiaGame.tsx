@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { NotificationProvider, useMafiaNotifications } from '@/components/ui/notification-system';
 import { AnimatedCard, AnimatedCardHeader, AnimatedCardTitle, AnimatedCardContent } from '@/components/ui/animated-card';
@@ -12,6 +12,8 @@ import { useEnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import SaveLoadDialog from '@/components/SaveLoadDialog';
 import TutorialSystem from '@/components/TutorialSystem';
+import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
+import { Button } from '@/components/ui/button';
 import { 
   Play, 
   Settings, 
@@ -28,21 +30,57 @@ import {
 } from 'lucide-react';
 
 const GameContent: React.FC = () => {
-  const { 
-    gameState, 
-    endTurn, 
-    selectTerritory, 
-    performAction, 
+  const {
+    gameState,
+    endTurn,
+    selectTerritory,
+    performAction,
     performBusinessAction,
     performReputationAction,
     handleEventChoice,
-    isWinner 
+    startMovementPhase,
+    selectUnit,
+    moveUnit,
+    endMovementPhase,
+    selectHeadquarters,
+    selectUnitFromHeadquarters,
+    deployUnit,
+    isWinner
   } = useEnhancedMafiaGameState();
+
+  // Handle action wrapper function
+  const handleAction = useCallback((action: any) => {
+    performAction(action);
+  }, [performAction]);
+
+  // Handle headquarters selection
+  const handleHeadquartersClick = useCallback((family: string) => {
+    const headquarters = gameState.headquarters[family];
+    const units = gameState.units[family];
+    
+    if (headquarters && units) {
+      setSelectedHeadquarters({
+        family,
+        headquarters,
+        units
+      });
+    }
+  }, [gameState.headquarters, gameState.units]);
+
+  // Close headquarters panel
+  const closeHeadquartersPanel = useCallback(() => {
+    setSelectedHeadquarters(null);
+  }, []);
 
   const { playSound, playSoundSequence } = useSoundSystem();
   const [activeMobileTab, setActiveMobileTab] = useState('map');
   const [showSettings, setShowSettings] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [selectedHeadquarters, setSelectedHeadquarters] = useState<{
+    family: string;
+    headquarters: any;
+    units: any;
+  } | null>(null);
   const { notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
 
   // Handle loading a saved game
@@ -57,7 +95,7 @@ const GameContent: React.FC = () => {
     {
       id: 'map',
       label: 'Map',
-      icon: <div className="w-4 h-4 bg-mafia-gold rounded-sm" />,
+      icon: <Target className="h-4 w-4" />,
       content: (
         <div className="h-full">
           <EnhancedMafiaHexGrid 
@@ -86,6 +124,11 @@ const GameContent: React.FC = () => {
             playerFamily={gameState.playerFamily}
             gameState={gameState}
             onAction={handleAction}
+            onSelectUnit={selectUnit}
+            onMoveUnit={moveUnit}
+            onSelectHeadquarters={handleHeadquartersClick}
+            onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
+            onDeployUnit={deployUnit}
           />
         </div>
       )
@@ -93,7 +136,7 @@ const GameContent: React.FC = () => {
     {
       id: 'mechanics',
       label: 'Game',
-      icon: <div className="w-4 h-4 bg-blue-500 rounded-sm" />,
+      icon: <Zap className="h-4 w-4" />,
       content: (
         <div className="p-4 h-full overflow-y-auto">
           <EnhancedGameMechanics 
@@ -106,7 +149,7 @@ const GameContent: React.FC = () => {
     {
       id: 'resources',
       label: 'Resources',
-      icon: <div className="w-4 h-4 bg-green-500 rounded-sm" />,
+      icon: <DollarSign className="h-4 w-4" />,
       content: (
         <div className="p-4 space-y-4">
           <ResourcePanel gameState={gameState} />
@@ -116,7 +159,7 @@ const GameContent: React.FC = () => {
     {
       id: 'events',
       label: 'Events',
-      icon: <div className="w-4 h-4 bg-purple-500 rounded-sm" />,
+      icon: <Calendar className="h-4 w-4" />,
       content: (
         <div className="p-4">
           <EventsPanel 
@@ -177,91 +220,104 @@ const GameContent: React.FC = () => {
   }
 
   const leftSidebar = (
-    <div className="space-y-4">
-      <AnimatedCard className="bg-gradient-to-br from-noir-dark to-background border-noir-light">
-        <AnimatedCardHeader>
-          <AnimatedCardTitle className="text-mafia-gold font-playfair">
-            {gameState.playerFamily.toUpperCase()} FAMILY
-          </AnimatedCardTitle>
-        </AnimatedCardHeader>
-        <AnimatedCardContent>
-          <ResourcePanel gameState={gameState} />
-        </AnimatedCardContent>
-      </AnimatedCard>
+    <div className="space-y-6 p-4">
+      {/* Family Status */}
+      <div className="bg-gradient-to-br from-noir-dark to-background border border-noir-light rounded-lg p-4">
+        <h3 className="text-lg font-bold text-mafia-gold font-playfair mb-4 flex items-center">
+          <div className="w-3 h-3 bg-mafia-gold rounded-full mr-2" />
+          {gameState.playerFamily.toUpperCase()} FAMILY
+        </h3>
+        <ResourcePanel gameState={gameState} />
+      </div>
 
-      <AnimatedCard className="bg-gradient-to-br from-noir-dark to-background border-noir-light">
-        <AnimatedCardHeader>
-          <AnimatedCardTitle className="text-mafia-gold font-playfair">
-            Game Mechanics
-          </AnimatedCardTitle>
-        </AnimatedCardHeader>
-        <AnimatedCardContent>
-          <EnhancedGameMechanics 
-            gameState={gameState} 
-            onAction={performAction}
-          />
-        </AnimatedCardContent>
-      </AnimatedCard>
+      {/* Game Mechanics */}
+      <div className="bg-gradient-to-br from-noir-dark to-background border border-noir-light rounded-lg p-4">
+        <h3 className="text-lg font-bold text-mafia-gold font-playfair mb-4 flex items-center">
+          <div className="w-3 h-3 bg-blue-500 rounded-full mr-2" />
+          Game Mechanics
+        </h3>
+        <EnhancedGameMechanics 
+          gameState={gameState} 
+          onAction={performAction}
+        />
+      </div>
     </div>
   );
 
   const rightSidebar = (
-    <div className="space-y-4">
-      <AnimatedCard className="bg-gradient-to-br from-noir-dark to-background border-noir-light">
-        <AnimatedCardHeader>
-          <AnimatedCardTitle className="text-mafia-gold font-playfair">
-            Events & Missions
-          </AnimatedCardTitle>
-        </AnimatedCardHeader>
-        <AnimatedCardContent>
-          <EventsPanel 
-            gameState={gameState} 
-            onEventChoice={handleEventChoice}
-          />
-        </AnimatedCardContent>
-      </AnimatedCard>
+    <div className="space-y-6 p-4">
+      {/* Events & Missions */}
+      <div className="bg-gradient-to-br from-noir-dark to-background border border-noir-light rounded-lg p-4">
+        <h3 className="text-lg font-bold text-mafia-gold font-playfair mb-4 flex items-center">
+          <div className="w-3 h-3 bg-purple-500 rounded-full mr-2" />
+          Events & Missions
+        </h3>
+        <EventsPanel 
+          gameState={gameState} 
+          onEventChoice={handleEventChoice}
+        />
+      </div>
       
-      <AnimatedCard className="bg-gradient-to-br from-noir-dark to-background border-noir-light">
-        <AnimatedCardHeader>
-          <AnimatedCardTitle className="text-mafia-gold font-playfair">
-            AI Opponents
-          </AnimatedCardTitle>
-        </AnimatedCardHeader>
-        <AnimatedCardContent>
-          <AIOpponentsPanel gameState={gameState} />
-        </AnimatedCardContent>
-      </AnimatedCard>
+      {/* AI Opponents */}
+      <div className="bg-gradient-to-br from-noir-dark to-background border border-noir-light rounded-lg p-4">
+        <h3 className="text-lg font-bold text-mafia-gold font-playfair mb-4 flex items-center">
+          <div className="w-3 h-3 bg-red-500 rounded-full mr-2" />
+          AI Opponents
+        </h3>
+        <AIOpponentsPanel gameState={gameState} />
+      </div>
     </div>
   );
 
   const topBar = (
-    <>
-      <div className="flex items-center space-x-4">
+    <div className="flex items-center justify-between w-full px-6 py-4 bg-gradient-to-r from-noir-dark to-background border-b border-noir-light">
+      {/* Left side - Game Title */}
+      <div className="flex items-center space-x-3">
         <motion.h1
           initial={{ x: -50, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.5 }}
-          className="text-2xl font-bold text-mafia-gold font-playfair"
+          className="text-xl font-bold text-mafia-gold font-playfair"
         >
           ULTIMATE FIVE FAMILIES
         </motion.h1>
-        <motion.div
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="w-2 h-2 bg-mafia-gold rounded-full"
-        />
-        <span className="text-sm text-muted-foreground font-source">ENHANCED UNDERWORLD</span>
+        <div className="h-6 w-px bg-noir-light" />
+        <span className="text-sm text-muted-foreground font-source">Enhanced Underworld</span>
       </div>
       
-      <div className="flex items-center space-x-4">
-        <div className="text-sm text-muted-foreground font-source">
-          TURN: {gameState.turn} | SEASON: {gameState.season.toUpperCase()} | STATUS: COMMISSION ACTIVE
+      {/* Center - Game Status */}
+      <div className="flex items-center space-x-6">
+        <div className="text-center">
+          <div className="text-lg font-bold text-mafia-gold">Turn {gameState.turn}</div>
+          <div className="text-xs text-muted-foreground capitalize">{gameState.season}</div>
         </div>
-        <motion.div
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-          className="w-3 h-3 bg-mafia-blood rounded-full"
-        />
+        <div className="text-center">
+          <div className="text-sm font-medium text-green-400">Commission Active</div>
+          <motion.div
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className="w-2 h-2 bg-green-400 rounded-full mx-auto mt-1"
+          />
+        </div>
+      </div>
+      
+      {/* Right side - Actions */}
+      <div className="flex items-center space-x-2">
+        <Button
+          variant={gameState.movementPhase ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            if (gameState.movementPhase) {
+              endMovementPhase();
+            } else {
+              startMovementPhase();
+            }
+          }}
+          className="font-medium"
+        >
+          <Target className="h-4 w-4 mr-2" />
+          {gameState.movementPhase ? 'End Movement' : 'Movement'}
+        </Button>
         <SaveLoadDialog 
           gameState={gameState} 
           onLoadGame={handleLoadGame}
@@ -271,30 +327,74 @@ const GameContent: React.FC = () => {
           size="sm"
           onClick={() => setShowTutorial(true)}
         >
-          <Info className="h-4 w-4 mr-2" />
-          Tutorial
+          <Info className="h-4 w-4" />
         </Button>
       </div>
-    </>
+    </div>
   );
 
   const bottomBar = (
-    <>
-      <div className="flex items-center space-x-6 text-sm font-source">
-        <span className="text-mafia-gold">
-          ▲ {gameState.selectedTerritory ? 
+    <div className="flex items-center justify-between w-full px-6 py-3 bg-gradient-to-r from-background to-noir-dark border-t border-noir-light">
+      {/* Left side - Selected Territory */}
+      <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2">
+          <div className="w-2 h-2 bg-mafia-gold rounded-full" />
+          <span className="text-sm font-medium text-mafia-gold">
+            {gameState.selectedTerritory ? 
              `${gameState.selectedTerritory.district} - ${gameState.selectedTerritory.family.toUpperCase()}` : 
-             'NO TERRITORY SELECTED'}
-        </span>
-        <span className="text-muted-foreground">
-          | RESPECT: {gameState.resources.respect}% | SOLDIERS: {gameState.resources.soldiers} | RESEARCH: {gameState.resources.researchPoints}
-        </span>
+             'No Territory Selected'}
+          </span>
+        </div>
+        
+        {/* Movement Status */}
+        {gameState.movementPhase && gameState.selectedUnit?.type && (
+          <div className="flex items-center space-x-2 px-3 py-1 bg-yellow-400/20 rounded-full border border-yellow-400/30">
+            <Target className="h-3 w-3 text-yellow-400" />
+            <span className="text-xs font-medium text-yellow-400">
+              {(() => {
+                const isAtHeadquarters = gameState.selectedUnit?.location && Object.values(gameState.headquarters).some(
+                  (hq: any) => 
+                    hq.q === gameState.selectedUnit.location.q && 
+                    hq.r === gameState.selectedUnit.location.r && 
+                    hq.s === gameState.selectedUnit.location.s
+                );
+                
+                if (isAtHeadquarters) {
+                  return `Deploying ${gameState.selectedUnit.type} - Click available hexagons`;
+                } else {
+                  return `Moving ${gameState.selectedUnit.type} (${gameState.selectedUnit.remainingMoves} moves left)`;
+                }
+              })()}
+            </span>
+          </div>
+        )}
       </div>
       
-      <div className="text-sm text-mafia-gold font-playfair">
-        "ADVANCED STRATEGY RULES THE UNDERWORLD"
+      {/* Center - Resources */}
+      <div className="flex items-center space-x-6">
+        <div className="text-center">
+          <div className="text-sm font-bold text-green-400">${gameState.resources.money.toLocaleString()}</div>
+          <div className="text-xs text-muted-foreground">Money</div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm font-bold text-red-400">{gameState.resources.soldiers}</div>
+          <div className="text-xs text-muted-foreground">Soldiers</div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm font-bold text-blue-400">{gameState.resources.respect}%</div>
+          <div className="text-xs text-muted-foreground">Respect</div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm font-bold text-purple-400">{gameState.resources.researchPoints}</div>
+          <div className="text-xs text-muted-foreground">Research</div>
+        </div>
       </div>
-    </>
+      
+      {/* Right side - Motto */}
+      <div className="text-sm text-muted-foreground font-playfair italic">
+        "Strategy Rules the Underworld"
+      </div>
+    </div>
   );
 
   const mainContent = (
@@ -315,31 +415,38 @@ const GameContent: React.FC = () => {
         gameState.season === 'winter' && "bg-blue-500"
       )} />
       
-      <EnhancedMafiaHexGrid 
-        key={`hex-grid-refresh-${Date.now()}`}
-        width={12}
-        height={12}
-        onBusinessClick={(business) => {
-          console.log('🏢 Business clicked:', business);
-          selectTerritory({
-            q: business.q,
-            r: business.r,
-            s: business.s,
-            district: business.district,
-            family: business.family,
-            business: {
-              type: business.businessType as any,
-              income: business.income
-            }
-          });
-          
-          if (business.family === gameState.playerFamily) {
-            notifyTerritoryCaptured(business.district);
-          }
-        }}
-        selectedBusiness={null}
-        playerFamily={gameState.playerFamily}
-      />
+          <EnhancedMafiaHexGrid 
+            key={`hex-grid-refresh-${Date.now()}`}
+            width={12}
+            height={12}
+            onBusinessClick={(business) => {
+              console.log('🏢 Business clicked:', business);
+              selectTerritory({
+                q: business.q,
+                r: business.r,
+                s: business.s,
+                district: business.district,
+                family: business.family,
+                business: {
+                  type: business.businessType as any,
+                  income: business.income
+                }
+              });
+              
+              if (business.family === gameState.playerFamily) {
+                notifyTerritoryCaptured(business.district);
+              }
+            }}
+            selectedBusiness={null}
+            playerFamily={gameState.playerFamily}
+            gameState={gameState}
+            onAction={handleAction}
+            onSelectUnit={selectUnit}
+            onMoveUnit={moveUnit}
+            onSelectHeadquarters={handleHeadquartersClick}
+            onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
+            onDeployUnit={deployUnit}
+          />
     </div>
   );
 
@@ -377,6 +484,20 @@ const GameContent: React.FC = () => {
         </div>
       </ResponsiveLayout>
 
+      {/* Headquarters Info Panel */}
+      {selectedHeadquarters && (
+        <HeadquartersInfoPanel
+          family={selectedHeadquarters.family}
+          headquarters={selectedHeadquarters.headquarters}
+          units={selectedHeadquarters.units}
+          businesses={gameState.businesses || []}
+          onClose={closeHeadquartersPanel}
+          onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
+          movementPhase={gameState.movementPhase}
+          playerFamily={gameState.playerFamily}
+        />
+      )}
+
       {/* Tutorial System */}
       <TutorialSystem
         isOpen={showTutorial}
@@ -392,27 +513,32 @@ const ResourcePanel: React.FC<{ gameState: any }> = ({ gameState }) => {
   const { resources } = gameState;
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        <div className="text-center p-2 border rounded">
-          <DollarSign className="h-4 w-4 mx-auto mb-1 text-green-500" />
-          <p className="text-sm font-medium">${resources.money.toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground">Money</p>
+    <div className="space-y-4">
+      {/* Primary Resources */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center">
+          <DollarSign className="h-5 w-5 mx-auto mb-2 text-green-400" />
+          <div className="text-lg font-bold text-green-400">${resources.money.toLocaleString()}</div>
+          <div className="text-xs text-muted-foreground">Money</div>
         </div>
-        <div className="text-center p-2 border rounded">
-          <Users className="h-4 w-4 mx-auto mb-1 text-red-500" />
-          <p className="text-sm font-medium">{resources.soldiers}</p>
-          <p className="text-xs text-muted-foreground">Soldiers</p>
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-center">
+          <Users className="h-5 w-5 mx-auto mb-2 text-red-400" />
+          <div className="text-lg font-bold text-red-400">{resources.soldiers}</div>
+          <div className="text-xs text-muted-foreground">Soldiers</div>
         </div>
-        <div className="text-center p-2 border rounded">
-          <Shield className="h-4 w-4 mx-auto mb-1 text-blue-500" />
-          <p className="text-sm font-medium">{resources.respect}%</p>
-          <p className="text-xs text-muted-foreground">Respect</p>
+      </div>
+      
+      {/* Secondary Resources */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-center">
+          <Shield className="h-5 w-5 mx-auto mb-2 text-blue-400" />
+          <div className="text-lg font-bold text-blue-400">{resources.respect}%</div>
+          <div className="text-xs text-muted-foreground">Respect</div>
         </div>
-        <div className="text-center p-2 border rounded">
-          <Brain className="h-4 w-4 mx-auto mb-1 text-purple-500" />
-          <p className="text-sm font-medium">{resources.researchPoints}</p>
-          <p className="text-xs text-muted-foreground">Research</p>
+        <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 text-center">
+          <Brain className="h-5 w-5 mx-auto mb-2 text-purple-400" />
+          <div className="text-lg font-bold text-purple-400">{resources.researchPoints}</div>
+          <div className="text-xs text-muted-foreground">Research</div>
         </div>
       </div>
     </div>

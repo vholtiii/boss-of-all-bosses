@@ -51,6 +51,11 @@ interface EnhancedMafiaHexGridProps {
   playerFamily: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
   gameState?: any; // Add gameState for accessing resources
   onAction?: (action: any) => void; // Add action handler
+  onSelectUnit?: (unitType: 'soldier' | 'capo', location: { q: number; r: number; s: number }) => void;
+  onMoveUnit?: (targetLocation: { q: number; r: number; s: number }) => void;
+  onSelectHeadquarters?: (family: string) => void;
+  onSelectUnitFromHeadquarters?: (unitType: 'soldier' | 'capo', family: string) => void;
+  onDeployUnit?: (unitType: 'soldier' | 'capo', targetLocation: { q: number; r: number; s: number }, family: string) => void;
 }
 
 const familyColors = {
@@ -71,6 +76,7 @@ const businessIcons = {
   gambling: '🎲',
   prostitution: '💄',
   loan_sharking: '💰',
+  headquarters: '🏛️',
 };
 
 const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({ 
@@ -80,7 +86,12 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   selectedBusiness,
   playerFamily,
   gameState,
-  onAction
+  onAction,
+  onSelectUnit,
+  onMoveUnit,
+  onSelectHeadquarters,
+  onSelectUnitFromHeadquarters,
+  onDeployUnit
 }) => {
   const [zoom, setZoom] = useState(1);
   const [showHeatMap, setShowHeatMap] = useState(false);
@@ -131,6 +142,38 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       for (let r = -height/2; r <= height/2; r++) {
         const s = -q - r;
         if (Math.abs(s) <= height/2) {
+          // Check if this is a headquarters location
+          const isHeadquarters = gameState?.headquarters && Object.values(gameState.headquarters).some(
+            (hq: any) => hq.q === q && hq.r === r && hq.s === s
+          );
+          
+          if (isHeadquarters) {
+            // Find which family this headquarters belongs to
+            const family = Object.keys(gameState.headquarters).find(
+              (family) => {
+                const hq = gameState.headquarters[family];
+                return hq.q === q && hq.r === r && hq.s === s;
+              }
+            );
+            
+            if (family) {
+              const hq = gameState.headquarters[family];
+              businesses.push({
+                q, r, s,
+                businessId: `headquarters-${family}`,
+                businessType: 'headquarters' as any, // Use headquarters icon
+                isLegal: true,
+                income: 0,
+                district: hq.district as BusinessHex['district'],
+                family: family as BusinessHex['family'],
+                isExtorted: false,
+                heatLevel: 0,
+                soldiers: undefined,
+              });
+              continue; // Skip normal business generation for headquarters
+            }
+          }
+
           const businessId = `business-${q}-${r}-${s}`;
           const district = districts[Math.floor(Math.random() * districts.length)];
           const family = families[Math.floor(Math.random() * families.length)];
@@ -164,7 +207,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       }
     }
     setGridData(businesses);
-  }, [width, height]);
+  }, [width, height, gameState?.headquarters]);
 
   const getHexPosition = (q: number, r: number) => {
     const x = hexWidth * (3/4) * q;
@@ -184,13 +227,83 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   };
 
   const handleHexClick = (business: BusinessHex) => {
-    onBusinessClick(business);
+    // Check if this is a headquarters
+    const isHeadquarters = gameState?.headquarters && Object.values(gameState.headquarters).some(
+      (hq: any) => hq.q === business.q && hq.r === business.r && hq.s === business.s
+    );
     
-    // Add visual feedback
-    if (business.family === playerFamily) {
-      notifyBusinessAcquired(business.businessType, business.income);
-    } else if (business.heatLevel && business.heatLevel > 3) {
-      notifyPoliceRaid(business.district);
+    if (isHeadquarters) {
+      // Find which family this headquarters belongs to
+      const family = Object.keys(gameState.headquarters).find(
+        (family) => {
+          const hq = gameState.headquarters[family];
+          return hq.q === business.q && hq.r === business.r && hq.s === business.s;
+        }
+      );
+      
+      if (family && onSelectHeadquarters) {
+        onSelectHeadquarters(family);
+        return;
+      }
+    }
+    
+    // Handle movement phase
+    if (gameState?.movementPhase) {
+      // Check if this is a deployment (unit selected but at headquarters)
+      if (gameState?.selectedUnit?.type && gameState?.selectedUnit?.location) {
+        const isAtHeadquarters = Object.values(gameState.headquarters).some(
+          (hq: any) => 
+            hq.q === gameState.selectedUnit.location.q && 
+            hq.r === gameState.selectedUnit.location.r && 
+            hq.s === gameState.selectedUnit.location.s
+        );
+        
+        if (isAtHeadquarters) {
+          // This is a deployment - check if target is available
+          if (gameState.availableMoves?.some(move => 
+              move.q === business.q && move.r === business.r && move.s === business.s)) {
+            // Find which family this headquarters belongs to
+            const family = Object.keys(gameState.headquarters).find(
+              (family) => {
+                const hq = gameState.headquarters[family];
+                return hq.q === gameState.selectedUnit.location.q && 
+                       hq.r === gameState.selectedUnit.location.r && 
+                       hq.s === gameState.selectedUnit.location.s;
+              }
+            );
+            if (family && onDeployUnit) {
+              onDeployUnit(gameState.selectedUnit.type, { q: business.q, r: business.r, s: business.s }, family);
+            }
+          }
+        } else {
+          // This is normal movement
+          if (onSelectUnit && (business.soldiers?.family === playerFamily || business.capo?.family === playerFamily)) {
+            // Select unit for movement
+            const unitType = business.capo ? 'capo' : 'soldier';
+            onSelectUnit(unitType, { q: business.q, r: business.r, s: business.s });
+          } else if (onMoveUnit && gameState?.selectedUnit?.type) {
+            // Move selected unit to this location
+            onMoveUnit({ q: business.q, r: business.r, s: business.s });
+          }
+        }
+      } else {
+        // No unit selected - select a unit
+        if (onSelectUnit && (business.soldiers?.family === playerFamily || business.capo?.family === playerFamily)) {
+          // Select unit for movement
+          const unitType = business.capo ? 'capo' : 'soldier';
+          onSelectUnit(unitType, { q: business.q, r: business.r, s: business.s });
+        }
+      }
+    } else {
+      // Normal business click
+      onBusinessClick(business);
+      
+      // Add visual feedback
+      if (business.family === playerFamily) {
+        notifyBusinessAcquired(business.businessType, business.income);
+      } else if (business.heatLevel && business.heatLevel > 3) {
+        notifyPoliceRaid(business.district);
+      }
     }
   };
 
@@ -249,10 +362,59 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   };
 
   const getHexColor = (business: BusinessHex) => {
+    // Check if this is a headquarters
+    const isHeadquarters = gameState?.headquarters && Object.values(gameState.headquarters).some(
+      (hq: any) => hq.q === business.q && hq.r === business.r && hq.s === business.s
+    );
+    
+    if (isHeadquarters) {
+      // Find which family this headquarters belongs to
+      const family = Object.keys(gameState.headquarters).find(
+        (family) => {
+          const hq = gameState.headquarters[family];
+          return hq.q === business.q && hq.r === business.r && hq.s === business.s;
+        }
+      );
+      
+      if (family) {
+        return family === playerFamily ? '#FFD700' : '#8B4513'; // Gold for player HQ, brown for others
+      }
+    }
+    
     if (showHeatMap && business.heatLevel) {
       const intensity = business.heatLevel / 5;
       return `rgba(255, ${Math.floor(255 * (1 - intensity))}, ${Math.floor(255 * (1 - intensity))}, 0.8)`;
     }
+    
+    // Movement phase highlighting
+    if (gameState?.movementPhase) {
+      // Highlight selected unit
+      if (gameState.selectedUnit?.location && 
+          business.q === gameState.selectedUnit.location.q && 
+          business.r === gameState.selectedUnit.location.r && 
+          business.s === gameState.selectedUnit.location.s) {
+        return '#FFD700'; // Gold for selected unit
+      }
+      
+      // Highlight available moves (for both movement and deployment)
+      if (gameState.availableMoves?.some(move => 
+          move.q === business.q && move.r === business.r && move.s === business.s)) {
+        // Check if this is a deployment (unit at headquarters)
+        const isAtHeadquarters = gameState.selectedUnit?.location && Object.values(gameState.headquarters).some(
+          (hq: any) => 
+            hq.q === gameState.selectedUnit.location.q && 
+            hq.r === gameState.selectedUnit.location.r && 
+            hq.s === gameState.selectedUnit.location.s
+        );
+        
+        if (isAtHeadquarters) {
+          return '#87CEEB'; // Sky blue for deployment targets
+        } else {
+          return '#90EE90'; // Light green for movement targets
+        }
+      }
+    }
+    
     return familyColors[business.family];
   };
 
@@ -265,54 +427,67 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   return (
     <div className="relative w-full h-full overflow-hidden bg-gradient-to-br from-noir-dark/50 to-background/50">
       {/* Controls */}
-      <div className="absolute top-4 left-4 z-10 flex gap-2">
-        <div className="flex items-center gap-2 bg-background/80 backdrop-blur-sm rounded-lg p-2 border">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setZoom(Math.min(zoom + 0.1, 2))}
-            disabled={zoom >= 2}
-            title="Zoom In (Ctrl + +)"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setZoom(Math.max(zoom - 0.1, 0.5))}
-            disabled={zoom <= 0.5}
-            title="Zoom Out (Ctrl + -)"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setZoom(1)}
-            title="Reset Zoom (Ctrl + 0)"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-          <div className="text-xs text-muted-foreground px-2">
+      <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
+        {/* Zoom Controls */}
+        <div className="flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-3 border border-noir-light shadow-lg">
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setZoom(Math.min(zoom + 0.1, 2))}
+              disabled={zoom >= 2}
+              title="Zoom In (Ctrl + +)"
+              className="h-8 w-8 p-0"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setZoom(Math.max(zoom - 0.1, 0.5))}
+              disabled={zoom <= 0.5}
+              title="Zoom Out (Ctrl + -)"
+              className="h-8 w-8 p-0"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setZoom(1)}
+              title="Reset Zoom (Ctrl + 0)"
+              className="h-8 w-8 p-0"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="h-6 w-px bg-noir-light mx-2" />
+          <div className="text-sm font-medium text-mafia-gold">
             {Math.round(zoom * 100)}%
           </div>
         </div>
-        <Button
-          variant={showHeatMap ? "default" : "outline"}
-          size="sm"
-          onClick={() => setShowHeatMap(!showHeatMap)}
-        >
-          {showHeatMap ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          {showHeatMap ? 'Hide Heat' : 'Show Heat'}
-        </Button>
-        <Button
-          variant={showSoldiers ? "default" : "outline"}
-          size="sm"
-          onClick={() => setShowSoldiers(!showSoldiers)}
-        >
-          {showSoldiers ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          {showSoldiers ? 'Hide Soldiers' : 'Show Soldiers'}
-        </Button>
+        
+        {/* View Controls */}
+        <div className="flex gap-2">
+          <Button
+            variant={showHeatMap ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowHeatMap(!showHeatMap)}
+            className="font-medium"
+          >
+            {showHeatMap ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+            Heat Map
+          </Button>
+          <Button
+            variant={showSoldiers ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowSoldiers(!showSoldiers)}
+            className="font-medium"
+          >
+            {showSoldiers ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+            Units
+          </Button>
+        </div>
       </div>
 
       {/* Grid Container */}
@@ -366,6 +541,36 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 >
                   {businessIcons[business.businessType] || '🏢'}
                 </motion.text>
+
+                {/* Deployment Indicator */}
+                {gameState?.movementPhase && gameState?.selectedUnit?.type && 
+                 gameState.availableMoves?.some(move => 
+                   move.q === business.q && move.r === business.r && move.s === business.s) && (
+                  <motion.text
+                    x={x}
+                    y={y - 15}
+                    textAnchor="middle"
+                    className="text-xs pointer-events-none select-none font-bold"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    {(() => {
+                      const isAtHeadquarters = gameState.selectedUnit?.location && Object.values(gameState.headquarters).some(
+                        (hq: any) => 
+                          hq.q === gameState.selectedUnit.location.q && 
+                          hq.r === gameState.selectedUnit.location.r && 
+                          hq.s === gameState.selectedUnit.location.s
+                      );
+                      
+                      if (isAtHeadquarters) {
+                        return 'DEPLOY';
+                      } else {
+                        return 'MOVE';
+                      }
+                    })()}
+                  </motion.text>
+                )}
 
                 {/* Income Display */}
                 {isHovered && (
