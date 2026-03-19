@@ -335,18 +335,25 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           </span>
         </div>
         
-        {/* Movement Status */}
-        {gameState.movementPhase && (gameState.selectedUnitId || gameState.deployMode) && (
-          <div className="flex items-center space-x-2 px-3 py-1 bg-yellow-400/20 rounded-full border border-yellow-400/30">
-            <Target className="h-3 w-3 text-yellow-400" />
-            <span className="text-xs font-medium text-yellow-400">
+        {/* Phase Status */}
+        {(gameState.selectedUnitId || gameState.deployMode) && (
+          <div className="flex items-center space-x-2 px-3 py-1 bg-accent/20 rounded-full border border-accent/30">
+            <Target className="h-3 w-3 text-accent-foreground" />
+            <span className="text-xs font-medium text-accent-foreground">
               {gameState.deployMode 
                 ? `Deploying ${gameState.deployMode.unitType} — click a highlighted hex`
                 : (() => {
-                    const unit = gameState.deployedUnits.find(u => u.id === gameState.selectedUnitId);
+                    const unit = gameState.deployedUnits.find((u: any) => u.id === gameState.selectedUnitId);
                     return unit ? `Moving ${unit.type} (${unit.movesRemaining} moves left)` : 'Select a unit';
                   })()
               }
+            </span>
+          </div>
+        )}
+        {!gameState.selectedUnitId && !gameState.deployMode && (
+          <div className="flex items-center space-x-2 px-3 py-1 bg-muted/50 rounded-full">
+            <span className="text-xs font-medium text-muted-foreground uppercase">
+              Phase: {gameState.turnPhase === 'deploy' ? '📦 Deploy units from HQ' : gameState.turnPhase === 'move' ? '🚶 Move your units' : gameState.turnPhase === 'action' ? '⚔️ Take actions (Hit, Extort, Bribe...)' : '⏳ End your turn'}
             </span>
           </div>
         )}
