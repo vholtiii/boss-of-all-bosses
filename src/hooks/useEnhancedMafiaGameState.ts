@@ -266,7 +266,7 @@ const createInitialGameState = (
   
   selectedTerritory: null,
   activeEvent: null,
-  showMissionBoard: false,
+  
   
   movementPhase: false,
   selectedUnit: { type: null, location: null, remainingMoves: 0 },
