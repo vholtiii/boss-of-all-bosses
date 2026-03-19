@@ -693,7 +693,7 @@ export const useEnhancedMafiaGameState = (
   // ============ MOVE UNIT (with zone-of-control + escort) ============
   const moveUnit = useCallback((targetLocation: { q: number; r: number; s: number }) => {
     setGameState(prev => {
-      if (prev.turnPhase !== 'move') return prev;
+      if (prev.turnPhase !== 'move' && prev.turnPhase !== 'deploy') return prev;
       if (!prev.selectedUnitId) return prev;
       const unitIdx = prev.deployedUnits.findIndex(u => u.id === prev.selectedUnitId);
       if (unitIdx === -1) return prev;
