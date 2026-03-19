@@ -38,10 +38,13 @@ interface GameSidePanelProps {
 
 // ─── LEFT PANEL: Resources + Actions ──────────────────────────────────
 
-export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: any) => void }> = ({
+export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: any) => void; turnPhase?: string }> = ({
   gameState,
   onAction,
+  turnPhase,
 }) => {
+  const phase = turnPhase || gameState.turnPhase || 'action';
+  const actionsLocked = phase === 'deploy' || phase === 'move';
   const [openSection, setOpenSection] = useState<string>('actions');
   const { resources, reputation, policeHeat, legalStatus } = gameState;
 
