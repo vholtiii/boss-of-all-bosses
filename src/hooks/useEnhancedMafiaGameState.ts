@@ -590,15 +590,30 @@ export const useEnhancedMafiaGameState = (
       const phaseOrder: TurnPhase[] = ['deploy', 'move', 'action'];
       const currentIdx = phaseOrder.indexOf(prev.turnPhase);
       const nextPhase = currentIdx < phaseOrder.length - 1 ? phaseOrder[currentIdx + 1] : 'waiting' as TurnPhase;
+      
+      // Calculate action budget when entering action phase
+      let actionsRemaining = prev.actionsRemaining;
+      let maxActions = prev.maxActions;
+      if (nextPhase === 'action') {
+        const hasBonus = prev.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD && 
+                         prev.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
+        maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0);
+        actionsRemaining = maxActions;
+      }
+      
       return {
         ...prev,
         turnPhase: nextPhase,
-        movementPhase: nextPhase === 'move',
+        movementPhase: nextPhase === 'move' || nextPhase === 'deploy',
         selectedUnitId: null,
         availableMoveHexes: [],
         deployMode: null,
         availableDeployHexes: [],
         selectedMoveAction: 'move' as MoveAction,
+        actionsRemaining,
+        maxActions,
+        // Reset tactical budget when entering move (tactical) phase
+        tacticalActionsRemaining: nextPhase === 'move' ? TACTICAL_ACTIONS_PER_TURN : prev.tacticalActionsRemaining,
       };
     });
   }, []);
