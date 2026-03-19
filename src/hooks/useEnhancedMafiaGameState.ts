@@ -310,7 +310,8 @@ const createInitialGameState = (
     },
 
     hexMap, deployedUnits,
-    movementPhase: false, selectedUnitId: null, availableMoveHexes: [],
+    turnPhase: 'deploy' as TurnPhase, movementPhase: false,
+    selectedUnitId: null, availableMoveHexes: [],
     deployMode: null, availableDeployHexes: [],
     headquarters: Object.fromEntries(allFamilies.map(f => [f, HQ_POSITIONS[f]])),
     units,
