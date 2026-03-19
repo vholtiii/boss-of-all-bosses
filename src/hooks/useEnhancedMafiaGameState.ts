@@ -1523,6 +1523,55 @@ export const useEnhancedMafiaGameState = (
           }
           return newState;
         }
+        case 'promote_capo': {
+          const unitId = action.unitId as string;
+          const unit = newState.deployedUnits.find(u => u.id === unitId);
+          if (!unit || unit.type !== 'soldier' || unit.family !== newState.playerFamily) return newState;
+          
+          // Check max capos
+          const currentCapos = newState.deployedUnits.filter(u => u.type === 'capo' && u.family === newState.playerFamily).length;
+          if (currentCapos >= 3) return newState;
+          
+          // Check cost
+          const promoCost = 10000;
+          if (newState.resources.money < promoCost) return newState;
+          
+          // Check soldier stats
+          const stats = newState.soldierStats?.[unitId];
+          if (stats) {
+            if (stats.survivedConflicts < 5 || stats.loyalty < 60 || stats.training < 3) return newState;
+          }
+          
+          // Deduct cost
+          newState.resources.money -= promoCost;
+          
+          // Convert soldier to capo
+          const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
+          const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
+          newState.deployedUnits = newState.deployedUnits.map(u => 
+            u.id === unitId ? {
+              ...u,
+              type: 'capo' as const,
+              maxMoves: 3,
+              movesRemaining: 0,
+              name: `Capo ${Math.floor(Math.random() * 100)}`,
+              personality: randomPersonality,
+              level: 1,
+            } : u
+          );
+          
+          // Remove from hitmen if applicable
+          newState.hitmen = (newState.hitmen || []).filter(h => h.unitId !== unitId);
+          
+          // Notification
+          newState.pendingNotifications = [...(newState.pendingNotifications || []), {
+            type: 'success' as const,
+            title: '⭐ Soldier Promoted to Capo!',
+            message: `A battle-hardened soldier has earned the rank of Capo. They now command 3 moves per turn.`,
+          }];
+          
+          return newState;
+        }
         case 'bribe_official':
           // Legacy fallback — use corruption panel for new system
           if (newState.resources.money >= 15000) {
