@@ -387,7 +387,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     caposByFamily.forEach((capos, fam) => {
                       const capo = capos[0];
                       const isSelected = selectedUnitId === capo.id;
-                      const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy');
+                      const isAtHQ = !!tile.isHeadquarters;
+                      const isClickable = fam === playerFamily && (turnPhase === 'move' || (turnPhase === 'deploy' && isAtHQ));
                       elements.push(
                         <CapoIcon
                           key={`capo-${fam}-${key}`}
@@ -400,7 +401,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           selected={isSelected}
                           onClick={isClickable ? (e) => {
                             e.stopPropagation();
-                            if (turnPhase === 'deploy' && onSelectUnitFromHeadquarters) {
+                            if (turnPhase === 'deploy' && isAtHQ && onSelectUnitFromHeadquarters) {
                               onSelectUnitFromHeadquarters('capo', fam);
                             } else if (turnPhase === 'move' && capo.movesRemaining > 0 && onSelectUnit) {
                               onSelectUnit('capo', { q: tile.q, r: tile.r, s: tile.s });
