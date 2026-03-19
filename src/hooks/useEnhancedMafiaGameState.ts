@@ -640,7 +640,7 @@ export const useEnhancedMafiaGameState = (
   // ============ SELECT UNIT FOR MOVEMENT ============
   const selectUnit = useCallback((unitType: 'soldier' | 'capo', location: { q: number; r: number; s: number }) => {
     setGameState(prev => {
-      if (prev.turnPhase !== 'move') return prev;
+      if (prev.turnPhase !== 'move' && prev.turnPhase !== 'deploy') return prev;
       const unit = prev.deployedUnits.find(u => 
         u.family === prev.playerFamily && u.type === unitType &&
         u.q === location.q && u.r === location.r && u.s === location.s &&
