@@ -16,6 +16,7 @@ import {
   SoldierStats, Hitman, BribeContract, BribeTier, VictoryProgress, VictoryType,
   FAMILY_BONUSES, BRIBE_TIERS, DOC_BUSINESS_TYPES,
   SOLDIER_COST, CAPO_COST, HITMAN_MAINTENANCE_MULTIPLIER, MAX_HITMEN, HITMAN_REQUIREMENTS,
+  MAX_CAPOS, CAPO_PROMOTION_COST, CAPO_PROMOTION_REQUIREMENTS,
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType,
   NEGOTIATION_TYPES,
   ScoutedHex, Safehouse, MoveAction,
