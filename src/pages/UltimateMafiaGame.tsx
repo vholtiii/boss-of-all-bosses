@@ -332,7 +332,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                     : "text-muted-foreground"
                 )}
               >
-                {phase === 'move' ? 'tactical' : phase}
+                {phase === 'deploy' ? 'deploy & move' : phase === 'move' ? 'tactical' : phase}
               </div>
             ))}
         </div>
