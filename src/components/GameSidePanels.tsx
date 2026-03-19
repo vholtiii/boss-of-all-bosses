@@ -141,8 +141,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Economy"
           icon={<TrendingUp className="h-4 w-4" />}
-          isOpen={openSection === 'economy'}
-          onToggle={() => toggle('economy')}
+          isOpen={!actionsLocked && openSection === 'economy'}
+          onToggle={() => !actionsLocked && toggle('economy')}
+          disabled={actionsLocked}
         >
           <div className="space-y-1.5">
             <ActionButton
