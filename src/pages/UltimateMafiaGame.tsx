@@ -452,42 +452,6 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
   );
 };
 
-// Resource Panel Component
-const ResourcePanel: React.FC<{ gameState: any }> = ({ gameState }) => {
-  const { resources } = gameState;
-
-  return (
-    <div className="space-y-4">
-      {/* Primary Resources */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center">
-          <DollarSign className="h-5 w-5 mx-auto mb-2 text-green-400" />
-          <div className="text-lg font-bold text-green-400">${resources.money.toLocaleString()}</div>
-          <div className="text-xs text-muted-foreground">Money</div>
-        </div>
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-center">
-          <Users className="h-5 w-5 mx-auto mb-2 text-red-400" />
-          <div className="text-lg font-bold text-red-400">{resources.soldiers}</div>
-          <div className="text-xs text-muted-foreground">Soldiers</div>
-        </div>
-      </div>
-      
-      {/* Secondary Resources */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-center">
-          <Shield className="h-5 w-5 mx-auto mb-2 text-blue-400" />
-          <div className="text-lg font-bold text-blue-400">{resources.respect}%</div>
-          <div className="text-xs text-muted-foreground">Respect</div>
-        </div>
-        <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 text-center">
-          <Brain className="h-5 w-5 mx-auto mb-2 text-purple-400" />
-          <div className="text-lg font-bold text-purple-400">{resources.researchPoints}</div>
-          <div className="text-xs text-muted-foreground">Research</div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // Events Panel Component
 const EventsPanel: React.FC<{ gameState: any; onEventChoice: (eventId: string, choiceId: string) => void }> = ({ 
