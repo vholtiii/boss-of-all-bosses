@@ -716,9 +716,14 @@ export const useEnhancedMafiaGameState = (
           return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
         }
 
-        if (moveAction === 'escort' && unitType === 'capo') {
+        if (moveAction === 'escort' && unitType === 'soldier') {
           if (prev.tacticalActionsRemaining <= 0) return prev;
-          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
+          // Show hexes containing player's capos that have room for more escorts
+          const capoHexes = prev.deployedUnits
+            .filter(u => u.type === 'capo' && u.family === prev.playerFamily && (u.escortingSoldierIds?.length || 0) < MAX_ESCORT_SOLDIERS)
+            .map(u => ({ q: u.q, r: u.r, s: u.s }));
+          if (capoHexes.length === 0) return prev;
+          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: capoHexes, deployMode: null, availableDeployHexes: [] };
         }
 
         // No regular movement in tactical phase
@@ -769,6 +774,36 @@ export const useEnhancedMafiaGameState = (
         return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
       }
 
+      // Handle escort "call" action (tactical phase only) — teleport soldier to capo's hex
+      if (prev.turnPhase === 'move' && moveAction === 'escort' && unit.type === 'soldier') {
+        if (prev.tacticalActionsRemaining <= 0) return prev;
+        // Find capo at target hex
+        const capo = prev.deployedUnits.find(u => 
+          u.type === 'capo' && u.family === prev.playerFamily &&
+          u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s &&
+          (u.escortingSoldierIds?.length || 0) < MAX_ESCORT_SOLDIERS
+        );
+        if (!capo) return prev;
+        const newUnitsEscort = [...prev.deployedUnits];
+        // Teleport soldier to capo's hex
+        const soldierIdx = newUnitsEscort.findIndex(u => u.id === unit.id);
+        if (soldierIdx === -1) return prev;
+        newUnitsEscort[soldierIdx] = { ...unit, q: capo.q, r: capo.r, s: capo.s, movesRemaining: 0 };
+        // Add soldier to capo's escort list
+        const capoIdx = newUnitsEscort.findIndex(u => u.id === capo.id);
+        const existingEscorts = capo.escortingSoldierIds || [];
+        newUnitsEscort[capoIdx] = { ...capo, escortingSoldierIds: [...existingEscorts, unit.id] };
+        return {
+          ...prev, deployedUnits: newUnitsEscort,
+          selectedUnitId: null, availableMoveHexes: [],
+          tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
+          pendingNotifications: [...prev.pendingNotifications, {
+            type: 'info' as const, title: '🚗 Soldier Called to Escort',
+            message: `A soldier has been called to ${capo.name || 'Capo'}'s location for escort duty.`,
+          }],
+        };
+      }
+
       if (!prev.availableMoveHexes.some(h => h.q === targetLocation.q && h.r === targetLocation.r && h.s === targetLocation.s)) {
         return prev;
       }
@@ -789,14 +824,16 @@ export const useEnhancedMafiaGameState = (
       const updatedUnit = { ...unit, q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: remainingMoves, fortified: false };
       newUnits[unitIdx] = updatedUnit;
 
-      // Handle escort: move escorted soldiers along with capo
-      if (moveAction === 'escort' && unit.type === 'capo' && unit.escortingSoldierIds?.length) {
+      // Handle escort: move escorted soldiers along with capo (works in any move action during deploy phase)
+      if (unit.type === 'capo' && unit.escortingSoldierIds?.length) {
         unit.escortingSoldierIds.forEach(soldierIdToEscort => {
           const sIdx = newUnits.findIndex(u => u.id === soldierIdToEscort);
           if (sIdx !== -1) {
             newUnits[sIdx] = { ...newUnits[sIdx], q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0, fortified: false };
           }
         });
+        // Auto-detach soldiers at destination
+        newUnits[unitIdx] = { ...newUnits[unitIdx], escortingSoldierIds: [] };
       }
 
       // Only Capos auto-claim and auto-extort neutral tiles on move
@@ -961,7 +998,7 @@ export const useEnhancedMafiaGameState = (
     }));
   }, []);
 
-  // ============ START ESCORT ============
+  // ============ START ESCORT (legacy — now handled via tactical phase call) ============
   const startEscort = useCallback((capoId: string, soldierIds: string[]) => {
     setGameState(prev => {
       if (prev.turnPhase !== 'move') return prev;
@@ -971,21 +1008,29 @@ export const useEnhancedMafiaGameState = (
 
       const validSoldierIds = soldierIds.filter(sid => {
         const s = prev.deployedUnits.find(u => u.id === sid);
-        return s && s.type === 'soldier' && s.family === prev.playerFamily && s.q === capo.q && s.r === capo.r && s.s === capo.s;
+        return s && s.type === 'soldier' && s.family === prev.playerFamily;
       }).slice(0, MAX_ESCORT_SOLDIERS);
 
       if (validSoldierIds.length === 0) return prev;
 
       const newUnits = [...prev.deployedUnits];
-      const newMoves = Math.max(0, capo.movesRemaining - validSoldierIds.length);
-      newUnits[capoIdx] = { ...capo, escortingSoldierIds: validSoldierIds, movesRemaining: newMoves };
+      // No movement penalty — capo keeps full movement range
+      newUnits[capoIdx] = { ...capo, escortingSoldierIds: validSoldierIds };
+
+      // Teleport soldiers to capo's hex
+      validSoldierIds.forEach(sid => {
+        const sIdx = newUnits.findIndex(u => u.id === sid);
+        if (sIdx !== -1) {
+          newUnits[sIdx] = { ...newUnits[sIdx], q: capo.q, r: capo.r, s: capo.s, movesRemaining: 0 };
+        }
+      });
 
       return {
         ...prev, deployedUnits: newUnits,
         selectedMoveAction: 'escort' as MoveAction,
         pendingNotifications: [...prev.pendingNotifications, {
           type: 'info' as const, title: '🚗 Escort Active',
-          message: `${capo.name || 'Capo'} is escorting ${validSoldierIds.length} soldier(s).`,
+          message: `${capo.name || 'Capo'} is escorting ${validSoldierIds.length} soldier(s). They will travel with the Capo and auto-detach at the destination.`,
         }],
       };
     });
