@@ -237,7 +237,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   }
 
   const leftSidebar = (
-    <LeftSidePanel gameState={gameState} onAction={performAction} />
+    <LeftSidePanel gameState={gameState} onAction={performAction} turnPhase={gameState.turnPhase} />
   );
 
   const rightSidebar = (

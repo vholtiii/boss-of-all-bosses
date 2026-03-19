@@ -503,7 +503,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             {actionMenu && (() => {
               const { x, y } = getHexPosition(actionMenu.tile.q, actionMenu.tile.r);
               const menuWidth = 140;
-              const buttonCount = [actionMenu.canHit, actionMenu.canExtort, actionMenu.canNegotiate].filter(Boolean).length;
+              const buttonCount = [actionMenu.canHit, actionMenu.canExtort, actionMenu.canNegotiate, actionMenu.canSabotage, actionMenu.canSafehouse].filter(Boolean).length;
               const menuHeight = buttonCount * 32 + 12;
               return (
                 <foreignObject
@@ -529,6 +529,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-destructive/90 hover:bg-destructive text-destructive-foreground text-xs font-bold transition-colors"
                       >
                         ⚔️ Hit Territory
+                      </button>
+                    )}
+                    {actionMenu.canSabotage && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAction) onAction({
+                            type: 'sabotage_hex',
+                            targetQ: actionMenu.tile.q,
+                            targetR: actionMenu.tile.r,
+                            targetS: actionMenu.tile.s,
+                          });
+                          setActionMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-orange-600/90 hover:bg-orange-600 text-white text-xs font-bold transition-colors"
+                      >
+                        💣 Sabotage
                       </button>
                     )}
                     {actionMenu.canExtort && (
@@ -564,6 +581,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-accent/90 hover:bg-accent text-accent-foreground text-xs font-bold transition-colors"
                       >
                         🤝 Negotiate
+                      </button>
+                    )}
+                    {actionMenu.canSafehouse && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAction) onAction({
+                            type: 'establish_safehouse',
+                            targetQ: actionMenu.tile.q,
+                            targetR: actionMenu.tile.r,
+                            targetS: actionMenu.tile.s,
+                          });
+                          setActionMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-600/90 hover:bg-amber-600 text-white text-xs font-bold transition-colors"
+                      >
+                        🏠 Safehouse
                       </button>
                     )}
                   </div>
