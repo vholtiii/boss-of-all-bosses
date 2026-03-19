@@ -147,7 +147,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     setSelectedHeadquarters(null);
   }, []);
 
-  const { playSound, playSoundSequence } = useSoundSystem();
+  // playSound/playSoundSequence already destructured above
   const [activeMobileTab, setActiveMobileTab] = useState('map');
   const [showSettings, setShowSettings] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
