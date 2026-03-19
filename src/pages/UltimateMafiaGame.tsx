@@ -108,7 +108,7 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
       content: (
         <div className="h-full">
           <EnhancedMafiaHexGrid 
-            key={`hex-grid-refresh-${Date.now()}`}
+            key="hex-grid-mobile"
             width={12}
             height={12}
             onBusinessClick={(business) => {
