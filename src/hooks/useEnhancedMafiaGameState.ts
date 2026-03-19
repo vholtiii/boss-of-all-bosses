@@ -1099,6 +1099,14 @@ export const useEnhancedMafiaGameState = (
       newState.deployMode = null;
       newState.availableDeployHexes = [];
       newState.selectedMoveAction = 'move' as MoveAction;
+      
+      // Reset action & tactical budgets for new turn
+      const hasBonus = newState.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD && 
+                       newState.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
+      newState.maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0);
+      newState.actionsRemaining = newState.maxActions;
+      newState.tacticalActionsRemaining = TACTICAL_ACTIONS_PER_TURN;
+      newState.maxTacticalActions = TACTICAL_ACTIONS_PER_TURN;
 
       // Clear fortified status and escort, reset moves
       newState.deployedUnits = (newState.deployedUnits || []).map(u => ({

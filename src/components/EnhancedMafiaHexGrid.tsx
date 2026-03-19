@@ -250,16 +250,17 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         
         const canHit = isEnemy && !tile.isHeadquarters && playerSoldiersHere.length > 0;
         const canExtort = isNeutral && !tile.isHeadquarters && playerSoldiersHere.length > 0;
+        const canClaim = isNeutral && !tile.isHeadquarters && playerSoldiersHere.length > 0;
         const canNegotiate = isEnemy && !tile.isHeadquarters && playerCaposHere.length > 0;
         const canSabotage = isEnemy && !tile.isHeadquarters && playerSoldiersHere.length > 0 && !!tile.business;
         const canSafehouse = isOwned && !tile.isHeadquarters && playerUnitsHere.length > 0;
         const negotiateCapoId = playerCaposHere[0]?.id;
         
-        if (canHit || canExtort || canNegotiate || canSabotage || canSafehouse) {
+        if (canHit || canExtort || canClaim || canNegotiate || canSabotage || canSafehouse) {
           if (actionMenu && actionMenu.tile.q === tile.q && actionMenu.tile.r === tile.r) {
             setActionMenu(null);
           } else {
-            setActionMenu({ tile, canHit, canExtort, canNegotiate, canSabotage, canSafehouse, negotiateCapoId });
+            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, negotiateCapoId });
           }
           return;
         }
