@@ -1074,6 +1074,23 @@ export const useEnhancedMafiaGameState = (
       
       newState.policeHeat.level = Math.max(0, newState.policeHeat.level - newState.policeHeat.reductionPerTurn);
       
+      // Compute turn report deltas
+      const afterPlayerHexes = new Set(
+        newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).map(t => `${t.q},${t.r},${t.s}`)
+      );
+      afterPlayerHexes.forEach(h => { if (!prevPlayerHexes.has(h)) turnReport.territoriesGained.push(h); });
+      prevPlayerHexes.forEach(h => { if (!afterPlayerHexes.has(h)) turnReport.territoriesLost.push(h); });
+      
+      const afterSoldierCount = newState.deployedUnits.filter(u => u.family === newState.playerFamily).length;
+      turnReport.resourceDeltas = {
+        money: newState.resources.money - prevMoney,
+        soldiers: afterSoldierCount - prevSoldierCount,
+        respect: Math.round(newState.reputation.respect - prevRespect),
+        territories: afterPlayerHexes.size - prevPlayerHexes.size,
+      };
+      
+      newState.turnReport = turnReport;
+      
       syncLegacyUnits(newState);
       newState.territories = buildLegacyTerritories(newState.hexMap);
       updateVictoryProgress(newState);
