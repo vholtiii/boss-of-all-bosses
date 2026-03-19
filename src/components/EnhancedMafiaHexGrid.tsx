@@ -49,6 +49,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canNegotiate: boolean; negotiateCapoId?: string } | null>(null);
+  const [hqUnitMenu, setHqUnitMenu] = useState<{ tile: HexTile; units: DeployedUnit[] } | null>(null);
   const didPanRef = React.useRef(false);
   const panRef = React.useRef({ x: 0, y: 0 });
   const isPanningRef = React.useRef(false);
@@ -200,19 +201,22 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     if (didPanRef.current) return; // ignore clicks after dragging
     const turnPhase = gameState?.turnPhase || 'waiting';
 
-    // During move phase, try selecting units on HQ hex before opening the panel
-    if (tile.isHeadquarters && turnPhase === 'move') {
+    // HQ click — show unit popover for player HQ, or open info panel
+    if (tile.isHeadquarters) {
       const key = `${tile.q},${tile.r},${tile.s}`;
       const unitsHere = unitsByHex.get(key) || [];
-      const playerUnit = unitsHere.find(u => u.family === playerFamily && u.movesRemaining > 0);
-      if (playerUnit && onSelectUnit) {
-        onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
+      const playerUnitsHere = unitsHere.filter(u => u.family === playerFamily);
+
+      if (tile.isHeadquarters === playerFamily && playerUnitsHere.length > 0 && (turnPhase === 'move' || turnPhase === 'deploy')) {
+        // Toggle the HQ unit menu
+        if (hqUnitMenu && hqUnitMenu.tile.q === tile.q && hqUnitMenu.tile.r === tile.r) {
+          setHqUnitMenu(null);
+        } else {
+          setHqUnitMenu({ tile, units: playerUnitsHere });
+        }
         return;
       }
-    }
 
-    // HQ click — open headquarters panel
-    if (tile.isHeadquarters) {
       if (onSelectHeadquarters) onSelectHeadquarters(tile.isHeadquarters);
       return;
     }
@@ -415,11 +419,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     </text>
                   )}
 
-                  {/* Render units */}
-                  {showSoldiers && unitsHere.length > 0 && (() => {
+                  {/* Render units — skip HQ hexes (handled by popover) */}
+                  {showSoldiers && unitsHere.length > 0 && !tile.isHeadquarters && (() => {
                     const turnPhase = gameState?.turnPhase || 'waiting';
                     const selectedUnitId = gameState?.selectedUnitId;
-                    // Group by family and type
                     const soldiersByFamily = new Map<string, DeployedUnit[]>();
                     const caposByFamily = new Map<string, DeployedUnit[]>();
                     unitsHere.forEach(u => {
@@ -490,6 +493,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
                     return elements;
                   })()}
+
+                  {/* HQ unit count badge */}
+                  {tile.isHeadquarters && unitsHere.length > 0 && (
+                    <g className="pointer-events-none">
+                      <circle cx={x + baseHexRadius * 0.5} cy={y - baseHexRadius * 0.5} r="9" fill="#D4AF37" stroke="#000" strokeWidth="1" />
+                      <text x={x + baseHexRadius * 0.5} y={y - baseHexRadius * 0.5 + 4} textAnchor="middle" fontSize="10" fill="#000" fontWeight="bold" className="select-none">
+                        {unitsHere.length}
+                      </text>
+                    </g>
+                  )}
 
                   {/* Territory control dot */}
                   {tile.controllingFamily !== 'neutral' && !tile.isHeadquarters && (
@@ -609,6 +622,81 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         🤝 Negotiate
                       </button>
                     )}
+                  </div>
+                </foreignObject>
+              );
+            })()}
+
+            {/* HQ unit selection popover */}
+            {hqUnitMenu && (() => {
+              const { x, y } = getHexPosition(hqUnitMenu.tile.q, hqUnitMenu.tile.r);
+              const turnPhase = gameState?.turnPhase || 'waiting';
+              const soldiers = hqUnitMenu.units.filter(u => u.type === 'soldier');
+              const capos = hqUnitMenu.units.filter(u => u.type === 'capo');
+              const itemCount = (soldiers.length > 0 ? 1 : 0) + capos.length + 1; // +1 for HQ info button
+              const menuWidth = 160;
+              const menuHeight = itemCount * 32 + 28;
+              return (
+                <foreignObject
+                  x={x - menuWidth / 2}
+                  y={y - baseHexRadius - menuHeight - 8}
+                  width={menuWidth}
+                  height={menuHeight}
+                  className="overflow-visible"
+                >
+                  <div className="flex flex-col gap-1 bg-background/95 backdrop-blur-sm border border-mafia-gold/40 rounded-lg p-2 shadow-xl">
+                    <div className="text-[10px] font-bold text-mafia-gold uppercase text-center mb-1">
+                      {hqUnitMenu.tile.isHeadquarters} HQ — Units
+                    </div>
+                    {capos.map(capo => (
+                      <button
+                        key={capo.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (turnPhase === 'deploy' && onSelectUnitFromHeadquarters) {
+                            onSelectUnitFromHeadquarters('capo', capo.family);
+                          } else if (turnPhase === 'move' && capo.movesRemaining > 0 && onSelectUnit) {
+                            onSelectUnit('capo', { q: hqUnitMenu.tile.q, r: hqUnitMenu.tile.r, s: hqUnitMenu.tile.s });
+                          }
+                          setHqUnitMenu(null);
+                        }}
+                        disabled={turnPhase === 'move' && capo.movesRemaining === 0}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-mafia-gold/20 hover:bg-mafia-gold/40 text-foreground text-xs font-bold transition-colors disabled:opacity-40"
+                      >
+                        👔 {capo.name || 'Capo'} (Lvl {capo.level})
+                        {turnPhase === 'move' && <span className="ml-auto text-muted-foreground">{capo.movesRemaining}mv</span>}
+                      </button>
+                    ))}
+                    {soldiers.length > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (turnPhase === 'deploy' && onSelectUnitFromHeadquarters) {
+                            onSelectUnitFromHeadquarters('soldier', soldiers[0].family);
+                          } else if (turnPhase === 'move' && onSelectUnit) {
+                            const movable = soldiers.find(s => s.movesRemaining > 0);
+                            if (movable) onSelectUnit('soldier', { q: hqUnitMenu.tile.q, r: hqUnitMenu.tile.r, s: hqUnitMenu.tile.s });
+                          }
+                          setHqUnitMenu(null);
+                        }}
+                        disabled={turnPhase === 'move' && !soldiers.some(s => s.movesRemaining > 0)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-foreground text-xs font-bold transition-colors disabled:opacity-40"
+                      >
+                        👤 Soldiers ×{soldiers.length}
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onSelectHeadquarters && hqUnitMenu.tile.isHeadquarters) {
+                          onSelectHeadquarters(hqUnitMenu.tile.isHeadquarters);
+                        }
+                        setHqUnitMenu(null);
+                      }}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/20 hover:bg-primary/40 text-foreground text-xs font-medium transition-colors mt-0.5 border-t border-border pt-1.5"
+                    >
+                      🏛️ View HQ Info
+                    </button>
                   </div>
                 </foreignObject>
               );
