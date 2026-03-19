@@ -1202,6 +1202,7 @@ export const useEnhancedMafiaGameState = (
       // Minimum passive income so AI always grows
       aiIncome = Math.max(aiIncome, 2000 + state.turn * 500);
       opponent.resources.money += aiIncome;
+      if (turnReport) turnReport.aiActions.push({ family: fam, action: 'income', detail: `Earned $${aiIncome.toLocaleString()} income` });
 
       // ── RECRUIT ── (always try to recruit up to a scaling cap)
       const soldierCap = Math.min(8, 3 + Math.floor(state.turn / 2));
@@ -1210,9 +1211,10 @@ export const useEnhancedMafiaGameState = (
       const wantToRecruit = Math.max(0, soldierCap - totalSoldiers);
       if (wantToRecruit > 0) {
         const canAfford = Math.floor(opponent.resources.money / SOLDIER_COST);
-        const toRecruit = Math.min(wantToRecruit, canAfford, 3); // max 3 per turn
+        const toRecruit = Math.min(wantToRecruit, canAfford, 3);
         opponent.resources.soldiers += toRecruit;
         opponent.resources.money -= toRecruit * SOLDIER_COST;
+        if (toRecruit > 0 && turnReport) turnReport.aiActions.push({ family: fam, action: 'recruit', detail: `Recruited ${toRecruit} soldier(s)` });
       }
 
       // ── DEPLOY ── (deploy ALL available soldiers from pool)
