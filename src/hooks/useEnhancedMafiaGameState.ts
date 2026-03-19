@@ -485,10 +485,24 @@ export const useEnhancedMafiaGameState = (
       legacy: { current: playerRep, highestRival, met: playerRep > highestRival && state.turn > 5 },
     };
 
+    const prevVictory = state.victoryType;
     if (state.victoryProgress.territory.met) state.victoryType = 'territory';
     else if (state.victoryProgress.economic.met) state.victoryType = 'economic';
     else if (state.victoryProgress.legacy.met) state.victoryType = 'legacy';
     else state.victoryType = null;
+
+    // Notify on first victory
+    if (state.victoryType && !prevVictory) {
+      const labels: Record<string, string> = {
+        territory: 'Territory Domination — You control 6+ territories!',
+        economic: 'Economic Empire — $8,000+ monthly income achieved!',
+        legacy: 'Legacy of Power — Your reputation surpasses all rivals!',
+      };
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'success' as const, title: '🏆 VICTORY!',
+        message: labels[state.victoryType] || 'You have won the game!',
+      }];
+    }
   };
 
   // ============ MOVEMENT PHASE ============
