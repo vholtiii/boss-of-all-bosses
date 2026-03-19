@@ -54,7 +54,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const turnPhaseRef = gameState?.turnPhase;
   useEffect(() => { setActionMenu(null); }, [turnPhaseRef]);
 
-  const baseHexRadius = 22;
+  const baseHexRadius = 28;
   const hexWidth = baseHexRadius * 2;
   const hexHeight = Math.sqrt(3) * baseHexRadius;
 
@@ -72,6 +72,19 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     });
     return map;
   }, [deployedUnits]);
+
+  // Mouse wheel zoom
+  useEffect(() => {
+    const container = document.getElementById('hex-grid-container');
+    if (!container) return;
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.08 : 0.08;
+      setZoom(prev => Math.min(Math.max(prev + delta, 0.3), 2.5));
+    };
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, []);
 
   // Keyboard zoom shortcuts
   useEffect(() => {
@@ -247,7 +260,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   }, [hexMap]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-gradient-to-br from-noir-dark/50 to-background/50">
+    <div id="hex-grid-container" className="relative w-full h-full overflow-auto bg-gradient-to-br from-noir-dark/50 to-background/50">
       {/* Controls */}
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
         <div className="flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-3 border border-noir-light shadow-lg">
