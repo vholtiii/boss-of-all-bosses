@@ -541,6 +541,16 @@ export const useEnhancedMafiaGameState = (
     }
   };
 
+  // ============ HELPER: check if hex is adjacent to enemy ============
+  const isAdjacentToEnemy = (q: number, r: number, s: number, hexMap: HexTile[], deployedUnits: DeployedUnit[], playerFamily: string): boolean => {
+    const neighbors = getHexNeighbors(q, r, s);
+    return neighbors.some(n => {
+      return deployedUnits.some(u => 
+        u.family !== playerFamily && u.q === n.q && u.r === n.r && u.s === n.s
+      );
+    });
+  };
+
   // ============ PHASE-BASED TURN SYSTEM ============
   const advancePhase = useCallback(() => {
     setGameState(prev => {
@@ -555,6 +565,7 @@ export const useEnhancedMafiaGameState = (
         availableMoveHexes: [],
         deployMode: null,
         availableDeployHexes: [],
+        selectedMoveAction: 'move' as MoveAction,
       };
     });
   }, []);
