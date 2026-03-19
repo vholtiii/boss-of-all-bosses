@@ -188,8 +188,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Defense & Law"
           icon={<Gavel className="h-4 w-4" />}
-          isOpen={openSection === 'defense'}
-          onToggle={() => toggle('defense')}
+          isOpen={!actionsLocked && openSection === 'defense'}
+          onToggle={() => !actionsLocked && toggle('defense')}
+          disabled={actionsLocked}
         >
           <div className="space-y-1.5">
             <ActionButton
