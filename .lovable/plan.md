@@ -1,31 +1,33 @@
 
-# ✅ Completed: Fix Broken Mechanics
 
-## Changes Made
+# Refine Scout Mechanic
 
-### 1. Soldiers can now move onto enemy hexes (Deploy phase)
-- Removed the filter in `selectUnit` and `moveUnit` that blocked soldiers from entering enemy-controlled territory.
+## Current State
+- Scout only works on **enemy** hexes (line 704 filters out `neutral`)
+- Scout reveals: enemy unit count, enemy family, business type, business income
+- Scouted info is stored but **never used** by Hit logic — no intelligence bonus
+- Duration: 3 turns
 
-### 2. Units at HQ visible during Deploy phase
-- Removed the `isDeployAtHQ` empty-render block — units at HQ now render normally and are clickable for movement.
+## Changes
 
-### 3. Unit-first action selection (Action phase)
-- **New flow**: Click a unit → valid action targets highlight (green hexes) → click a target → context menu appears with available actions.
-- `selectUnit` now works during `action` phase, computing adjacent target hexes based on unit type.
-- Units are clickable during action phase in the hex grid.
-- Bottom bar shows "select a unit first" guidance.
+### 1. Allow scouting neutral hexes
+**File**: `src/hooks/useEnhancedMafiaGameState.ts` (line 704)
+Change the filter from `!== 'neutral' && !== playerFamily` to just `!== playerFamily`. This lets soldiers scout neutral hexes to reveal business profits before committing to a Claim or Extort.
 
-### 4. Tactical action description panel
-- During Tactical phase, a description panel appears below the action toolbar showing the selected action's full description.
+Update the notification message to handle neutral hex output (no enemy units, just business info).
 
-### 5. Extortion works on enemy hexes
-- Extortion now targets both neutral (90% success, claims territory) and enemy hexes with businesses (50% success, steals income without claiming).
-- Player units can be on OR adjacent to the target hex.
+### 2. Add intelligence bonus to Hit actions (+15% success)
+**File**: `src/hooks/useEnhancedMafiaGameState.ts` (~line 2055, inside `processTerritoryHit`)
+After the family combat bonus line, add a check: if the target hex exists in `state.scoutedHexes`, apply a `+0.15` (15%) bonus to the hit chance. This makes scouting a meaningful tactical investment before attacking.
 
-## Key Behavior Summary
+### 3. Update scout notification for neutral hexes
+**File**: `src/hooks/useEnhancedMafiaGameState.ts` (~line 920, inside `processScout`)
+Adjust the notification message: for neutral hexes, show business info only (no "enemy units" count). For enemy hexes, keep current format.
 
-```text
-DEPLOY: Move all units anywhere (including enemy territory). Capos auto-claim/extort on arrival. Soldiers just move.
-TACTICAL: Scout, Fortify, Safehouse, Escort (3/turn budget). Description panel visible.
-ACTION: Select unit first → click highlighted target → Hit, Extort, Claim, Sabotage, Negotiate (2/turn, 3 with bonus).
-```
+### Constants
+Add `SCOUT_INTEL_BONUS = 15` to `src/types/game-mechanics.ts` alongside existing constants.
+
+## Files Modified
+- `src/types/game-mechanics.ts` — add `SCOUT_INTEL_BONUS` constant
+- `src/hooks/useEnhancedMafiaGameState.ts` — 3 small edits (filter, hit bonus, notification)
+
