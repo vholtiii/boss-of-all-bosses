@@ -745,7 +745,7 @@ export const useEnhancedMafiaGameState = (
       newState.availableDeployHexes = [];
 
       // Reset all player unit moves
-      newState.deployedUnits = newState.deployedUnits.map(u => ({
+      newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
         ...u,
         movesRemaining: u.maxMoves,
       }));
