@@ -2091,7 +2091,12 @@ export const useEnhancedMafiaGameState = (
           }
         });
         
-        const casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
+        let casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
+        // Reduce casualties if attacking units are fortified
+        const attackersFortified = playerUnits.some(u => u.fortified);
+        if (attackersFortified) {
+          casualties = Math.max(0, Math.floor(casualties * (1 - FORTIFY_CASUALTY_REDUCTION / 100)));
+        }
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
