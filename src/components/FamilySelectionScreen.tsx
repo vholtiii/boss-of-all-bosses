@@ -69,7 +69,7 @@ const families: FamilyInfo[] = [
       { label: 'Trade', icon: <Shield className="h-3.5 w-3.5" />, value: 5 },
     ],
     bonuses: ['+25% hit success rate', '+15% heat reduction', '+20% intelligence gathering'],
-    startingResources: { money: 70000, soldiers: 3, influence: 12, politicalPower: 20, respect: 15 },
+    startingResources: { money: 70000, soldiers: 4, influence: 12, politicalPower: 20, respect: 15 },
   },
   {
     id: 'bonanno',
