@@ -201,19 +201,22 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     if (didPanRef.current) return; // ignore clicks after dragging
     const turnPhase = gameState?.turnPhase || 'waiting';
 
-    // During move phase, try selecting units on HQ hex before opening the panel
-    if (tile.isHeadquarters && turnPhase === 'move') {
+    // HQ click — show unit popover for player HQ, or open info panel
+    if (tile.isHeadquarters) {
       const key = `${tile.q},${tile.r},${tile.s}`;
       const unitsHere = unitsByHex.get(key) || [];
-      const playerUnit = unitsHere.find(u => u.family === playerFamily && u.movesRemaining > 0);
-      if (playerUnit && onSelectUnit) {
-        onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
+      const playerUnitsHere = unitsHere.filter(u => u.family === playerFamily);
+
+      if (tile.isHeadquarters === playerFamily && playerUnitsHere.length > 0 && (turnPhase === 'move' || turnPhase === 'deploy')) {
+        // Toggle the HQ unit menu
+        if (hqUnitMenu && hqUnitMenu.tile.q === tile.q && hqUnitMenu.tile.r === tile.r) {
+          setHqUnitMenu(null);
+        } else {
+          setHqUnitMenu({ tile, units: playerUnitsHere });
+        }
         return;
       }
-    }
 
-    // HQ click — open headquarters panel
-    if (tile.isHeadquarters) {
       if (onSelectHeadquarters) onSelectHeadquarters(tile.isHeadquarters);
       return;
     }
