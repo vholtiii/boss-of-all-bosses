@@ -8,7 +8,8 @@ interface SoldierIconProps {
   family: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
   count: number;
   isPlayerFamily?: boolean;
-  onClick?: () => void;
+  selected?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
 const familyColors = {
@@ -20,7 +21,7 @@ const familyColors = {
 };
 
 const SoldierIcon: React.FC<SoldierIconProps> = ({ 
-  x, y, family, count, isPlayerFamily = false, onClick 
+  x, y, family, count, isPlayerFamily = false, selected = false, onClick 
 }) => {
   const familyColor = familyColors[family];
   const size = 14;
@@ -28,15 +29,25 @@ const SoldierIcon: React.FC<SoldierIconProps> = ({
   return (
     <motion.g
       initial={{ opacity: 0, scale: 0 }}
-      animate={{ opacity: 1, scale: 1 }}
+      animate={{ opacity: 1, scale: selected ? 1.25 : 1 }}
       transition={{ duration: 0.3, delay: 0.2 }}
       whileHover={{ scale: 1.15 }}
       whileTap={{ scale: 0.9 }}
       onClick={onClick}
       className="cursor-pointer"
     >
+      {/* Selected pulse ring */}
+      {selected && (
+        <motion.circle
+          cx={x} cy={y + 2} r={size / 2 + 7}
+          fill="none" stroke="#FFD700" strokeWidth="2"
+          animate={{ r: [size / 2 + 5, size / 2 + 9, size / 2 + 5], opacity: [1, 0.4, 1] }}
+          transition={{ duration: 1.2, repeat: Infinity }}
+        />
+      )}
+
       {/* Family color glow */}
-      <circle cx={x} cy={y + 2} r={size / 2 + 2} fill={familyColor} opacity="0.25" />
+      <circle cx={x} cy={y + 2} r={size / 2 + 2} fill={familyColor} opacity={selected ? 0.5 : 0.25} />
       
       {/* Soldier figure image */}
       <image
@@ -45,11 +56,11 @@ const SoldierIcon: React.FC<SoldierIconProps> = ({
         y={y - size / 2 - 4}
         width={size}
         height={size * 1.5}
-        style={{ filter: `drop-shadow(0 0 3px ${familyColor})` }}
+        style={{ filter: `drop-shadow(0 0 ${selected ? '6' : '3'}px ${selected ? '#FFD700' : familyColor})` }}
       />
       
       {/* Player family gold ring */}
-      {isPlayerFamily && (
+      {isPlayerFamily && !selected && (
         <circle cx={x} cy={y + 2} r={size / 2 + 4} fill="none" stroke="#D4AF37" strokeWidth="1.5" opacity="0.8" />
       )}
       
