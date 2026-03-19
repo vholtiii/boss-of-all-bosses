@@ -56,7 +56,7 @@ const families: FamilyInfo[] = [
       { label: 'Military', icon: <Swords className="h-4 w-4" />, value: '★★★★☆' },
       { label: 'Stealth', icon: <Eye className="h-4 w-4" />, value: '★★★★★' },
     ],
-    bonuses: ['-30% police heat gain', 'Intelligence reports each turn', 'Bonus to sabotage actions'],
+    bonuses: ['+30% business income', '+20% laundering efficiency', '+25% business upgrade discount'],
     startingResources: { money: 45000, soldiers: 6, influence: 10, politicalPower: 25, respect: 20 },
   },
   {
