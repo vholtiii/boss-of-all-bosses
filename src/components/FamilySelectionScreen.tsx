@@ -54,7 +54,7 @@ const families: FamilyInfo[] = [
       { label: 'Stealth', icon: <Eye className="h-3.5 w-3.5" />, value: 5 },
     ],
     bonuses: ['+30% business income', '+20% laundering efficiency', '+25% business upgrade discount'],
-    startingResources: { money: 45000, soldiers: 6, influence: 10, politicalPower: 25, respect: 20 },
+    startingResources: { money: 45000, soldiers: 4, influence: 10, politicalPower: 25, respect: 20 },
   },
   {
     id: 'lucchese',
@@ -69,7 +69,7 @@ const families: FamilyInfo[] = [
       { label: 'Trade', icon: <Shield className="h-3.5 w-3.5" />, value: 5 },
     ],
     bonuses: ['+25% hit success rate', '+15% heat reduction', '+20% intelligence gathering'],
-    startingResources: { money: 70000, soldiers: 4, influence: 12, politicalPower: 20, respect: 15 },
+    startingResources: { money: 70000, soldiers: 3, influence: 12, politicalPower: 20, respect: 15 },
   },
   {
     id: 'bonanno',
@@ -84,7 +84,7 @@ const families: FamilyInfo[] = [
       { label: 'Loyalty', icon: <Users className="h-3.5 w-3.5" />, value: 5 },
     ],
     bonuses: ['+20% extortion income', '+25% intimidation power', '+15% fear generation'],
-    startingResources: { money: 40000, soldiers: 7, influence: 8, politicalPower: 15, respect: 35 },
+    startingResources: { money: 40000, soldiers: 5, influence: 8, politicalPower: 15, respect: 35 },
   },
   {
     id: 'colombo',
@@ -99,7 +99,7 @@ const families: FamilyInfo[] = [
       { label: 'Fear', icon: <Crown className="h-3.5 w-3.5" />, value: 4 },
     ],
     bonuses: ['+20% all income', '-15% recruitment cost', '+10% reputation gain'],
-    startingResources: { money: 35000, soldiers: 8, influence: 18, politicalPower: 10, respect: 25 },
+    startingResources: { money: 35000, soldiers: 6, influence: 18, politicalPower: 10, respect: 25 },
   },
 ];
 
