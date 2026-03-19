@@ -16,7 +16,8 @@ import {
   SoldierStats, Hitman, BribeContract, BribeTier, VictoryProgress, VictoryType,
   FAMILY_BONUSES, BRIBE_TIERS, DOC_BUSINESS_TYPES,
   SOLDIER_COST, CAPO_COST, HITMAN_MAINTENANCE_MULTIPLIER, MAX_HITMEN, HITMAN_REQUIREMENTS,
-  FamilyBonuses,
+  FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType,
+  NEGOTIATION_TYPES,
 } from '@/types/game-mechanics';
 
 // ============ UNIT TYPES ============
@@ -31,6 +32,7 @@ export interface DeployedUnit {
   maxMoves: number;
   level: number;
   name?: string;
+  personality?: CapoPersonality;
 }
 
 // ============ HEX TILE ============
@@ -95,6 +97,8 @@ export interface EnhancedMafiaGameState {
   soldierStats: Record<string, SoldierStats>;
   hitmen: Hitman[];
   activeBribes: BribeContract[];
+  alliances: AlliancePact[];
+  ceasefires: CeasefirePact[];
   victoryProgress: VictoryProgress;
   victoryType: VictoryType;
   familyBonuses: FamilyBonuses;
@@ -273,10 +277,13 @@ const createInitialGameState = (
       gambino: 'Vito Scaletta', genovese: 'Sal Marcano', lucchese: 'Tommy Angelo',
       bonanno: 'Joe Barbaro', colombo: 'Frank Colletti'
     };
+    const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
+    const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
     deployedUnits.push({
       id: `${fam}-capo-0`, type: 'capo', family: fam,
       q: hq.q, r: hq.r, s: hq.s,
       movesRemaining: 3, maxMoves: 3, level: 1, name: capoNames[fam],
+      personality: randomPersonality,
     });
   });
 
@@ -320,6 +327,8 @@ const createInitialGameState = (
     soldierStats,
     hitmen: [],
     activeBribes: [],
+    alliances: [],
+    ceasefires: [],
     victoryProgress: {
       territory: { current: 0, target: 6, met: false },
       economic: { current: 0, target: 8000, met: false },
@@ -571,8 +580,8 @@ export const useEnhancedMafiaGameState = (
           // Soldiers cannot enter enemy-controlled hexes — must Hit first
           if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) return false;
         } else {
-          // Capos can only move to own territory
-          if (tile.controllingFamily !== prev.playerFamily) return false;
+          // Capos can move to own or enemy territory (for negotiation) but not neutral
+          // Allow enemy territory so capos can negotiate
         }
         return true;
       });
@@ -624,7 +633,7 @@ export const useEnhancedMafiaGameState = (
           if (updatedUnit.type === 'soldier') {
             if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) return false;
           } else {
-            if (tile.controllingFamily !== prev.playerFamily) return false;
+            // Capos can move to own or enemy territory for negotiation
           }
           return true;
         });
@@ -777,6 +786,7 @@ export const useEnhancedMafiaGameState = (
       processWeather(newState);
       processEvents(newState);
       processBribes(newState);
+      processPacts(newState);
       
       newState.reputation.reputation = Math.max(0, newState.reputation.reputation - 0.5);
       newState.reputation.fear = Math.max(0, newState.reputation.fear - 1);
@@ -1054,11 +1064,14 @@ export const useEnhancedMafiaGameState = (
             const hq = newState.headquarters[newState.playerFamily];
             if (hq) {
               const newId = `${newState.playerFamily}-capo-${Date.now()}`;
+              const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
+              const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
               newState.deployedUnits = [...newState.deployedUnits, {
                 id: newId, type: 'capo' as const, family: newState.playerFamily,
                 q: hq.q, r: hq.r, s: hq.s,
                 movesRemaining: 0, maxMoves: 3, level: 1,
                 name: `Capo ${Math.floor(Math.random() * 100)}`,
+                personality: randomPersonality,
               }];
             }
           }
@@ -1156,6 +1169,9 @@ export const useEnhancedMafiaGameState = (
             newState.reputation.reputation += repGain;
           }
           return newState;
+        case 'negotiate': {
+          return processNegotiation(newState, action);
+        }
         default:
           return newState;
       }
@@ -1230,6 +1246,36 @@ export const useEnhancedMafiaGameState = (
     if (targetQ !== undefined) {
       const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
       if (!tile || tile.controllingFamily === state.playerFamily || tile.isHeadquarters) return state;
+
+      // Check ceasefire
+      const hasCeasefire = state.ceasefires.some(c => c.active && c.family === tile.controllingFamily);
+      // Check alliance
+      const hasAlliance = state.alliances.some(a => a.active && a.alliedFamily === tile.controllingFamily);
+      if (hasCeasefire || hasAlliance) {
+        if (hasAlliance) {
+          // Breaking alliance — dissolve with penalty
+          state.alliances = state.alliances.map(a => 
+            a.active && a.alliedFamily === tile.controllingFamily ? { ...a, active: false } : a
+          ).filter(a => a.active);
+          state.reputation.respect = Math.max(0, state.reputation.respect - 25);
+          state.reputation.reputation = Math.max(0, state.reputation.reputation - 15);
+          if (state.reputation.familyRelationships[tile.controllingFamily] !== undefined) {
+            state.reputation.familyRelationships[tile.controllingFamily] -= 40;
+          }
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'error', title: '💔 Alliance Broken!',
+            message: `You attacked your ally! -25 respect, -15 reputation. Relations devastated.`,
+          }];
+        }
+        if (hasCeasefire) {
+          state.ceasefires = state.ceasefires.filter(c => !(c.active && c.family === tile.controllingFamily));
+          state.reputation.respect = Math.max(0, state.reputation.respect - 15);
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'warning', title: '⚠️ Ceasefire Violated!',
+            message: `You broke the ceasefire! -15 respect.`,
+          }];
+        }
+      }
 
       const playerUnits = state.deployedUnits.filter(u => 
         u.family === state.playerFamily && u.q === targetQ && u.r === targetR && u.s === targetS
@@ -1363,7 +1409,132 @@ export const useEnhancedMafiaGameState = (
     return state;
   };
 
-  // ============ CLEAR NOTIFICATIONS ============
+  // ============ NEGOTIATION HANDLER ============
+  const processNegotiation = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
+    const { negotiationType, targetQ, targetR, targetS, capoId, extraData } = action;
+    const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
+    if (!tile || tile.controllingFamily === state.playerFamily || tile.controllingFamily === 'neutral') return state;
+
+    const capo = state.deployedUnits.find(u => u.id === capoId);
+    if (!capo || capo.type !== 'capo' || capo.family !== state.playerFamily) return state;
+
+    const enemyFamily = tile.controllingFamily;
+    const config = NEGOTIATION_TYPES.find(n => n.type === negotiationType);
+    if (!config) return state;
+
+    const cost = config.baseCost + (negotiationType === 'bribe_territory' ? (state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS).length * 2000 + (tile.business?.income || 0)) : 0);
+    if (state.resources.money < cost) return state;
+
+    state.resources.money -= cost;
+
+    // Reputation cost
+    if (config.reputationCost > 0) {
+      state.reputation.respect = Math.max(0, state.reputation.respect - config.reputationCost);
+    }
+
+    switch (negotiationType as NegotiationType) {
+      case 'ceasefire': {
+        const duration = 3 + Math.floor(Math.random() * 3); // 3-5 turns
+        state.ceasefires = [...state.ceasefires, {
+          id: `ceasefire-${Date.now()}`,
+          family: enemyFamily,
+          turnsRemaining: duration,
+          turnFormed: state.turn,
+          active: true,
+        }];
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: '🤝 Ceasefire Agreed!',
+          message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} won't attack for ${duration} turns. -${config.reputationCost} respect.`,
+        }];
+        break;
+      }
+      case 'bribe_territory': {
+        // Peacefully claim the hex
+        const enemyUnits = state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS);
+        enemyUnits.forEach(eu => {
+          const idx = state.deployedUnits.indexOf(eu);
+          if (idx !== -1) state.deployedUnits.splice(idx, 1);
+        });
+        tile.controllingFamily = state.playerFamily;
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: '💵 Territory Acquired!',
+          message: `Peacefully bribed for the hex. Cost: $${cost.toLocaleString()}.`,
+        }];
+        break;
+      }
+      case 'alliance': {
+        const condition: AllianceCondition = extraData?.condition || { type: 'no_attack_family', target: enemyFamily, violated: false };
+        const duration = 5 + Math.floor(Math.random() * 4); // 5-8 turns
+        state.alliances = [...state.alliances, {
+          id: `alliance-${Date.now()}`,
+          alliedFamily: enemyFamily,
+          conditions: [condition],
+          turnsRemaining: duration,
+          turnFormed: state.turn,
+          active: true,
+        }];
+        // Also boost relationship
+        if (state.reputation.familyRelationships[enemyFamily] !== undefined) {
+          state.reputation.familyRelationships[enemyFamily] += 20;
+        }
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: '⚖️ Alliance Formed!',
+          message: `Pact with ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} for ${duration} turns. Condition: ${condition.type.replace(/_/g, ' ')}.`,
+        }];
+        break;
+      }
+    }
+
+    syncLegacyUnits(state);
+    return state;
+  };
+
+  // ============ PROCESS PACTS AT END OF TURN ============
+  const processPacts = (state: EnhancedMafiaGameState) => {
+    // Tick down ceasefires
+    state.ceasefires = state.ceasefires.map(c => {
+      if (!c.active) return c;
+      const remaining = c.turnsRemaining - 1;
+      if (remaining <= 0) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'warning', title: '⏰ Ceasefire Expired',
+          message: `Ceasefire with ${c.family.charAt(0).toUpperCase() + c.family.slice(1)} has ended.`,
+        }];
+        return { ...c, turnsRemaining: 0, active: false };
+      }
+      return { ...c, turnsRemaining: remaining };
+    }).filter(c => c.active);
+
+    // Tick down alliances and check conditions
+    state.alliances = state.alliances.map(a => {
+      if (!a.active) return a;
+      const remaining = a.turnsRemaining - 1;
+
+      // Check conditions
+      a.conditions.forEach(cond => {
+        if (cond.violated) return;
+        if (cond.type === 'no_attack_family') {
+          // Check if player attacked ally this turn (we can't retroactively check, but if relationship dropped significantly)
+          // Simple: if any ally territory was taken by player this turn, condition violated
+        }
+        if (cond.type === 'no_expand_district') {
+          // Check if player expanded into the target district
+          // For simplicity we don't enforce this retroactively here
+        }
+      });
+
+      if (remaining <= 0) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'info', title: '📜 Alliance Ended',
+          message: `Alliance with ${a.alliedFamily.charAt(0).toUpperCase() + a.alliedFamily.slice(1)} has expired naturally.`,
+        }];
+        return { ...a, turnsRemaining: 0, active: false };
+      }
+      return { ...a, turnsRemaining: remaining };
+    }).filter(a => a.active);
+  };
+
+
   const clearNotifications = useCallback(() => {
     setGameState(prev => ({ ...prev, pendingNotifications: [] }));
   }, []);

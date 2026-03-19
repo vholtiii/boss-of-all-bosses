@@ -127,6 +127,64 @@ export const DOC_BUSINESS_TYPES: DocBusinessConfig[] = [
   { type: 'store_front', label: 'Store Front', icon: '🏪', baseIncome: 2000, baseHeat: 1, launderingCapacity: 50 },
 ];
 
+// ============ CAPO PERSONALITY TYPES ============
+export type CapoPersonality = 'diplomat' | 'enforcer' | 'schemer';
+
+export const PERSONALITY_BONUSES: Record<CapoPersonality, Record<string, number>> = {
+  diplomat:  { ceasefire: 20, bribe_territory: 5,  alliance: 10, all: 0  },
+  enforcer:  { ceasefire: 0,  bribe_territory: 15, alliance: 0,  all: 0  },
+  schemer:   { ceasefire: 0,  bribe_territory: 0,  alliance: 15, all: 10 },
+};
+
+export const PERSONALITY_LABELS: Record<CapoPersonality, { label: string; icon: string; description: string }> = {
+  diplomat:  { label: 'Diplomat',  icon: '🕊️', description: '+20% Ceasefire, +10% Alliance' },
+  enforcer:  { label: 'Enforcer',  icon: '💪', description: '+15% Bribe for Territory' },
+  schemer:   { label: 'Schemer',   icon: '🧠', description: '+15% Alliance, +10% all negotiations' },
+};
+
+// ============ NEGOTIATION TYPES ============
+export type NegotiationType = 'ceasefire' | 'bribe_territory' | 'alliance';
+
+export interface NegotiationConfig {
+  type: NegotiationType;
+  label: string;
+  icon: string;
+  description: string;
+  baseSuccess: number; // 0-100
+  baseCost: number;
+  reputationCost: number;
+}
+
+export const NEGOTIATION_TYPES: NegotiationConfig[] = [
+  { type: 'ceasefire', label: 'Ceasefire Pact', icon: '🤝', description: 'Both families stop attacking each other for 3-5 turns. Costs reputation.', baseSuccess: 50, baseCost: 3000, reputationCost: 5 },
+  { type: 'bribe_territory', label: 'Bribe for Territory', icon: '💵', description: 'Pay to peacefully claim this hex. Cost scales with enemy strength.', baseSuccess: 40, baseCost: 8000, reputationCost: 0 },
+  { type: 'alliance', label: 'Form Alliance', icon: '⚖️', description: 'Conditional pact with shared defense. Breaking conditions has severe penalties.', baseSuccess: 30, baseCost: 5000, reputationCost: 0 },
+];
+
+// ============ ALLIANCE & CEASEFIRE DATA ============
+export interface AllianceCondition {
+  type: 'no_expand_district' | 'no_attack_family' | 'share_income';
+  target: string;
+  violated: boolean;
+}
+
+export interface AlliancePact {
+  id: string;
+  alliedFamily: string;
+  conditions: AllianceCondition[];
+  turnsRemaining: number;
+  turnFormed: number;
+  active: boolean;
+}
+
+export interface CeasefirePact {
+  id: string;
+  family: string;
+  turnsRemaining: number;
+  turnFormed: number;
+  active: boolean;
+}
+
 // ============ RECRUITMENT COSTS ============
 export const SOLDIER_COST = 500;
 export const CAPO_COST = 1500;

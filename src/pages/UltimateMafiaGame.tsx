@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import NegotiationDialog from '@/components/NegotiationDialog';
 import { NotificationProvider, useMafiaNotifications } from '@/components/ui/notification-system';
 import { AnimatedCard, AnimatedCardHeader, AnimatedCardTitle, AnimatedCardContent } from '@/components/ui/animated-card';
 import { EnhancedButton } from '@/components/ui/enhanced-button';
@@ -74,8 +75,27 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
   }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications]);
 
+  // Negotiation dialog state
+  const [negotiationState, setNegotiationState] = useState<{
+    open: boolean;
+    targetQ: number;
+    targetR: number;
+    targetS: number;
+    capoId: string;
+  } | null>(null);
+
   // Handle action wrapper function
   const handleAction = useCallback((action: any) => {
+    if (action.type === 'open_negotiate') {
+      setNegotiationState({
+        open: true,
+        targetQ: action.targetQ,
+        targetR: action.targetR,
+        targetS: action.targetS,
+        capoId: action.capoId,
+      });
+      return;
+    }
     performAction(action);
   }, [performAction]);
 
@@ -379,9 +399,21 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         </div>
       </div>
       
-      {/* Right side - Motto */}
-      <div className="text-sm text-muted-foreground font-playfair italic">
-        "Strategy Rules the Underworld"
+      {/* Right side - Active Pacts */}
+      <div className="flex items-center gap-2 text-xs">
+        {gameState.ceasefires?.filter((c: any) => c.active).map((c: any) => (
+          <span key={c.id} className="px-2 py-0.5 rounded-full bg-accent/20 border border-accent/30 text-accent-foreground">
+            🤝 {c.family.charAt(0).toUpperCase() + c.family.slice(1)} ({c.turnsRemaining}t)
+          </span>
+        ))}
+        {gameState.alliances?.filter((a: any) => a.active).map((a: any) => (
+          <span key={a.id} className="px-2 py-0.5 rounded-full bg-primary/20 border border-primary/30 text-primary">
+            ⚖️ {a.alliedFamily.charAt(0).toUpperCase() + a.alliedFamily.slice(1)} ({a.turnsRemaining}t)
+          </span>
+        ))}
+        {(!gameState.ceasefires?.length && !gameState.alliances?.length) && (
+          <span className="text-muted-foreground font-playfair italic">"Strategy Rules the Underworld"</span>
+        )}
       </div>
     </div>
   );
@@ -486,6 +518,40 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           playerFamily={gameState.playerFamily}
         />
       )}
+
+      {/* Negotiation Dialog */}
+      {negotiationState && (() => {
+        const tile = gameState.hexMap.find((t: any) => t.q === negotiationState.targetQ && t.r === negotiationState.targetR && t.s === negotiationState.targetS);
+        const capo = gameState.deployedUnits.find((u: any) => u.id === negotiationState.capoId);
+        if (!tile || !capo) return null;
+        const enemyFamily = tile.controllingFamily;
+        const enemyUnitsOnHex = gameState.deployedUnits.filter((u: any) => u.family === enemyFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+        return (
+          <NegotiationDialog
+            open={negotiationState.open}
+            onClose={() => setNegotiationState(null)}
+            onNegotiate={(type, extraData) => {
+              performAction({
+                type: 'negotiate',
+                negotiationType: type,
+                targetQ: negotiationState.targetQ,
+                targetR: negotiationState.targetR,
+                targetS: negotiationState.targetS,
+                capoId: negotiationState.capoId,
+                extraData,
+              });
+              setNegotiationState(null);
+            }}
+            capoName={capo.name || 'Capo'}
+            capoPersonality={capo.personality || 'diplomat'}
+            enemyFamily={enemyFamily}
+            playerReputation={gameState.reputation.respect}
+            playerMoney={gameState.resources.money}
+            enemyStrength={enemyUnitsOnHex.length}
+            hexIncome={tile.business?.income || 0}
+          />
+        );
+      })()}
 
       {/* Tutorial System */}
       <TutorialSystem
