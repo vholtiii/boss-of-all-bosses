@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import ResponsiveLayout, { MobileTabBar, MobileFloatingActionButton } from '@/components/ResponsiveLayout';
 import EnhancedMafiaHexGrid from '@/components/EnhancedMafiaHexGrid';
-import EnhancedGameMechanics from '@/components/EnhancedGameMechanics';
+import { LeftSidePanel, RightSidePanel } from '@/components/GameSidePanels';
 import { useEnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import SaveLoadDialog from '@/components/SaveLoadDialog';
