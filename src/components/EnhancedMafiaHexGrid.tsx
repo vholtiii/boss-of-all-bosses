@@ -408,11 +408,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     );
                   })()}
 
-                  {/* Income on hover */}
-                  {isHovered && tile.business && (
-                    <text x={x} y={y + baseHexRadius + 12} textAnchor="middle" fontSize="9" fill="#ffffff" fontWeight="600" className="pointer-events-none">
-                      ${tile.business.income.toLocaleString()}/turn
-                    </text>
+                  {/* Player territory gold outer glow */}
+                  {isPlayerTerritory && !tile.isHeadquarters && (
+                    <polygon
+                      points={getHexPoints(x, y, baseHexRadius + 2)}
+                      fill="none"
+                      stroke="#D4AF37"
+                      strokeWidth="1.5"
+                      opacity="0.4"
+                      className="pointer-events-none"
+                    />
                   )}
 
                   {/* Render units */}
