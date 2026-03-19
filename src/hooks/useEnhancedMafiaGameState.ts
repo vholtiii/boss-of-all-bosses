@@ -1168,6 +1168,9 @@ export const useEnhancedMafiaGameState = (
             newState.reputation.reputation += repGain;
           }
           return newState;
+        case 'negotiate': {
+          return processNegotiation(newState, action);
+        }
         default:
           return newState;
       }
