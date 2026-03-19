@@ -234,7 +234,7 @@ export const FORTIFY_DEFENSE_BONUS = 25; // +25% defense
 export const FORTIFY_CASUALTY_REDUCTION = 50; // -50% casualties when fortified
 export const SCOUT_DURATION = 3; // turns
 export const SCOUT_INTEL_BONUS = 15; // +15% hit success on scouted hexes
-export const SAFEHOUSE_DURATION = 2; // turns
+export const SAFEHOUSE_DURATION = 5; // turns
 export const MAX_ESCORT_SOLDIERS = 2;
 
 // ============ ACTION BUDGET ============
