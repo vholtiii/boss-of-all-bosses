@@ -525,7 +525,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       soldiersByFamily.forEach((soldiers, fam) => {
                         const firstSoldier = soldiers[0];
                         const isSelected = soldiers.some(s => s.id === selectedUnitId);
-                        const isClickable = fam === playerFamily && (turnPhase === 'move' || (turnPhase === 'deploy' && isAtHQ));
+                        const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy');
                         elements.push(
                           <SoldierIcon
                             key={`soldier-${fam}-${key}`}
