@@ -49,6 +49,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canNegotiate: boolean; negotiateCapoId?: string } | null>(null);
+  const [hqUnitMenu, setHqUnitMenu] = useState<{ tile: HexTile; units: DeployedUnit[] } | null>(null);
   const didPanRef = React.useRef(false);
   const panRef = React.useRef({ x: 0, y: 0 });
   const isPanningRef = React.useRef(false);
