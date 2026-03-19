@@ -157,13 +157,42 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       }
     }
 
-    return familyColors[tile.controllingFamily] || '#555555';
+    // Extorted territory: fully shaded in family color
+    if (tile.isExtorted && tile.controllingFamily !== 'neutral') {
+      return familyColors[tile.controllingFamily] || '#555555';
+    }
+
+    // Claimed (not extorted) territory: use a dark base, the outline will show family color
+    if (tile.controllingFamily !== 'neutral' && !tile.isExtorted) {
+      return '#1a1a1a';
+    }
+
+    return '#555555'; // neutral
   };
 
   const getHexOpacity = (tile: HexTile): number => {
-    if (tile.controllingFamily === playerFamily) return 0.85;
+    if (tile.isExtorted && tile.controllingFamily !== 'neutral') return 0.85;
+    if (tile.controllingFamily !== 'neutral' && !tile.isExtorted) return 0.6;
     if (tile.controllingFamily === 'neutral') return 0.35;
     return 0.65;
+  };
+
+  const getHexStroke = (tile: HexTile): string => {
+    if (tile.isHeadquarters) return '#D4AF37';
+    // Claimed or extorted: outline in family color
+    if (tile.controllingFamily !== 'neutral') {
+      return familyColors[tile.controllingFamily] || '#333333';
+    }
+    return '#333333';
+  };
+
+  const getHexStrokeWidth = (tile: HexTile): number => {
+    if (tile.isHeadquarters) return 3;
+    // Claimed (not extorted): thick outline to show ownership
+    if (tile.controllingFamily !== 'neutral' && !tile.isExtorted) return 2.5;
+    // Extorted: thinner outline since fill shows ownership
+    if (tile.isExtorted && tile.controllingFamily !== 'neutral') return 2;
+    return 1;
   };
 
   const handleHexClick = (tile: HexTile) => {
@@ -377,8 +406,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   <polygon
                     points={getHexPoints(x, y, baseHexRadius)}
                     fill={getHexColor(tile)}
-                    stroke={tile.isHeadquarters ? '#D4AF37' : isPlayerTerritory ? '#D4AF3780' : '#333333'}
-                    strokeWidth={tile.isHeadquarters ? 3 : isPlayerTerritory ? 2 : 1}
+                    stroke={getHexStroke(tile)}
+                    strokeWidth={getHexStrokeWidth(tile)}
                     opacity={getHexOpacity(tile)}
                     className="cursor-pointer transition-all duration-150"
                     onClick={() => handleHexClick(tile)}
