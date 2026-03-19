@@ -324,6 +324,7 @@ const createInitialGameState = (
     victoryType: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
+    pendingNotifications: [],
     
     combat: {
       territoryBattles: [],
