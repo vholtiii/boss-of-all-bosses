@@ -109,6 +109,11 @@ export interface EnhancedMafiaGameState {
   lastTurnIncome: number;
   pendingNotifications: Array<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; message?: string }>;
   
+  // Move phase systems
+  scoutedHexes: ScoutedHex[];
+  safehouse: Safehouse | null;
+  selectedMoveAction: MoveAction;
+  
   // Enhanced systems
   combat: CombatSystem;
   economy: EconomySystem;
