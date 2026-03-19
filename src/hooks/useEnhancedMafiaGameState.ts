@@ -1930,9 +1930,17 @@ export const useEnhancedMafiaGameState = (
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
+        const hitDetails = `+$5,000, +10 respect${casualties > 0 ? `, ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}` : ''}`;
+        state.lastCombatResult = {
+          q: targetQ, r: targetR, s: targetS,
+          success: true, type: 'hit',
+          title: 'TERRITORY CAPTURED!',
+          details: hitDetails,
+          timestamp: Date.now(),
+        };
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: 'Territory Captured!',
-          message: `Hit successful! +$5,000, +10 respect.${casualties > 0 ? ` ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}.` : ''}`,
+          message: `Hit successful! ${hitDetails}.`,
         }];
       } else {
         const casualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
