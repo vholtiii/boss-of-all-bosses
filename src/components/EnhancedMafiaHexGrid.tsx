@@ -419,8 +419,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             {/* Action context menu on hex */}
             {actionMenu && (() => {
               const { x, y } = getHexPosition(actionMenu.tile.q, actionMenu.tile.r);
-              const menuWidth = 120;
-              const menuHeight = actionMenu.canHit && actionMenu.canExtort ? 80 : 50;
+              const menuWidth = 140;
+              const buttonCount = [actionMenu.canHit, actionMenu.canExtort, actionMenu.canNegotiate].filter(Boolean).length;
+              const menuHeight = buttonCount * 32 + 12;
               return (
                 <foreignObject
                   x={x - menuWidth / 2}
@@ -462,6 +463,24 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/90 hover:bg-primary text-primary-foreground text-xs font-bold transition-colors"
                       >
                         💰 Extort
+                      </button>
+                    )}
+                    {actionMenu.canNegotiate && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAction) onAction({
+                            type: 'open_negotiate',
+                            targetQ: actionMenu.tile.q,
+                            targetR: actionMenu.tile.r,
+                            targetS: actionMenu.tile.s,
+                            capoId: actionMenu.negotiateCapoId,
+                          });
+                          setActionMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-accent/90 hover:bg-accent text-accent-foreground text-xs font-bold transition-colors"
+                      >
+                        🤝 Negotiate
                       </button>
                     )}
                   </div>
