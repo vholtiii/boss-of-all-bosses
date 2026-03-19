@@ -88,7 +88,7 @@ const families: FamilyInfo[] = [
       { label: 'Defense', icon: <Shield className="h-4 w-4" />, value: '★★★★★' },
       { label: 'Loyalty', icon: <Users className="h-4 w-4" />, value: '★★★★★' },
     ],
-    bonuses: ['+50% territory defense', 'Soldiers never betray', 'Higher starting loyalty'],
+    bonuses: ['+20% extortion income', '+25% intimidation power', '+15% fear generation'],
     startingResources: { money: 40000, soldiers: 7, influence: 8, politicalPower: 15, respect: 35 },
   },
   {
