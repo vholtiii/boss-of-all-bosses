@@ -104,7 +104,6 @@ const GameContent: React.FC = () => {
             currentTurn={gameState.turn}
             familyControl={gameState.familyControl}
             onAction={performBusinessAction}
-            territories={gameState.territories}
             playerFamily={gameState.playerFamily}
           />
         </div>
