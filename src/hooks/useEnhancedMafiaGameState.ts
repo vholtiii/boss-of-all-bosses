@@ -1315,6 +1315,11 @@ export const useEnhancedMafiaGameState = (
     return state;
   };
 
+  // ============ CLEAR NOTIFICATIONS ============
+  const clearNotifications = useCallback(() => {
+    setGameState(prev => ({ ...prev, pendingNotifications: [] }));
+  }, []);
+
   // ============ WINNER CHECK ============
   const isWinner = gameState.victoryType !== null;
 
@@ -1334,5 +1339,6 @@ export const useEnhancedMafiaGameState = (
     selectUnitFromHeadquarters,
     deployUnit,
     isWinner,
+    clearNotifications,
   };
 };
