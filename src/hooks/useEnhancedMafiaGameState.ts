@@ -20,7 +20,7 @@ import {
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType,
   NEGOTIATION_TYPES,
   ScoutedHex, Safehouse, MoveAction,
-  FORTIFY_DEFENSE_BONUS, SCOUT_DURATION, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
+  FORTIFY_DEFENSE_BONUS, SCOUT_DURATION, SCOUT_INTEL_BONUS, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
   BASE_ACTIONS_PER_TURN, BONUS_ACTION_RESPECT_THRESHOLD, BONUS_ACTION_INFLUENCE_THRESHOLD,
   TACTICAL_ACTIONS_PER_TURN,
 } from '@/types/game-mechanics';
@@ -701,7 +701,7 @@ export const useEnhancedMafiaGameState = (
           const scoutableHexes = neighbors.filter(h => {
             const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
             if (!tile) return false;
-            return tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily;
+            return tile.controllingFamily !== prev.playerFamily;
           });
           return { ...prev, selectedUnitId: unit.id, availableMoveHexes: scoutableHexes, deployMode: null, availableDeployHexes: [] };
         }
@@ -918,7 +918,9 @@ export const useEnhancedMafiaGameState = (
       selectedMoveAction: 'move' as MoveAction,
       pendingNotifications: [...prev.pendingNotifications, {
         type: 'info' as const, title: '👁️ Hex Scouted',
-        message: `${tile.controllingFamily.toUpperCase()} territory: ${enemyUnitsOnHex.length} units${tile.business ? `, ${tile.business.type} ($${tile.business.income}/turn)` : ''}.`,
+        message: tile.controllingFamily === 'neutral'
+          ? `Neutral territory${tile.business ? `: ${tile.business.type} generating $${tile.business.income}/turn` : ': no businesses'}.`
+          : `${tile.controllingFamily.toUpperCase()} territory: ${enemyUnitsOnHex.length} units${tile.business ? `, ${tile.business.type} ($${tile.business.income}/turn)` : ''}.`,
       }],
     };
   };
@@ -2063,6 +2065,12 @@ export const useEnhancedMafiaGameState = (
       
       // Apply Lucchese hit success bonus
       chance += state.familyBonuses.hitSuccess / 100;
+
+      // Apply scout intelligence bonus
+      const isScouted = state.scoutedHexes.some(s => s.q === targetQ && s.r === targetR && s.s === targetS);
+      if (isScouted) {
+        chance += SCOUT_INTEL_BONUS / 100;
+      }
       
       chance = Math.min(0.95, chance);
 
