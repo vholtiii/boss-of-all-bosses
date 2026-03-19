@@ -260,7 +260,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   }, [hexMap]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-gradient-to-br from-noir-dark/50 to-background/50">
+    <div id="hex-grid-container" className="relative w-full h-full overflow-auto bg-gradient-to-br from-noir-dark/50 to-background/50">
       {/* Controls */}
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
         <div className="flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-3 border border-noir-light shadow-lg">
