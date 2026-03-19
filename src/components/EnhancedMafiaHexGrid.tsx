@@ -47,6 +47,11 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [zoom, setZoom] = useState(1);
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
+  const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean } | null>(null);
+
+  // Clear action menu when phase changes
+  const turnPhaseRef = gameState?.turnPhase;
+  useEffect(() => { setActionMenu(null); }, [turnPhaseRef]);
 
   const baseHexRadius = 35;
   const hexWidth = baseHexRadius * 2;
@@ -174,6 +179,29 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
         return;
       }
+    }
+
+    // Action phase — show context menu if player has soldiers on enemy/neutral hex
+    if (turnPhase === 'action') {
+      const key = `${tile.q},${tile.r},${tile.s}`;
+      const unitsHere = unitsByHex.get(key) || [];
+      const playerSoldiersHere = unitsHere.filter(u => u.family === playerFamily && u.type === 'soldier');
+      
+      if (playerSoldiersHere.length > 0 && tile.controllingFamily !== playerFamily) {
+        const canHit = tile.controllingFamily !== 'neutral' && !tile.isHeadquarters;
+        const canExtort = tile.controllingFamily === 'neutral' && !tile.isHeadquarters;
+        if (canHit || canExtort) {
+          // Toggle menu — click same hex again to close
+          if (actionMenu && actionMenu.tile.q === tile.q && actionMenu.tile.r === tile.r) {
+            setActionMenu(null);
+          } else {
+            setActionMenu({ tile, canHit, canExtort });
+          }
+          return;
+        }
+      }
+      // Close menu on clicking elsewhere
+      setActionMenu(null);
     }
 
     // Normal click — show info
@@ -349,6 +377,58 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 </g>
               );
             })}
+            {/* Action context menu on hex */}
+            {actionMenu && (() => {
+              const { x, y } = getHexPosition(actionMenu.tile.q, actionMenu.tile.r);
+              const menuWidth = 120;
+              const menuHeight = actionMenu.canHit && actionMenu.canExtort ? 80 : 50;
+              return (
+                <foreignObject
+                  x={x - menuWidth / 2}
+                  y={y - baseHexRadius - menuHeight - 8}
+                  width={menuWidth}
+                  height={menuHeight}
+                  className="overflow-visible"
+                >
+                  <div className="flex flex-col gap-1 bg-background/95 backdrop-blur-sm border border-primary/40 rounded-lg p-1.5 shadow-xl">
+                    {actionMenu.canHit && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAction) onAction({
+                            type: 'hit_territory',
+                            targetQ: actionMenu.tile.q,
+                            targetR: actionMenu.tile.r,
+                            targetS: actionMenu.tile.s,
+                          });
+                          setActionMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-destructive/90 hover:bg-destructive text-destructive-foreground text-xs font-bold transition-colors"
+                      >
+                        ⚔️ Hit Territory
+                      </button>
+                    )}
+                    {actionMenu.canExtort && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAction) onAction({
+                            type: 'extort_territory',
+                            targetQ: actionMenu.tile.q,
+                            targetR: actionMenu.tile.r,
+                            targetS: actionMenu.tile.s,
+                          });
+                          setActionMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/90 hover:bg-primary text-primary-foreground text-xs font-bold transition-colors"
+                      >
+                        💰 Extort
+                      </button>
+                    )}
+                  </div>
+                </foreignObject>
+              );
+            })()}
           </g>
         </svg>
       </div>
