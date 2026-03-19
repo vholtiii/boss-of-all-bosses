@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -46,9 +46,13 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   onSelectUnitFromHeadquarters, onDeployUnit
 }) => {
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canNegotiate: boolean; negotiateCapoId?: string } | null>(null);
+  const didPanRef = React.useRef(false);
 
   // Clear action menu when phase changes
   const turnPhaseRef = gameState?.turnPhase;
@@ -99,6 +103,28 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Pan handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    setIsPanning(true);
+    didPanRef.current = false;
+    setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  }, [pan]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning) return;
+    const dx = e.clientX - panStart.x;
+    const dy = e.clientY - panStart.y;
+    if (Math.abs(dx - pan.x) > 3 || Math.abs(dy - pan.y) > 3) {
+      didPanRef.current = true;
+    }
+    setPan({ x: dx, y: dy });
+  }, [isPanning, panStart, pan]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
   }, []);
 
   const getHexPosition = (q: number, r: number) => ({
@@ -153,6 +179,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   };
 
   const handleHexClick = (tile: HexTile) => {
+    if (didPanRef.current) return; // ignore clicks after dragging
     const turnPhase = gameState?.turnPhase || 'waiting';
 
     // During move phase, try selecting units on HQ hex before opening the panel
@@ -288,9 +315,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       </div>
 
       {/* Grid */}
-      <div className="absolute inset-0 flex items-center justify-center">
+      <div
+        className="absolute inset-0"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
+      >
         <svg width="100%" height="100%" viewBox={viewBox} className="overflow-visible">
-          <g transform={`scale(${zoom})`}>
+          <g transform={`translate(${pan.x / zoom}, ${pan.y / zoom}) scale(${zoom})`}>
             {hexMap.map(tile => {
               const { x, y } = getHexPosition(tile.q, tile.r);
               const key = `${tile.q},${tile.r},${tile.s}`;
