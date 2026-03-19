@@ -1939,10 +1939,16 @@ export const useEnhancedMafiaGameState = (
     const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
     if (!tile || tile.controllingFamily !== 'neutral' || tile.isHeadquarters) return state;
 
-    const playerSoldiers = state.deployedUnits.filter(u => 
+    const playerSoldiersOnHex = state.deployedUnits.filter(u => 
       u.family === state.playerFamily && u.type === 'soldier' &&
       u.q === targetQ && u.r === targetR && u.s === targetS
     );
+    const claimNeighbors = getHexNeighbors(targetQ, targetR, targetS);
+    const playerSoldiersAdjacent = state.deployedUnits.filter(u => 
+      u.family === state.playerFamily && u.type === 'soldier' &&
+      claimNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s)
+    );
+    const playerSoldiers = [...playerSoldiersOnHex, ...playerSoldiersAdjacent];
     if (playerSoldiers.length === 0) return state;
 
     tile.controllingFamily = state.playerFamily;
