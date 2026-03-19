@@ -48,7 +48,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [zoom, setZoom] = useState(1);
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
-  const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; negotiateCapoId?: string } | null>(null);
+  const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; negotiateCapoId?: string } | null>(null);
   const [expandedHQKey, setExpandedHQKey] = useState<string | null>(null);
   const [combatOverlay, setCombatOverlay] = useState<{
     q: number; r: number; s: number;
