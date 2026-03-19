@@ -88,32 +88,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return map;
   }, [deployedUnits]);
 
-  // Mouse wheel zoom — debounced with requestAnimationFrame
-  useEffect(() => {
-    const container = document.getElementById('hex-grid-container');
-    if (!container) return;
-    let rafId: number | null = null;
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      if (rafId) return;
-      rafId = requestAnimationFrame(() => {
-        const delta = e.deltaY > 0 ? -0.06 : 0.06;
-        setZoom(prev => {
-          const next = Math.min(Math.max(prev + delta, 0.3), 2.5);
-          zoomRef.current = next;
-          updateTransform();
-          return next;
-        });
-        rafId = null;
-      });
-    };
-    container.addEventListener('wheel', handleWheel, { passive: false });
-    return () => {
-      container.removeEventListener('wheel', handleWheel);
-      if (rafId) cancelAnimationFrame(rafId);
-    };
-  }, [updateTransform]);
-
   // Keyboard zoom shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
