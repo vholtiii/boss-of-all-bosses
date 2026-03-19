@@ -424,10 +424,11 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         )}
 
         {/* Tactical action toolbar — only during tactical (move) phase */}
+        {/* Tactical action toolbar — only during tactical (move) phase */}
         {gameState.turnPhase === 'move' && (
           <div className="flex items-center gap-1 bg-background/80 rounded-lg px-2 py-1 border border-noir-light">
             <span className="text-[10px] text-muted-foreground mr-1">📋 {gameState.tacticalActionsRemaining}/{gameState.maxTacticalActions}</span>
-              { action: 'move' as const, label: '🚶 Move', tip: 'Move unit to adjacent hex' },
+            {([
               { action: 'scout' as const, label: '👁️ Scout', tip: 'Reveal enemy hex info' },
               { action: 'fortify' as const, label: '🛡️ Fortify', tip: 'Skip move for +25% defense' },
               { action: 'escort' as const, label: '🚗 Escort', tip: 'Capo carries soldiers' },
@@ -439,6 +440,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 variant={gameState.selectedMoveAction === action ? 'default' : 'outline'}
                 className="text-xs h-7 px-2"
                 title={tip}
+                disabled={gameState.tacticalActionsRemaining <= 0}
                 onClick={() => {
                   if (action === 'fortify' && gameState.selectedUnitId) {
                     fortifyUnit();
