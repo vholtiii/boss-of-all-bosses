@@ -49,6 +49,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean } | null>(null);
 
+  // Clear action menu when phase changes
+  const turnPhaseRef = gameState?.turnPhase;
+  useEffect(() => { setActionMenu(null); }, [turnPhaseRef]);
+
   const baseHexRadius = 35;
   const hexWidth = baseHexRadius * 2;
   const hexHeight = Math.sqrt(3) * baseHexRadius;
