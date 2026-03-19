@@ -25,7 +25,8 @@ import {
   Target,
   Swords,
   Eye,
-  SkipForward
+  SkipForward,
+  LogOut
 } from 'lucide-react';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
