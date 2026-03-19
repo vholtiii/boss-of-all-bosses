@@ -147,10 +147,17 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             />
             <ActionButton
               icon={<Users className="h-4 w-4" />}
-              label="Recruit Soldiers"
-              sublabel={`$8,000 each`}
-              disabled={resources.money < 8000}
-              onClick={() => onAction({ type: 'recruit_soldiers', cost: 8000 })}
+              label="Recruit Soldier"
+              sublabel={`$${SOLDIER_COST}`}
+              disabled={resources.money < SOLDIER_COST}
+              onClick={() => onAction({ type: 'recruit_soldiers', cost: SOLDIER_COST })}
+            />
+            <ActionButton
+              icon={<Crown className="h-4 w-4" />}
+              label="Recruit Capo"
+              sublabel={`$${CAPO_COST.toLocaleString()}`}
+              disabled={resources.money < CAPO_COST}
+              onClick={() => onAction({ type: 'recruit_capo', cost: CAPO_COST })}
             />
           </div>
         </CollapsibleSection>
