@@ -184,14 +184,14 @@ const generateHexMap = (radius: number): HexTile[] => {
   const tiles: HexTile[] = [];
   
   const getDistrict = (q: number, r: number): HexTile['district'] => {
-    if (q <= -3 && r >= 2) return 'Little Italy';
-    if (q >= 2 && r <= -3) return 'Manhattan';
-    if (q >= 2 && r >= 2) return 'Staten Island';
-    if (q <= -3 && r <= -3) return 'Queens';
-    if (r >= 2) return 'Brooklyn';
-    if (r <= -3) return 'Bronx';
-    if (q >= 2) return 'Manhattan';
-    if (q <= -3) return 'Queens';
+    if (q <= -4 && r >= 3) return 'Little Italy';
+    if (q >= 3 && r <= -4) return 'Manhattan';
+    if (q >= 3 && r >= 3) return 'Staten Island';
+    if (q <= -4 && r <= -4) return 'Queens';
+    if (r >= 3) return 'Brooklyn';
+    if (r <= -4) return 'Bronx';
+    if (q >= 3) return 'Manhattan';
+    if (q <= -4) return 'Queens';
     return 'Brooklyn';
   };
 
