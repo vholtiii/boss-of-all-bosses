@@ -99,8 +99,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Strategic Actions"
           icon={<Swords className="h-4 w-4" />}
-          isOpen={openSection === 'actions'}
-          onToggle={() => toggle('actions')}
+          isOpen={!actionsLocked && openSection === 'actions'}
+          onToggle={() => !actionsLocked && toggle('actions')}
+          disabled={actionsLocked}
         >
           <div className="space-y-1.5">
             <ActionButton
