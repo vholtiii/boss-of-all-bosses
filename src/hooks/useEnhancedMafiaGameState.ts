@@ -50,7 +50,6 @@ export interface HexTile {
   district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
   terrain: 'urban' | 'industrial' | 'residential' | 'docks' | 'commercial';
   controllingFamily: 'neutral' | 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
-  isExtorted?: boolean;
   business?: {
     type: string;
     income: number;
@@ -776,7 +775,7 @@ export const useEnhancedMafiaGameState = (
               title: '💰 Capo Auto-Extortion!',
               message: `${unit.name || 'Your Capo'} took over and extorted the territory on arrival! +$3,000, +5 respect.`,
             };
-            return { ...tile, controllingFamily: prev.playerFamily, isExtorted: true };
+            return { ...tile, controllingFamily: prev.playerFamily };
           }
         }
         return tile;
@@ -1064,7 +1063,7 @@ export const useEnhancedMafiaGameState = (
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
           if (unitType === 'capo' && (tile.controllingFamily === 'neutral' || tile.controllingFamily === family) && !tile.isHeadquarters) {
-            return { ...tile, controllingFamily: family as any, isExtorted: true };
+            return { ...tile, controllingFamily: family as any };
           }
         }
         return tile;
@@ -2104,7 +2103,6 @@ export const useEnhancedMafiaGameState = (
 
       if (Math.random() < chance) {
         tile.controllingFamily = state.playerFamily;
-        tile.isExtorted = true;
         state.resources.money += 3000;
         state.resources.respect += 5;
         
