@@ -700,14 +700,34 @@ export const useEnhancedMafiaGameState = (
       }
 
       // Auto-claim neutral tiles on move
+      // Capos auto-extort: claim territory + bonus money/respect instantly
+      let autoExtortNotification: typeof prev.pendingNotifications[0] | null = null;
+      let bonusMoney = 0;
+      let bonusRespect = 0;
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
           if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters) {
+            if (unit.type === 'capo') {
+              // Capo auto-extorts on arrival — skip the extort action step
+              bonusMoney = 3000;
+              bonusRespect = 5;
+              autoExtortNotification = {
+                type: 'success' as const,
+                title: '💰 Capo Auto-Extortion!',
+                message: `${unit.name || 'Your Capo'} took over and extorted the territory on arrival! +$3,000, +5 respect.`,
+              };
+            }
             return { ...tile, controllingFamily: prev.playerFamily };
           }
         }
         return tile;
       });
+
+      // Apply capo extortion bonuses
+      let newResources = prev.resources;
+      if (bonusMoney > 0) {
+        newResources = { ...prev.resources, money: prev.resources.money + bonusMoney, respect: prev.resources.respect + bonusRespect };
+      }
 
       let newAvailableMoves: Array<{q:number;r:number;s:number}> = [];
       if (updatedUnit.movesRemaining > 0) {
@@ -726,10 +746,16 @@ export const useEnhancedMafiaGameState = (
         });
       }
 
+      const notifications = autoExtortNotification 
+        ? [...prev.pendingNotifications, autoExtortNotification]
+        : prev.pendingNotifications;
+
       const newState = {
         ...prev, deployedUnits: newUnits, hexMap: newHexMap,
+        resources: newResources,
         selectedUnitId: updatedUnit.movesRemaining > 0 ? updatedUnit.id : null,
         availableMoveHexes: newAvailableMoves,
+        pendingNotifications: notifications,
       };
       syncLegacyUnits(newState);
       return newState;
