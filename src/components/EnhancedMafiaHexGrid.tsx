@@ -181,11 +181,17 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       }
     }
 
-    // HQ click — during deploy phase, toggle unit picker AND show HQ info
+    // HQ click — during deploy phase, toggle unit picker, show HQ info, AND allow unit selection
     if (tile.isHeadquarters && turnPhase === 'deploy' && tile.isHeadquarters === playerFamily) {
       const hqKey = `${tile.q},${tile.r},${tile.s}`;
       setExpandedHQKey(prev => prev === hqKey ? null : hqKey);
       if (onSelectHeadquarters) onSelectHeadquarters(tile.isHeadquarters);
+      // Also try selecting a unit at HQ for movement (don't return early if unit found)
+      const unitsHere = unitsByHex.get(hqKey) || [];
+      const playerUnit = unitsHere.find(u => u.family === playerFamily && u.movesRemaining > 0);
+      if (playerUnit && onSelectUnit) {
+        onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
+      }
       return;
     }
 
