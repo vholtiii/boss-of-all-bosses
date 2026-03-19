@@ -25,7 +25,8 @@ import {
   Target,
   Swords,
   Eye,
-  SkipForward
+  SkipForward,
+  LogOut
 } from 'lucide-react';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
@@ -35,7 +36,7 @@ interface GameConfig {
   resources: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number };
 }
 
-const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
+const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = ({ config, onExitToMenu }) => {
   const {
     gameState,
     endTurn,
@@ -262,6 +263,18 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
           <Info className="h-4 w-4" />
         </Button>
         <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (window.confirm('Return to main menu? Unsaved progress will be lost.')) {
+              onExitToMenu();
+            }
+          }}
+          className="text-destructive hover:text-destructive"
+        >
+          <LogOut className="h-4 w-4" />
+        </Button>
+        <Button
           onClick={() => {
             playSound('notification');
             endTurn();
@@ -460,7 +473,7 @@ const UltimateMafiaGame: React.FC = () => {
 
   return (
     <NotificationProvider>
-      <GameContent config={gameConfig} />
+      <GameContent config={gameConfig} onExitToMenu={() => setGameConfig(null)} />
     </NotificationProvider>
   );
 };
