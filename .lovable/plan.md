@@ -1,31 +1,58 @@
 
 
-# Refine Fortify Mechanic
+# Refine Escort Mechanic (Capo Only)
 
 ## Current State (from code audit)
-- **Defense bonus**: +25% applied in `processTerritoryHit` — working correctly
-- **Resets every turn**: Line 1166-1168 clears `fortified: false` on all units at turn start — **needs to change per user request**
-- **Casualty reduction**: Not implemented — fortify only affects hit success chance, not casualties
-- **Visual indicator**: Shield icon (🛡️) is rendered for ALL fortified units regardless of family — needs to be player-only
+- **startEscort** requires soldiers to be on the **same hex** as the Capo — needs to change (unlimited range teleport)
+- **Move penalty**: Capo loses 1 move per escorted soldier — needs removal (no penalty)
+- **No prompt** to move with/without soldiers — needs adding
+- **Escort action costs 1 tactical action** for attaching — needs to change (1 to call, 2 to move-with)
+- **No auto-detach** — escortingSoldierIds persist until turn end reset — needs detach on arrival
 
 ## Changes
 
-### 1. Fortify persists across turns (does NOT reset)
-**File**: `src/hooks/useEnhancedMafiaGameState.ts` (~line 1167)
-Remove `fortified: false` from the turn-reset mapping. Fortified status will persist until the unit **moves** (already handled — line 789 sets `fortified: false` on move). This means a unit stays fortified as long as it holds position.
+### 1. Call soldier to Capo (unlimited range, 1 tactical action)
+**File**: `src/hooks/useEnhancedMafiaGameState.ts` (~line 964, `startEscort`)
+- Remove the same-hex filter (`s.q === capo.q && s.r === capo.r && s.s === capo.s`)
+- Teleport called soldiers to the Capo's hex immediately (update their q/r/s)
+- Cost: 1 tactical action (deduct from `tacticalActionsRemaining`)
+- Remove the move penalty line (`movesRemaining - validSoldierIds.length`)
+- Keep max 2 soldiers limit
 
-### 2. Fortified units reduce casualty rates
-**File**: `src/hooks/useEnhancedMafiaGameState.ts` (inside `processTerritoryHit`, ~line 2046-2054)
-After the existing fortify defense bonus logic, add casualty reduction: if defending units are fortified, reduce defending casualties by 50% (round down). This makes fortification a meaningful tactical choice for holding key territory.
+### 2. New flow: click soldier → click Capo's hex to call
+**File**: `src/hooks/useEnhancedMafiaGameState.ts` (~line 719, escort selection)
+- Change escort selection: when `moveAction === 'escort'`, allow selecting a **soldier** (not capo)
+- When soldier is selected, highlight all hexes containing friendly Capos as valid targets
+- When player clicks a Capo's hex, call `startEscort` with that Capo and the selected soldier
+- This replaces the current capo-first flow
 
-Add constant `FORTIFY_CASUALTY_REDUCTION = 50` to `src/types/game-mechanics.ts`.
+### 3. Move with/without soldiers prompt
+**File**: `src/hooks/useEnhancedMafiaGameState.ts` (~line 788, `moveUnit`)
+- Add state field `pendingEscortMove?: { capoId: string; targetLocation: { q: number; r: number; s: number } }`
+- When a Capo with `escortingSoldierIds` tries to move during deploy phase, set `pendingEscortMove` instead of moving immediately
+- Add `confirmEscortMove(withSoldiers: boolean)` callback:
+  - `withSoldiers = true`: move Capo + soldiers to target, costs 2 tactical actions, auto-detach soldiers on arrival (clear `escortingSoldierIds`)
+  - `withSoldiers = false`: move Capo alone, costs 1 move as normal, soldiers stay at current hex, clear `escortingSoldierIds`
 
-### 3. Visual indicator only for player's own fortified units
-**File**: `src/components/EnhancedMafiaHexGrid.tsx` (~line 482)
-Add a filter condition: only show the shield icon if the fortified unit's `family === playerFamily`. Enemy fortified units remain hidden on the map — the player must scout to discover them.
+### 4. Auto-detach at destination
+**File**: `src/hooks/useEnhancedMafiaGameState.ts` (~line 793)
+- After moving soldiers to destination, clear `escortingSoldierIds` on the Capo
+- Soldiers become independent units at the destination hex
+
+### 5. No move penalty
+**File**: `src/hooks/useEnhancedMafiaGameState.ts` (~line 980)
+- Remove `const newMoves = Math.max(0, capo.movesRemaining - validSoldierIds.length)`
+- Capo keeps full 3-move, 5-hex fly range regardless of escort count
+
+### 6. UI for escort move prompt
+**File**: `src/components/EnhancedMafiaHexGrid.tsx` or new dialog component
+- When `pendingEscortMove` is set, show a small prompt/dialog: "Move with soldiers (2 tactical actions) or move alone?"
+- Two buttons: "Move with soldiers 🚗" / "Move alone"
+
+## State Changes
+- Add `pendingEscortMove` to game state interface
+- Add `confirmEscortMove` callback
 
 ## Files Modified
-- `src/types/game-mechanics.ts` — add `FORTIFY_CASUALTY_REDUCTION` constant
-- `src/hooks/useEnhancedMafiaGameState.ts` — remove fortify reset, add casualty reduction
-- `src/components/EnhancedMafiaHexGrid.tsx` — filter shield indicator to player units only
-
+- `src/hooks/useEnhancedMafiaGameState.ts` — rework escort flow, add pending move, confirm callback, remove move penalty, auto-detach
+- `src/components/EnhancedMafiaHexGrid.tsx` — escort move prompt UI, soldier-first selection highlighting
