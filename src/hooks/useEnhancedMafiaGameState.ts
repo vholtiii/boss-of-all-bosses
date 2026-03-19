@@ -2067,7 +2067,7 @@ export const useEnhancedMafiaGameState = (
       chance += state.familyBonuses.hitSuccess / 100;
 
       // Apply scout intelligence bonus
-      const isScouted = state.scoutedHexes.some(s => s.q === targetLocation.q && s.r === targetLocation.r && s.s === targetLocation.s);
+      const isScouted = state.scoutedHexes.some(s => s.q === targetQ && s.r === targetR && s.s === targetS);
       if (isScouted) {
         chance += SCOUT_INTEL_BONUS / 100;
       }
