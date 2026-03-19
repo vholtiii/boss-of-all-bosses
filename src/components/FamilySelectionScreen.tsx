@@ -40,7 +40,7 @@ const families: FamilyInfo[] = [
       { label: 'Military', icon: <Swords className="h-4 w-4" />, value: '★★★☆☆' },
       { label: 'Influence', icon: <Crown className="h-4 w-4" />, value: '★★★★☆' },
     ],
-    bonuses: ['+20% business income', 'Start with political connections', 'Cheaper bribes'],
+    bonuses: ['+25% combat power', '+10% territory income', '+15% intimidation'],
     startingResources: { money: 60000, soldiers: 5, influence: 15, politicalPower: 40, respect: 30 },
   },
   {
