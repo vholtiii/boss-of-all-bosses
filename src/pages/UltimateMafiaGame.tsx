@@ -433,7 +433,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               {([
                 { action: 'scout' as const, label: '👁️ Scout', tip: 'Select a soldier, click adjacent enemy hex to reveal unit count & business info for 3 turns.' },
                 { action: 'fortify' as const, label: '🛡️ Fortify', tip: 'Select a unit to skip movement for +25% defense bonus this turn.' },
-                { action: 'escort' as const, label: '🚗 Escort', tip: 'Select a capo to carry up to 2 soldiers when it moves.' },
+                { action: 'escort' as const, label: '🚗 Escort', tip: 'Select a soldier, then click a hex with your capo to teleport the soldier there. Soldiers auto-travel with the capo and detach at destination.' },
                 { action: 'safehouse' as const, label: '🏠 Safehouse', tip: 'Select a capo on your territory to set up a secondary deploy point (5 turns).' },
               ] as const).map(({ action, label, tip }) => (
                 <Button
