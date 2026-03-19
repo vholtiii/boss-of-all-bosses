@@ -1211,7 +1211,15 @@ export const useEnhancedMafiaGameState = (
             : getHexesInRange(unit.q, unit.r, unit.s, Math.min(3, movesLeft));
           const validMoves = neighbors.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
-            return tile && !tile.isHeadquarters;
+            if (!tile || tile.isHeadquarters) return false;
+            // Already own this hex — always valid
+            if (tile.controllingFamily === fam) return true;
+            // Only expand to hexes adjacent to already-controlled territory
+            const nNeighbors = getHexNeighbors(n.q, n.r, n.s);
+            return nNeighbors.some(nn => {
+              const nt = state.hexMap.find(t => t.q === nn.q && t.r === nn.r && t.s === nn.s);
+              return nt && (nt.controllingFamily === fam || (nt.isHeadquarters && state.headquarters[fam]?.q === nt.q && state.headquarters[fam]?.r === nt.r));
+            });
           });
           if (validMoves.length === 0) break;
 
