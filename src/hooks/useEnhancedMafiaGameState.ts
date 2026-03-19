@@ -390,12 +390,6 @@ export const useEnhancedMafiaGameState = (
         case 'research_technology':
           startTechnologyResearch(newState, action.technologyId);
           break;
-        case 'accept_mission':
-          acceptMission(newState, action.missionId);
-          break;
-        case 'complete_mission':
-          completeMission(newState, action.missionId);
-          break;
         case 'make_investment':
           makeInvestment(newState, action);
           break;
