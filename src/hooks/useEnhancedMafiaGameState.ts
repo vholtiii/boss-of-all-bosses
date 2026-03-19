@@ -809,6 +809,7 @@ export const useEnhancedMafiaGameState = (
   const fortifyUnit = useCallback(() => {
     setGameState(prev => {
       if (prev.turnPhase !== 'move') return prev;
+      if (prev.tacticalActionsRemaining <= 0) return prev;
       if (!prev.selectedUnitId) return prev;
       const unitIdx = prev.deployedUnits.findIndex(u => u.id === prev.selectedUnitId);
       if (unitIdx === -1) return prev;
