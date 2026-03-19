@@ -358,6 +358,9 @@ const createInitialGameState = (
     familyBonuses: bonuses,
     lastTurnIncome: 0,
     pendingNotifications: [],
+    scoutedHexes: [],
+    safehouse: null,
+    selectedMoveAction: 'move' as MoveAction,
     
     combat: {
       territoryBattles: [],
