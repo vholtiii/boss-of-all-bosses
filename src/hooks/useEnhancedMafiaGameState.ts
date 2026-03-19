@@ -785,14 +785,15 @@ export const useEnhancedMafiaGameState = (
   // ============ ECONOMY ============
   const processEconomy = (state: EnhancedMafiaGameState) => {
     let income = 0;
-    state.hexMap.forEach(tile => {
+    const units = state.deployedUnits || [];
+    (state.hexMap || []).forEach(tile => {
       if (tile.controllingFamily === state.playerFamily && tile.business) {
         // Check if a capo is on this hex
-        const hasCapo = state.deployedUnits.some(u => 
+        const hasCapo = units.some(u => 
           u.family === state.playerFamily && u.type === 'capo' &&
           u.q === tile.q && u.r === tile.r && u.s === tile.s
         );
-        const hasSoldier = state.deployedUnits.some(u => 
+        const hasSoldier = units.some(u => 
           u.family === state.playerFamily && u.type === 'soldier' &&
           u.q === tile.q && u.r === tile.r && u.s === tile.s
         );
