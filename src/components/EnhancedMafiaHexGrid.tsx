@@ -546,6 +546,18 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               {hoveredHex.isHeadquarters && (
                 <p className="text-mafia-gold font-bold">🏛️ {hoveredHex.isHeadquarters.toUpperCase()} HQ</p>
               )}
+              {/* Scouted intel */}
+              {(() => {
+                const scoutInfo = (gameState?.scoutedHexes || []).find((s: ScoutedHex) => s.q === hoveredHex.q && s.r === hoveredHex.r && s.s === hoveredHex.s);
+                if (!scoutInfo) return null;
+                return (
+                  <div className="mt-1 p-1.5 rounded bg-blue-900/40 border border-blue-500/30">
+                    <p className="text-blue-300 font-bold text-xs">👁️ SCOUTED ({scoutInfo.turnsRemaining}t left)</p>
+                    <p><span className="text-muted-foreground">Enemy:</span> {scoutInfo.enemySoldierCount} units ({scoutInfo.enemyFamily})</p>
+                    {scoutInfo.businessType && <p><span className="text-muted-foreground">Business:</span> {scoutInfo.businessType} (${scoutInfo.businessIncome?.toLocaleString()}/turn)</p>}
+                  </div>
+                );
+              })()}
               {(() => {
                 const key = `${hoveredHex.q},${hoveredHex.r},${hoveredHex.s}`;
                 const units = unitsByHex.get(key) || [];
@@ -553,7 +565,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 return units.map(u => (
                   <p key={u.id} className={u.family === playerFamily ? 'text-green-400' : 'text-red-400'}>
                     {u.type === 'capo' ? `👔 ${u.name} (Lvl ${u.level})${u.personality ? ` ${u.personality === 'diplomat' ? '🕊️' : u.personality === 'enforcer' ? '💪' : '🧠'}` : ''}` : '👤 Soldier'} — {u.family.toUpperCase()}
-                    {u.family === playerFamily && ` (${u.movesRemaining} moves)`}
+                    {u.family === playerFamily && ` (${u.movesRemaining} moves${u.fortified ? ', 🛡️ Fortified' : ''})`}
                   </p>
                 ));
               })()}
