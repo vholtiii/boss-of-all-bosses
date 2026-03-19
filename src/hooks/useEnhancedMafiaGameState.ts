@@ -822,6 +822,7 @@ export const useEnhancedMafiaGameState = (
       return {
         ...prev, deployedUnits: newUnits,
         selectedUnitId: null, availableMoveHexes: [],
+        tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
         pendingNotifications: [...prev.pendingNotifications, {
           type: 'info' as const, title: '🛡️ Unit Fortified',
           message: `${unit.type === 'capo' ? unit.name || 'Capo' : 'Soldier'} is fortified (+${FORTIFY_DEFENSE_BONUS}% defense).`,
