@@ -1,84 +1,59 @@
 
 
-# Refine Takeover/Extort System — Visual & Audio Feedback
+# Revised: Phase System Restructure
 
-## Problem Summary
-When the player clicks "Hit" or "Extort" on the hex action menu, the menu closes, the hex ownership silently updates, and a small toast appears in the corner — but there is no on-map feedback, no dramatic moment, and no sound. It feels like nothing happened.
+## Correction Applied
+- **Soldiers**: Move across map but do NOT auto-claim or auto-extort. They must use the Action phase to claim/extort.
+- **Capos**: KEEP auto-claim and auto-extort on arrival (existing behavior is correct for Capos).
 
-## Plan
+## Updated Plan
 
-### Step 1: Add a Combat Result Overlay on the Hex Grid
-After a Hit or Extort action resolves, display a temporary animated overlay directly on the affected hex showing the outcome.
+### Step 1: Deploy Phase — Movement Without Auto-Claim (Soldiers Only)
+- Remove auto-claim logic **only for soldiers** in `moveUnit`. Capos retain their auto-claim and auto-extort on arrival.
+- Deploy phase handles both HQ placement and map movement for all units.
 
-**What it shows:**
-- Success: green flash on hex + floating text showing "+$5,000 / +10 respect" (hit) or "+$3,000 / +5 respect" (extort)
-- Failure: red flash on hex + floating text showing "FAILED — 2 casualties"
-- The overlay auto-dismisses after ~2.5 seconds with a fade-out
+**Files:** `src/hooks/useEnhancedMafiaGameState.ts`
 
-**Implementation:**
-- Add a `combatResult` state to `EnhancedMafiaHexGrid` (stores hex coords, outcome type, text, timestamp)
-- After `onAction` fires for hit/extort, the game state pushes a `lastCombatResult` field alongside `pendingNotifications`
-- The hex grid renders an SVG overlay group at the target hex with framer-motion animations (scale-in, float-up text, color flash)
+### Step 2: Move Phase → Tactical Phase
+- Rename to "Tactical" — Scout, Fortify, Safehouse, Escort only.
+- Add `tacticalActionsRemaining` (budget: 3 per turn).
 
-**Files:** `src/hooks/useEnhancedMafiaGameState.ts`, `src/components/EnhancedMafiaHexGrid.tsx`
+**Files:** `src/hooks/useEnhancedMafiaGameState.ts`, `src/pages/UltimateMafiaGame.tsx`, `src/types/game-mechanics.ts`
 
-### Step 2: Add Sound Effects for Hit and Extort
-Use the existing `useSoundSystem` hook (Web Audio API oscillator-based) to play distinct sounds.
+### Step 3: Action Phase Limit
+- Add `actionsRemaining` (default 2). Hit, Extort, Claim, Bribe each cost 1 action.
+- Disable action buttons when budget is 0. Show counter in bottom bar.
+- **"Claim Territory"** added as a new action for soldiers on neutral hexes.
 
-**Sounds:**
-- Hit success: low rumble + rising tone (combat → success preset combo)
-- Hit failure: descending harsh tone (combat → error preset)
-- Extort success: cash register chime (money preset)
-- Extort failure: error buzz (error preset)
+**Files:** `src/hooks/useEnhancedMafiaGameState.ts`, `src/components/EnhancedMafiaHexGrid.tsx`, `src/pages/UltimateMafiaGame.tsx`
 
-**Implementation:**
-- Wire `playSound` calls into the notification drain effect in `UltimateMafiaGame.tsx` — when a combat result notification is detected, play the corresponding sound
-- Add new presets to `useSoundSystem.ts` for `hit_success`, `hit_fail`, `extort_success`, `extort_fail` with multi-tone sequences
+### Step 4: Bonus Action at 50+ Respect & 50+ Influence
+- `maxActions = 2 + (respect >= 50 && influence >= 50 ? 1 : 0)`
+- Reset each turn. Notify player on first unlock.
 
-**Files:** `src/hooks/useSoundSystem.ts`, `src/pages/UltimateMafiaGame.tsx`
+**Files:** `src/hooks/useEnhancedMafiaGameState.ts`, `src/types/game-mechanics.ts`
 
-### Step 3: Add Hex Flash Animation on Ownership Change
-When a hex changes from neutral/enemy to player-owned, animate the hex polygon itself.
+### Step 5: UI Polish
+- Update phase labels: Deploy → DEPLOY, Move → TACTICAL, Action → ACTION.
+- Update phase hints. Add action/tactical counters to bottom bar.
 
-**Effect:** The hex border briefly pulses gold (3 pulses over 1.5s), then settles to the new ownership color. Uses framer-motion `animate` on the polygon's stroke/fill.
-
-**Files:** `src/components/EnhancedMafiaHexGrid.tsx`
-
-### Step 4: Remove/Disable Legacy "TAKE OVER" Button
-The old `MafiaHud` component has a permanently-highlighted yellow "TAKE OVER" button that is confusing. Since `UltimateMafiaGame.tsx` (the active game page) doesn't use `MafiaHud`, verify it's not rendered. If the user is seeing it, identify where and either remove or disable it.
-
-**Files:** `src/components/MafiaHud.tsx` (audit only — may not need changes)
+**Files:** `src/pages/UltimateMafiaGame.tsx`
 
 ---
 
-### Technical Details
+### Key Behavior Summary
 
-**Combat Result Data Flow:**
 ```text
-performAction (hit/extort)
-  → processTerritoryHit / processTerritoryExtortion
-    → sets state.lastCombatResult = { q, r, s, success, title, details, type }
-    → sets state.pendingNotifications (existing)
-
-UltimateMafiaGame.tsx useEffect
-  → drains pendingNotifications → toasts
-  → reads lastCombatResult → plays sound
-
-EnhancedMafiaHexGrid
-  → reads gameState.lastCombatResult
-  → renders SVG overlay at (q,r,s) with animated text + hex flash
-  → auto-clears after timeout
+DEPLOY: Move all units. Capos auto-claim/extort on arrival. Soldiers just move.
+TACTICAL: Scout, Fortify, Safehouse, Escort (3/turn budget).
+ACTION: Hit, Extort, Claim (soldiers only), Bribe (2/turn, 3 with bonus).
 ```
 
-**New state field on `EnhancedMafiaGameState`:**
+### New Constants
 ```typescript
-lastCombatResult?: {
-  q: number; r: number; s: number;
-  success: boolean;
-  type: 'hit' | 'extort' | 'sabotage';
-  title: string;
-  details: string; // e.g. "+$5,000, +10 respect"
-  timestamp: number;
-}
+export const BASE_ACTIONS_PER_TURN = 2;
+export const BONUS_ACTION_RESPECT_THRESHOLD = 50;
+export const BONUS_ACTION_INFLUENCE_THRESHOLD = 50;
+export const TACTICAL_ACTIONS_PER_TURN = 3;
 ```
 
