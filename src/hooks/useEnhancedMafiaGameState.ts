@@ -584,6 +584,7 @@ export const useEnhancedMafiaGameState = (
   // ============ MOVE UNIT ============
   const moveUnit = useCallback((targetLocation: { q: number; r: number; s: number }) => {
     setGameState(prev => {
+      if (prev.turnPhase !== 'move') return prev;
       if (!prev.selectedUnitId) return prev;
       const unitIdx = prev.deployedUnits.findIndex(u => u.id === prev.selectedUnitId);
       if (unitIdx === -1) return prev;
@@ -600,10 +601,9 @@ export const useEnhancedMafiaGameState = (
       const updatedUnit = { ...unit, q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: unit.movesRemaining - moveCost };
       newUnits[unitIdx] = updatedUnit;
 
-      // Moving to enemy territory does NOT auto-claim — use hit/extort
+      // Auto-claim neutral tiles on move
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
-          // Only auto-claim neutral tiles
           if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters) {
             return { ...tile, controllingFamily: prev.playerFamily };
           }
@@ -617,10 +617,28 @@ export const useEnhancedMafiaGameState = (
         const candidates = updatedUnit.type === 'soldier'
           ? getHexNeighbors(updatedUnit.q, updatedUnit.r, updatedUnit.s)
           : getHexesInRange(updatedUnit.q, updatedUnit.r, updatedUnit.s, range);
-        newAvailableMoves = candidates.filter(h => 
-          newHexMap.some(t => t.q === h.q && t.r === h.r && t.s === h.s)
-        );
+        newAvailableMoves = candidates.filter(h => {
+          const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+          if (!tile) return false;
+          if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+          if (updatedUnit.type === 'soldier') {
+            if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) return false;
+          } else {
+            if (tile.controllingFamily !== prev.playerFamily) return false;
+          }
+          return true;
+        });
       }
+
+      const newState = {
+        ...prev, deployedUnits: newUnits, hexMap: newHexMap,
+        selectedUnitId: updatedUnit.movesRemaining > 0 ? updatedUnit.id : null,
+        availableMoveHexes: newAvailableMoves,
+      };
+      syncLegacyUnits(newState);
+      return newState;
+    });
+  }, []);
 
       const newState = {
         ...prev, deployedUnits: newUnits, hexMap: newHexMap,
