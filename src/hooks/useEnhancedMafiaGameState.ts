@@ -672,13 +672,12 @@ export const useEnhancedMafiaGameState = (
       if (!hq) return prev;
 
       if (unitType === 'soldier') {
-        if (prev.resources.soldiers <= 0) {
-          const atHQ = prev.deployedUnits.filter(u => 
-            u.family === family && u.type === 'soldier' &&
-            u.q === hq.q && u.r === hq.r && u.s === hq.s
-          );
-          if (atHQ.length === 0) return prev;
-        }
+        const atHQ = prev.deployedUnits.filter(u => 
+          u.family === family && u.type === 'soldier' &&
+          u.q === hq.q && u.r === hq.r && u.s === hq.s
+        );
+        // Must have soldiers at HQ or in undeployed reserve pool
+        if (atHQ.length === 0 && prev.resources.soldiers <= 0) return prev;
       } else {
         const caposAtHQ = prev.deployedUnits.filter(u => 
           u.family === family && u.type === 'capo' &&
