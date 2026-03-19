@@ -20,7 +20,7 @@ import {
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType,
   NEGOTIATION_TYPES,
   ScoutedHex, Safehouse, MoveAction,
-  FORTIFY_DEFENSE_BONUS, SCOUT_DURATION, SCOUT_INTEL_BONUS, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
+  FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, SCOUT_DURATION, SCOUT_INTEL_BONUS, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
   BASE_ACTIONS_PER_TURN, BONUS_ACTION_RESPECT_THRESHOLD, BONUS_ACTION_INFLUENCE_THRESHOLD,
   TACTICAL_ACTIONS_PER_TURN,
 } from '@/types/game-mechanics';
@@ -1164,7 +1164,7 @@ export const useEnhancedMafiaGameState = (
 
       // Clear fortified status and escort, reset moves
       newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
-        ...u, movesRemaining: u.maxMoves, fortified: false, escortingSoldierIds: undefined,
+        ...u, movesRemaining: u.maxMoves, escortingSoldierIds: undefined,
       }));
 
       // Tick scouted hexes
@@ -2091,7 +2091,12 @@ export const useEnhancedMafiaGameState = (
           }
         });
         
-        const casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
+        let casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
+        // Reduce casualties if attacking units are fortified
+        const attackersFortified = playerUnits.some(u => u.fortified);
+        if (attackersFortified) {
+          casualties = Math.max(0, Math.floor(casualties * (1 - FORTIFY_CASUALTY_REDUCTION / 100)));
+        }
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
@@ -2109,7 +2114,12 @@ export const useEnhancedMafiaGameState = (
           message: `Hit successful! ${hitDetails}.`,
         }];
       } else {
-        const casualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
+        let casualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
+        // Reduce casualties if defending/fortified units
+        const defendersFortified = playerUnits.some(u => u.fortified);
+        if (defendersFortified) {
+          casualties = Math.max(1, Math.floor(casualties * (1 - FORTIFY_CASUALTY_REDUCTION / 100)));
+        }
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
