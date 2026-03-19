@@ -75,8 +75,27 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
   }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications]);
 
+  // Negotiation dialog state
+  const [negotiationState, setNegotiationState] = useState<{
+    open: boolean;
+    targetQ: number;
+    targetR: number;
+    targetS: number;
+    capoId: string;
+  } | null>(null);
+
   // Handle action wrapper function
   const handleAction = useCallback((action: any) => {
+    if (action.type === 'open_negotiate') {
+      setNegotiationState({
+        open: true,
+        targetQ: action.targetQ,
+        targetR: action.targetR,
+        targetS: action.targetS,
+        capoId: action.capoId,
+      });
+      return;
+    }
     performAction(action);
   }, [performAction]);
 
