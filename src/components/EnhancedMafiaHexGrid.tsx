@@ -498,7 +498,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       caposByFamily.forEach((capos, fam) => {
                         const capo = capos[0];
                         const isSelected = selectedUnitId === capo.id;
-                        const isClickable = fam === playerFamily && (turnPhase === 'move' || (turnPhase === 'deploy' && isAtHQ));
+                        const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy');
                         elements.push(
                           <CapoIcon
                             key={`capo-${fam}-${key}`}
