@@ -1042,10 +1042,10 @@ export const useEnhancedMafiaGameState = (
         };
       }
 
-      // Claim neutral hexes
+      // Only Capos auto-claim neutral hexes on deploy; soldiers do not
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
-          if (tile.controllingFamily === 'neutral' || tile.controllingFamily === family) {
+          if (unitType === 'capo' && (tile.controllingFamily === 'neutral' || tile.controllingFamily === family) && !tile.isHeadquarters) {
             return { ...tile, controllingFamily: family as any };
           }
         }
