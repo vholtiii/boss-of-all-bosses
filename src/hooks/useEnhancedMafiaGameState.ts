@@ -1182,7 +1182,7 @@ export const useEnhancedMafiaGameState = (
   };
 
   // ============ AI TURN ============
-  const processAITurn = (state: EnhancedMafiaGameState) => {
+  const processAITurn = (state: EnhancedMafiaGameState, turnReport?: TurnReport) => {
     state.aiOpponents.forEach(opponent => {
       const fam = opponent.family as any;
       const hq = state.headquarters[fam];
