@@ -106,7 +106,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     headquarters: any;
     units: any;
   } | null>(null);
-  const { notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
+  // notifyTerritoryCaptured and notifyReputationChange already destructured above
 
   // Handle loading a saved game
   const handleLoadGame = (loadedGameState: any) => {
