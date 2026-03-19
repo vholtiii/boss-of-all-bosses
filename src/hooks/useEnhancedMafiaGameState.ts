@@ -509,10 +509,29 @@ export const useEnhancedMafiaGameState = (
     }
   };
 
-  // ============ MOVEMENT PHASE ============
+  // ============ PHASE-BASED TURN SYSTEM ============
+  const advancePhase = useCallback(() => {
+    setGameState(prev => {
+      const phaseOrder: TurnPhase[] = ['deploy', 'move', 'action'];
+      const currentIdx = phaseOrder.indexOf(prev.turnPhase);
+      const nextPhase = currentIdx < phaseOrder.length - 1 ? phaseOrder[currentIdx + 1] : 'waiting' as TurnPhase;
+      return {
+        ...prev,
+        turnPhase: nextPhase,
+        movementPhase: nextPhase === 'move',
+        selectedUnitId: null,
+        availableMoveHexes: [],
+        deployMode: null,
+        availableDeployHexes: [],
+      };
+    });
+  }, []);
+
+  // Legacy compat — map to advancePhase
   const startMovementPhase = useCallback(() => {
     setGameState(prev => ({
       ...prev,
+      turnPhase: 'move' as TurnPhase,
       movementPhase: true, selectedUnitId: null, availableMoveHexes: [],
       deployMode: null, availableDeployHexes: [],
     }));
@@ -521,6 +540,7 @@ export const useEnhancedMafiaGameState = (
   const endMovementPhase = useCallback(() => {
     setGameState(prev => ({
       ...prev,
+      turnPhase: 'action' as TurnPhase,
       movementPhase: false, selectedUnitId: null, availableMoveHexes: [],
       deployMode: null, availableDeployHexes: [],
     }));
