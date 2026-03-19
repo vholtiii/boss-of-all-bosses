@@ -193,7 +193,10 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
               <div className="text-lg font-bold font-playfair mb-0.5" style={{ color: family.color }}>
                 {family.name}
               </div>
-              <div className="text-[10px] text-muted-foreground mb-3">{family.difficulty} difficulty</div>
+              <div className="text-[10px] text-muted-foreground mb-1">{family.difficulty} difficulty</div>
+              <div className="flex items-center gap-1 text-xs font-medium mb-3" style={{ color: family.color }}>
+                <Users className="h-3 w-3" /> {family.startingResources.soldiers} soldiers
+              </div>
 
               {/* Stat bars */}
               <div className="space-y-2">
