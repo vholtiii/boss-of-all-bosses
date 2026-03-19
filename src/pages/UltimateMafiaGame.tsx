@@ -263,6 +263,18 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           <Info className="h-4 w-4" />
         </Button>
         <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (window.confirm('Return to main menu? Unsaved progress will be lost.')) {
+              onExitToMenu();
+            }
+          }}
+          className="text-destructive hover:text-destructive"
+        >
+          <LogOut className="h-4 w-4" />
+        </Button>
+        <Button
           onClick={() => {
             playSound('notification');
             endTurn();
