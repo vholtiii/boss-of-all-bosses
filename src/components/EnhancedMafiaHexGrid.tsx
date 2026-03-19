@@ -524,10 +524,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     const isAtHQ = !!tile.isHeadquarters;
                     const isDeployAtHQ = isAtHQ && turnPhase === 'deploy' && tile.isHeadquarters === playerFamily;
 
-                    // Keep the HQ hex clear during deploy; the picker renders in the outer side panel
-                    if (isDeployAtHQ) {
-                      // Intentionally render nothing here.
-                    } else {
+                    // Show units at HQ during deploy so players can select them for movement
+                    {
                       // Normal compact layout for non-deploy or non-HQ
                       let offsetIdx = 0;
 
