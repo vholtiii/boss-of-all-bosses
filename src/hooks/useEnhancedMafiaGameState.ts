@@ -568,14 +568,6 @@ export const useEnhancedMafiaGameState = (
     }
   };
 
-  const processMissions = (state: EnhancedMafiaGameState) => {
-    // Update mission progress
-    state.missions.forEach(mission => {
-      if (mission.status === 'active') {
-        updateMissionProgress(state, mission);
-      }
-    });
-  };
 
   const processTechnology = (state: EnhancedMafiaGameState) => {
     // Update research progress
