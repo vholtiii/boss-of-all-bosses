@@ -224,22 +224,6 @@ const createInitialGameState = (
     }),
   
   events: [],
-  missions: [
-    {
-      id: 'tutorial-1',
-      title: 'First Territory',
-      description: 'Establish control in your home district',
-      type: 'story',
-      difficulty: 'easy',
-      objectives: [{ id: 'obj-1', description: 'Control a territory', type: 'collect', target: 'territory', amount: 1, completed: false }],
-      rewards: [
-        { type: 'money', amount: 10000, description: 'Startup capital bonus' },
-        { type: 'reputation', amount: 5, description: 'Respect from the neighborhood' },
-      ],
-      status: 'available',
-      progress: 0,
-    },
-  ],
   
   weather: {
     currentWeather: { type: 'clear', intensity: 0, duration: 3, description: 'Clear skies, perfect for business' },
