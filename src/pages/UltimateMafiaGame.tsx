@@ -460,7 +460,7 @@ const UltimateMafiaGame: React.FC = () => {
 
   return (
     <NotificationProvider>
-      <GameContent config={gameConfig} />
+      <GameContent config={gameConfig} onExitToMenu={() => setGameConfig(null)} />
     </NotificationProvider>
   );
 };
