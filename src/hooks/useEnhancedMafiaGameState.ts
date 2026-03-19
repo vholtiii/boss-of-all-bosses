@@ -389,6 +389,10 @@ const createInitialGameState = (
     scoutedHexes: [],
     safehouse: null,
     selectedMoveAction: 'move' as MoveAction,
+    actionsRemaining: BASE_ACTIONS_PER_TURN,
+    maxActions: BASE_ACTIONS_PER_TURN,
+    tacticalActionsRemaining: TACTICAL_ACTIONS_PER_TURN,
+    maxTacticalActions: TACTICAL_ACTIONS_PER_TURN,
     
     combat: {
       territoryBattles: [],
