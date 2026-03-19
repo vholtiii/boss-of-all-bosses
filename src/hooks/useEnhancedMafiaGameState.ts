@@ -1953,9 +1953,17 @@ export const useEnhancedMafiaGameState = (
             state.soldierStats[u.id].survivedConflicts += 1;
           }
         });
+        const failDetails = `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} suffered`;
+        state.lastCombatResult = {
+          q: targetQ, r: targetR, s: targetS,
+          success: false, type: 'hit',
+          title: 'HIT FAILED!',
+          details: failDetails,
+          timestamp: Date.now(),
+        };
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'error', title: 'Hit Failed!',
-          message: `The attack was repelled. ${casualties} casualt${casualties > 1 ? 'ies' : 'y'} suffered.`,
+          message: `The attack was repelled. ${failDetails}.`,
         }];
       }
       state.policeHeat.level = Math.min(100, state.policeHeat.level + 15);
