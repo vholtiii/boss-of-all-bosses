@@ -144,6 +144,7 @@ export interface EnhancedMafiaGameState {
   legalStatus: LegalStatus;
   policeHeat: PoliceHeat;
   
+  turnReport: TurnReport | null;
   selectedTerritory?: any;
   activeEvent?: GameEvent;
   
