@@ -319,6 +319,37 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     {tile.isHeadquarters ? '🏛️' : tile.business ? (businessIcons[tile.business.type] || '🏢') : ''}
                   </text>
 
+                  {/* Scouted hex indicator */}
+                  {gameState?.scoutedHexes?.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s) && (
+                    <g className="pointer-events-none">
+                      <circle cx={x + baseHexRadius * 0.55} cy={y - baseHexRadius * 0.55} r="8" fill="#3B82F6" stroke="#ffffff" strokeWidth="1" />
+                      <text x={x + baseHexRadius * 0.55} y={y - baseHexRadius * 0.55 + 3.5} textAnchor="middle" fontSize="9" className="select-none">👁️</text>
+                    </g>
+                  )}
+
+                  {/* Safehouse indicator */}
+                  {gameState?.safehouse && gameState.safehouse.q === tile.q && gameState.safehouse.r === tile.r && gameState.safehouse.s === tile.s && (
+                    <g className="pointer-events-none">
+                      <circle cx={x - baseHexRadius * 0.55} cy={y - baseHexRadius * 0.55} r="8" fill="#F59E0B" stroke="#ffffff" strokeWidth="1" />
+                      <text x={x - baseHexRadius * 0.55} y={y - baseHexRadius * 0.55 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🏠</text>
+                    </g>
+                  )}
+
+                  {/* Fortified units indicator */}
+                  {(() => {
+                    const key2 = `${tile.q},${tile.r},${tile.s}`;
+                    const fortifiedHere = (gameState?.deployedUnits || []).filter((u: DeployedUnit) => 
+                      u.fortified && u.q === tile.q && u.r === tile.r && u.s === tile.s
+                    );
+                    if (fortifiedHere.length === 0) return null;
+                    return (
+                      <g className="pointer-events-none">
+                        <circle cx={x} cy={y - baseHexRadius * 0.7} r="8" fill="#10B981" stroke="#ffffff" strokeWidth="1" />
+                        <text x={x} y={y - baseHexRadius * 0.7 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🛡️</text>
+                      </g>
+                    );
+                  })()}
+
                   {/* Income on hover */}
                   {isHovered && tile.business && (
                     <text x={x} y={y + baseHexRadius + 12} textAnchor="middle" fontSize="9" fill="#ffffff" fontWeight="600" className="pointer-events-none">
