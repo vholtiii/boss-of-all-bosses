@@ -35,6 +35,8 @@ export interface DeployedUnit {
   level: number;
   name?: string;
   personality?: CapoPersonality;
+  fortified?: boolean;
+  escortingSoldierIds?: string[]; // capo only — IDs of soldiers being escorted
 }
 
 // ============ HEX TILE ============
