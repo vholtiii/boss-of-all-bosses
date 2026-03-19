@@ -64,10 +64,6 @@ const EnhancedGameMechanics: React.FC<EnhancedGameMechanicsProps> = memo(({
             <Brain className="h-4 w-4" />
             <span className="hidden sm:inline">AI</span>
           </TabsTrigger>
-          <TabsTrigger value="missions" className="flex items-center gap-2">
-            <Target className="h-4 w-4" />
-            <span className="hidden sm:inline">Missions</span>
-          </TabsTrigger>
           <TabsTrigger value="weather" className="flex items-center gap-2">
             <Cloud className="h-4 w-4" />
             <span className="hidden sm:inline">Weather</span>
