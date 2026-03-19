@@ -998,7 +998,7 @@ export const useEnhancedMafiaGameState = (
     }));
   }, []);
 
-  // ============ START ESCORT ============
+  // ============ START ESCORT (legacy — now handled via tactical phase call) ============
   const startEscort = useCallback((capoId: string, soldierIds: string[]) => {
     setGameState(prev => {
       if (prev.turnPhase !== 'move') return prev;
@@ -1008,21 +1008,29 @@ export const useEnhancedMafiaGameState = (
 
       const validSoldierIds = soldierIds.filter(sid => {
         const s = prev.deployedUnits.find(u => u.id === sid);
-        return s && s.type === 'soldier' && s.family === prev.playerFamily && s.q === capo.q && s.r === capo.r && s.s === capo.s;
+        return s && s.type === 'soldier' && s.family === prev.playerFamily;
       }).slice(0, MAX_ESCORT_SOLDIERS);
 
       if (validSoldierIds.length === 0) return prev;
 
       const newUnits = [...prev.deployedUnits];
-      const newMoves = Math.max(0, capo.movesRemaining - validSoldierIds.length);
-      newUnits[capoIdx] = { ...capo, escortingSoldierIds: validSoldierIds, movesRemaining: newMoves };
+      // No movement penalty — capo keeps full movement range
+      newUnits[capoIdx] = { ...capo, escortingSoldierIds: validSoldierIds };
+
+      // Teleport soldiers to capo's hex
+      validSoldierIds.forEach(sid => {
+        const sIdx = newUnits.findIndex(u => u.id === sid);
+        if (sIdx !== -1) {
+          newUnits[sIdx] = { ...newUnits[sIdx], q: capo.q, r: capo.r, s: capo.s, movesRemaining: 0 };
+        }
+      });
 
       return {
         ...prev, deployedUnits: newUnits,
         selectedMoveAction: 'escort' as MoveAction,
         pendingNotifications: [...prev.pendingNotifications, {
           type: 'info' as const, title: '🚗 Escort Active',
-          message: `${capo.name || 'Capo'} is escorting ${validSoldierIds.length} soldier(s).`,
+          message: `${capo.name || 'Capo'} is escorting ${validSoldierIds.length} soldier(s). They will travel with the Capo and auto-detach at the destination.`,
         }],
       };
     });
