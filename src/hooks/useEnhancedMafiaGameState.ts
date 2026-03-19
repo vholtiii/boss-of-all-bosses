@@ -257,9 +257,20 @@ const createInitialGameState = (
   const deployedUnits: DeployedUnit[] = [];
   const soldierStats: Record<string, SoldierStats> = {};
 
+  // Real-life inspired starting soldiers:
+  // Gambino: 4 — historically the largest and most powerful NYC family
+  // Genovese: 4 — rivaled Gambino in size, deeply embedded in unions/politics
+  // Lucchese: 3 — mid-sized but highly effective, strong in garment district
+  // Bonanno: 2 — suffered internal wars (Banana War), weakened by defections
+  // Colombo: 1 — smallest of the Five Families, plagued by leadership instability
+  const familySoldierCount: Record<string, number> = {
+    gambino: 4, genovese: 4, lucchese: 3, bonanno: 2, colombo: 1,
+  };
+
   allFamilies.forEach(fam => {
     const hq = HQ_POSITIONS[fam];
-    for (let i = 0; i < 3; i++) {
+    const soldierCount = familySoldierCount[fam] || 3;
+    for (let i = 0; i < soldierCount; i++) {
       const id = `${fam}-soldier-${i}`;
       deployedUnits.push({
         id, type: 'soldier', family: fam,
