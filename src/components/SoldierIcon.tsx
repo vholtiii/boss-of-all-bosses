@@ -23,7 +23,7 @@ const SoldierIcon: React.FC<SoldierIconProps> = ({
   x, y, family, count, isPlayerFamily = false, onClick 
 }) => {
   const familyColor = familyColors[family];
-  const size = 28;
+  const size = 14;
   
   return (
     <motion.g
