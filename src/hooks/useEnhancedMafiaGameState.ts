@@ -1247,6 +1247,36 @@ export const useEnhancedMafiaGameState = (
       const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
       if (!tile || tile.controllingFamily === state.playerFamily || tile.isHeadquarters) return state;
 
+      // Check ceasefire
+      const hasCeasefire = state.ceasefires.some(c => c.active && c.family === tile.controllingFamily);
+      // Check alliance
+      const hasAlliance = state.alliances.some(a => a.active && a.alliedFamily === tile.controllingFamily);
+      if (hasCeasefire || hasAlliance) {
+        if (hasAlliance) {
+          // Breaking alliance — dissolve with penalty
+          state.alliances = state.alliances.map(a => 
+            a.active && a.alliedFamily === tile.controllingFamily ? { ...a, active: false } : a
+          ).filter(a => a.active);
+          state.reputation.respect = Math.max(0, state.reputation.respect - 25);
+          state.reputation.reputation = Math.max(0, state.reputation.reputation - 15);
+          if (state.reputation.familyRelationships[tile.controllingFamily] !== undefined) {
+            state.reputation.familyRelationships[tile.controllingFamily] -= 40;
+          }
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'error', title: '💔 Alliance Broken!',
+            message: `You attacked your ally! -25 respect, -15 reputation. Relations devastated.`,
+          }];
+        }
+        if (hasCeasefire) {
+          state.ceasefires = state.ceasefires.filter(c => !(c.active && c.family === tile.controllingFamily));
+          state.reputation.respect = Math.max(0, state.reputation.respect - 15);
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'warning', title: '⚠️ Ceasefire Violated!',
+            message: `You broke the ceasefire! -15 respect.`,
+          }];
+        }
+      }
+
       const playerUnits = state.deployedUnits.filter(u => 
         u.family === state.playerFamily && u.q === targetQ && u.r === targetR && u.s === targetS
       );
