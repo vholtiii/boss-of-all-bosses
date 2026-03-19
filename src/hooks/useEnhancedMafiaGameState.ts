@@ -1521,6 +1521,7 @@ export const useEnhancedMafiaGameState = (
     state.safehouse = {
       q: targetQ, r: targetR, s: targetS,
       turnsRemaining: SAFEHOUSE_DURATION,
+      createdTurn: state.turn,
     };
 
     state.pendingNotifications = [...state.pendingNotifications, {
