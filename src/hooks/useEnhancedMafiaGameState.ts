@@ -746,10 +746,16 @@ export const useEnhancedMafiaGameState = (
         });
       }
 
+      const notifications = autoExtortNotification 
+        ? [...prev.pendingNotifications, autoExtortNotification]
+        : prev.pendingNotifications;
+
       const newState = {
         ...prev, deployedUnits: newUnits, hexMap: newHexMap,
+        resources: newResources,
         selectedUnitId: updatedUnit.movesRemaining > 0 ? updatedUnit.id : null,
         availableMoveHexes: newAvailableMoves,
+        pendingNotifications: notifications,
       };
       syncLegacyUnits(newState);
       return newState;
