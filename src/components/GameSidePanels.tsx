@@ -239,8 +239,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title={`Hitmen (${gameState.hitmen.length}/3)`}
           icon={<Crosshair className="h-4 w-4" />}
-          isOpen={openSection === 'hitmen'}
-          onToggle={() => toggle('hitmen')}
+          isOpen={!actionsLocked && openSection === 'hitmen'}
+          onToggle={() => !actionsLocked && toggle('hitmen')}
+          disabled={actionsLocked}
         >
           <HitmanPanel
             hitmen={gameState.hitmen}
