@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { NotificationProvider, useMafiaNotifications } from '@/components/ui/notification-system';
 import { AnimatedCard, AnimatedCardHeader, AnimatedCardTitle, AnimatedCardContent } from '@/components/ui/animated-card';
@@ -52,8 +52,26 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     selectHeadquarters,
     selectUnitFromHeadquarters,
     deployUnit,
-    isWinner
+    isWinner,
+    clearNotifications,
   } = useEnhancedMafiaGameState(config.family, config.resources);
+
+  const { notifySuccess, notifyError, notifyWarning, notifyInfo, notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
+
+  // Drain pending notifications from game state into the notification system
+  useEffect(() => {
+    if (gameState.pendingNotifications.length > 0) {
+      gameState.pendingNotifications.forEach(n => {
+        switch (n.type) {
+          case 'success': notifySuccess(n.title, n.message); break;
+          case 'error': notifyError(n.title, n.message); break;
+          case 'warning': notifyWarning(n.title, n.message); break;
+          case 'info': notifyInfo(n.title, n.message); break;
+        }
+      });
+      clearNotifications();
+    }
+  }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications]);
 
   // Handle action wrapper function
   const handleAction = useCallback((action: any) => {
@@ -88,7 +106,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     headquarters: any;
     units: any;
   } | null>(null);
-  const { notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
+  // notifyTerritoryCaptured and notifyReputationChange already destructured above
 
   // Handle loading a saved game
   const handleLoadGame = (loadedGameState: any) => {

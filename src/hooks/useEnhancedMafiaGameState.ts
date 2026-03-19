@@ -96,6 +96,7 @@ export interface EnhancedMafiaGameState {
   victoryType: VictoryType;
   familyBonuses: FamilyBonuses;
   lastTurnIncome: number;
+  pendingNotifications: Array<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; message?: string }>;
   
   // Enhanced systems
   combat: CombatSystem;
@@ -323,6 +324,7 @@ const createInitialGameState = (
     victoryType: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
+    pendingNotifications: [],
     
     combat: {
       territoryBattles: [],
@@ -483,10 +485,24 @@ export const useEnhancedMafiaGameState = (
       legacy: { current: playerRep, highestRival, met: playerRep > highestRival && state.turn > 5 },
     };
 
+    const prevVictory = state.victoryType;
     if (state.victoryProgress.territory.met) state.victoryType = 'territory';
     else if (state.victoryProgress.economic.met) state.victoryType = 'economic';
     else if (state.victoryProgress.legacy.met) state.victoryType = 'legacy';
     else state.victoryType = null;
+
+    // Notify on first victory
+    if (state.victoryType && !prevVictory) {
+      const labels: Record<string, string> = {
+        territory: 'Territory Domination — You control 6+ territories!',
+        economic: 'Economic Empire — $8,000+ monthly income achieved!',
+        legacy: 'Legacy of Power — Your reputation surpasses all rivals!',
+      };
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'success' as const, title: '🏆 VICTORY!',
+        message: labels[state.victoryType] || 'You have won the game!',
+      }];
+    }
   };
 
   // ============ MOVEMENT PHASE ============
@@ -1037,7 +1053,6 @@ export const useEnhancedMafiaGameState = (
               newState.policeHeat.level = Math.max(0, Math.floor(newState.policeHeat.level * 0.7));
             }
             if (tier === 'mayor' && action.targetFamily) {
-              // Shut down a rival territory hex
               const rivalHex = newState.hexMap.find(t => 
                 t.controllingFamily === action.targetFamily && t.business && !t.isHeadquarters
               );
@@ -1047,8 +1062,16 @@ export const useEnhancedMafiaGameState = (
             }
             
             newState.activeBribes = [...newState.activeBribes, contract];
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'success', title: `${config.label} Bribed!`,
+              message: `${config.description}. Active for ${config.duration} turns.`,
+            }];
+          } else {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'error', title: `Bribe Failed!`,
+              message: `The ${config.label} rejected your offer. $${config.cost.toLocaleString()} lost.`,
+            }];
           }
-          // If failed, money is still lost
           return newState;
         }
         case 'promote_hitman': {
@@ -1063,6 +1086,10 @@ export const useEnhancedMafiaGameState = (
           
           newState.hitmen = [...newState.hitmen, {
             unitId, hitmanLevel: 1, promotedTurn: newState.turn,
+          }];
+          newState.pendingNotifications = [...newState.pendingNotifications, {
+            type: 'success', title: 'Hitman Promoted!',
+            message: `A soldier has been elevated to Hitman. +30% hit success, 50% higher maintenance.`,
           }];
           return newState;
         }
@@ -1191,7 +1218,6 @@ export const useEnhancedMafiaGameState = (
         state.resources.money += 5000;
         state.resources.respect += 10;
         
-        // Record hits for soldiers involved
         playerUnits.forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].hits += 1;
@@ -1199,25 +1225,30 @@ export const useEnhancedMafiaGameState = (
           }
         });
         
-        // 20% player casualties
         const casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: 'Territory Captured!',
+          message: `Hit successful! +$5,000, +10 respect.${casualties > 0 ? ` ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}.` : ''}`,
+        }];
       } else {
-        // Defeat — 40% casualties
         const casualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
-        // Surviving soldiers still get experience
         playerUnits.slice(casualties).forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].survivedConflicts += 1;
           }
         });
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'error', title: 'Hit Failed!',
+          message: `The attack was repelled. ${casualties} casualt${casualties > 1 ? 'ies' : 'y'} suffered.`,
+        }];
       }
       state.policeHeat.level = Math.min(100, state.policeHeat.level + 15);
     }
@@ -1257,19 +1288,25 @@ export const useEnhancedMafiaGameState = (
           }
         });
         
-        // 10% casualties
         const casualties = Math.floor(playerUnits.length * 0.1);
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: 'Extortion Successful!',
+          message: `Territory claimed! +$3,000, +5 respect.`,
+        }];
       } else {
-        // 20% casualties on failure
         const casualties = Math.max(1, Math.floor(playerUnits.length * 0.2));
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'error', title: 'Extortion Failed!',
+          message: `Resistance was stronger than expected. ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}.`,
+        }];
       }
       state.policeHeat.level = Math.min(100, state.policeHeat.level + 8);
     }
@@ -1277,6 +1314,11 @@ export const useEnhancedMafiaGameState = (
     syncLegacyUnits(state);
     return state;
   };
+
+  // ============ CLEAR NOTIFICATIONS ============
+  const clearNotifications = useCallback(() => {
+    setGameState(prev => ({ ...prev, pendingNotifications: [] }));
+  }, []);
 
   // ============ WINNER CHECK ============
   const isWinner = gameState.victoryType !== null;
@@ -1297,5 +1339,6 @@ export const useEnhancedMafiaGameState = (
     selectUnitFromHeadquarters,
     deployUnit,
     isWinner,
+    clearNotifications,
   };
 };
