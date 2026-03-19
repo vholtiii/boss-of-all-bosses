@@ -46,9 +46,13 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   onSelectUnitFromHeadquarters, onDeployUnit
 }) => {
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canNegotiate: boolean; negotiateCapoId?: string } | null>(null);
+  const didPanRef = React.useRef(false);
 
   // Clear action menu when phase changes
   const turnPhaseRef = gameState?.turnPhase;
