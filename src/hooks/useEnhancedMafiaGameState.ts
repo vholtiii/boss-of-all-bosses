@@ -716,9 +716,14 @@ export const useEnhancedMafiaGameState = (
           return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
         }
 
-        if (moveAction === 'escort' && unitType === 'capo') {
+        if (moveAction === 'escort' && unitType === 'soldier') {
           if (prev.tacticalActionsRemaining <= 0) return prev;
-          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
+          // Show hexes containing player's capos that have room for more escorts
+          const capoHexes = prev.deployedUnits
+            .filter(u => u.type === 'capo' && u.family === prev.playerFamily && (u.escortingSoldierIds?.length || 0) < MAX_ESCORT_SOLDIERS)
+            .map(u => ({ q: u.q, r: u.r, s: u.s }));
+          if (capoHexes.length === 0) return prev;
+          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: capoHexes, deployMode: null, availableDeployHexes: [] };
         }
 
         // No regular movement in tactical phase
