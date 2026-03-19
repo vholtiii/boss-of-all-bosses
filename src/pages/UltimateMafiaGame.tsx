@@ -399,9 +399,21 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         </div>
       </div>
       
-      {/* Right side - Motto */}
-      <div className="text-sm text-muted-foreground font-playfair italic">
-        "Strategy Rules the Underworld"
+      {/* Right side - Active Pacts */}
+      <div className="flex items-center gap-2 text-xs">
+        {gameState.ceasefires?.filter((c: any) => c.active).map((c: any) => (
+          <span key={c.id} className="px-2 py-0.5 rounded-full bg-accent/20 border border-accent/30 text-accent-foreground">
+            🤝 {c.family.charAt(0).toUpperCase() + c.family.slice(1)} ({c.turnsRemaining}t)
+          </span>
+        ))}
+        {gameState.alliances?.filter((a: any) => a.active).map((a: any) => (
+          <span key={a.id} className="px-2 py-0.5 rounded-full bg-primary/20 border border-primary/30 text-primary">
+            ⚖️ {a.alliedFamily.charAt(0).toUpperCase() + a.alliedFamily.slice(1)} ({a.turnsRemaining}t)
+          </span>
+        ))}
+        {(!gameState.ceasefires?.length && !gameState.alliances?.length) && (
+          <span className="text-muted-foreground font-playfair italic">"Strategy Rules the Underworld"</span>
+        )}
       </div>
     </div>
   );
