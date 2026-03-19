@@ -701,7 +701,7 @@ export const useEnhancedMafiaGameState = (
           const scoutableHexes = neighbors.filter(h => {
             const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
             if (!tile) return false;
-            return tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily;
+            return tile.controllingFamily !== prev.playerFamily;
           });
           return { ...prev, selectedUnitId: unit.id, availableMoveHexes: scoutableHexes, deployMode: null, availableDeployHexes: [] };
         }
