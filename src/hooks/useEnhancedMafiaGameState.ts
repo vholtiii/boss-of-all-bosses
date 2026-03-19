@@ -994,10 +994,29 @@ export const useEnhancedMafiaGameState = (
       newState.availableMoveHexes = [];
       newState.deployMode = null;
       newState.availableDeployHexes = [];
+      newState.selectedMoveAction = 'move' as MoveAction;
 
+      // Clear fortified status and escort, reset moves
       newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
-        ...u, movesRemaining: u.maxMoves,
+        ...u, movesRemaining: u.maxMoves, fortified: false, escortingSoldierIds: undefined,
       }));
+
+      // Tick scouted hexes
+      newState.scoutedHexes = newState.scoutedHexes
+        .map(s => ({ ...s, turnsRemaining: s.turnsRemaining - 1 }))
+        .filter(s => s.turnsRemaining > 0);
+
+      // Tick safehouse
+      if (newState.safehouse) {
+        newState.safehouse = { ...newState.safehouse, turnsRemaining: newState.safehouse.turnsRemaining - 1 };
+        if (newState.safehouse.turnsRemaining <= 0) {
+          newState.safehouse = null;
+          newState.pendingNotifications = [...newState.pendingNotifications, {
+            type: 'warning' as const, title: '🏠 Safehouse Expired',
+            message: 'Your safehouse has been dismantled.',
+          }];
+        }
+      }
       
       const seasons = ['spring', 'summer', 'fall', 'winter'] as const;
       newState.season = seasons[Math.floor((newState.turn - 1) / 3) % 4];
