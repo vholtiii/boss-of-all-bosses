@@ -129,6 +129,12 @@ export interface EnhancedMafiaGameState {
   safehouse: Safehouse | null;
   selectedMoveAction: MoveAction;
   
+  // Action & tactical budgets
+  actionsRemaining: number;
+  maxActions: number;
+  tacticalActionsRemaining: number;
+  maxTacticalActions: number;
+  
   // Enhanced systems
   combat: CombatSystem;
   economy: EconomySystem;
