@@ -86,9 +86,6 @@ const EnhancedGameMechanics: React.FC<EnhancedGameMechanicsProps> = memo(({
           <AIPanel gameState={gameState} onAction={onAction} />
         </TabsContent>
 
-        <TabsContent value="missions" className="space-y-4">
-          <MissionsPanel gameState={gameState} onAction={onAction} />
-        </TabsContent>
 
         <TabsContent value="weather" className="space-y-4">
           <WeatherPanel gameState={gameState} onAction={onAction} />
