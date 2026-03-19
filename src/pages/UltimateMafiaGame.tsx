@@ -424,37 +424,56 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         )}
 
         {/* Tactical action toolbar — only during tactical (move) phase */}
-        {/* Tactical action toolbar — only during tactical (move) phase */}
         {gameState.turnPhase === 'move' && (
-          <div className="flex items-center gap-1 bg-background/80 rounded-lg px-2 py-1 border border-noir-light">
-            <span className="text-[10px] text-muted-foreground mr-1">📋 {gameState.tacticalActionsRemaining}/{gameState.maxTacticalActions}</span>
-            {([
-              { action: 'scout' as const, label: '👁️ Scout', tip: 'Reveal enemy hex info' },
-              { action: 'fortify' as const, label: '🛡️ Fortify', tip: 'Skip move for +25% defense' },
-              { action: 'escort' as const, label: '🚗 Escort', tip: 'Capo carries soldiers' },
-              { action: 'safehouse' as const, label: '🏠 Safehouse', tip: 'Capo sets up deploy point' },
-            ] as const).map(({ action, label, tip }) => (
-              <Button
-                key={action}
-                size="sm"
-                variant={gameState.selectedMoveAction === action ? 'default' : 'outline'}
-                className="text-xs h-7 px-2"
-                title={tip}
-                disabled={gameState.tacticalActionsRemaining <= 0}
-                onClick={() => {
-                  if (action === 'fortify' && gameState.selectedUnitId) {
-                    fortifyUnit();
-                  } else {
-                    setMoveAction(action);
-                  }
-                }}
-              >
-                {label}
-              </Button>
-            ))}
-            {gameState.safehouse && (
-              <span className="text-xs text-muted-foreground ml-1">🏠 {gameState.safehouse.turnsRemaining}t</span>
-            )}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-1 bg-background/80 rounded-lg px-2 py-1 border border-noir-light">
+              <span className="text-[10px] text-muted-foreground mr-1">📋 {gameState.tacticalActionsRemaining}/{gameState.maxTacticalActions}</span>
+              {([
+                { action: 'scout' as const, label: '👁️ Scout', tip: 'Select a soldier, click adjacent enemy hex to reveal unit count & business info for 3 turns.' },
+                { action: 'fortify' as const, label: '🛡️ Fortify', tip: 'Select a unit to skip movement for +25% defense bonus this turn.' },
+                { action: 'escort' as const, label: '🚗 Escort', tip: 'Select a capo to carry up to 2 soldiers when it moves.' },
+                { action: 'safehouse' as const, label: '🏠 Safehouse', tip: 'Select a capo on your territory to set up a secondary deploy point (5 turns).' },
+              ] as const).map(({ action, label, tip }) => (
+                <Button
+                  key={action}
+                  size="sm"
+                  variant={gameState.selectedMoveAction === action ? 'default' : 'outline'}
+                  className="text-xs h-7 px-2"
+                  title={tip}
+                  disabled={gameState.tacticalActionsRemaining <= 0}
+                  onClick={() => {
+                    if (action === 'fortify' && gameState.selectedUnitId) {
+                      fortifyUnit();
+                    } else {
+                      setMoveAction(action);
+                    }
+                  }}
+                >
+                  {label}
+                </Button>
+              ))}
+              {gameState.safehouse && (
+                <span className="text-xs text-muted-foreground ml-1">🏠 {gameState.safehouse.turnsRemaining}t</span>
+              )}
+            </div>
+            {/* Tactical action description panel */}
+            <div className="bg-background/80 rounded-lg px-3 py-2 border border-noir-light text-xs text-muted-foreground max-w-md">
+              {gameState.selectedMoveAction === 'scout' && (
+                <p><span className="text-foreground font-semibold">👁️ Scout:</span> Select a soldier, then click an adjacent enemy hex to reveal unit count and fortification status for 3 turns.</p>
+              )}
+              {gameState.selectedMoveAction === 'fortify' && (
+                <p><span className="text-foreground font-semibold">🛡️ Fortify:</span> Select a unit to skip its movement for +25% defense bonus this turn.</p>
+              )}
+              {gameState.selectedMoveAction === 'escort' && (
+                <p><span className="text-foreground font-semibold">🚗 Escort:</span> Select a capo to carry up to 2 soldiers when it moves.</p>
+              )}
+              {gameState.selectedMoveAction === 'safehouse' && (
+                <p><span className="text-foreground font-semibold">🏠 Safehouse:</span> Select a capo on your territory to establish a secondary deploy point lasting 5 turns.</p>
+              )}
+              {gameState.selectedMoveAction === 'move' && (
+                <p className="italic">Select a tactical action above to see its description. No regular movement in this phase.</p>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -2126,50 +2126,62 @@ export const useEnhancedMafiaGameState = (
 
     if (targetQ !== undefined) {
       const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
-      if (!tile || tile.controllingFamily !== 'neutral' || tile.isHeadquarters) return state;
+      if (!tile || tile.isHeadquarters) return state;
+      
+      const isNeutral = tile.controllingFamily === 'neutral';
+      const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== state.playerFamily;
+      if (!isNeutral && !isEnemy) return state;
 
-      const playerUnits = state.deployedUnits.filter(u => 
+      // Check for player units on OR adjacent to the target hex
+      const playerUnitsOnHex = state.deployedUnits.filter(u => 
         u.family === state.playerFamily && u.q === targetQ && u.r === targetR && u.s === targetS
       );
-      if (playerUnits.length === 0) return state;
+      const neighbors = getHexNeighbors(targetQ, targetR, targetS);
+      const playerUnitsAdjacent = state.deployedUnits.filter(u => 
+        u.family === state.playerFamily && 
+        neighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s)
+      );
+      const allPlayerUnits = [...playerUnitsOnHex, ...playerUnitsAdjacent];
+      if (allPlayerUnits.length === 0) return state;
 
-      // 90% success for extortion of neutral territory
-      let chance = 0.9;
+      // Neutral: 90% success, claims territory. Enemy: 50% success, steals income only.
+      let chance = isNeutral ? 0.9 : 0.5;
       chance += state.familyBonuses.extortion / 100;
       chance = Math.min(0.99, chance);
 
       if (Math.random() < chance) {
-        tile.controllingFamily = state.playerFamily;
-        state.resources.money += 3000;
-        state.resources.respect += 5;
+        if (isNeutral) {
+          tile.controllingFamily = state.playerFamily;
+        }
+        const moneyGain = isEnemy ? (tile.business?.income || 2000) : 3000;
+        const respectGain = isEnemy ? 3 : 5;
+        state.resources.money += moneyGain;
+        state.resources.respect += respectGain;
         
-        playerUnits.forEach(u => {
+        allPlayerUnits.forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].extortions += 1;
           }
         });
         
-        const casualties = Math.floor(playerUnits.length * 0.1);
-        for (let i = 0; i < casualties; i++) {
-          const idx = state.deployedUnits.indexOf(playerUnits[i]);
-          if (idx !== -1) state.deployedUnits.splice(idx, 1);
-        }
-        const extortDetails = `+$3,000, +5 respect${casualties > 0 ? `, ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}` : ''}`;
+        const extortDetails = isEnemy 
+          ? `Stole $${moneyGain.toLocaleString()} from ${tile.controllingFamily} business, +${respectGain} respect`
+          : `+$${moneyGain.toLocaleString()}, +${respectGain} respect`;
         state.lastCombatResult = {
           q: targetQ, r: targetR, s: targetS,
           success: true, type: 'extort',
-          title: 'EXTORTION SUCCESSFUL!',
+          title: isEnemy ? 'EXTORTION RAID!' : 'EXTORTION SUCCESSFUL!',
           details: extortDetails,
           timestamp: Date.now(),
         };
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: 'Extortion Successful!',
-          message: `Territory claimed! ${extortDetails}.`,
+          type: 'success', title: isEnemy ? '💰 Enemy Business Extorted!' : 'Extortion Successful!',
+          message: isEnemy ? `Stole income from ${tile.controllingFamily} territory! ${extortDetails}.` : `Territory claimed! ${extortDetails}.`,
         }];
       } else {
-        const casualties = Math.max(1, Math.floor(playerUnits.length * 0.2));
-        for (let i = 0; i < casualties; i++) {
-          const idx = state.deployedUnits.indexOf(playerUnits[i]);
+        const casualties = Math.max(1, Math.floor(playerUnitsOnHex.length * 0.2));
+        for (let i = 0; i < casualties && i < playerUnitsOnHex.length; i++) {
+          const idx = state.deployedUnits.indexOf(playerUnitsOnHex[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
         const failDetails = `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} — resistance was strong`;
@@ -2185,7 +2197,7 @@ export const useEnhancedMafiaGameState = (
           message: `Resistance was stronger than expected. ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}.`,
         }];
       }
-      state.policeHeat.level = Math.min(100, state.policeHeat.level + 8);
+      state.policeHeat.level = Math.min(100, state.policeHeat.level + (isEnemy ? 12 : 8));
     }
 
     syncLegacyUnits(state);
