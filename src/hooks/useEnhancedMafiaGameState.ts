@@ -1774,7 +1774,9 @@ export const useEnhancedMafiaGameState = (
           }
           return newState;
         case 'negotiate': {
-          return processNegotiation(newState, action);
+          const result = processNegotiation(newState, action);
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
         }
         default:
           return newState;
