@@ -1,56 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { Business } from '@/types/business';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff } from 'lucide-react';
-import { useMafiaNotifications } from '@/components/ui/notification-system';
 import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
-
-interface BusinessHex {
-  q: number;
-  r: number;
-  s: number;
-  businessId: string;
-  businessType: Business['category'];
-  isLegal: boolean;
-  income: number;
-  district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
-  family: 'neutral' | 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
-  isExtorted?: boolean;
-  heatLevel?: number;
-  soldiers?: {
-    count: number;
-    family: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
-  };
-  capo?: {
-    name: string;
-    family: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
-    level: number;
-  };
-}
-
-interface Territory {
-  district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
-  family: 'neutral' | 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
-  businesses: BusinessHex[];
-  capo?: {
-    name: string;
-    loyalty: number;
-    strength: number;
-    family: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
-  };
-}
+import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
 
 interface EnhancedMafiaHexGridProps {
   width: number;
   height: number;
-  onBusinessClick: (business: BusinessHex) => void;
-  selectedBusiness?: BusinessHex | null;
+  onBusinessClick: (business: any) => void;
+  selectedBusiness?: any;
   playerFamily: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
-  gameState?: any; // Add gameState for accessing resources
-  onAction?: (action: any) => void; // Add action handler
+  gameState?: any;
+  onAction?: (action: any) => void;
   onSelectUnit?: (unitType: 'soldier' | 'capo', location: { q: number; r: number; s: number }) => void;
   onMoveUnit?: (targetLocation: { q: number; r: number; s: number }) => void;
   onSelectHeadquarters?: (family: string) => void;
@@ -58,643 +22,334 @@ interface EnhancedMafiaHexGridProps {
   onDeployUnit?: (unitType: 'soldier' | 'capo', targetLocation: { q: number; r: number; s: number }, family: string) => void;
 }
 
-const familyColors = {
-  gambino: '#42D3F2', // Light Blue
-  genovese: '#2AA63E', // Green
-  lucchese: '#4169E1', // Royal Blue
-  bonanno: '#DC143C', // Crimson
-  colombo: '#8A2BE2', // Blue Violet
-  neutral: '#696969', // Dim Gray
+const familyColors: Record<string, string> = {
+  gambino: '#42D3F2',
+  genovese: '#2AA63E',
+  lucchese: '#4169E1',
+  bonanno: '#DC143C',
+  colombo: '#8A2BE2',
+  neutral: '#555555',
 };
 
-const businessIcons = {
-  casino: '🎰',
-  restaurant: '🍝',
-  laundromat: '🧽',
-  construction: '🏗️',
-  drug_trafficking: '💊',
-  gambling: '🎲',
-  prostitution: '💄',
-  loan_sharking: '💰',
-  headquarters: '🏛️',
+const businessIcons: Record<string, string> = {
+  casino: '🎰', restaurant: '🍝', laundromat: '🧽', construction: '🏗️',
+  drug_trafficking: '💊', gambling: '🎲', nightclub: '🍸', docks: '⚓',
+  speakeasy: '🥃', headquarters: '🏛️',
 };
 
 const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({ 
-  width, 
-  height, 
-  onBusinessClick, 
-  selectedBusiness,
-  playerFamily,
-  gameState,
-  onAction,
-  onSelectUnit,
-  onMoveUnit,
-  onSelectHeadquarters,
-  onSelectUnitFromHeadquarters,
-  onDeployUnit
+  width, height, onBusinessClick, selectedBusiness, playerFamily,
+  gameState, onAction, onSelectUnit, onMoveUnit, onSelectHeadquarters,
+  onSelectUnitFromHeadquarters, onDeployUnit
 }) => {
   const [zoom, setZoom] = useState(1);
-  const [showHeatMap, setShowHeatMap] = useState(false);
   const [showSoldiers, setShowSoldiers] = useState(true);
-  const [hoveredHex, setHoveredHex] = useState<BusinessHex | null>(null);
-  const [gridData, setGridData] = useState<BusinessHex[]>([]);
-  const { notifyBusinessAcquired, notifyPoliceRaid } = useMafiaNotifications();
+  const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
 
-  // Keyboard shortcuts for zoom
+  const baseHexRadius = 35;
+  const hexWidth = baseHexRadius * 2;
+  const hexHeight = Math.sqrt(3) * baseHexRadius;
+
+  // Read hex data from gameState
+  const hexMap: HexTile[] = gameState?.hexMap || [];
+  const deployedUnits: DeployedUnit[] = gameState?.deployedUnits || [];
+
+  // Group units by hex for rendering
+  const unitsByHex = useMemo(() => {
+    const map = new Map<string, DeployedUnit[]>();
+    deployedUnits.forEach(unit => {
+      const key = `${unit.q},${unit.r},${unit.s}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(unit);
+    });
+    return map;
+  }, [deployedUnits]);
+
+  // Keyboard zoom shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey) {
         switch (event.key) {
-          case '=':
-          case '+':
-            event.preventDefault();
-            setZoom(prev => Math.min(prev + 0.1, 2));
-            break;
-          case '-':
-            event.preventDefault();
-            setZoom(prev => Math.max(prev - 0.1, 0.5));
-            break;
-          case '0':
-            event.preventDefault();
-            setZoom(1);
-            break;
+          case '=': case '+': event.preventDefault(); setZoom(prev => Math.min(prev + 0.1, 2)); break;
+          case '-': event.preventDefault(); setZoom(prev => Math.max(prev - 0.1, 0.5)); break;
+          case '0': event.preventDefault(); setZoom(1); break;
         }
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const baseHexRadius = 35;
-  const hexRadius = baseHexRadius * zoom;
-  const hexWidth = baseHexRadius * 2;
-  const hexHeight = Math.sqrt(3) * baseHexRadius;
+  const getHexPosition = (q: number, r: number) => ({
+    x: hexWidth * (3/4) * q,
+    y: hexHeight * (r + q/2),
+  });
 
-  // Generate grid data
-  useEffect(() => {
-    const businesses: BusinessHex[] = [];
-    const districts: Array<BusinessHex['district']> = ['Little Italy', 'Bronx', 'Brooklyn', 'Queens', 'Manhattan', 'Staten Island'];
-    const families: Array<BusinessHex['family']> = ['neutral', 'gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
-    const businessTypes: Array<Business['category']> = ['casino', 'restaurant', 'laundromat', 'construction', 'drug_trafficking', 'gambling', 'prostitution', 'loan_sharking'];
-
-    for (let q = -width/2; q <= width/2; q++) {
-      for (let r = -height/2; r <= height/2; r++) {
-        const s = -q - r;
-        if (Math.abs(s) <= height/2) {
-          // Check if this is a headquarters location
-          const isHeadquarters = gameState?.headquarters && Object.values(gameState.headquarters).some(
-            (hq: any) => hq.q === q && hq.r === r && hq.s === s
-          );
-          
-          if (isHeadquarters) {
-            // Find which family this headquarters belongs to
-            const family = Object.keys(gameState.headquarters).find(
-              (family) => {
-                const hq = gameState.headquarters[family];
-                return hq.q === q && hq.r === r && hq.s === s;
-              }
-            );
-            
-            if (family) {
-              const hq = gameState.headquarters[family];
-              businesses.push({
-                q, r, s,
-                businessId: `headquarters-${family}`,
-                businessType: 'headquarters' as any, // Use headquarters icon
-                isLegal: true,
-                income: 0,
-                district: hq.district as BusinessHex['district'],
-                family: family as BusinessHex['family'],
-                isExtorted: false,
-                heatLevel: 0,
-                soldiers: undefined,
-              });
-              continue; // Skip normal business generation for headquarters
-            }
-          }
-
-          const businessId = `business-${q}-${r}-${s}`;
-          const district = districts[Math.floor(Math.random() * districts.length)];
-          const family = families[Math.floor(Math.random() * families.length)];
-          const businessType = businessTypes[Math.floor(Math.random() * businessTypes.length)];
-          const income = Math.floor(Math.random() * 5000) + 1000;
-          const heatLevel = Math.floor(Math.random() * 5);
-
-          // Add soldiers to non-neutral territories
-          let soldiers = undefined;
-          if (family !== 'neutral' && Math.random() > 0.3) {
-            const soldierCount = Math.floor(Math.random() * 3) + 1; // 1-3 soldiers
-            soldiers = {
-              count: soldierCount,
-              family: family as 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo',
-            };
-          }
-
-          businesses.push({
-            q, r, s,
-            businessId,
-            businessType,
-            isLegal: Math.random() > 0.3,
-            income,
-            district,
-            family,
-            isExtorted: Math.random() > 0.7,
-            heatLevel,
-            soldiers,
-          });
-        }
-      }
-    }
-    setGridData(businesses);
-  }, [width, height, gameState?.headquarters]);
-
-  const getHexPosition = (q: number, r: number) => {
-    const x = hexWidth * (3/4) * q;
-    const y = hexHeight * (r + q/2);
-    return { x, y };
-  };
-
-  const getHexPoints = (centerX: number, centerY: number, radius: number) => {
+  const getHexPoints = (cx: number, cy: number, radius: number) => {
     const points = [];
     for (let i = 0; i < 6; i++) {
       const angle = (Math.PI / 3) * i;
-      const x = centerX + radius * Math.cos(angle);
-      const y = centerY + radius * Math.sin(angle);
-      points.push(`${x},${y}`);
+      points.push(`${cx + radius * Math.cos(angle)},${cy + radius * Math.sin(angle)}`);
     }
     return points.join(' ');
   };
 
-  const handleHexClick = (business: BusinessHex) => {
-    // Check if this is a headquarters
-    const isHeadquarters = gameState?.headquarters && Object.values(gameState.headquarters).some(
-      (hq: any) => hq.q === business.q && hq.r === business.r && hq.s === business.s
-    );
-    
-    if (isHeadquarters) {
-      // Find which family this headquarters belongs to
-      const family = Object.keys(gameState.headquarters).find(
-        (family) => {
-          const hq = gameState.headquarters[family];
-          return hq.q === business.q && hq.r === business.r && hq.s === business.s;
-        }
+  const getHexColor = (tile: HexTile): string => {
+    // HQ
+    if (tile.isHeadquarters) {
+      return tile.isHeadquarters === playerFamily ? '#D4AF37' : '#8B4513';
+    }
+
+    // Deployment highlights
+    if (gameState?.deployMode && gameState.availableDeployHexes?.some(
+      (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
+    )) {
+      return '#87CEEB'; // sky blue
+    }
+
+    // Movement highlights
+    if (gameState?.selectedUnitId && gameState.availableMoveHexes?.some(
+      (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
+    )) {
+      return '#90EE90'; // light green
+    }
+
+    // Selected unit hex
+    if (gameState?.selectedUnitId) {
+      const unit = deployedUnits.find(u => u.id === gameState.selectedUnitId);
+      if (unit && unit.q === tile.q && unit.r === tile.r && unit.s === tile.s) {
+        return '#FFD700'; // gold
+      }
+    }
+
+    return familyColors[tile.controllingFamily] || '#555555';
+  };
+
+  const getHexOpacity = (tile: HexTile): number => {
+    if (tile.controllingFamily === playerFamily) return 1;
+    if (tile.controllingFamily === 'neutral') return 0.5;
+    return 0.7;
+  };
+
+  const handleHexClick = (tile: HexTile) => {
+    // HQ click
+    if (tile.isHeadquarters) {
+      if (onSelectHeadquarters) onSelectHeadquarters(tile.isHeadquarters);
+      return;
+    }
+
+    // Deploy mode — place unit
+    if (gameState?.deployMode) {
+      const isValid = gameState.availableDeployHexes?.some(
+        (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
       );
-      
-      if (family && onSelectHeadquarters) {
-        onSelectHeadquarters(family);
+      if (isValid && onDeployUnit) {
+        onDeployUnit(gameState.deployMode.unitType, { q: tile.q, r: tile.r, s: tile.s }, gameState.deployMode.family);
+      }
+      return;
+    }
+
+    // Movement phase
+    if (gameState?.movementPhase) {
+      // If we have a selected unit, try to move it
+      if (gameState.selectedUnitId) {
+        const isValidMove = gameState.availableMoveHexes?.some(
+          (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
+        );
+        if (isValidMove && onMoveUnit) {
+          onMoveUnit({ q: tile.q, r: tile.r, s: tile.s });
+          return;
+        }
+      }
+
+      // Try to select a player unit on this hex
+      const key = `${tile.q},${tile.r},${tile.s}`;
+      const unitsHere = unitsByHex.get(key) || [];
+      const playerUnit = unitsHere.find(u => u.family === playerFamily && u.movesRemaining > 0);
+      if (playerUnit && onSelectUnit) {
+        onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
         return;
       }
     }
-    
-    // Handle movement phase
-    if (gameState?.movementPhase) {
-      // Check if this is a deployment (unit selected but at headquarters)
-      if (gameState?.selectedUnit?.type && gameState?.selectedUnit?.location) {
-        const isAtHeadquarters = Object.values(gameState.headquarters).some(
-          (hq: any) => 
-            hq.q === gameState.selectedUnit.location.q && 
-            hq.r === gameState.selectedUnit.location.r && 
-            hq.s === gameState.selectedUnit.location.s
-        );
-        
-        if (isAtHeadquarters) {
-          // This is a deployment - check if target is available
-          if (gameState.availableMoves?.some(move => 
-              move.q === business.q && move.r === business.r && move.s === business.s)) {
-            // Find which family this headquarters belongs to
-            const family = Object.keys(gameState.headquarters).find(
-              (family) => {
-                const hq = gameState.headquarters[family];
-                return hq.q === gameState.selectedUnit.location.q && 
-                       hq.r === gameState.selectedUnit.location.r && 
-                       hq.s === gameState.selectedUnit.location.s;
-              }
-            );
-            if (family && onDeployUnit) {
-              onDeployUnit(gameState.selectedUnit.type, { q: business.q, r: business.r, s: business.s }, family);
-            }
-          }
-        } else {
-          // This is normal movement
-          if (onSelectUnit && (business.soldiers?.family === playerFamily || business.capo?.family === playerFamily)) {
-            // Select unit for movement
-            const unitType = business.capo ? 'capo' : 'soldier';
-            onSelectUnit(unitType, { q: business.q, r: business.r, s: business.s });
-          } else if (onMoveUnit && gameState?.selectedUnit?.type) {
-            // Move selected unit to this location
-            onMoveUnit({ q: business.q, r: business.r, s: business.s });
-          }
-        }
-      } else {
-        // No unit selected - select a unit
-        if (onSelectUnit && (business.soldiers?.family === playerFamily || business.capo?.family === playerFamily)) {
-          // Select unit for movement
-          const unitType = business.capo ? 'capo' : 'soldier';
-          onSelectUnit(unitType, { q: business.q, r: business.r, s: business.s });
-        }
-      }
-    } else {
-      // Normal business click
-      onBusinessClick(business);
-      
-      // Add visual feedback
-      if (business.family === playerFamily) {
-        notifyBusinessAcquired(business.businessType, business.income);
-      } else if (business.heatLevel && business.heatLevel > 3) {
-        notifyPoliceRaid(business.district);
-      }
-    }
+
+    // Normal click — show info
+    onBusinessClick({
+      q: tile.q, r: tile.r, s: tile.s,
+      district: tile.district,
+      family: tile.controllingFamily,
+      businessType: tile.business?.type || 'none',
+      income: tile.business?.income || 0,
+      isLegal: tile.business?.isLegal ?? true,
+      heatLevel: tile.business?.heatLevel || 0,
+    });
   };
 
-  const handleHexRightClick = (business: BusinessHex, e: React.MouseEvent) => {
-    e.preventDefault();
-    
-    if (business.family === playerFamily && !business.capo) {
-      // Can deploy capo to player's own territory
-      const capoNames = ['Vito', 'Salvatore', 'Antonio', 'Giuseppe', 'Francesco', 'Mario', 'Luigi', 'Paolo'];
-      const randomName = capoNames[Math.floor(Math.random() * capoNames.length)];
-      const confirmCapo = window.confirm(
-        `Deploy Capo ${randomName} to ${business.district}? This will maximize income from this territory (100% vs 30% with soldiers).`
-      );
-      if (confirmCapo && onAction) {
-        onAction({ 
-          type: 'deploy_capo', 
-          territory: business.district, 
-          capoName: randomName,
-          capoLevel: 1
-        });
-      }
-    } else if (business.soldiers && business.soldiers.family === playerFamily) {
-      // Player has soldiers here - can take action based on territory type
-      if (business.family === 'neutral') {
-        // Can extort neutral territory
-        const confirmExtortion = window.confirm(
-          `Extort ${business.district}? You have ${business.soldiers.count} soldiers here. This will attempt to take control of the territory.`
-        );
-        if (confirmExtortion && onAction) {
-          // Trigger extortion action
-          onAction({ type: 'extort_territory', targetTerritory: business.district });
-        }
-      } else if (business.family !== playerFamily) {
-        // Can hit rival territory
-        const confirmHit = window.confirm(
-          `Hit ${business.district}? You have ${business.soldiers.count} soldiers here. This will attempt to take control of the rival territory.`
-        );
-        if (confirmHit && onAction) {
-          // Trigger hit action
-          onAction({ type: 'hit_territory', targetTerritory: business.district });
-        }
-      }
-    } else {
-      // Can deploy soldiers to any territory (neutral, player's own, or rival)
-      const soldierCount = prompt(
-        `Deploy how many soldiers to ${business.district}? (Available: ${gameState?.resources.soldiers || 0})`
-      );
-      if (soldierCount && !isNaN(Number(soldierCount))) {
-        const count = Math.min(Number(soldierCount), gameState?.resources.soldiers || 0);
-        if (count > 0 && onAction) {
-          // Trigger deploy action
-          onAction({ type: 'deploy_soldiers', territory: business.district, soldierCount: count });
-        }
-      }
-    }
-  };
-
-  const getHexColor = (business: BusinessHex) => {
-    // Check if this is a headquarters
-    const isHeadquarters = gameState?.headquarters && Object.values(gameState.headquarters).some(
-      (hq: any) => hq.q === business.q && hq.r === business.r && hq.s === business.s
-    );
-    
-    if (isHeadquarters) {
-      // Find which family this headquarters belongs to
-      const family = Object.keys(gameState.headquarters).find(
-        (family) => {
-          const hq = gameState.headquarters[family];
-          return hq.q === business.q && hq.r === business.r && hq.s === business.s;
-        }
-      );
-      
-      if (family) {
-        return family === playerFamily ? '#FFD700' : '#8B4513'; // Gold for player HQ, brown for others
-      }
-    }
-    
-    if (showHeatMap && business.heatLevel) {
-      const intensity = business.heatLevel / 5;
-      return `rgba(255, ${Math.floor(255 * (1 - intensity))}, ${Math.floor(255 * (1 - intensity))}, 0.8)`;
-    }
-    
-    // Movement phase highlighting
-    if (gameState?.movementPhase) {
-      // Highlight selected unit
-      if (gameState.selectedUnit?.location && 
-          business.q === gameState.selectedUnit.location.q && 
-          business.r === gameState.selectedUnit.location.r && 
-          business.s === gameState.selectedUnit.location.s) {
-        return '#FFD700'; // Gold for selected unit
-      }
-      
-      // Highlight available moves (for both movement and deployment)
-      if (gameState.availableMoves?.some(move => 
-          move.q === business.q && move.r === business.r && move.s === business.s)) {
-        // Check if this is a deployment (unit at headquarters)
-        const isAtHeadquarters = gameState.selectedUnit?.location && Object.values(gameState.headquarters).some(
-          (hq: any) => 
-            hq.q === gameState.selectedUnit.location.q && 
-            hq.r === gameState.selectedUnit.location.r && 
-            hq.s === gameState.selectedUnit.location.s
-        );
-        
-        if (isAtHeadquarters) {
-          return '#87CEEB'; // Sky blue for deployment targets
-        } else {
-          return '#90EE90'; // Light green for movement targets
-        }
-      }
-    }
-    
-    return familyColors[business.family];
-  };
-
-  const getHexOpacity = (business: BusinessHex) => {
-    if (business.family === playerFamily) return 1;
-    if (business.family === 'neutral') return 0.6;
-    return 0.8;
-  };
+  // Compute viewbox from hexMap
+  const viewBox = useMemo(() => {
+    if (hexMap.length === 0) return '-400 -400 800 800';
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    hexMap.forEach(tile => {
+      const { x, y } = getHexPosition(tile.q, tile.r);
+      if (x - baseHexRadius < minX) minX = x - baseHexRadius;
+      if (x + baseHexRadius > maxX) maxX = x + baseHexRadius;
+      if (y - baseHexRadius < minY) minY = y - baseHexRadius;
+      if (y + baseHexRadius > maxY) maxY = y + baseHexRadius;
+    });
+    const pad = 60;
+    return `${minX - pad} ${minY - pad} ${maxX - minX + pad*2} ${maxY - minY + pad*2}`;
+  }, [hexMap]);
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-gradient-to-br from-noir-dark/50 to-background/50">
       {/* Controls */}
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
-        {/* Zoom Controls */}
         <div className="flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-3 border border-noir-light shadow-lg">
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setZoom(Math.min(zoom + 0.1, 2))}
-              disabled={zoom >= 2}
-              title="Zoom In (Ctrl + +)"
-              className="h-8 w-8 p-0"
-            >
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setZoom(Math.max(zoom - 0.1, 0.5))}
-              disabled={zoom <= 0.5}
-              title="Zoom Out (Ctrl + -)"
-              className="h-8 w-8 p-0"
-            >
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setZoom(1)}
-              title="Reset Zoom (Ctrl + 0)"
-              className="h-8 w-8 p-0"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="h-6 w-px bg-noir-light mx-2" />
-          <div className="text-sm font-medium text-mafia-gold">
-            {Math.round(zoom * 100)}%
-          </div>
-        </div>
-        
-        {/* View Controls */}
-        <div className="flex gap-2">
-          <Button
-            variant={showHeatMap ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowHeatMap(!showHeatMap)}
-            className="font-medium"
-          >
-            {showHeatMap ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-            Heat Map
+          <Button variant="outline" size="sm" onClick={() => setZoom(z => Math.min(z + 0.15, 2.5))} className="h-8 w-8 p-0">
+            <ZoomIn className="h-4 w-4" />
           </Button>
-          <Button
-            variant={showSoldiers ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowSoldiers(!showSoldiers)}
-            className="font-medium"
-          >
-            {showSoldiers ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-            Units
+          <Button variant="outline" size="sm" onClick={() => setZoom(z => Math.max(z - 0.15, 0.4))} className="h-8 w-8 p-0">
+            <ZoomOut className="h-4 w-4" />
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setZoom(1)} className="h-8 w-8 p-0">
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+          <div className="h-6 w-px bg-noir-light mx-1" />
+          <span className="text-sm font-medium text-mafia-gold">{Math.round(zoom * 100)}%</span>
         </div>
+        <Button
+          variant={showSoldiers ? "default" : "outline"}
+          size="sm"
+          onClick={() => setShowSoldiers(s => !s)}
+          className="font-medium"
+        >
+          {showSoldiers ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+          Units
+        </Button>
       </div>
 
-      {/* Grid Container */}
-      <div className="absolute inset-0 flex items-center justify-center hex-grid-container">
-        <svg
-          width="100%"
-          height="100%"
-          viewBox={`-${width * hexWidth/2} -${height * hexHeight/2} ${width * hexWidth} ${height * hexHeight}`}
-          className="overflow-visible"
-        >
+      {/* Grid */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <svg width="100%" height="100%" viewBox={viewBox} className="overflow-visible">
           <g transform={`scale(${zoom})`}>
-          {gridData.map((business) => {
-            const { x, y } = getHexPosition(business.q, business.r);
-            const isSelected = selectedBusiness?.businessId === business.businessId;
-            const isHovered = hoveredHex?.businessId === business.businessId;
-            const isPlayerFamily = business.family === playerFamily;
+            {hexMap.map(tile => {
+              const { x, y } = getHexPosition(tile.q, tile.r);
+              const key = `${tile.q},${tile.r},${tile.s}`;
+              const unitsHere = unitsByHex.get(key) || [];
+              const isHovered = hoveredHex?.q === tile.q && hoveredHex?.r === tile.r;
+              const isPlayerTerritory = tile.controllingFamily === playerFamily;
 
-            return (
-              <motion.g
-                key={business.businessId}
-                initial={{ opacity: 0, scale: 0 }}
-                animate={{ 
-                  opacity: getHexOpacity(business),
-                  scale: isSelected ? 1.1 : isHovered ? 1.05 : 1,
-                }}
-                transition={{ duration: 0.2 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <polygon
-                  points={getHexPoints(x, y, baseHexRadius)}
-                  fill={getHexColor(business)}
-                  stroke={isSelected ? '#ffffff' : isPlayerFamily ? '#D4AF37' : '#333333'}
-                  strokeWidth={isSelected ? 3 : isPlayerFamily ? 2 : 1}
-                  className="cursor-pointer transition-all duration-200"
-                  onClick={() => handleHexClick(business)}
-                  onContextMenu={(e) => handleHexRightClick(business, e)}
-                  onMouseEnter={() => setHoveredHex(business)}
-                  onMouseLeave={() => setHoveredHex(null)}
-                />
-                
-                {/* Business Icon */}
-                <motion.text
-                  x={x}
-                  y={y + 5}
-                  textAnchor="middle"
-                  className="text-lg pointer-events-none select-none"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.1 }}
-                >
-                  {businessIcons[business.businessType] || '🏢'}
-                </motion.text>
+              // Check highlight states
+              const isDeployTarget = gameState?.deployMode && gameState.availableDeployHexes?.some(
+                (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
+              );
+              const isMoveTarget = gameState?.selectedUnitId && gameState.availableMoveHexes?.some(
+                (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
+              );
 
-                {/* Deployment Indicator */}
-                {gameState?.movementPhase && gameState?.selectedUnit?.type && 
-                 gameState.availableMoves?.some(move => 
-                   move.q === business.q && move.r === business.r && move.s === business.s) && (
-                  <motion.text
-                    x={x}
-                    y={y - 15}
-                    textAnchor="middle"
-                    className="text-xs pointer-events-none select-none font-bold"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.2 }}
-                  >
-                    {(() => {
-                      const isAtHeadquarters = gameState.selectedUnit?.location && Object.values(gameState.headquarters).some(
-                        (hq: any) => 
-                          hq.q === gameState.selectedUnit.location.q && 
-                          hq.r === gameState.selectedUnit.location.r && 
-                          hq.s === gameState.selectedUnit.location.s
-                      );
-                      
-                      if (isAtHeadquarters) {
-                        return 'DEPLOY';
+              return (
+                <g key={key}>
+                  <polygon
+                    points={getHexPoints(x, y, baseHexRadius)}
+                    fill={getHexColor(tile)}
+                    stroke={tile.isHeadquarters ? '#D4AF37' : isPlayerTerritory ? '#D4AF3780' : '#333333'}
+                    strokeWidth={tile.isHeadquarters ? 3 : isPlayerTerritory ? 2 : 1}
+                    opacity={getHexOpacity(tile)}
+                    className="cursor-pointer transition-all duration-150"
+                    onClick={() => handleHexClick(tile)}
+                    onMouseEnter={() => setHoveredHex(tile)}
+                    onMouseLeave={() => setHoveredHex(null)}
+                  />
+
+                  {/* Deploy/Move label */}
+                  {(isDeployTarget || isMoveTarget) && (
+                    <text x={x} y={y - 12} textAnchor="middle" fontSize="8" fill="#ffffff" fontWeight="bold" className="pointer-events-none select-none">
+                      {isDeployTarget ? 'DEPLOY' : 'MOVE'}
+                    </text>
+                  )}
+
+                  {/* Business/HQ icon */}
+                  <text x={x} y={y + 5} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">
+                    {tile.isHeadquarters ? '🏛️' : tile.business ? (businessIcons[tile.business.type] || '🏢') : ''}
+                  </text>
+
+                  {/* Income on hover */}
+                  {isHovered && tile.business && (
+                    <text x={x} y={y + baseHexRadius + 12} textAnchor="middle" fontSize="9" fill="#ffffff" fontWeight="600" className="pointer-events-none">
+                      ${tile.business.income.toLocaleString()}/turn
+                    </text>
+                  )}
+
+                  {/* Render units */}
+                  {showSoldiers && unitsHere.length > 0 && (() => {
+                    // Group by family and type
+                    const soldiersByFamily = new Map<string, DeployedUnit[]>();
+                    const caposByFamily = new Map<string, DeployedUnit[]>();
+                    unitsHere.forEach(u => {
+                      if (u.type === 'soldier') {
+                        if (!soldiersByFamily.has(u.family)) soldiersByFamily.set(u.family, []);
+                        soldiersByFamily.get(u.family)!.push(u);
                       } else {
-                        return 'MOVE';
+                        if (!caposByFamily.has(u.family)) caposByFamily.set(u.family, []);
+                        caposByFamily.get(u.family)!.push(u);
                       }
-                    })()}
-                  </motion.text>
-                )}
+                    });
 
-                {/* Income Display */}
-                {isHovered && (
-                  <motion.text
-                    x={x}
-                    y={y + hexRadius + 15}
-                    textAnchor="middle"
-                    className="text-xs fill-white font-semibold pointer-events-none"
-                    initial={{ opacity: 0, y: y + hexRadius + 10 }}
-                    animate={{ opacity: 1, y: y + hexRadius + 15 }}
-                    exit={{ opacity: 0, y: y + hexRadius + 10 }}
-                  >
-                    ${business.income.toLocaleString()}
-                  </motion.text>
-                )}
+                    const elements: React.ReactNode[] = [];
+                    let offsetIdx = 0;
 
-                {/* Heat Indicator */}
-                {showHeatMap && business.heatLevel && business.heatLevel > 2 && (
-                  <motion.circle
-                    cx={x + hexRadius * 0.6}
-                    cy={y - hexRadius * 0.6}
-                    r="8"
-                    fill="red"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.2 }}
-                  />
-                )}
+                    caposByFamily.forEach((capos, fam) => {
+                      const capo = capos[0];
+                      elements.push(
+                        <CapoIcon
+                          key={`capo-${fam}-${key}`}
+                          x={x + baseHexRadius * 0.35 + offsetIdx * 8}
+                          y={y + baseHexRadius * 0.3}
+                          family={fam as any}
+                          name={capo.name || 'Capo'}
+                          level={capo.level}
+                          isPlayerFamily={fam === playerFamily}
+                        />
+                      );
+                      offsetIdx++;
+                    });
 
-                {/* Extortion Indicator */}
-                {business.isExtorted && (
-                  <motion.text
-                    x={x - hexRadius * 0.6}
-                    y={y - hexRadius * 0.6}
-                    className="text-xs fill-yellow-400 pointer-events-none"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    💰
-                  </motion.text>
-                )}
+                    soldiersByFamily.forEach((soldiers, fam) => {
+                      elements.push(
+                        <SoldierIcon
+                          key={`soldier-${fam}-${key}`}
+                          x={x + baseHexRadius * 0.35 + offsetIdx * 8}
+                          y={y + baseHexRadius * 0.3}
+                          family={fam as any}
+                          count={soldiers.length}
+                          isPlayerFamily={fam === playerFamily}
+                        />
+                      );
+                      offsetIdx++;
+                    });
 
-                {/* Capo Icon */}
-                {business.capo && (
-                  <CapoIcon
-                    x={x + hexRadius * 0.4}
-                    y={y + hexRadius * 0.4}
-                    family={business.capo.family}
-                    name={business.capo.name}
-                    level={business.capo.level}
-                    isPlayerFamily={business.capo.family === playerFamily}
-                    onClick={() => {
-                      console.log(`Capo ${business.capo?.name} (Level ${business.capo?.level}) in ${business.district}`);
-                    }}
-                  />
-                )}
+                    return elements;
+                  })()}
 
-                {/* Soldier Icon - only show if no capo */}
-                {business.soldiers && showSoldiers && !business.capo && (
-                  <SoldierIcon
-                    x={x + hexRadius * 0.4}
-                    y={y + hexRadius * 0.4}
-                    family={business.soldiers.family}
-                    count={business.soldiers.count}
-                    isPlayerFamily={business.soldiers.family === playerFamily}
-                    onClick={() => {
-                      console.log(`Soldiers in ${business.district}: ${business.soldiers?.count} ${business.soldiers?.family} soldiers`);
-                    }}
-                  />
-                )}
-
-                {/* Territory Control Indicator */}
-                {business.family !== 'neutral' && (
-                  <motion.circle
-                    cx={x - hexRadius * 0.6}
-                    cy={y + hexRadius * 0.6}
-                    r="6"
-                    fill={business.family === playerFamily ? '#10B981' : '#EF4444'}
-                    stroke="#ffffff"
-                    strokeWidth="1"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.4 }}
-                  />
-                )}
-
-                {/* Action Available Indicator */}
-                {business.family === playerFamily && !business.capo && (
-                  <motion.text
-                    x={x}
-                    y={y - hexRadius * 0.8}
-                    textAnchor="middle"
-                    className="text-xs pointer-events-none font-bold"
-                    fill="#8B5CF6"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                  >
-                    👔
-                  </motion.text>
-                )}
-                {business.soldiers && business.soldiers.family === playerFamily && business.family !== playerFamily && (
-                  <motion.text
-                    x={x}
-                    y={y - hexRadius * 0.8}
-                    textAnchor="middle"
-                    className="text-xs pointer-events-none font-bold"
-                    fill={business.family === 'neutral' ? '#10B981' : '#EF4444'}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                  >
-                    {business.family === 'neutral' ? '💰' : '⚔️'}
-                  </motion.text>
-                )}
-              </motion.g>
-            );
-          })}
+                  {/* Territory control dot */}
+                  {tile.controllingFamily !== 'neutral' && !tile.isHeadquarters && (
+                    <circle
+                      cx={x - baseHexRadius * 0.55}
+                      cy={y + baseHexRadius * 0.55}
+                      r="5"
+                      fill={isPlayerTerritory ? '#10B981' : '#EF4444'}
+                      stroke="#ffffff"
+                      strokeWidth="0.8"
+                      className="pointer-events-none"
+                    />
+                  )}
+                </g>
+              );
+            })}
           </g>
         </svg>
       </div>
 
-      {/* Hover Info Panel */}
+      {/* Hover Info */}
       <AnimatePresence>
         {hoveredHex && (
           <motion.div
@@ -703,47 +358,31 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             exit={{ opacity: 0, y: 20 }}
             className="absolute bottom-4 left-4 bg-noir-dark/90 backdrop-blur-sm border border-noir-light rounded-lg p-4 text-white max-w-xs"
           >
-            <h3 className="font-semibold text-mafia-gold mb-2">
-              {hoveredHex.district}
-            </h3>
+            <h3 className="font-semibold text-mafia-gold mb-2">{hoveredHex.district}</h3>
             <div className="space-y-1 text-sm">
-              <p><span className="text-muted-foreground">Family:</span> {hoveredHex.family.toUpperCase()}</p>
-              <p><span className="text-muted-foreground">Business:</span> {hoveredHex.businessType.replace('_', ' ').toUpperCase()}</p>
-              <p><span className="text-muted-foreground">Income:</span> ${hoveredHex.income.toLocaleString()}/turn</p>
-              <p><span className="text-muted-foreground">Status:</span> {hoveredHex.isLegal ? 'Legal' : 'Illegal'}</p>
-              {hoveredHex.heatLevel && (
-                <p><span className="text-muted-foreground">Heat Level:</span> {hoveredHex.heatLevel}/5</p>
+              <p><span className="text-muted-foreground">Control:</span> {hoveredHex.controllingFamily.toUpperCase()}</p>
+              <p><span className="text-muted-foreground">Terrain:</span> {hoveredHex.terrain}</p>
+              {hoveredHex.business && (
+                <>
+                  <p><span className="text-muted-foreground">Business:</span> {hoveredHex.business.type.replace('_', ' ').toUpperCase()}</p>
+                  <p><span className="text-muted-foreground">Income:</span> ${hoveredHex.business.income.toLocaleString()}/turn</p>
+                  <p><span className="text-muted-foreground">Type:</span> {hoveredHex.business.isLegal ? 'Legal' : 'Illegal'}</p>
+                </>
               )}
-              {hoveredHex.isExtorted && (
-                <p className="text-yellow-400">💰 Extorted</p>
+              {hoveredHex.isHeadquarters && (
+                <p className="text-mafia-gold font-bold">🏛️ {hoveredHex.isHeadquarters.toUpperCase()} HQ</p>
               )}
-              {hoveredHex.capo && (
-                <p className="text-purple-400">
-                  👔 {hoveredHex.capo.name} (Level {hoveredHex.capo.level}) - {hoveredHex.capo.family.toUpperCase()} Capo
-                </p>
-              )}
-              {hoveredHex.soldiers && !hoveredHex.capo && (
-                <p className="text-blue-400">
-                  👤 {hoveredHex.soldiers.count} {hoveredHex.soldiers.family.toUpperCase()} soldier{hoveredHex.soldiers.count > 1 ? 's' : ''}
-                </p>
-              )}
-              {hoveredHex.family !== 'neutral' && (
-                <p className={hoveredHex.family === playerFamily ? 'text-green-400' : 'text-red-400'}>
-                  🏴 {hoveredHex.family.toUpperCase()} TERRITORY
-                </p>
-              )}
-              {hoveredHex.family === playerFamily && !hoveredHex.capo && (
-                <p className="text-purple-400 font-bold">
-                  👔 READY TO DEPLOY CAPO
-                </p>
-              )}
-              {hoveredHex.soldiers && hoveredHex.soldiers.family === playerFamily && hoveredHex.family !== playerFamily && (
-                <p className={`font-bold ${
-                  hoveredHex.family === 'neutral' ? 'text-green-400' : 'text-red-400'
-                }`}>
-                  {hoveredHex.family === 'neutral' ? '💰 READY TO EXTORT' : '⚔️ READY TO HIT'}
-                </p>
-              )}
+              {(() => {
+                const key = `${hoveredHex.q},${hoveredHex.r},${hoveredHex.s}`;
+                const units = unitsByHex.get(key) || [];
+                if (units.length === 0) return null;
+                return units.map(u => (
+                  <p key={u.id} className={u.family === playerFamily ? 'text-green-400' : 'text-red-400'}>
+                    {u.type === 'capo' ? `👔 ${u.name} (Lvl ${u.level})` : '👤 Soldier'} — {u.family.toUpperCase()}
+                    {u.family === playerFamily && ` (${u.movesRemaining} moves)`}
+                  </p>
+                ));
+              })()}
             </div>
           </motion.div>
         )}
