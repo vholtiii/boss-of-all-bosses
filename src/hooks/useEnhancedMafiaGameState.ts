@@ -650,9 +650,8 @@ export const useEnhancedMafiaGameState = (
 
       const moveAction = prev.selectedMoveAction || 'move';
 
-      // Tactical actions only during move (tactical) phase
+      // Tactical phase: only tactical actions (scout, fortify, safehouse, escort) — no regular movement
       if (prev.turnPhase === 'move') {
-        // Scout: show adjacent enemy hexes
         if (moveAction === 'scout' && unitType === 'soldier') {
           if (prev.tacticalActionsRemaining <= 0) return prev;
           const neighbors = getHexNeighbors(unit.q, unit.r, unit.s);
@@ -664,13 +663,26 @@ export const useEnhancedMafiaGameState = (
           return { ...prev, selectedUnitId: unit.id, availableMoveHexes: scoutableHexes, deployMode: null, availableDeployHexes: [] };
         }
 
-        // Safehouse: highlight current hex
         if (moveAction === 'safehouse' && unitType === 'capo') {
           if (prev.tacticalActionsRemaining <= 0) return prev;
           return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
         }
+
+        if (moveAction === 'fortify') {
+          if (prev.tacticalActionsRemaining <= 0) return prev;
+          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
+        }
+
+        if (moveAction === 'escort' && unitType === 'capo') {
+          if (prev.tacticalActionsRemaining <= 0) return prev;
+          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
+        }
+
+        // No regular movement in tactical phase
+        return prev;
       }
 
+      // Deploy phase: regular movement
       const range = unitType === 'soldier' ? 1 : Math.min(5, unit.movesRemaining);
       const candidateHexes = unitType === 'soldier' 
         ? getHexNeighbors(unit.q, unit.r, unit.s)
