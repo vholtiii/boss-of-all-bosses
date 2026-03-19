@@ -2017,9 +2017,15 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      const playerUnits = state.deployedUnits.filter(u => 
+      const playerUnitsOnHex = state.deployedUnits.filter(u => 
         u.family === state.playerFamily && u.q === targetQ && u.r === targetR && u.s === targetS
       );
+      const hitNeighbors = getHexNeighbors(targetQ, targetR, targetS);
+      const playerUnitsAdjacent = state.deployedUnits.filter(u => 
+        u.family === state.playerFamily && 
+        hitNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s)
+      );
+      const playerUnits = [...playerUnitsOnHex, ...playerUnitsAdjacent];
       const enemyUnits = state.deployedUnits.filter(u => 
         u.family === tile.controllingFamily && u.q === targetQ && u.r === targetR && u.s === targetS
       );
