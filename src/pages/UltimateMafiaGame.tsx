@@ -79,6 +79,13 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
   }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications]);
 
+  // Show turn summary when a new report comes in
+  useEffect(() => {
+    if (gameState.turnReport && gameState.turnReport.turn === gameState.turn) {
+      setShowTurnSummary(true);
+    }
+  }, [gameState.turnReport, gameState.turn]);
+
   // Negotiation dialog state
   const [negotiationState, setNegotiationState] = useState<{
     open: boolean;
