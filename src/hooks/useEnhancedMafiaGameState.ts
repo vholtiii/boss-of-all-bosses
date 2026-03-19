@@ -640,15 +640,6 @@ export const useEnhancedMafiaGameState = (
     });
   }, []);
 
-      const newState = {
-        ...prev, deployedUnits: newUnits, hexMap: newHexMap,
-        selectedUnitId: updatedUnit.movesRemaining > 0 ? updatedUnit.id : null,
-        availableMoveHexes: newAvailableMoves,
-      };
-      syncLegacyUnits(newState);
-      return newState;
-    });
-  }, []);
 
   // ============ DEPLOY FROM HQ ============
   const selectHeadquarters = useCallback((family: string) => {}, []);
