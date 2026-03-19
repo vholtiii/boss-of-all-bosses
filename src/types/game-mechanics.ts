@@ -191,6 +191,15 @@ export const CAPO_COST = 1500;
 export const HITMAN_MAINTENANCE_MULTIPLIER = 1.5;
 export const MAX_HITMEN = 3;
 
+// ============ CAPO PROMOTION ============
+export const MAX_CAPOS = 3;
+export const CAPO_PROMOTION_COST = 10000;
+export const CAPO_PROMOTION_REQUIREMENTS = {
+  minVictories: 5,       // survivedConflicts on SoldierStats
+  minLoyalty: 60,         // loyalty on SoldierStats
+  minTraining: 3,        // training on SoldierStats (1-10 scale)
+};
+
 // Hitman promotion requirements
 export const HITMAN_REQUIREMENTS = {
   minStrength: 80,    // maps to training * 10
