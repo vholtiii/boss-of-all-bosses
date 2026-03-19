@@ -220,8 +220,8 @@ const generateHexMap = (radius: number): HexTile[] => {
 const HQ_POSITIONS: Record<string, {q:number;r:number;s:number;district:HexTile['district']}> = {
   gambino:  { q: -5, r:  5, s: 0,  district: 'Little Italy' },
   genovese: { q:  5, r: -5, s: 0,  district: 'Manhattan' },
-  lucchese: { q: -5, r: -2, s: 7,  district: 'Queens' },
-  bonanno:  { q:  5, r:  3, s: -8, district: 'Staten Island' },
+  lucchese: { q: -5, r: -1, s: 6,  district: 'Queens' },
+  bonanno:  { q:  4, r:  2, s: -6, district: 'Staten Island' },
   colombo:  { q:  0, r: -5, s: 5,  district: 'Bronx' },
 };
 
@@ -468,11 +468,12 @@ export const useEnhancedMafiaGameState = (
   const syncLegacyUnits = (state: EnhancedMafiaGameState) => {
     const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'] as const;
     const newUnits: typeof state.units = {};
+    const deployed = state.deployedUnits || [];
     allFamilies.forEach(fam => {
       const hq = state.headquarters[fam];
       newUnits[fam] = {
-        soldiers: state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier').map(u => ({q:u.q,r:u.r,s:u.s,id:u.id})),
-        capos: state.deployedUnits.filter(u => u.family === fam && u.type === 'capo').map(u => ({q:u.q,r:u.r,s:u.s,id:u.id})),
+        soldiers: deployed.filter(u => u.family === fam && u.type === 'soldier').map(u => ({q:u.q,r:u.r,s:u.s,id:u.id})),
+        capos: deployed.filter(u => u.family === fam && u.type === 'capo').map(u => ({q:u.q,r:u.r,s:u.s,id:u.id})),
         boss: { q: hq?.q ?? 0, r: hq?.r ?? 0, s: hq?.s ?? 0, id: `${fam}-boss` },
       };
     });
@@ -745,7 +746,7 @@ export const useEnhancedMafiaGameState = (
       newState.availableDeployHexes = [];
 
       // Reset all player unit moves
-      newState.deployedUnits = newState.deployedUnits.map(u => ({
+      newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
         ...u,
         movesRemaining: u.maxMoves,
       }));
@@ -785,14 +786,15 @@ export const useEnhancedMafiaGameState = (
   // ============ ECONOMY ============
   const processEconomy = (state: EnhancedMafiaGameState) => {
     let income = 0;
-    state.hexMap.forEach(tile => {
+    const units = state.deployedUnits || [];
+    (state.hexMap || []).forEach(tile => {
       if (tile.controllingFamily === state.playerFamily && tile.business) {
         // Check if a capo is on this hex
-        const hasCapo = state.deployedUnits.some(u => 
+        const hasCapo = units.some(u => 
           u.family === state.playerFamily && u.type === 'capo' &&
           u.q === tile.q && u.r === tile.r && u.s === tile.s
         );
-        const hasSoldier = state.deployedUnits.some(u => 
+        const hasSoldier = units.some(u => 
           u.family === state.playerFamily && u.type === 'soldier' &&
           u.q === tile.q && u.r === tile.r && u.s === tile.s
         );
