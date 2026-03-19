@@ -338,6 +338,18 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
         >
           <Info className="h-4 w-4" />
         </Button>
+        <Button
+          onClick={() => {
+            playSound('notification');
+            endTurn();
+          }}
+          size="sm"
+          className="bg-primary text-primary-foreground font-bold font-playfair hover:bg-primary/90"
+          disabled={gameState.legalStatus.jailTime > 0}
+        >
+          <SkipForward className="h-4 w-4 mr-2" />
+          {gameState.legalStatus.jailTime > 0 ? `JAILED (${gameState.legalStatus.jailTime})` : 'END TURN'}
+        </Button>
       </div>
     </div>
   );
