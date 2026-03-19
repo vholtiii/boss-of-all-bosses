@@ -6,6 +6,7 @@ import { ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
+import { ScoutedHex, Safehouse } from '@/types/game-mechanics';
 
 interface EnhancedMafiaHexGridProps {
   width: number;
