@@ -46,13 +46,24 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   onSelectUnitFromHeadquarters, onDeployUnit
 }) => {
   const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canNegotiate: boolean; negotiateCapoId?: string } | null>(null);
   const didPanRef = React.useRef(false);
+  const panRef = React.useRef({ x: 0, y: 0 });
+  const isPanningRef = React.useRef(false);
+  const panStartRef = React.useRef({ x: 0, y: 0 });
+  const transformGroupRef = React.useRef<SVGGElement>(null);
+  const zoomRef = React.useRef(zoom);
+  zoomRef.current = zoom;
+
+  const updateTransform = useCallback(() => {
+    if (transformGroupRef.current) {
+      const p = panRef.current;
+      const z = zoomRef.current;
+      transformGroupRef.current.setAttribute('transform', `translate(${p.x / z}, ${p.y / z}) scale(${z})`);
+    }
+  }, []);
 
   // Clear action menu when phase changes
   const turnPhaseRef = gameState?.turnPhase;
@@ -77,18 +88,31 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return map;
   }, [deployedUnits]);
 
-  // Mouse wheel zoom
+  // Mouse wheel zoom — debounced with requestAnimationFrame
   useEffect(() => {
     const container = document.getElementById('hex-grid-container');
     if (!container) return;
+    let rafId: number | null = null;
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const delta = e.deltaY > 0 ? -0.08 : 0.08;
-      setZoom(prev => Math.min(Math.max(prev + delta, 0.3), 2.5));
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        const delta = e.deltaY > 0 ? -0.06 : 0.06;
+        setZoom(prev => {
+          const next = Math.min(Math.max(prev + delta, 0.3), 2.5);
+          zoomRef.current = next;
+          updateTransform();
+          return next;
+        });
+        rafId = null;
+      });
     };
     container.addEventListener('wheel', handleWheel, { passive: false });
-    return () => container.removeEventListener('wheel', handleWheel);
-  }, []);
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [updateTransform]);
 
   // Keyboard zoom shortcuts
   useEffect(() => {
@@ -105,27 +129,47 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Pan handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    setIsPanning(true);
-    didPanRef.current = false;
-    setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-  }, [pan]);
+  // Sync zoom state to DOM transform
+  useEffect(() => { updateTransform(); }, [zoom, updateTransform]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isPanning) return;
-    const dx = e.clientX - panStart.x;
-    const dy = e.clientY - panStart.y;
-    if (Math.abs(dx - pan.x) > 3 || Math.abs(dy - pan.y) > 3) {
-      didPanRef.current = true;
-    }
-    setPan({ x: dx, y: dy });
-  }, [isPanning, panStart, pan]);
+  // Pan via native DOM events + refs (no React re-renders during drag)
+  useEffect(() => {
+    const container = document.getElementById('hex-grid-container');
+    if (!container) return;
 
-  const handleMouseUp = useCallback(() => {
-    setIsPanning(false);
-  }, []);
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      isPanningRef.current = true;
+      didPanRef.current = false;
+      panStartRef.current = { x: e.clientX - panRef.current.x, y: e.clientY - panRef.current.y };
+      container.style.cursor = 'grabbing';
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isPanningRef.current) return;
+      const nx = e.clientX - panStartRef.current.x;
+      const ny = e.clientY - panStartRef.current.y;
+      if (Math.abs(nx - panRef.current.x) > 3 || Math.abs(ny - panRef.current.y) > 3) {
+        didPanRef.current = true;
+      }
+      panRef.current = { x: nx, y: ny };
+      updateTransform();
+    };
+
+    const onMouseUp = () => {
+      isPanningRef.current = false;
+      container.style.cursor = 'grab';
+    };
+
+    container.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      container.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [updateTransform]);
 
   const getHexPosition = (q: number, r: number) => ({
     x: hexWidth * (3/4) * q,
