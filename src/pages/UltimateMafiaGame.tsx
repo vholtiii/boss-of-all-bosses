@@ -17,17 +17,14 @@ import FamilySelectionScreen from '@/components/FamilySelectionScreen';
 import { Button } from '@/components/ui/button';
 import { 
   Play, 
-  Settings, 
-  Trophy, 
   Info, 
-  Calendar,
   Users,
   DollarSign,
   Shield,
   Brain,
   Target,
-  Cloud,
-  Zap,
+  Swords,
+  Eye,
   SkipForward
 } from 'lucide-react';
 
