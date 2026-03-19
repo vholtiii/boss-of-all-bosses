@@ -406,8 +406,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   <polygon
                     points={getHexPoints(x, y, baseHexRadius)}
                     fill={getHexColor(tile)}
-                    stroke={tile.isHeadquarters ? '#D4AF37' : isPlayerTerritory ? '#D4AF3780' : '#333333'}
-                    strokeWidth={tile.isHeadquarters ? 3 : isPlayerTerritory ? 2 : 1}
+                    stroke={getHexStroke(tile)}
+                    strokeWidth={getHexStrokeWidth(tile)}
                     opacity={getHexOpacity(tile)}
                     className="cursor-pointer transition-all duration-150"
                     onClick={() => handleHexClick(tile)}
