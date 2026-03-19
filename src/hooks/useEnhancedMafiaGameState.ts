@@ -184,14 +184,14 @@ const generateHexMap = (radius: number): HexTile[] => {
   const tiles: HexTile[] = [];
   
   const getDistrict = (q: number, r: number): HexTile['district'] => {
-    if (q <= -3 && r >= 2) return 'Little Italy';
-    if (q >= 2 && r <= -3) return 'Manhattan';
-    if (q >= 2 && r >= 2) return 'Staten Island';
-    if (q <= -3 && r <= -3) return 'Queens';
-    if (r >= 2) return 'Brooklyn';
-    if (r <= -3) return 'Bronx';
-    if (q >= 2) return 'Manhattan';
-    if (q <= -3) return 'Queens';
+    if (q <= -4 && r >= 3) return 'Little Italy';
+    if (q >= 3 && r <= -4) return 'Manhattan';
+    if (q >= 3 && r >= 3) return 'Staten Island';
+    if (q <= -4 && r <= -4) return 'Queens';
+    if (r >= 3) return 'Brooklyn';
+    if (r <= -4) return 'Bronx';
+    if (q >= 3) return 'Manhattan';
+    if (q <= -4) return 'Queens';
     return 'Brooklyn';
   };
 
@@ -229,11 +229,11 @@ const generateHexMap = (radius: number): HexTile[] => {
 };
 
 const HQ_POSITIONS: Record<string, {q:number;r:number;s:number;district:HexTile['district']}> = {
-  gambino:  { q: -5, r:  5, s: 0,  district: 'Little Italy' },
-  genovese: { q:  5, r: -5, s: 0,  district: 'Manhattan' },
-  lucchese: { q: -5, r: -1, s: 6,  district: 'Queens' },
-  bonanno:  { q:  4, r:  2, s: -6, district: 'Staten Island' },
-  colombo:  { q:  0, r: -5, s: 5,  district: 'Bronx' },
+  gambino:  { q: -8, r:  8, s: 0,  district: 'Little Italy' },
+  genovese: { q:  8, r: -8, s: 0,  district: 'Manhattan' },
+  lucchese: { q: -8, r: -1, s: 9,  district: 'Queens' },
+  bonanno:  { q:  7, r:  3, s: -10, district: 'Staten Island' },
+  colombo:  { q:  0, r: -9, s: 9,  district: 'Bronx' },
 };
 
 // ============ INITIAL STATE ============
@@ -241,7 +241,7 @@ const createInitialGameState = (
   family: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo' = 'gambino',
   startingResources?: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number }
 ): EnhancedMafiaGameState => {
-  const mapRadius = 6;
+  const mapRadius = 10;
   let hexMap = generateHexMap(mapRadius);
 
   const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'] as const;

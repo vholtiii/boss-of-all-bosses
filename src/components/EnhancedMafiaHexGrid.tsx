@@ -54,7 +54,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const turnPhaseRef = gameState?.turnPhase;
   useEffect(() => { setActionMenu(null); }, [turnPhaseRef]);
 
-  const baseHexRadius = 35;
+  const baseHexRadius = 22;
   const hexWidth = baseHexRadius * 2;
   const hexHeight = Math.sqrt(3) * baseHexRadius;
 
@@ -78,8 +78,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey) {
         switch (event.key) {
-          case '=': case '+': event.preventDefault(); setZoom(prev => Math.min(prev + 0.1, 2)); break;
-          case '-': event.preventDefault(); setZoom(prev => Math.max(prev - 0.1, 0.5)); break;
+          case '=': case '+': event.preventDefault(); setZoom(prev => Math.min(prev + 0.1, 2.5)); break;
+          case '-': event.preventDefault(); setZoom(prev => Math.max(prev - 0.1, 0.3)); break;
           case '0': event.preventDefault(); setZoom(1); break;
         }
       }
@@ -254,7 +254,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           <Button variant="outline" size="sm" onClick={() => setZoom(z => Math.min(z + 0.15, 2.5))} className="h-8 w-8 p-0">
             <ZoomIn className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setZoom(z => Math.max(z - 0.15, 0.4))} className="h-8 w-8 p-0">
+          <Button variant="outline" size="sm" onClick={() => setZoom(z => Math.max(z - 0.15, 0.3))} className="h-8 w-8 p-0">
             <ZoomOut className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="sm" onClick={() => setZoom(1)} className="h-8 w-8 p-0">
@@ -448,6 +448,42 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 </g>
               );
             })}
+
+            {/* District name labels */}
+            {(() => {
+              const districts = ['Little Italy', 'Bronx', 'Brooklyn', 'Queens', 'Manhattan', 'Staten Island'] as const;
+              return districts.map(district => {
+                const tilesInDistrict = hexMap.filter(t => t.district === district);
+                if (tilesInDistrict.length === 0) return null;
+                let cx = 0, cy = 0;
+                tilesInDistrict.forEach(t => {
+                  const pos = getHexPosition(t.q, t.r);
+                  cx += pos.x;
+                  cy += pos.y;
+                });
+                cx /= tilesInDistrict.length;
+                cy /= tilesInDistrict.length;
+                return (
+                  <text
+                    key={`district-label-${district}`}
+                    x={cx}
+                    y={cy}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize="18"
+                    fontWeight="800"
+                    fontFamily="'Playfair Display', serif"
+                    fill="white"
+                    fillOpacity="0.18"
+                    letterSpacing="3"
+                    className="pointer-events-none select-none uppercase"
+                  >
+                    {district}
+                  </text>
+                );
+              });
+            })()}
+
             {/* Action context menu on hex */}
             {actionMenu && (() => {
               const { x, y } = getHexPosition(actionMenu.tile.q, actionMenu.tile.r);
