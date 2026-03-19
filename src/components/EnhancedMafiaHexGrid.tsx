@@ -600,8 +600,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             {actionMenu && (() => {
               const { x, y } = getHexPosition(actionMenu.tile.q, actionMenu.tile.r);
               const menuWidth = 140;
-              const buttonCount = [actionMenu.canHit, actionMenu.canExtort, actionMenu.canNegotiate, actionMenu.canSabotage, actionMenu.canSafehouse].filter(Boolean).length;
-              const menuHeight = buttonCount * 32 + 12;
+              const buttonCount = [actionMenu.canHit, actionMenu.canExtort, actionMenu.canClaim, actionMenu.canNegotiate, actionMenu.canSabotage, actionMenu.canSafehouse].filter(Boolean).length;
+              const menuHeight = buttonCount * 32 + 30;
+              const noActions = gameState?.actionsRemaining === 0;
               return (
                 <foreignObject
                   x={x - menuWidth / 2}
@@ -610,7 +611,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   height={menuHeight}
                   className="overflow-visible"
                 >
-                  <div className="flex flex-col gap-1 bg-background/95 backdrop-blur-sm border border-primary/40 rounded-lg p-1.5 shadow-xl">
+                  <div className="text-[9px] font-bold text-center mb-0.5 text-muted-foreground">
+                    ⚔️ {gameState?.actionsRemaining ?? '?'}/{gameState?.maxActions ?? '?'} Actions
+                  </div>
+                  <div className={cn("flex flex-col gap-1 bg-background/95 backdrop-blur-sm border border-primary/40 rounded-lg p-1.5 shadow-xl", noActions && "opacity-50 pointer-events-none")}>
                     {actionMenu.canHit && (
                       <button
                         onClick={(e) => {
