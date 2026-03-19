@@ -365,7 +365,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   )}
 
                   {/* Render units */}
-                  {showSoldiers && unitsHere.length > 0 && (() => {
+                  {showSoldiers && unitsHere.length > 0 && (!tile.isHeadquarters || expandedHQKey === key) && (() => {
                     const turnPhase = gameState?.turnPhase || 'waiting';
                     const selectedUnitId = gameState?.selectedUnitId;
                     // Group by family and type
