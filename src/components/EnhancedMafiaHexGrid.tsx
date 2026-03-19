@@ -448,6 +448,42 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 </g>
               );
             })}
+
+            {/* District name labels */}
+            {(() => {
+              const districts = ['Little Italy', 'Bronx', 'Brooklyn', 'Queens', 'Manhattan', 'Staten Island'] as const;
+              return districts.map(district => {
+                const tilesInDistrict = hexMap.filter(t => t.district === district);
+                if (tilesInDistrict.length === 0) return null;
+                let cx = 0, cy = 0;
+                tilesInDistrict.forEach(t => {
+                  const pos = getHexPosition(t.q, t.r);
+                  cx += pos.x;
+                  cy += pos.y;
+                });
+                cx /= tilesInDistrict.length;
+                cy /= tilesInDistrict.length;
+                return (
+                  <text
+                    key={`district-label-${district}`}
+                    x={cx}
+                    y={cy}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize="18"
+                    fontWeight="800"
+                    fontFamily="'Playfair Display', serif"
+                    fill="white"
+                    fillOpacity="0.18"
+                    letterSpacing="3"
+                    className="pointer-events-none select-none uppercase"
+                  >
+                    {district}
+                  </text>
+                );
+              });
+            })()}
+
             {/* Action context menu on hex */}
             {actionMenu && (() => {
               const { x, y } = getHexPosition(actionMenu.tile.q, actionMenu.tile.r);
