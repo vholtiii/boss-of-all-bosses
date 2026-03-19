@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import ResponsiveLayout, { MobileTabBar, MobileFloatingActionButton } from '@/components/ResponsiveLayout';
 import EnhancedMafiaHexGrid from '@/components/EnhancedMafiaHexGrid';
-import EnhancedGameMechanics from '@/components/EnhancedGameMechanics';
+import { LeftSidePanel, RightSidePanel } from '@/components/GameSidePanels';
 import { useEnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import SaveLoadDialog from '@/components/SaveLoadDialog';
@@ -17,17 +17,14 @@ import FamilySelectionScreen from '@/components/FamilySelectionScreen';
 import { Button } from '@/components/ui/button';
 import { 
   Play, 
-  Settings, 
-  Trophy, 
   Info, 
-  Calendar,
   Users,
   DollarSign,
   Shield,
   Brain,
   Target,
-  Cloud,
-  Zap,
+  Swords,
+  Eye,
   SkipForward
 } from 'lucide-react';
 
@@ -112,19 +109,11 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
             width={12}
             height={12}
             onBusinessClick={(business) => {
-              console.log('🏢 Business clicked:', business);
               selectTerritory({
-                q: business.q,
-                r: business.r,
-                s: business.s,
-                district: business.district,
-                family: business.family,
-                business: {
-                  type: business.businessType as any,
-                  income: business.income
-                }
+                q: business.q, r: business.r, s: business.s,
+                district: business.district, family: business.family,
+                business: { type: business.businessType as any, income: business.income }
               });
-              
               if (business.family === gameState.playerFamily) {
                 notifyTerritoryCaptured(business.district);
               }
@@ -143,41 +132,17 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
       )
     },
     {
-      id: 'mechanics',
-      label: 'Game',
-      icon: <Zap className="h-4 w-4" />,
-      content: (
-        <div className="p-4 h-full overflow-y-auto">
-          <EnhancedGameMechanics 
-            gameState={gameState} 
-            onAction={performAction}
-          />
-        </div>
-      )
+      id: 'actions',
+      label: 'Actions',
+      icon: <Swords className="h-4 w-4" />,
+      content: <LeftSidePanel gameState={gameState} onAction={performAction} />
     },
     {
-      id: 'resources',
-      label: 'Resources',
-      icon: <DollarSign className="h-4 w-4" />,
-      content: (
-        <div className="p-4 space-y-4">
-          <ResourcePanel gameState={gameState} />
-        </div>
-      )
+      id: 'intel',
+      label: 'Intel',
+      icon: <Eye className="h-4 w-4" />,
+      content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} />
     },
-    {
-      id: 'events',
-      label: 'Events',
-      icon: <Calendar className="h-4 w-4" />,
-      content: (
-        <div className="p-4">
-          <EventsPanel 
-            gameState={gameState} 
-            onEventChoice={handleEventChoice}
-          />
-        </div>
-      )
-    }
   ];
 
   if (isWinner) {
@@ -229,53 +194,11 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
   }
 
   const leftSidebar = (
-    <div className="space-y-6 p-4">
-      {/* Family Status */}
-      <div className="bg-gradient-to-br from-noir-dark to-background border border-noir-light rounded-lg p-4">
-        <h3 className="text-lg font-bold text-mafia-gold font-playfair mb-4 flex items-center">
-          <div className="w-3 h-3 bg-mafia-gold rounded-full mr-2" />
-          {gameState.playerFamily.toUpperCase()} FAMILY
-        </h3>
-        <ResourcePanel gameState={gameState} />
-      </div>
-
-      {/* Game Mechanics */}
-      <div className="bg-gradient-to-br from-noir-dark to-background border border-noir-light rounded-lg p-4">
-        <h3 className="text-lg font-bold text-mafia-gold font-playfair mb-4 flex items-center">
-          <div className="w-3 h-3 bg-blue-500 rounded-full mr-2" />
-          Game Mechanics
-        </h3>
-        <EnhancedGameMechanics 
-          gameState={gameState} 
-          onAction={performAction}
-        />
-      </div>
-    </div>
+    <LeftSidePanel gameState={gameState} onAction={performAction} />
   );
 
   const rightSidebar = (
-    <div className="space-y-6 p-4">
-      {/* Events & Intel */}
-      <div className="bg-gradient-to-br from-noir-dark to-background border border-noir-light rounded-lg p-4">
-        <h3 className="text-lg font-bold text-mafia-gold font-playfair mb-4 flex items-center">
-          <div className="w-3 h-3 bg-destructive rounded-full mr-2" />
-          Events & Intel
-        </h3>
-        <EventsPanel 
-          gameState={gameState} 
-          onEventChoice={handleEventChoice}
-        />
-      </div>
-      
-      {/* AI Opponents */}
-      <div className="bg-gradient-to-br from-noir-dark to-background border border-noir-light rounded-lg p-4">
-        <h3 className="text-lg font-bold text-mafia-gold font-playfair mb-4 flex items-center">
-          <div className="w-3 h-3 bg-red-500 rounded-full mr-2" />
-          AI Opponents
-        </h3>
-        <AIOpponentsPanel gameState={gameState} />
-      </div>
-    </div>
+    <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} />
   );
 
   const topBar = (
@@ -529,116 +452,7 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
   );
 };
 
-// Resource Panel Component
-const ResourcePanel: React.FC<{ gameState: any }> = ({ gameState }) => {
-  const { resources } = gameState;
 
-  return (
-    <div className="space-y-4">
-      {/* Primary Resources */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center">
-          <DollarSign className="h-5 w-5 mx-auto mb-2 text-green-400" />
-          <div className="text-lg font-bold text-green-400">${resources.money.toLocaleString()}</div>
-          <div className="text-xs text-muted-foreground">Money</div>
-        </div>
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-center">
-          <Users className="h-5 w-5 mx-auto mb-2 text-red-400" />
-          <div className="text-lg font-bold text-red-400">{resources.soldiers}</div>
-          <div className="text-xs text-muted-foreground">Soldiers</div>
-        </div>
-      </div>
-      
-      {/* Secondary Resources */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-center">
-          <Shield className="h-5 w-5 mx-auto mb-2 text-blue-400" />
-          <div className="text-lg font-bold text-blue-400">{resources.respect}%</div>
-          <div className="text-xs text-muted-foreground">Respect</div>
-        </div>
-        <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 text-center">
-          <Brain className="h-5 w-5 mx-auto mb-2 text-purple-400" />
-          <div className="text-lg font-bold text-purple-400">{resources.researchPoints}</div>
-          <div className="text-xs text-muted-foreground">Research</div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Events Panel Component
-const EventsPanel: React.FC<{ gameState: any; onEventChoice: (eventId: string, choiceId: string) => void }> = ({ 
-  gameState, 
-  onEventChoice 
-}) => {
-  const { events } = gameState;
-
-  return (
-    <div className="space-y-4">
-      {events.length > 0 ? (
-        <div>
-          <h4 className="font-semibold text-sm mb-2">Active Events</h4>
-          <div className="space-y-2">
-            {events.slice(0, 3).map((event: any, index: number) => (
-              <motion.div
-                key={event.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="p-3 border border-border rounded-lg bg-card"
-              >
-                <p className="font-medium text-sm text-foreground">{event.title}</p>
-                <p className="text-xs text-muted-foreground mt-1">{event.description}</p>
-                <div className="flex gap-1 mt-2 flex-wrap">
-                  {event.choices.map((choice: any) => (
-                    <button
-                      key={choice.id}
-                      onClick={() => onEventChoice(event.id, choice.id)}
-                      className="text-xs px-2 py-1 bg-primary text-primary-foreground rounded hover:bg-primary/80 transition-colors"
-                    >
-                      {choice.text}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <p className="text-xs text-muted-foreground italic">No active events. End your turn to see what happens on the streets.</p>
-      )}
-    </div>
-  );
-};
-
-// AI Opponents Panel Component
-const AIOpponentsPanel: React.FC<{ gameState: any }> = ({ gameState }) => {
-  const { aiOpponents } = gameState;
-
-  return (
-    <div className="space-y-2">
-      {aiOpponents.slice(0, 3).map((opponent: any, index: number) => (
-        <motion.div
-          key={opponent.family}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.1 }}
-          className="p-2 border rounded"
-        >
-          <div className="flex justify-between items-center mb-1">
-            <span className="font-medium text-sm capitalize">{opponent.family}</span>
-            <Badge variant="outline" className="text-xs">{opponent.personality}</Badge>
-          </div>
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>${opponent.resources.money.toLocaleString()}</span>
-            <span>{opponent.resources.soldiers} soldiers</span>
-            <span>{opponent.resources.influence} influence</span>
-          </div>
-        </motion.div>
-      ))}
-    </div>
-  );
-};
 
 const UltimateMafiaGame: React.FC = () => {
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
