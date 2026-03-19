@@ -1288,6 +1288,10 @@ export const useEnhancedMafiaGameState = (
           return processTerritoryHit(newState, action);
         case 'extort_territory':
           return processTerritoryExtortion(newState, action);
+        case 'sabotage_hex':
+          return processSabotageHex(newState, action);
+        case 'establish_safehouse':
+          return processEstablishSafehouse(newState, action);
         case 'recruit_soldiers': {
           const cost = Math.floor(SOLDIER_COST * (1 - discount));
           if (newState.resources.money >= cost) {
