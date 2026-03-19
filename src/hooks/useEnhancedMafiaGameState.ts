@@ -716,14 +716,42 @@ export const useEnhancedMafiaGameState = (
           return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
         }
 
-        if (moveAction === 'escort' && unitType === 'soldier') {
+        if (moveAction === 'escort') {
           if (prev.tacticalActionsRemaining <= 0) return prev;
-          // Show hexes containing player's capos that have room for more escorts
-          const capoHexes = prev.deployedUnits
-            .filter(u => u.type === 'capo' && u.family === prev.playerFamily && (u.escortingSoldierIds?.length || 0) < MAX_ESCORT_SOLDIERS)
-            .map(u => ({ q: u.q, r: u.r, s: u.s }));
-          if (capoHexes.length === 0) return prev;
-          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: capoHexes, deployMode: null, availableDeployHexes: [] };
+
+          // If a soldier is already selected and user clicks a capo, trigger the escort directly
+          if (prev.selectedUnitId && unitType === 'capo') {
+            const selectedSoldier = prev.deployedUnits.find(u => u.id === prev.selectedUnitId && u.type === 'soldier');
+            if (selectedSoldier && unit.family === prev.playerFamily && (unit.escortingSoldierIds?.length || 0) < MAX_ESCORT_SOLDIERS) {
+              const newUnits = [...prev.deployedUnits];
+              const soldierIdx = newUnits.findIndex(u => u.id === selectedSoldier.id);
+              if (soldierIdx === -1) return prev;
+              newUnits[soldierIdx] = { ...selectedSoldier, q: unit.q, r: unit.r, s: unit.s, movesRemaining: 0 };
+              const capoIdx = newUnits.findIndex(u => u.id === unit.id);
+              const existingEscorts = unit.escortingSoldierIds || [];
+              newUnits[capoIdx] = { ...unit, escortingSoldierIds: [...existingEscorts, selectedSoldier.id] };
+              return {
+                ...prev, deployedUnits: newUnits,
+                selectedUnitId: null, availableMoveHexes: [],
+                tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
+                pendingNotifications: [...prev.pendingNotifications, {
+                  type: 'info' as const, title: '🚗 Soldier Called to Escort',
+                  message: `A soldier has been called to ${unit.name || 'Capo'}'s location for escort duty.`,
+                }],
+              };
+            }
+            return prev;
+          }
+
+          // First step: select a soldier to show available capo targets
+          if (unitType === 'soldier') {
+            const capoHexes = prev.deployedUnits
+              .filter(u => u.type === 'capo' && u.family === prev.playerFamily && (u.escortingSoldierIds?.length || 0) < MAX_ESCORT_SOLDIERS)
+              .map(u => ({ q: u.q, r: u.r, s: u.s }));
+            if (capoHexes.length === 0) return prev;
+            return { ...prev, selectedUnitId: unit.id, availableMoveHexes: capoHexes, deployMode: null, availableDeployHexes: [] };
+          }
+          return prev;
         }
 
         // No regular movement in tactical phase
