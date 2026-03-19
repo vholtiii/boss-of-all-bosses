@@ -49,6 +49,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canNegotiate: boolean; negotiateCapoId?: string } | null>(null);
+  const [expandedHQKey, setExpandedHQKey] = useState<string | null>(null);
 
   // Clear action menu when phase changes
   const turnPhaseRef = gameState?.turnPhase;
@@ -153,8 +154,14 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       }
     }
 
-    // HQ click — open headquarters panel
+    // HQ click — toggle unit icons and open headquarters panel
     if (tile.isHeadquarters) {
+      const hqKey = `${tile.q},${tile.r},${tile.s}`;
+      if (expandedHQKey === hqKey) {
+        setExpandedHQKey(null);
+      } else {
+        setExpandedHQKey(hqKey);
+      }
       if (onSelectHeadquarters) onSelectHeadquarters(tile.isHeadquarters);
       return;
     }
@@ -358,7 +365,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   )}
 
                   {/* Render units */}
-                  {showSoldiers && unitsHere.length > 0 && (() => {
+                  {showSoldiers && unitsHere.length > 0 && (!tile.isHeadquarters || expandedHQKey === key) && (() => {
                     const turnPhase = gameState?.turnPhase || 'waiting';
                     const selectedUnitId = gameState?.selectedUnitId;
                     // Group by family and type
