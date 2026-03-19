@@ -16,7 +16,8 @@ import {
   SoldierStats, Hitman, BribeContract, BribeTier, VictoryProgress, VictoryType,
   FAMILY_BONUSES, BRIBE_TIERS, DOC_BUSINESS_TYPES,
   SOLDIER_COST, CAPO_COST, HITMAN_MAINTENANCE_MULTIPLIER, MAX_HITMEN, HITMAN_REQUIREMENTS,
-  FamilyBonuses,
+  FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType,
+  NEGOTIATION_TYPES,
 } from '@/types/game-mechanics';
 
 // ============ UNIT TYPES ============
