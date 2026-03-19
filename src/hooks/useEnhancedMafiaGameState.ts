@@ -716,7 +716,18 @@ export const useEnhancedMafiaGameState = (
       let newSoldierStats = { ...prev.soldierStats };
 
       if (unitType === 'soldier') {
-        if (prev.resources.soldiers > 0) {
+        // First try to move a soldier already sitting at HQ
+        const soldierAtHQ = newDeployedUnits.findIndex(u => 
+          u.family === family && u.type === 'soldier' &&
+          u.q === hq.q && u.r === hq.r && u.s === hq.s
+        );
+        if (soldierAtHQ !== -1) {
+          newDeployedUnits[soldierAtHQ] = {
+            ...newDeployedUnits[soldierAtHQ],
+            q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0,
+          };
+        } else if (prev.resources.soldiers > 0) {
+          // Spawn from undeployed reserve pool
           const newId = `${family}-soldier-${Date.now()}-${Math.random().toString(36).substr(2,4)}`;
           newDeployedUnits.push({
             id: newId, type: 'soldier', family: family as any,
@@ -729,15 +740,7 @@ export const useEnhancedMafiaGameState = (
           };
           newResources.soldiers -= 1;
         } else {
-          const soldierAtHQ = newDeployedUnits.findIndex(u => 
-            u.family === family && u.type === 'soldier' &&
-            u.q === hq.q && u.r === hq.r && u.s === hq.s
-          );
-          if (soldierAtHQ === -1) return prev;
-          newDeployedUnits[soldierAtHQ] = {
-            ...newDeployedUnits[soldierAtHQ],
-            q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0,
-          };
+          return prev; // No soldiers available
         }
       } else {
         const capoAtHQ = newDeployedUnits.findIndex(u => 
