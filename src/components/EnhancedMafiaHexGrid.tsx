@@ -141,7 +141,18 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const handleHexClick = (tile: HexTile) => {
     const turnPhase = gameState?.turnPhase || 'waiting';
 
-    // HQ click — always allow viewing, deploy only during deploy phase
+    // During move phase, try selecting units on HQ hex before opening the panel
+    if (tile.isHeadquarters && turnPhase === 'move') {
+      const key = `${tile.q},${tile.r},${tile.s}`;
+      const unitsHere = unitsByHex.get(key) || [];
+      const playerUnit = unitsHere.find(u => u.family === playerFamily && u.movesRemaining > 0);
+      if (playerUnit && onSelectUnit) {
+        onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
+        return;
+      }
+    }
+
+    // HQ click — open headquarters panel
     if (tile.isHeadquarters) {
       if (onSelectHeadquarters) onSelectHeadquarters(tile.isHeadquarters);
       return;
