@@ -1811,5 +1811,8 @@ export const useEnhancedMafiaGameState = (
     deployUnit,
     isWinner,
     clearNotifications,
+    fortifyUnit,
+    setMoveAction,
+    startEscort,
   };
 };
