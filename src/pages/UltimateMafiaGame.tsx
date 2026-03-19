@@ -437,7 +437,7 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
       )} />
       
           <EnhancedMafiaHexGrid 
-            key={`hex-grid-refresh-${Date.now()}`}
+            key="hex-grid-desktop"
             width={12}
             height={12}
             onBusinessClick={(business) => {
