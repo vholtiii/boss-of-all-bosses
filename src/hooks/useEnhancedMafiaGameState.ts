@@ -468,11 +468,12 @@ export const useEnhancedMafiaGameState = (
   const syncLegacyUnits = (state: EnhancedMafiaGameState) => {
     const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'] as const;
     const newUnits: typeof state.units = {};
+    const deployed = state.deployedUnits || [];
     allFamilies.forEach(fam => {
       const hq = state.headquarters[fam];
       newUnits[fam] = {
-        soldiers: state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier').map(u => ({q:u.q,r:u.r,s:u.s,id:u.id})),
-        capos: state.deployedUnits.filter(u => u.family === fam && u.type === 'capo').map(u => ({q:u.q,r:u.r,s:u.s,id:u.id})),
+        soldiers: deployed.filter(u => u.family === fam && u.type === 'soldier').map(u => ({q:u.q,r:u.r,s:u.s,id:u.id})),
+        capos: deployed.filter(u => u.family === fam && u.type === 'capo').map(u => ({q:u.q,r:u.r,s:u.s,id:u.id})),
         boss: { q: hq?.q ?? 0, r: hq?.r ?? 0, s: hq?.s ?? 0, id: `${fam}-boss` },
       };
     });
