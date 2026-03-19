@@ -534,15 +534,19 @@ const CollapsibleSection: React.FC<{
   isOpen: boolean;
   onToggle: () => void;
   children: React.ReactNode;
-}> = ({ title, icon, isOpen, onToggle, children }) => (
-  <div>
+  disabled?: boolean;
+}> = ({ title, icon, isOpen, onToggle, children, disabled }) => (
+  <div className={cn(disabled && 'opacity-40 pointer-events-none')}>
     <button
       onClick={onToggle}
-      className="flex items-center gap-2 w-full text-left text-sm font-semibold text-foreground hover:text-primary transition-colors py-1"
+      disabled={disabled}
+      className="flex items-center gap-2 w-full text-left text-sm font-semibold text-foreground hover:text-primary transition-colors py-1 disabled:cursor-not-allowed"
     >
       {icon}
       <span className="flex-1">{title}</span>
-      {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+      {disabled ? (
+        <span className="text-[9px] text-muted-foreground font-normal">🔒</span>
+      ) : isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
     </button>
     <AnimatePresence>
       {isOpen && (
