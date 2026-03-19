@@ -1129,6 +1129,7 @@ export const useEnhancedMafiaGameState = (
       const hq = state.headquarters[fam];
       if (!hq) return;
 
+      // ── INCOME ──
       let aiIncome = 0;
       state.hexMap.forEach(tile => {
         if (tile.controllingFamily === fam && tile.business) {
@@ -1139,80 +1140,183 @@ export const useEnhancedMafiaGameState = (
           else aiIncome += Math.floor(tile.business.income * 0.1);
         }
       });
+      // Minimum passive income so AI always grows
+      aiIncome = Math.max(aiIncome, 2000 + state.turn * 500);
       opponent.resources.money += aiIncome;
 
-      // AI recruit at new costs
-      if (opponent.resources.money > 5000 && opponent.resources.soldiers < 5) {
-        const recruit = Math.min(2, Math.floor((opponent.resources.money - 3000) / SOLDIER_COST));
-        opponent.resources.soldiers += recruit;
-        opponent.resources.money -= recruit * SOLDIER_COST;
+      // ── RECRUIT ── (always try to recruit up to a scaling cap)
+      const soldierCap = Math.min(8, 3 + Math.floor(state.turn / 2));
+      const currentDeployed = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier').length;
+      const totalSoldiers = opponent.resources.soldiers + currentDeployed;
+      const wantToRecruit = Math.max(0, soldierCap - totalSoldiers);
+      if (wantToRecruit > 0) {
+        const canAfford = Math.floor(opponent.resources.money / SOLDIER_COST);
+        const toRecruit = Math.min(wantToRecruit, canAfford, 3); // max 3 per turn
+        opponent.resources.soldiers += toRecruit;
+        opponent.resources.money -= toRecruit * SOLDIER_COST;
       }
 
-      // AI deploy
-      if (opponent.resources.soldiers > 0 && Math.random() < 0.6) {
-        const neighbors = getHexNeighbors(hq.q, hq.r, hq.s);
-        const validTargets = neighbors.filter(n => state.hexMap.some(t => t.q === n.q && t.r === n.r && t.s === n.s));
-        if (validTargets.length > 0) {
-          const target = validTargets[Math.floor(Math.random() * validTargets.length)];
-          const newId = `${fam}-soldier-${Date.now()}-${Math.random().toString(36).substr(2,4)}`;
-          state.deployedUnits.push({
-            id: newId, type: 'soldier', family: fam,
-            q: target.q, r: target.r, s: target.s,
-            movesRemaining: 2, maxMoves: 2, level: 1,
+      // ── DEPLOY ── (deploy ALL available soldiers from pool)
+      let soldiersToPlace = opponent.resources.soldiers;
+      while (soldiersToPlace > 0) {
+        // Find valid hexes: HQ neighbors first, then neighbors of existing units
+        const aiUnitPositions = state.deployedUnits
+          .filter(u => u.family === fam)
+          .map(u => ({ q: u.q, r: u.r, s: u.s }));
+        const spawnPoints = [{ q: hq.q, r: hq.r, s: hq.s }, ...aiUnitPositions];
+        
+        let placed = false;
+        for (const sp of spawnPoints) {
+          const neighbors = getHexNeighbors(sp.q, sp.r, sp.s);
+          const validTargets = neighbors.filter(n => {
+            const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+            if (!tile || tile.isHeadquarters) return false;
+            // Prefer neutral or own territory, avoid stacking too many
+            const unitsHere = state.deployedUnits.filter(u => u.q === n.q && u.r === n.r && u.s === n.s);
+            return unitsHere.length < 2;
           });
-          state.soldierStats[newId] = {
-            loyalty: 40 + Math.floor(Math.random() * 30), training: 2 + Math.floor(Math.random() * 3),
-            equipment: 2, hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
-          };
-          opponent.resources.soldiers -= 1;
-
-          const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
-          if (tile && tile.controllingFamily === 'neutral' && !tile.isHeadquarters) {
-            tile.controllingFamily = fam;
+          if (validTargets.length > 0) {
+            const target = validTargets[Math.floor(Math.random() * validTargets.length)];
+            const newId = `${fam}-soldier-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+            state.deployedUnits.push({
+              id: newId, type: 'soldier', family: fam,
+              q: target.q, r: target.r, s: target.s,
+              movesRemaining: 2, maxMoves: 2, level: 1,
+            });
+            state.soldierStats[newId] = {
+              loyalty: 40 + Math.floor(Math.random() * 30), training: 2 + Math.floor(Math.random() * 3),
+              equipment: 2, hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+            };
+            const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
+            if (tile && (tile.controllingFamily === 'neutral' || tile.controllingFamily === fam) && !tile.isHeadquarters) {
+              tile.controllingFamily = fam;
+            }
+            soldiersToPlace--;
+            placed = true;
+            break; // one per spawn point cycle
           }
         }
+        if (!placed) break; // no valid spots
       }
+      opponent.resources.soldiers = soldiersToPlace; // leftover
 
-      // AI move existing units
+      // ── MOVE ALL UNITS ── (each unit tries to move)
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
-      if (aiUnits.length > 0 && Math.random() < 0.4) {
-        const unit = aiUnits[Math.floor(Math.random() * aiUnits.length)];
-        const neighbors = unit.type === 'soldier' 
-          ? getHexNeighbors(unit.q, unit.r, unit.s)
-          : getHexesInRange(unit.q, unit.r, unit.s, 3);
-        const validMoves = neighbors.filter(n => {
-          const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
-          return tile && !tile.isHeadquarters;
-        });
-        if (validMoves.length > 0) {
-          const preferred = validMoves.filter(n => {
+      for (const unit of aiUnits) {
+        // Each unit gets up to 2 move attempts
+        let movesLeft = Math.min(unit.movesRemaining, unit.type === 'soldier' ? 2 : 3);
+        while (movesLeft > 0) {
+          const neighbors = unit.type === 'soldier'
+            ? getHexNeighbors(unit.q, unit.r, unit.s)
+            : getHexesInRange(unit.q, unit.r, unit.s, Math.min(3, movesLeft));
+          const validMoves = neighbors.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
-            return tile && tile.controllingFamily !== fam;
+            return tile && !tile.isHeadquarters;
           });
-          const target = (preferred.length > 0 ? preferred : validMoves)[Math.floor(Math.random() * (preferred.length > 0 ? preferred.length : validMoves.length))];
+          if (validMoves.length === 0) break;
+
+          // Prioritize: 1) player territory, 2) neutral territory, 3) expand away from HQ
+          const playerHexes = validMoves.filter(n => {
+            const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+            return tile && tile.controllingFamily === state.playerFamily;
+          });
+          const neutralHexes = validMoves.filter(n => {
+            const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+            return tile && tile.controllingFamily === 'neutral';
+          });
+          const enemyHexes = validMoves.filter(n => {
+            const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+            return tile && tile.controllingFamily !== fam && tile.controllingFamily !== 'neutral';
+          });
+
+          let targetPool = playerHexes.length > 0 ? playerHexes
+            : enemyHexes.length > 0 ? enemyHexes
+            : neutralHexes.length > 0 ? neutralHexes
+            : validMoves;
+          
+          // 30% chance to just expand to neutral instead of attacking (variety)
+          if (neutralHexes.length > 0 && Math.random() < 0.3) {
+            targetPool = neutralHexes;
+          }
+
+          const target = targetPool[Math.floor(Math.random() * targetPool.length)];
           unit.q = target.q;
           unit.r = target.r;
           unit.s = target.s;
           unit.movesRemaining -= 1;
-          
+          movesLeft--;
+
           const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
           if (tile && !tile.isHeadquarters) {
-            const playerUnitsHere = state.deployedUnits.filter(u => 
-              u.family === state.playerFamily && u.q === target.q && u.r === target.r && u.s === target.s
+            // Combat: check for enemy units on this hex
+            const enemyUnitsHere = state.deployedUnits.filter(u =>
+              u.family !== fam && u.q === target.q && u.r === target.r && u.s === target.s
             );
-            if (playerUnitsHere.length > 0) {
+            if (enemyUnitsHere.length > 0) {
               const aiStrength = state.deployedUnits.filter(u => u.family === fam && u.q === target.q && u.r === target.r && u.s === target.s).length;
-              if (aiStrength > playerUnitsHere.length && Math.random() < 0.6) {
-                playerUnitsHere.forEach(pu => {
-                  const idx = state.deployedUnits.indexOf(pu);
-                  if (idx !== -1) state.deployedUnits.splice(idx, 1);
+              // Combat resolution — attacker advantage
+              if (aiStrength >= enemyUnitsHere.length || Math.random() < 0.4) {
+                // Remove enemy units (with some surviving based on luck)
+                enemyUnitsHere.forEach(eu => {
+                  if (Math.random() < 0.7) { // 70% chance to eliminate each enemy
+                    const idx = state.deployedUnits.indexOf(eu);
+                    if (idx !== -1) state.deployedUnits.splice(idx, 1);
+                  }
                 });
+                // Check if we cleared the hex
+                const remainingEnemies = state.deployedUnits.filter(u =>
+                  u.family !== fam && u.q === target.q && u.r === target.r && u.s === target.s
+                );
+                if (remainingEnemies.length === 0) {
+                  tile.controllingFamily = fam;
+                }
+                // AI may also lose units
+                if (Math.random() < 0.3) {
+                  const aiHere = state.deployedUnits.filter(u => u.family === fam && u.q === target.q && u.r === target.r && u.s === target.s);
+                  if (aiHere.length > 1) {
+                    const casualty = aiHere[Math.floor(Math.random() * aiHere.length)];
+                    const idx = state.deployedUnits.indexOf(casualty);
+                    if (idx !== -1) state.deployedUnits.splice(idx, 1);
+                  }
+                }
+                // Notify player if their units were attacked
+                if (enemyUnitsHere.some(u => u.family === state.playerFamily)) {
+                  state.pendingNotifications.push({
+                    type: 'warning' as const,
+                    title: `⚔️ ${fam.charAt(0).toUpperCase() + fam.slice(1)} Attack!`,
+                    message: `The ${fam} family attacked your units in ${tile.district || 'unknown territory'}!`,
+                  });
+                }
+              }
+              break; // Stop moving after combat
+            } else {
+              // Claim empty territory
+              if (tile.controllingFamily !== fam) {
                 tile.controllingFamily = fam;
               }
-            } else {
-              tile.controllingFamily = fam;
             }
           }
+        }
+      }
+
+      // ── DEPLOY CAPO ── (if capo is still at HQ, move it out)
+      const caposAtHQ = state.deployedUnits.filter(u =>
+        u.family === fam && u.type === 'capo' && u.q === hq.q && u.r === hq.r && u.s === hq.s
+      );
+      if (caposAtHQ.length > 0) {
+        const capo = caposAtHQ[0];
+        // Move capo to a controlled territory with a business
+        const valuableTiles = state.hexMap.filter(t =>
+          t.controllingFamily === fam && t.business && !t.isHeadquarters &&
+          !state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
+        );
+        if (valuableTiles.length > 0) {
+          valuableTiles.sort((a, b) => (b.business?.income || 0) - (a.business?.income || 0));
+          const bestTile = valuableTiles[0];
+          capo.q = bestTile.q;
+          capo.r = bestTile.r;
+          capo.s = bestTile.s;
+          capo.movesRemaining = 0;
         }
       }
     });
