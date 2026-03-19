@@ -179,6 +179,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   };
 
   const handleHexClick = (tile: HexTile) => {
+    if (didPanRef.current) return; // ignore clicks after dragging
     const turnPhase = gameState?.turnPhase || 'waiting';
 
     // During move phase, try selecting units on HQ hex before opening the panel
