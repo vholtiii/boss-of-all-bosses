@@ -1164,7 +1164,7 @@ export const useEnhancedMafiaGameState = (
 
       // Clear fortified status and escort, reset moves
       newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
-        ...u, movesRemaining: u.maxMoves, fortified: false, escortingSoldierIds: undefined,
+        ...u, movesRemaining: u.maxMoves, escortingSoldierIds: undefined,
       }));
 
       // Tick scouted hexes
