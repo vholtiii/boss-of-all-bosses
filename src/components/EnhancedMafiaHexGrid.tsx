@@ -50,10 +50,26 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; negotiateCapoId?: string } | null>(null);
   const [expandedHQKey, setExpandedHQKey] = useState<string | null>(null);
+  const [combatOverlay, setCombatOverlay] = useState<{
+    q: number; r: number; s: number;
+    success: boolean; type: string;
+    title: string; details: string;
+    timestamp: number;
+  } | null>(null);
 
   // Clear action menu when phase changes
   const turnPhaseRef = gameState?.turnPhase;
   useEffect(() => { setActionMenu(null); }, [turnPhaseRef]);
+
+  // Show combat result overlay when lastCombatResult changes
+  const lastCombatResult = gameState?.lastCombatResult;
+  useEffect(() => {
+    if (lastCombatResult && lastCombatResult.timestamp) {
+      setCombatOverlay(lastCombatResult);
+      const timer = setTimeout(() => setCombatOverlay(null), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [lastCombatResult?.timestamp]);
 
   const baseHexRadius = 22;
   const hexWidth = baseHexRadius * 2;
