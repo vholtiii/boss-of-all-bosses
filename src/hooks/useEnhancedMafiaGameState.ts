@@ -706,6 +706,9 @@ export const useEnhancedMafiaGameState = (
   const moveUnit = useCallback((targetLocation: { q: number; r: number; s: number }) => {
     setGameState(prev => {
       if (prev.turnPhase !== 'move' && prev.turnPhase !== 'deploy') return prev;
+      // In tactical phase, only allow tactical actions — not regular movement
+      const moveActionCheck = prev.selectedMoveAction || 'move';
+      if (prev.turnPhase === 'move' && moveActionCheck === 'move') return prev;
       if (!prev.selectedUnitId) return prev;
       const unitIdx = prev.deployedUnits.findIndex(u => u.id === prev.selectedUnitId);
       if (unitIdx === -1) return prev;
