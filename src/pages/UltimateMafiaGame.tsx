@@ -13,6 +13,7 @@ import { useSoundSystem } from '@/hooks/useSoundSystem';
 import SaveLoadDialog from '@/components/SaveLoadDialog';
 import TutorialSystem from '@/components/TutorialSystem';
 import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
+import FamilySelectionScreen from '@/components/FamilySelectionScreen';
 import { Button } from '@/components/ui/button';
 import { 
   Play, 
@@ -26,10 +27,18 @@ import {
   Brain,
   Target,
   Cloud,
-  Zap
+  Zap,
+  SkipForward
 } from 'lucide-react';
 
-const GameContent: React.FC = () => {
+type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
+
+interface GameConfig {
+  family: FamilyId;
+  resources: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number };
+}
+
+const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
   const {
     gameState,
     endTurn,
@@ -46,7 +55,7 @@ const GameContent: React.FC = () => {
     selectUnitFromHeadquarters,
     deployUnit,
     isWinner
-  } = useEnhancedMafiaGameState();
+  } = useEnhancedMafiaGameState(config.family, config.resources);
 
   // Handle action wrapper function
   const handleAction = useCallback((action: any) => {
