@@ -105,6 +105,28 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Pan handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    setIsPanning(true);
+    didPanRef.current = false;
+    setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  }, [pan]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning) return;
+    const dx = e.clientX - panStart.x;
+    const dy = e.clientY - panStart.y;
+    if (Math.abs(dx - pan.x) > 3 || Math.abs(dy - pan.y) > 3) {
+      didPanRef.current = true;
+    }
+    setPan({ x: dx, y: dy });
+  }, [isPanning, panStart, pan]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
+  }, []);
+
   const getHexPosition = (q: number, r: number) => ({
     x: hexWidth * (3/4) * q,
     y: hexHeight * (r + q/2),
