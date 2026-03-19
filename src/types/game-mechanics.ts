@@ -197,3 +197,31 @@ export const HITMAN_REQUIREMENTS = {
   minReputation: 50,  // maps to loyalty
   minHits: 3,
 };
+
+// ============ MOVE PHASE TYPES ============
+export interface ScoutedHex {
+  q: number;
+  r: number;
+  s: number;
+  scoutedTurn: number;
+  turnsRemaining: number;
+  enemySoldierCount: number;
+  enemyFamily: string;
+  businessType?: string;
+  businessIncome?: number;
+}
+
+export interface Safehouse {
+  q: number;
+  r: number;
+  s: number;
+  turnsRemaining: number;
+  createdTurn: number;
+}
+
+export type MoveAction = 'move' | 'scout' | 'fortify' | 'escort' | 'safehouse';
+
+export const FORTIFY_DEFENSE_BONUS = 25; // +25% defense
+export const SCOUT_DURATION = 3; // turns
+export const SAFEHOUSE_DURATION = 2; // turns
+export const MAX_ESCORT_SOLDIERS = 2;

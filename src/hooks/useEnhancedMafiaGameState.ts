@@ -18,6 +18,8 @@ import {
   SOLDIER_COST, CAPO_COST, HITMAN_MAINTENANCE_MULTIPLIER, MAX_HITMEN, HITMAN_REQUIREMENTS,
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType,
   NEGOTIATION_TYPES,
+  ScoutedHex, Safehouse, MoveAction,
+  FORTIFY_DEFENSE_BONUS, SCOUT_DURATION, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
 } from '@/types/game-mechanics';
 
 // ============ UNIT TYPES ============
