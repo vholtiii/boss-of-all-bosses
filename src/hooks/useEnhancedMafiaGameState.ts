@@ -35,7 +35,7 @@ export interface EnhancedMafiaGameState {
   economy: EconomySystem;
   aiOpponents: AIOpponent[];
   events: GameEvent[];
-  missions: Mission[];
+  missions?: never[]; // deprecated
   weather: WeatherSystem;
   technology: TechnologySystem;
   seasonalEvents: SeasonalEvent[];
