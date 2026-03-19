@@ -1,33 +1,31 @@
 
 
-# Refine Scout Mechanic
+# Refine Fortify Mechanic
 
-## Current State
-- Scout only works on **enemy** hexes (line 704 filters out `neutral`)
-- Scout reveals: enemy unit count, enemy family, business type, business income
-- Scouted info is stored but **never used** by Hit logic — no intelligence bonus
-- Duration: 3 turns
+## Current State (from code audit)
+- **Defense bonus**: +25% applied in `processTerritoryHit` — working correctly
+- **Resets every turn**: Line 1166-1168 clears `fortified: false` on all units at turn start — **needs to change per user request**
+- **Casualty reduction**: Not implemented — fortify only affects hit success chance, not casualties
+- **Visual indicator**: Shield icon (🛡️) is rendered for ALL fortified units regardless of family — needs to be player-only
 
 ## Changes
 
-### 1. Allow scouting neutral hexes
-**File**: `src/hooks/useEnhancedMafiaGameState.ts` (line 704)
-Change the filter from `!== 'neutral' && !== playerFamily` to just `!== playerFamily`. This lets soldiers scout neutral hexes to reveal business profits before committing to a Claim or Extort.
+### 1. Fortify persists across turns (does NOT reset)
+**File**: `src/hooks/useEnhancedMafiaGameState.ts` (~line 1167)
+Remove `fortified: false` from the turn-reset mapping. Fortified status will persist until the unit **moves** (already handled — line 789 sets `fortified: false` on move). This means a unit stays fortified as long as it holds position.
 
-Update the notification message to handle neutral hex output (no enemy units, just business info).
+### 2. Fortified units reduce casualty rates
+**File**: `src/hooks/useEnhancedMafiaGameState.ts` (inside `processTerritoryHit`, ~line 2046-2054)
+After the existing fortify defense bonus logic, add casualty reduction: if defending units are fortified, reduce defending casualties by 50% (round down). This makes fortification a meaningful tactical choice for holding key territory.
 
-### 2. Add intelligence bonus to Hit actions (+15% success)
-**File**: `src/hooks/useEnhancedMafiaGameState.ts` (~line 2055, inside `processTerritoryHit`)
-After the family combat bonus line, add a check: if the target hex exists in `state.scoutedHexes`, apply a `+0.15` (15%) bonus to the hit chance. This makes scouting a meaningful tactical investment before attacking.
+Add constant `FORTIFY_CASUALTY_REDUCTION = 50` to `src/types/game-mechanics.ts`.
 
-### 3. Update scout notification for neutral hexes
-**File**: `src/hooks/useEnhancedMafiaGameState.ts` (~line 920, inside `processScout`)
-Adjust the notification message: for neutral hexes, show business info only (no "enemy units" count). For enemy hexes, keep current format.
-
-### Constants
-Add `SCOUT_INTEL_BONUS = 15` to `src/types/game-mechanics.ts` alongside existing constants.
+### 3. Visual indicator only for player's own fortified units
+**File**: `src/components/EnhancedMafiaHexGrid.tsx` (~line 482)
+Add a filter condition: only show the shield icon if the fortified unit's `family === playerFamily`. Enemy fortified units remain hidden on the map — the player must scout to discover them.
 
 ## Files Modified
-- `src/types/game-mechanics.ts` — add `SCOUT_INTEL_BONUS` constant
-- `src/hooks/useEnhancedMafiaGameState.ts` — 3 small edits (filter, hit bonus, notification)
+- `src/types/game-mechanics.ts` — add `FORTIFY_CASUALTY_REDUCTION` constant
+- `src/hooks/useEnhancedMafiaGameState.ts` — remove fortify reset, add casualty reduction
+- `src/components/EnhancedMafiaHexGrid.tsx` — filter shield indicator to player units only
 
