@@ -14,6 +14,7 @@ import { useSoundSystem } from '@/hooks/useSoundSystem';
 import SaveLoadDialog from '@/components/SaveLoadDialog';
 import TutorialSystem from '@/components/TutorialSystem';
 import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
+import TurnSummaryModal from '@/components/TurnSummaryModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
 import { Button } from '@/components/ui/button';
 import { 
