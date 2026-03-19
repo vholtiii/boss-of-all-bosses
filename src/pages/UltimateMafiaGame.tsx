@@ -619,6 +619,13 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         onClose={() => setShowTutorial(false)}
         onComplete={() => setShowTutorial(false)}
       />
+
+      {/* Turn Summary Modal */}
+      <TurnSummaryModal
+        report={gameState.turnReport}
+        open={showTurnSummary}
+        onClose={() => setShowTurnSummary(false)}
+      />
     </>
   );
 };
