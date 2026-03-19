@@ -35,7 +35,7 @@ interface GameConfig {
   resources: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number };
 }
 
-const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
+const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = ({ config, onExitToMenu }) => {
   const {
     gameState,
     endTurn,
