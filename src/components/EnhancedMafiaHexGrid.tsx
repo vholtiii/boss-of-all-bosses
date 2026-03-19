@@ -411,94 +411,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     const isAtHQ = !!tile.isHeadquarters;
                     const isDeployAtHQ = isAtHQ && turnPhase === 'deploy' && tile.isHeadquarters === playerFamily;
 
-                    // For HQ during deploy, render a compact picker by unit type/count
-                    // For normal hexes, use compact layout
+                    // Keep the HQ hex clear during deploy; the picker renders in the outer side panel
                     if (isDeployAtHQ) {
-                      const playerCapos = caposByFamily.get(playerFamily) || [];
-                      const playerSoldiers = soldiersByFamily.get(playerFamily) || [];
-                      const deployableOptions = [
-                        ...(playerCapos.length > 0 ? [{ type: 'capo' as const, units: playerCapos }] : []),
-                        ...(playerSoldiers.length > 0 ? [{ type: 'soldier' as const, units: playerSoldiers }] : []),
-                      ];
-
-                      const pickerWidth = 92;
-                      const pickerHeight = 64;
-                      const pickerY = y + baseHexRadius + 10;
-                      const spacing = 36;
-                      const totalWidth = (deployableOptions.length - 1) * spacing;
-                      const startX = x - totalWidth / 2;
-
-                      elements.push(
-                        <g key={`deploy-picker-bg-${key}`} className="pointer-events-none">
-                          <rect
-                            x={x - pickerWidth / 2}
-                            y={pickerY - 14}
-                            width={pickerWidth}
-                            height={pickerHeight}
-                            rx={12}
-                            fill="rgba(15, 23, 42, 0.88)"
-                            stroke="#D4AF37"
-                            strokeWidth="1.5"
-                          />
-                        </g>
-                      );
-
-                      deployableOptions.forEach((option, idx) => {
-                        const optionX = startX + idx * spacing;
-                        const optionY = pickerY + 10;
-                        const representativeUnit = option.units[0];
-                        const isSelected = option.units.some(unit => unit.id === selectedUnitId);
-
-                        if (option.type === 'capo') {
-                          elements.push(
-                            <CapoIcon
-                              key={`capo-deploy-${key}`}
-                              x={optionX}
-                              y={optionY}
-                              family={playerFamily}
-                              name={representativeUnit.name || 'Capo'}
-                              level={representativeUnit.level}
-                              isPlayerFamily={true}
-                              selected={isSelected}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onSelectUnitFromHeadquarters?.('capo', playerFamily);
-                              }}
-                            />
-                          );
-                        } else {
-                          elements.push(
-                            <SoldierIcon
-                              key={`soldier-deploy-${key}`}
-                              x={optionX}
-                              y={optionY}
-                              family={playerFamily}
-                              count={option.units.length}
-                              isPlayerFamily={true}
-                              selected={isSelected}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onSelectUnitFromHeadquarters?.('soldier', playerFamily);
-                              }}
-                            />
-                          );
-                        }
-                      });
-
-                      elements.push(
-                        <text
-                          key={`deploy-label-${key}`}
-                          x={x}
-                          y={pickerY + 38}
-                          textAnchor="middle"
-                          fontSize="8"
-                          fill="#D4AF37"
-                          fontWeight="bold"
-                          className="pointer-events-none select-none"
-                        >
-                          SELECT A UNIT TO DEPLOY
-                        </text>
-                      );
+                      // Intentionally render nothing here.
                     } else {
                       // Normal compact layout for non-deploy or non-HQ
                       let offsetIdx = 0;
