@@ -639,6 +639,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         💰 Extort
                       </button>
                     )}
+                    {actionMenu.canClaim && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAction) onAction({
+                            type: 'claim_territory',
+                            targetQ: actionMenu.tile.q,
+                            targetR: actionMenu.tile.r,
+                            targetS: actionMenu.tile.s,
+                          });
+                          setActionMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-secondary/90 hover:bg-secondary text-secondary-foreground text-xs font-bold transition-colors"
+                      >
+                        🏴 Claim Territory
+                      </button>
+                    )}
                     {actionMenu.canNegotiate && (
                       <button
                         onClick={(e) => {
