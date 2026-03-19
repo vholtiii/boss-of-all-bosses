@@ -2065,6 +2065,12 @@ export const useEnhancedMafiaGameState = (
       
       // Apply Lucchese hit success bonus
       chance += state.familyBonuses.hitSuccess / 100;
+
+      // Apply scout intelligence bonus
+      const isScouted = state.scoutedHexes.some(s => s.q === targetLocation.q && s.r === targetLocation.r && s.s === targetLocation.s);
+      if (isScouted) {
+        chance += SCOUT_INTEL_BONUS / 100;
+      }
       
       chance = Math.min(0.95, chance);
 
