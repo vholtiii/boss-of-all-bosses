@@ -757,6 +757,8 @@ export const useEnhancedMafiaGameState = (
       const newState = { ...prev };
       newState.turn += 1;
       
+      // Reset to deploy phase for next turn
+      newState.turnPhase = 'deploy';
       newState.movementPhase = false;
       newState.selectedUnitId = null;
       newState.availableMoveHexes = [];
