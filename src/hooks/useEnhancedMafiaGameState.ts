@@ -1481,6 +1481,56 @@ export const useEnhancedMafiaGameState = (
     });
   }, []);
 
+  // ============ SABOTAGE HEX (action phase) ============
+  const processSabotageHex = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
+    const { targetQ, targetR, targetS } = action;
+    const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
+    if (!tile || !tile.business || tile.controllingFamily === state.playerFamily || tile.isHeadquarters) return state;
+
+    // Reduce business income by 40-60%
+    const reduction = 0.4 + Math.random() * 0.2;
+    const oldIncome = tile.business.income;
+    tile.business.income = Math.max(100, Math.floor(oldIncome * (1 - reduction)));
+    tile.business.heatLevel = Math.min(100, tile.business.heatLevel + 20);
+
+    // Increase police heat
+    state.policeHeat.level = Math.min(100, state.policeHeat.level + 10);
+
+    // Damage relationship with owning family
+    if (state.reputation.familyRelationships[tile.controllingFamily] !== undefined) {
+      state.reputation.familyRelationships[tile.controllingFamily] -= 10;
+    }
+
+    state.pendingNotifications = [...state.pendingNotifications, {
+      type: 'success', title: '💣 Sabotage Successful!',
+      message: `${tile.controllingFamily}'s ${tile.business.type} income reduced from $${oldIncome.toLocaleString()} to $${tile.business.income.toLocaleString()}/turn. +10 Heat.`,
+    }];
+
+    syncLegacyUnits(state);
+    updateVictoryProgress(state);
+    return state;
+  };
+
+  // ============ ESTABLISH SAFEHOUSE (action phase) ============
+  const processEstablishSafehouse = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
+    const { targetQ, targetR, targetS } = action;
+    const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
+    if (!tile || tile.controllingFamily !== state.playerFamily || tile.isHeadquarters) return state;
+
+    // Only one safehouse at a time
+    state.safehouse = {
+      q: targetQ, r: targetR, s: targetS,
+      turnsRemaining: SAFEHOUSE_DURATION,
+    };
+
+    state.pendingNotifications = [...state.pendingNotifications, {
+      type: 'success', title: '🏠 Safehouse Established!',
+      message: `New safehouse at ${tile.district}. Acts as secondary deploy point for ${SAFEHOUSE_DURATION} turns.`,
+    }];
+
+    return state;
+  };
+
   // ============ 3-STEP TAKEOVER: HIT ============
   const processTerritoryHit = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
     const targetQ = action.targetQ;
