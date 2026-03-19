@@ -96,6 +96,7 @@ export interface EnhancedMafiaGameState {
   victoryType: VictoryType;
   familyBonuses: FamilyBonuses;
   lastTurnIncome: number;
+  pendingNotifications: Array<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; message?: string }>;
   
   // Enhanced systems
   combat: CombatSystem;
