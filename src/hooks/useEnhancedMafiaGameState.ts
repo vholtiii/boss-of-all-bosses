@@ -774,6 +774,36 @@ export const useEnhancedMafiaGameState = (
         return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
       }
 
+      // Handle escort "call" action (tactical phase only) — teleport soldier to capo's hex
+      if (prev.turnPhase === 'move' && moveAction === 'escort' && unit.type === 'soldier') {
+        if (prev.tacticalActionsRemaining <= 0) return prev;
+        // Find capo at target hex
+        const capo = prev.deployedUnits.find(u => 
+          u.type === 'capo' && u.family === prev.playerFamily &&
+          u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s &&
+          (u.escortingSoldierIds?.length || 0) < MAX_ESCORT_SOLDIERS
+        );
+        if (!capo) return prev;
+        const newUnitsEscort = [...prev.deployedUnits];
+        // Teleport soldier to capo's hex
+        const soldierIdx = newUnitsEscort.findIndex(u => u.id === unit.id);
+        if (soldierIdx === -1) return prev;
+        newUnitsEscort[soldierIdx] = { ...unit, q: capo.q, r: capo.r, s: capo.s, movesRemaining: 0 };
+        // Add soldier to capo's escort list
+        const capoIdx = newUnitsEscort.findIndex(u => u.id === capo.id);
+        const existingEscorts = capo.escortingSoldierIds || [];
+        newUnitsEscort[capoIdx] = { ...capo, escortingSoldierIds: [...existingEscorts, unit.id] };
+        return {
+          ...prev, deployedUnits: newUnitsEscort,
+          selectedUnitId: null, availableMoveHexes: [],
+          tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
+          pendingNotifications: [...prev.pendingNotifications, {
+            type: 'info' as const, title: '🚗 Soldier Called to Escort',
+            message: `A soldier has been called to ${capo.name || 'Capo'}'s location for escort duty.`,
+          }],
+        };
+      }
+
       if (!prev.availableMoveHexes.some(h => h.q === targetLocation.q && h.r === targetLocation.r && h.s === targetLocation.s)) {
         return prev;
       }
