@@ -51,6 +51,8 @@ export interface HexTile {
   isHeadquarters?: string;
 }
 
+export type TurnPhase = 'deploy' | 'move' | 'action' | 'waiting';
+
 export interface EnhancedMafiaGameState {
   playerFamily: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
   turn: number;
@@ -69,8 +71,9 @@ export interface EnhancedMafiaGameState {
   hexMap: HexTile[];
   deployedUnits: DeployedUnit[];
   
-  // Movement UI state
-  movementPhase: boolean;
+  // Phase-based turn system
+  turnPhase: TurnPhase;
+  movementPhase: boolean; // kept for compat — derived from turnPhase
   selectedUnitId: string | null;
   availableMoveHexes: Array<{ q: number; r: number; s: number }>;
   deployMode: { unitType: 'soldier' | 'capo'; family: string } | null;
