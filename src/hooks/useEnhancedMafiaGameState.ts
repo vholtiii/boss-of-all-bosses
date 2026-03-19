@@ -580,8 +580,8 @@ export const useEnhancedMafiaGameState = (
           // Soldiers cannot enter enemy-controlled hexes — must Hit first
           if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) return false;
         } else {
-          // Capos can only move to own territory
-          if (tile.controllingFamily !== prev.playerFamily) return false;
+          // Capos can move to own or enemy territory (for negotiation) but not neutral
+          // Allow enemy territory so capos can negotiate
         }
         return true;
       });
