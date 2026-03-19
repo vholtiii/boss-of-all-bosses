@@ -411,76 +411,92 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     const isAtHQ = !!tile.isHeadquarters;
                     const isDeployAtHQ = isAtHQ && turnPhase === 'deploy' && tile.isHeadquarters === playerFamily;
 
-                    // For HQ during deploy, lay out units in a clear grid around the hex
+                    // For HQ during deploy, render a compact picker by unit type/count
                     // For normal hexes, use compact layout
                     if (isDeployAtHQ) {
-                      // Spread units around the HQ hex in a ring for easy clicking
-                      const allPlayerUnits: { unit: DeployedUnit; type: 'soldier' | 'capo' }[] = [];
-                      caposByFamily.forEach((capos, fam) => {
-                        if (fam === playerFamily) capos.forEach(c => allPlayerUnits.push({ unit: c, type: 'capo' }));
-                      });
-                      soldiersByFamily.forEach((soldiers, fam) => {
-                        if (fam === playerFamily) soldiers.forEach(s => allPlayerUnits.push({ unit: s, type: 'soldier' }));
-                      });
+                      const playerCapos = caposByFamily.get(playerFamily) || [];
+                      const playerSoldiers = soldiersByFamily.get(playerFamily) || [];
+                      const deployableOptions = [
+                        ...(playerCapos.length > 0 ? [{ type: 'capo' as const, units: playerCapos }] : []),
+                        ...(playerSoldiers.length > 0 ? [{ type: 'soldier' as const, units: playerSoldiers }] : []),
+                      ];
 
-                      const spacing = 28;
-                      const totalWidth = (allPlayerUnits.length - 1) * spacing;
+                      const pickerWidth = 92;
+                      const pickerHeight = 64;
+                      const pickerY = y + baseHexRadius + 10;
+                      const spacing = 36;
+                      const totalWidth = (deployableOptions.length - 1) * spacing;
                       const startX = x - totalWidth / 2;
 
-                      allPlayerUnits.forEach((item, idx) => {
-                        const unitX = startX + idx * spacing;
-                        const unitY = y + baseHexRadius + 18;
-                        const isSelected = selectedUnitId === item.unit.id;
+                      elements.push(
+                        <g key={`deploy-picker-bg-${key}`} className="pointer-events-none">
+                          <rect
+                            x={x - pickerWidth / 2}
+                            y={pickerY - 14}
+                            width={pickerWidth}
+                            height={pickerHeight}
+                            rx={12}
+                            fill="rgba(15, 23, 42, 0.88)"
+                            stroke="#D4AF37"
+                            strokeWidth="1.5"
+                          />
+                        </g>
+                      );
 
-                        if (item.type === 'capo') {
+                      deployableOptions.forEach((option, idx) => {
+                        const optionX = startX + idx * spacing;
+                        const optionY = pickerY + 10;
+                        const representativeUnit = option.units[0];
+                        const isSelected = option.units.some(unit => unit.id === selectedUnitId);
+
+                        if (option.type === 'capo') {
                           elements.push(
                             <CapoIcon
-                              key={`capo-deploy-${item.unit.id}`}
-                              x={unitX}
-                              y={unitY}
-                              family={item.unit.family as any}
-                              name={item.unit.name || 'Capo'}
-                              level={item.unit.level}
+                              key={`capo-deploy-${key}`}
+                              x={optionX}
+                              y={optionY}
+                              family={playerFamily}
+                              name={representativeUnit.name || 'Capo'}
+                              level={representativeUnit.level}
                               isPlayerFamily={true}
                               selected={isSelected}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (onSelectUnitFromHeadquarters) onSelectUnitFromHeadquarters('capo', item.unit.family);
+                                onSelectUnitFromHeadquarters?.('capo', playerFamily);
                               }}
                             />
                           );
                         } else {
                           elements.push(
                             <SoldierIcon
-                              key={`soldier-deploy-${item.unit.id}`}
-                              x={unitX}
-                              y={unitY}
-                              family={item.unit.family as any}
-                              count={1}
+                              key={`soldier-deploy-${key}`}
+                              x={optionX}
+                              y={optionY}
+                              family={playerFamily}
+                              count={option.units.length}
                               isPlayerFamily={true}
                               selected={isSelected}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (onSelectUnitFromHeadquarters) onSelectUnitFromHeadquarters('soldier', item.unit.family);
+                                onSelectUnitFromHeadquarters?.('soldier', playerFamily);
                               }}
                             />
                           );
                         }
                       });
 
-                      // Label
                       elements.push(
                         <text
                           key={`deploy-label-${key}`}
                           x={x}
-                          y={y + baseHexRadius + 42}
+                          y={pickerY + 38}
                           textAnchor="middle"
                           fontSize="8"
                           fill="#D4AF37"
                           fontWeight="bold"
                           className="pointer-events-none select-none"
                         >
-                          ▲ CLICK TO DEPLOY ▲
+                          SELECT A UNIT TO DEPLOY
                         </text>
                       );
                     } else {
