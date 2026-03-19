@@ -1278,50 +1278,6 @@ export const useEnhancedMafiaGameState = (
     }
   };
 
-  const updateMissionProgress = (state: EnhancedMafiaGameState, mission: Mission) => {
-    // Update mission progress based on current game state
-    mission.objectives.forEach(objective => {
-      if (!objective.completed) {
-        switch (objective.type) {
-          case 'collect':
-            // Check if player has collected the required items
-            if (objective.target === 'Little Italy' && state.familyControl[state.playerFamily] > 25) {
-              objective.completed = true;
-            }
-            break;
-          case 'eliminate':
-            // Check if target has been eliminated
-            break;
-          case 'protect':
-            // Check if target is still protected
-            break;
-        }
-      }
-    });
-
-    // Calculate overall progress
-    const completedObjectives = mission.objectives.filter(obj => obj.completed).length;
-    mission.progress = Math.round((completedObjectives / mission.objectives.length) * 100);
-
-    // Check if mission is complete
-    if (mission.progress >= 100 && mission.status === 'active') {
-      mission.status = 'completed';
-      // Apply rewards
-      mission.rewards.forEach(reward => {
-        switch (reward.type) {
-          case 'money':
-            state.resources.money += reward.amount;
-            break;
-          case 'reputation':
-            state.reputation.reputation += reward.amount;
-            break;
-          case 'soldiers':
-            state.resources.soldiers += reward.amount;
-            break;
-        }
-      });
-    }
-  };
 
   const completeTechnologyResearch = (state: EnhancedMafiaGameState, techId: string) => {
     const tech = state.technology.available.find(t => t.id === techId);
