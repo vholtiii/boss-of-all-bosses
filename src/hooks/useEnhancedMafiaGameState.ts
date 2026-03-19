@@ -633,7 +633,7 @@ export const useEnhancedMafiaGameState = (
           if (updatedUnit.type === 'soldier') {
             if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) return false;
           } else {
-            if (tile.controllingFamily !== prev.playerFamily) return false;
+            // Capos can move to own or enemy territory for negotiation
           }
           return true;
         });
