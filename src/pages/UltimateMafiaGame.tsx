@@ -345,7 +345,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           variant={gameState.turnPhase === 'action' ? 'default' : 'outline'}
         >
           <SkipForward className="h-4 w-4 mr-2" />
-          {gameState.turnPhase === 'action' ? 'Next Phase' : gameState.turnPhase === 'waiting' ? 'Waiting...' : `End ${gameState.turnPhase.charAt(0).toUpperCase() + gameState.turnPhase.slice(1)}`}
+          {gameState.turnPhase === 'action' ? 'Next Phase' : gameState.turnPhase === 'waiting' ? 'Waiting...' : `End ${gameState.turnPhase === 'move' ? 'Tactical' : gameState.turnPhase.charAt(0).toUpperCase() + gameState.turnPhase.slice(1)}`}
         </Button>
 
         <SaveLoadDialog 
