@@ -380,6 +380,39 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             </span>
           </div>
         )}
+
+        {/* Move action toolbar */}
+        {gameState.turnPhase === 'move' && (
+          <div className="flex items-center gap-1 bg-background/80 rounded-lg px-2 py-1 border border-noir-light">
+            {([
+              { action: 'move' as const, label: '🚶 Move', tip: 'Move unit to adjacent hex' },
+              { action: 'scout' as const, label: '👁️ Scout', tip: 'Reveal enemy hex info' },
+              { action: 'fortify' as const, label: '🛡️ Fortify', tip: 'Skip move for +25% defense' },
+              { action: 'escort' as const, label: '🚗 Escort', tip: 'Capo carries soldiers' },
+              { action: 'safehouse' as const, label: '🏠 Safehouse', tip: 'Capo sets up deploy point' },
+            ] as const).map(({ action, label, tip }) => (
+              <Button
+                key={action}
+                size="sm"
+                variant={gameState.selectedMoveAction === action ? 'default' : 'outline'}
+                className="text-xs h-7 px-2"
+                title={tip}
+                onClick={() => {
+                  if (action === 'fortify' && gameState.selectedUnitId) {
+                    fortifyUnit();
+                  } else {
+                    setMoveAction(action);
+                  }
+                }}
+              >
+                {label}
+              </Button>
+            ))}
+            {gameState.safehouse && (
+              <span className="text-xs text-muted-foreground ml-1">🏠 {gameState.safehouse.turnsRemaining}t</span>
+            )}
+          </div>
+        )}
       </div>
       
       {/* Center - Resources */}
