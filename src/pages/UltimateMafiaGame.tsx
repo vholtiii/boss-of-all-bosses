@@ -255,11 +255,11 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
 
   const rightSidebar = (
     <div className="space-y-6 p-4">
-      {/* Events & Missions */}
+      {/* Events & Intel */}
       <div className="bg-gradient-to-br from-noir-dark to-background border border-noir-light rounded-lg p-4">
         <h3 className="text-lg font-bold text-mafia-gold font-playfair mb-4 flex items-center">
-          <div className="w-3 h-3 bg-purple-500 rounded-full mr-2" />
-          Events & Missions
+          <div className="w-3 h-3 bg-destructive rounded-full mr-2" />
+          Events & Intel
         </h3>
         <EventsPanel 
           gameState={gameState} 
