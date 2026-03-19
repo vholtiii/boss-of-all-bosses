@@ -146,6 +146,14 @@ export interface EnhancedMafiaGameState {
   policeHeat: PoliceHeat;
   
   turnReport: TurnReport | null;
+  lastCombatResult?: {
+    q: number; r: number; s: number;
+    success: boolean;
+    type: 'hit' | 'extort' | 'sabotage';
+    title: string;
+    details: string;
+    timestamp: number;
+  };
   selectedTerritory?: any;
   activeEvent?: GameEvent;
   
