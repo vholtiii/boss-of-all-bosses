@@ -837,9 +837,6 @@ export const useEnhancedMafiaGameState = (
           const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
           if (!tile) return false;
           if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
-          if (updatedUnit.type === 'soldier') {
-            if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) return false;
-          }
           return true;
         });
       }
