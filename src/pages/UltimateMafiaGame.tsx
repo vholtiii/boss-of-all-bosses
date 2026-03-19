@@ -56,6 +56,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     deployUnit,
     isWinner,
     clearNotifications,
+    fortifyUnit,
+    setMoveAction,
+    startEscort,
   } = useEnhancedMafiaGameState(config.family, config.resources);
 
   const { notifySuccess, notifyError, notifyWarning, notifyInfo, notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
