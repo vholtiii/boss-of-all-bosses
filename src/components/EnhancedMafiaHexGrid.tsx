@@ -154,8 +154,14 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       }
     }
 
-    // HQ click — open headquarters panel
+    // HQ click — toggle unit icons and open headquarters panel
     if (tile.isHeadquarters) {
+      const hqKey = `${tile.q},${tile.r},${tile.s}`;
+      if (expandedHQKey === hqKey) {
+        setExpandedHQKey(null);
+      } else {
+        setExpandedHQKey(hqKey);
+      }
       if (onSelectHeadquarters) onSelectHeadquarters(tile.isHeadquarters);
       return;
     }
