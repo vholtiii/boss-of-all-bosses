@@ -1064,7 +1064,7 @@ export const useEnhancedMafiaGameState = (
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
           if (unitType === 'capo' && (tile.controllingFamily === 'neutral' || tile.controllingFamily === family) && !tile.isHeadquarters) {
-            return { ...tile, controllingFamily: family as any };
+            return { ...tile, controllingFamily: family as any, isExtorted: true };
           }
         }
         return tile;
