@@ -1571,46 +1571,44 @@ export const useEnhancedMafiaGameState = (
           const unit = newState.deployedUnits.find(u => u.id === unitId);
           if (!unit || unit.type !== 'soldier' || unit.family !== newState.playerFamily) return newState;
           
-          // Check max capos
           const currentCapos = newState.deployedUnits.filter(u => u.type === 'capo' && u.family === newState.playerFamily).length;
-          if (currentCapos >= 3) return newState;
+          if (currentCapos >= MAX_CAPOS) return newState;
+          if (newState.resources.money < CAPO_PROMOTION_COST) return newState;
           
-          // Check cost
-          const promoCost = 10000;
-          if (newState.resources.money < promoCost) return newState;
-          
-          // Check soldier stats
           const stats = newState.soldierStats?.[unitId];
           if (stats) {
-            if (stats.survivedConflicts < 5 || stats.loyalty < 60 || stats.training < 3) return newState;
+            if (
+              stats.survivedConflicts < CAPO_PROMOTION_REQUIREMENTS.minVictories ||
+              stats.loyalty < CAPO_PROMOTION_REQUIREMENTS.minLoyalty ||
+              stats.training < CAPO_PROMOTION_REQUIREMENTS.minTraining
+            ) return newState;
           }
           
-          // Deduct cost
-          newState.resources.money -= promoCost;
+          newState.resources.money -= CAPO_PROMOTION_COST;
           
-          // Convert soldier to capo
           const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
           const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
+          const personalityLabel = randomPersonality.charAt(0).toUpperCase() + randomPersonality.slice(1);
+          const capoName = `Capo ${Math.floor(Math.random() * 100)}`;
+          
           newState.deployedUnits = newState.deployedUnits.map(u => 
             u.id === unitId ? {
               ...u,
               type: 'capo' as const,
               maxMoves: 3,
               movesRemaining: 0,
-              name: `Capo ${Math.floor(Math.random() * 100)}`,
+              name: capoName,
               personality: randomPersonality,
               level: 1,
             } : u
           );
           
-          // Remove from hitmen if applicable
           newState.hitmen = (newState.hitmen || []).filter(h => h.unitId !== unitId);
           
-          // Notification
           newState.pendingNotifications = [...(newState.pendingNotifications || []), {
             type: 'success' as const,
             title: '⭐ Soldier Promoted to Capo!',
-            message: `A battle-hardened soldier has earned the rank of Capo. They now command 3 moves per turn.`,
+            message: `${capoName} (${personalityLabel}) now commands 3 moves per turn and can extort, escort, and negotiate.`,
           }];
           
           return newState;
