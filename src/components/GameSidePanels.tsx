@@ -22,8 +22,13 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  Crosshair,
 } from 'lucide-react';
 import { EnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
+import HitmanPanel from '@/components/HitmanPanel';
+import CorruptionPanel from '@/components/CorruptionPanel';
+import VictoryTracker from '@/components/VictoryTracker';
+import { SOLDIER_COST, CAPO_COST } from '@/types/game-mechanics';
 
 interface GameSidePanelProps {
   gameState: EnhancedMafiaGameState;
