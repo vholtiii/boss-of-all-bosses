@@ -1073,6 +1073,10 @@ export const useEnhancedMafiaGameState = (
           newState.hitmen = [...newState.hitmen, {
             unitId, hitmanLevel: 1, promotedTurn: newState.turn,
           }];
+          newState.pendingNotifications = [...newState.pendingNotifications, {
+            type: 'success', title: 'Hitman Promoted!',
+            message: `A soldier has been elevated to Hitman. +30% hit success, 50% higher maintenance.`,
+          }];
           return newState;
         }
         case 'charitable_donation':
