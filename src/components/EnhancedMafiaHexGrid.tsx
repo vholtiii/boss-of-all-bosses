@@ -626,6 +626,81 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 </foreignObject>
               );
             })()}
+
+            {/* HQ unit selection popover */}
+            {hqUnitMenu && (() => {
+              const { x, y } = getHexPosition(hqUnitMenu.tile.q, hqUnitMenu.tile.r);
+              const turnPhase = gameState?.turnPhase || 'waiting';
+              const soldiers = hqUnitMenu.units.filter(u => u.type === 'soldier');
+              const capos = hqUnitMenu.units.filter(u => u.type === 'capo');
+              const itemCount = (soldiers.length > 0 ? 1 : 0) + capos.length + 1; // +1 for HQ info button
+              const menuWidth = 160;
+              const menuHeight = itemCount * 32 + 28;
+              return (
+                <foreignObject
+                  x={x - menuWidth / 2}
+                  y={y - baseHexRadius - menuHeight - 8}
+                  width={menuWidth}
+                  height={menuHeight}
+                  className="overflow-visible"
+                >
+                  <div className="flex flex-col gap-1 bg-background/95 backdrop-blur-sm border border-mafia-gold/40 rounded-lg p-2 shadow-xl">
+                    <div className="text-[10px] font-bold text-mafia-gold uppercase text-center mb-1">
+                      {hqUnitMenu.tile.isHeadquarters} HQ — Units
+                    </div>
+                    {capos.map(capo => (
+                      <button
+                        key={capo.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (turnPhase === 'deploy' && onSelectUnitFromHeadquarters) {
+                            onSelectUnitFromHeadquarters('capo', capo.family);
+                          } else if (turnPhase === 'move' && capo.movesRemaining > 0 && onSelectUnit) {
+                            onSelectUnit('capo', { q: hqUnitMenu.tile.q, r: hqUnitMenu.tile.r, s: hqUnitMenu.tile.s });
+                          }
+                          setHqUnitMenu(null);
+                        }}
+                        disabled={turnPhase === 'move' && capo.movesRemaining === 0}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-mafia-gold/20 hover:bg-mafia-gold/40 text-foreground text-xs font-bold transition-colors disabled:opacity-40"
+                      >
+                        👔 {capo.name || 'Capo'} (Lvl {capo.level})
+                        {turnPhase === 'move' && <span className="ml-auto text-muted-foreground">{capo.movesRemaining}mv</span>}
+                      </button>
+                    ))}
+                    {soldiers.length > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (turnPhase === 'deploy' && onSelectUnitFromHeadquarters) {
+                            onSelectUnitFromHeadquarters('soldier', soldiers[0].family);
+                          } else if (turnPhase === 'move' && onSelectUnit) {
+                            const movable = soldiers.find(s => s.movesRemaining > 0);
+                            if (movable) onSelectUnit('soldier', { q: hqUnitMenu.tile.q, r: hqUnitMenu.tile.r, s: hqUnitMenu.tile.s });
+                          }
+                          setHqUnitMenu(null);
+                        }}
+                        disabled={turnPhase === 'move' && !soldiers.some(s => s.movesRemaining > 0)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-foreground text-xs font-bold transition-colors disabled:opacity-40"
+                      >
+                        👤 Soldiers ×{soldiers.length}
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onSelectHeadquarters && hqUnitMenu.tile.isHeadquarters) {
+                          onSelectHeadquarters(hqUnitMenu.tile.isHeadquarters);
+                        }
+                        setHqUnitMenu(null);
+                      }}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/20 hover:bg-primary/40 text-foreground text-xs font-medium transition-colors mt-0.5 border-t border-border pt-1.5"
+                    >
+                      🏛️ View HQ Info
+                    </button>
+                  </div>
+                </foreignObject>
+              );
+            })()}
           </g>
         </svg>
       </div>
