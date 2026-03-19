@@ -640,7 +640,50 @@ export const useEnhancedMafiaGameState = (
   // ============ SELECT UNIT FOR MOVEMENT ============
   const selectUnit = useCallback((unitType: 'soldier' | 'capo', location: { q: number; r: number; s: number }) => {
     setGameState(prev => {
-      if (prev.turnPhase !== 'move' && prev.turnPhase !== 'deploy') return prev;
+      if (prev.turnPhase !== 'move' && prev.turnPhase !== 'deploy' && prev.turnPhase !== 'action') return prev;
+      
+      // Action phase: select unit and compute valid action target hexes
+      if (prev.turnPhase === 'action') {
+        const unit = prev.deployedUnits.find(u => 
+          u.family === prev.playerFamily && u.type === unitType &&
+          u.q === location.q && u.r === location.r && u.s === location.s
+        );
+        if (!unit) return prev;
+        
+        // If clicking the already-selected unit, deselect
+        if (prev.selectedUnitId === unit.id) {
+          return { ...prev, selectedUnitId: null, availableMoveHexes: [] };
+        }
+        
+        // Compute valid action target hexes (adjacent hexes where actions can be performed)
+        const neighbors = getHexNeighbors(unit.q, unit.r, unit.s);
+        // Also include the unit's own hex (for safehouse on owned territory)
+        const candidateHexes = [...neighbors, { q: unit.q, r: unit.r, s: unit.s }];
+        
+        const actionTargets = candidateHexes.filter(h => {
+          const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+          if (!tile || tile.isHeadquarters) return false;
+          
+          const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily;
+          const isNeutral = tile.controllingFamily === 'neutral';
+          const isOwned = tile.controllingFamily === prev.playerFamily;
+          
+          if (unitType === 'soldier') {
+            // Soldiers can hit/sabotage enemy, extort neutral/enemy with business, claim neutral
+            if (isEnemy) return true;
+            if (isNeutral) return true;
+          }
+          if (unitType === 'capo') {
+            // Capos can negotiate on enemy hexes, safehouse on owned
+            if (isEnemy) return true;
+            if (isOwned && h.q === unit.q && h.r === unit.r && h.s === unit.s) return true;
+          }
+          return false;
+        });
+        
+        return { ...prev, selectedUnitId: unit.id, availableMoveHexes: actionTargets, deployMode: null, availableDeployHexes: [] };
+      }
+
       const unit = prev.deployedUnits.find(u => 
         u.family === prev.playerFamily && u.type === unitType &&
         u.q === location.q && u.r === location.r && u.s === location.s &&
@@ -682,7 +725,7 @@ export const useEnhancedMafiaGameState = (
         return prev;
       }
 
-      // Deploy phase: regular movement
+      // Deploy phase: regular movement — soldiers CAN move onto enemy hexes
       const range = unitType === 'soldier' ? 1 : Math.min(5, unit.movesRemaining);
       const candidateHexes = unitType === 'soldier' 
         ? getHexNeighbors(unit.q, unit.r, unit.s)
@@ -692,9 +735,6 @@ export const useEnhancedMafiaGameState = (
         const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
         if (!tile) return false;
         if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
-        if (unitType === 'soldier') {
-          if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) return false;
-        }
         return true;
       });
 
