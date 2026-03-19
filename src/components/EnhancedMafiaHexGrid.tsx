@@ -332,6 +332,19 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     {tile.isHeadquarters ? '🏛️' : tile.business ? (businessIcons[tile.business.type] || '🏢') : ''}
                   </text>
 
+                  {/* Prompt to click HQ during deploy phase */}
+                  {tile.isHeadquarters === playerFamily && gameState?.turnPhase === 'deploy' && expandedHQKey !== key && (
+                    <motion.text
+                      x={x} y={y + baseHexRadius + 14}
+                      textAnchor="middle" fontSize="7" fill="#D4AF37" fontWeight="bold"
+                      className="pointer-events-none select-none"
+                      animate={{ opacity: [0.5, 1, 0.5] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      ▲ CLICK TO SEE UNITS ▲
+                    </motion.text>
+                  )}
+
                   {/* Scouted hex indicator */}
                   {gameState?.scoutedHexes?.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s) && (
                     <g className="pointer-events-none">
