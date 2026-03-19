@@ -229,11 +229,11 @@ const generateHexMap = (radius: number): HexTile[] => {
 };
 
 const HQ_POSITIONS: Record<string, {q:number;r:number;s:number;district:HexTile['district']}> = {
-  gambino:  { q: -5, r:  5, s: 0,  district: 'Little Italy' },
-  genovese: { q:  5, r: -5, s: 0,  district: 'Manhattan' },
-  lucchese: { q: -5, r: -1, s: 6,  district: 'Queens' },
-  bonanno:  { q:  4, r:  2, s: -6, district: 'Staten Island' },
-  colombo:  { q:  0, r: -5, s: 5,  district: 'Bronx' },
+  gambino:  { q: -8, r:  8, s: 0,  district: 'Little Italy' },
+  genovese: { q:  8, r: -8, s: 0,  district: 'Manhattan' },
+  lucchese: { q: -8, r: -1, s: 9,  district: 'Queens' },
+  bonanno:  { q:  7, r:  3, s: -10, district: 'Staten Island' },
+  colombo:  { q:  0, r: -9, s: 9,  district: 'Bronx' },
 };
 
 // ============ INITIAL STATE ============
