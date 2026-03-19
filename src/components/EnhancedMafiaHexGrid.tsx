@@ -208,17 +208,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       const playerSoldiersHere = playerUnitsHere.filter(u => u.type === 'soldier');
       const playerCaposHere = playerUnitsHere.filter(u => u.type === 'capo');
       
-      if (playerUnitsHere.length > 0 && tile.controllingFamily !== playerFamily) {
-        const canHit = tile.controllingFamily !== 'neutral' && !tile.isHeadquarters && playerSoldiersHere.length > 0;
-        const canExtort = tile.controllingFamily === 'neutral' && !tile.isHeadquarters && playerSoldiersHere.length > 0;
-        const canNegotiate = tile.controllingFamily !== 'neutral' && !tile.isHeadquarters && playerCaposHere.length > 0;
+      if (playerUnitsHere.length > 0) {
+        const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== playerFamily;
+        const isNeutral = tile.controllingFamily === 'neutral';
+        const isOwned = tile.controllingFamily === playerFamily;
+        
+        const canHit = isEnemy && !tile.isHeadquarters && playerSoldiersHere.length > 0;
+        const canExtort = isNeutral && !tile.isHeadquarters && playerSoldiersHere.length > 0;
+        const canNegotiate = isEnemy && !tile.isHeadquarters && playerCaposHere.length > 0;
+        const canSabotage = isEnemy && !tile.isHeadquarters && playerSoldiersHere.length > 0 && !!tile.business;
+        const canSafehouse = isOwned && !tile.isHeadquarters && playerUnitsHere.length > 0;
         const negotiateCapoId = playerCaposHere[0]?.id;
         
-        if (canHit || canExtort || canNegotiate) {
+        if (canHit || canExtort || canNegotiate || canSabotage || canSafehouse) {
           if (actionMenu && actionMenu.tile.q === tile.q && actionMenu.tile.r === tile.r) {
             setActionMenu(null);
           } else {
-            setActionMenu({ tile, canHit, canExtort, canNegotiate, negotiateCapoId });
+            setActionMenu({ tile, canHit, canExtort, canNegotiate, canSabotage, canSafehouse, negotiateCapoId });
           }
           return;
         }
