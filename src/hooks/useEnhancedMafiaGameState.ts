@@ -50,6 +50,7 @@ export interface HexTile {
   district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
   terrain: 'urban' | 'industrial' | 'residential' | 'docks' | 'commercial';
   controllingFamily: 'neutral' | 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
+  isExtorted?: boolean;
   business?: {
     type: string;
     income: number;
