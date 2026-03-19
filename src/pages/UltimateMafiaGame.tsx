@@ -499,8 +499,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   );
 
   const phaseConfig: Record<string, { label: string; hint: string; color: string }> = {
-    deploy: { label: '📦 DEPLOY PHASE', hint: 'Deploy units from HQ & move them across the map', color: 'bg-blue-600/80' },
-    move: { label: '📋 TACTICAL PHASE', hint: `Scout, Fortify, Escort, Safehouse (${gameState.tacticalActionsRemaining}/${gameState.maxTacticalActions} left)`, color: 'bg-amber-600/80' },
+    deploy: { label: '📦 DEPLOY & MOVE', hint: 'Deploy units from HQ & move them across the map', color: 'bg-blue-600/80' },
+    move: { label: '📋 TACTICAL PHASE', hint: `Scout, Fortify, Escort, Safehouse (${gameState.tacticalActionsRemaining}/${gameState.maxTacticalActions} left) — no movement`, color: 'bg-amber-600/80' },
     action: { label: '⚔️ ACTION PHASE', hint: `Hit, Extort, Claim, Negotiate (${gameState.actionsRemaining}/${gameState.maxActions} left)`, color: 'bg-red-600/80' },
     waiting: { label: '⏳ END TURN', hint: 'Press End Turn to advance', color: 'bg-muted' },
   };
