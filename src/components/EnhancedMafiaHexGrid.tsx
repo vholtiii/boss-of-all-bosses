@@ -384,7 +384,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           selected={isSelected}
                           onClick={isClickable ? (e) => {
                             e.stopPropagation();
-                            if (turnPhase === 'move' && firstSoldier.movesRemaining > 0 && onSelectUnit) {
+                            if (turnPhase === 'deploy' && onSelectUnitFromHeadquarters) {
+                              onSelectUnitFromHeadquarters('soldier', fam);
+                            } else if (turnPhase === 'move' && firstSoldier.movesRemaining > 0 && onSelectUnit) {
                               onSelectUnit('soldier', { q: tile.q, r: tile.r, s: tile.s });
                             }
                           } : undefined}
