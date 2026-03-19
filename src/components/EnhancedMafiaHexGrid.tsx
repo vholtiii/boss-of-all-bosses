@@ -146,6 +146,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     // During move phase, try selecting units on HQ hex before opening the panel
     if (tile.isHeadquarters && turnPhase === 'move') {
       const key = `${tile.q},${tile.r},${tile.s}`;
+      setExpandedHQKey(key); // Ensure units are visible
       const unitsHere = unitsByHex.get(key) || [];
       const playerUnit = unitsHere.find(u => u.family === playerFamily && u.movesRemaining > 0);
       if (playerUnit && onSelectUnit) {
