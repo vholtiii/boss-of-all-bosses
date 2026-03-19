@@ -1527,6 +1527,17 @@ export const useEnhancedMafiaGameState = (
       // Base chance: 80% if outnumbering, 20% if not
       let chance = playerUnits.length > enemyUnits.length ? 0.8 : 0.2;
       
+      // Apply fortified defense bonus for defenders
+      const fortifiedDefenders = enemyUnits.filter(u => u.fortified);
+      if (fortifiedDefenders.length > 0) {
+        chance -= FORTIFY_DEFENSE_BONUS / 100;
+      }
+      // Apply fortified bonus for player attackers (shouldn't normally be fortified when attacking, but check)
+      const fortifiedAttackers = playerUnits.filter(u => u.fortified);
+      if (fortifiedAttackers.length > 0) {
+        chance += FORTIFY_DEFENSE_BONUS / 200; // Half bonus for fortified attackers
+      }
+      
       // Apply family combat bonus
       chance += state.familyBonuses.combatBonus / 100;
       
