@@ -231,6 +231,21 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               ULTIMATE VICTORY ACHIEVED
             </Badge>
           </motion.div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.5, duration: 0.5 }}
+            className="mt-8"
+          >
+            <Button
+              size="lg"
+              onClick={onExitToMenu}
+              className="font-playfair text-lg px-8 py-3"
+            >
+              <LogOut className="h-5 w-5 mr-2" />
+              Return to Main Menu
+            </Button>
+          </motion.div>
         </motion.div>
       </div>
     );
