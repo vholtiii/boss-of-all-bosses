@@ -18,6 +18,8 @@ import {
   SOLDIER_COST, CAPO_COST, HITMAN_MAINTENANCE_MULTIPLIER, MAX_HITMEN, HITMAN_REQUIREMENTS,
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType,
   NEGOTIATION_TYPES,
+  ScoutedHex, Safehouse, MoveAction,
+  FORTIFY_DEFENSE_BONUS, SCOUT_DURATION, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
 } from '@/types/game-mechanics';
 
 // ============ UNIT TYPES ============
@@ -33,6 +35,8 @@ export interface DeployedUnit {
   level: number;
   name?: string;
   personality?: CapoPersonality;
+  fortified?: boolean;
+  escortingSoldierIds?: string[]; // capo only — IDs of soldiers being escorted
 }
 
 // ============ HEX TILE ============
@@ -104,6 +108,11 @@ export interface EnhancedMafiaGameState {
   familyBonuses: FamilyBonuses;
   lastTurnIncome: number;
   pendingNotifications: Array<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; message?: string }>;
+  
+  // Move phase systems
+  scoutedHexes: ScoutedHex[];
+  safehouse: Safehouse | null;
+  selectedMoveAction: MoveAction;
   
   // Enhanced systems
   combat: CombatSystem;
@@ -349,6 +358,9 @@ const createInitialGameState = (
     familyBonuses: bonuses,
     lastTurnIncome: 0,
     pendingNotifications: [],
+    scoutedHexes: [],
+    safehouse: null,
+    selectedMoveAction: 'move' as MoveAction,
     
     combat: {
       territoryBattles: [],
@@ -529,6 +541,16 @@ export const useEnhancedMafiaGameState = (
     }
   };
 
+  // ============ HELPER: check if hex is adjacent to enemy ============
+  const isAdjacentToEnemy = (q: number, r: number, s: number, hexMap: HexTile[], deployedUnits: DeployedUnit[], playerFamily: string): boolean => {
+    const neighbors = getHexNeighbors(q, r, s);
+    return neighbors.some(n => {
+      return deployedUnits.some(u => 
+        u.family !== playerFamily && u.q === n.q && u.r === n.r && u.s === n.s
+      );
+    });
+  };
+
   // ============ PHASE-BASED TURN SYSTEM ============
   const advancePhase = useCallback(() => {
     setGameState(prev => {
@@ -543,6 +565,7 @@ export const useEnhancedMafiaGameState = (
         availableMoveHexes: [],
         deployMode: null,
         availableDeployHexes: [],
+        selectedMoveAction: 'move' as MoveAction,
       };
     });
   }, []);
@@ -569,13 +592,31 @@ export const useEnhancedMafiaGameState = (
   // ============ SELECT UNIT FOR MOVEMENT ============
   const selectUnit = useCallback((unitType: 'soldier' | 'capo', location: { q: number; r: number; s: number }) => {
     setGameState(prev => {
-      if (prev.turnPhase !== 'move') return prev; // Only allow during move phase
+      if (prev.turnPhase !== 'move') return prev;
       const unit = prev.deployedUnits.find(u => 
         u.family === prev.playerFamily && u.type === unitType &&
         u.q === location.q && u.r === location.r && u.s === location.s &&
         u.movesRemaining > 0
       );
       if (!unit) return prev;
+
+      const moveAction = prev.selectedMoveAction || 'move';
+
+      // Scout: show adjacent enemy hexes
+      if (moveAction === 'scout' && unitType === 'soldier') {
+        const neighbors = getHexNeighbors(unit.q, unit.r, unit.s);
+        const scoutableHexes = neighbors.filter(h => {
+          const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+          if (!tile) return false;
+          return tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily;
+        });
+        return { ...prev, selectedUnitId: unit.id, availableMoveHexes: scoutableHexes, deployMode: null, availableDeployHexes: [] };
+      }
+
+      // Safehouse: highlight current hex
+      if (moveAction === 'safehouse' && unitType === 'capo') {
+        return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
+      }
 
       const range = unitType === 'soldier' ? 1 : Math.min(5, unit.movesRemaining);
       const candidateHexes = unitType === 'soldier' 
@@ -586,13 +627,8 @@ export const useEnhancedMafiaGameState = (
         const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
         if (!tile) return false;
         if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
-        
         if (unitType === 'soldier') {
-          // Soldiers cannot enter enemy-controlled hexes — must Hit first
           if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) return false;
-        } else {
-          // Capos can move to own or enemy territory (for negotiation) but not neutral
-          // Allow enemy territory so capos can negotiate
         }
         return true;
       });
@@ -601,7 +637,7 @@ export const useEnhancedMafiaGameState = (
     });
   }, []);
 
-  // ============ MOVE UNIT ============
+  // ============ MOVE UNIT (with zone-of-control + escort) ============
   const moveUnit = useCallback((targetLocation: { q: number; r: number; s: number }) => {
     setGameState(prev => {
       if (prev.turnPhase !== 'move') return prev;
@@ -609,6 +645,17 @@ export const useEnhancedMafiaGameState = (
       const unitIdx = prev.deployedUnits.findIndex(u => u.id === prev.selectedUnitId);
       if (unitIdx === -1) return prev;
       const unit = prev.deployedUnits[unitIdx];
+      const moveAction = prev.selectedMoveAction || 'move';
+
+      // Handle scout action
+      if (moveAction === 'scout' && unit.type === 'soldier') {
+        return processScout(prev, unit, targetLocation);
+      }
+
+      // Handle safehouse action
+      if (moveAction === 'safehouse' && unit.type === 'capo') {
+        return processSafehouse(prev, unit);
+      }
 
       if (!prev.availableMoveHexes.some(h => h.q === targetLocation.q && h.r === targetLocation.r && h.s === targetLocation.s)) {
         return prev;
@@ -618,8 +665,27 @@ export const useEnhancedMafiaGameState = (
       if (unit.movesRemaining < moveCost) return prev;
 
       const newUnits = [...prev.deployedUnits];
-      const updatedUnit = { ...unit, q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: unit.movesRemaining - moveCost };
+      let remainingMoves = unit.movesRemaining - moveCost;
+
+      // Zone of control: if soldier moves adjacent to enemy, movement ends
+      if (unit.type === 'soldier') {
+        if (isAdjacentToEnemy(targetLocation.q, targetLocation.r, targetLocation.s, prev.hexMap, prev.deployedUnits, prev.playerFamily)) {
+          remainingMoves = 0;
+        }
+      }
+
+      const updatedUnit = { ...unit, q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: remainingMoves, fortified: false };
       newUnits[unitIdx] = updatedUnit;
+
+      // Handle escort: move escorted soldiers along with capo
+      if (moveAction === 'escort' && unit.type === 'capo' && unit.escortingSoldierIds?.length) {
+        unit.escortingSoldierIds.forEach(soldierIdToEscort => {
+          const sIdx = newUnits.findIndex(u => u.id === soldierIdToEscort);
+          if (sIdx !== -1) {
+            newUnits[sIdx] = { ...newUnits[sIdx], q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0, fortified: false };
+          }
+        });
+      }
 
       // Auto-claim neutral tiles on move
       const newHexMap = prev.hexMap.map(tile => {
@@ -643,8 +709,6 @@ export const useEnhancedMafiaGameState = (
           if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
           if (updatedUnit.type === 'soldier') {
             if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) return false;
-          } else {
-            // Capos can move to own or enemy territory for negotiation
           }
           return true;
         });
@@ -657,6 +721,136 @@ export const useEnhancedMafiaGameState = (
       };
       syncLegacyUnits(newState);
       return newState;
+    });
+  }, []);
+
+  // ============ FORTIFY UNIT ============
+  const fortifyUnit = useCallback(() => {
+    setGameState(prev => {
+      if (prev.turnPhase !== 'move') return prev;
+      if (!prev.selectedUnitId) return prev;
+      const unitIdx = prev.deployedUnits.findIndex(u => u.id === prev.selectedUnitId);
+      if (unitIdx === -1) return prev;
+      const unit = prev.deployedUnits[unitIdx];
+      if (unit.family !== prev.playerFamily || unit.movesRemaining <= 0) return prev;
+
+      const newUnits = [...prev.deployedUnits];
+      newUnits[unitIdx] = { ...unit, fortified: true, movesRemaining: 0 };
+
+      return {
+        ...prev, deployedUnits: newUnits,
+        selectedUnitId: null, availableMoveHexes: [],
+        pendingNotifications: [...prev.pendingNotifications, {
+          type: 'info' as const, title: '🛡️ Unit Fortified',
+          message: `${unit.type === 'capo' ? unit.name || 'Capo' : 'Soldier'} is fortified (+${FORTIFY_DEFENSE_BONUS}% defense).`,
+        }],
+      };
+    });
+  }, []);
+
+  // ============ SCOUT HEX ============
+  const processScout = (prev: EnhancedMafiaGameState, unit: DeployedUnit, targetLocation: { q: number; r: number; s: number }): EnhancedMafiaGameState => {
+    const tile = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
+    if (!tile) return prev;
+    const dist = hexDistance(unit, targetLocation);
+    if (dist !== 1) return prev;
+
+    const enemyUnitsOnHex = prev.deployedUnits.filter(u => 
+      u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s &&
+      u.family !== prev.playerFamily
+    );
+
+    const scoutInfo: ScoutedHex = {
+      q: targetLocation.q, r: targetLocation.r, s: targetLocation.s,
+      scoutedTurn: prev.turn,
+      turnsRemaining: SCOUT_DURATION,
+      enemySoldierCount: enemyUnitsOnHex.length,
+      enemyFamily: tile.controllingFamily,
+      businessType: tile.business?.type,
+      businessIncome: tile.business?.income,
+    };
+
+    const newScoutedHexes = prev.scoutedHexes.filter(s => !(s.q === targetLocation.q && s.r === targetLocation.r && s.s === targetLocation.s));
+    newScoutedHexes.push(scoutInfo);
+
+    const newUnits = [...prev.deployedUnits];
+    const uIdx = newUnits.findIndex(u => u.id === unit.id);
+    newUnits[uIdx] = { ...unit, movesRemaining: unit.movesRemaining - 1 };
+
+    return {
+      ...prev, deployedUnits: newUnits, scoutedHexes: newScoutedHexes,
+      selectedUnitId: null, availableMoveHexes: [],
+      selectedMoveAction: 'move' as MoveAction,
+      pendingNotifications: [...prev.pendingNotifications, {
+        type: 'info' as const, title: '👁️ Hex Scouted',
+        message: `${tile.controllingFamily.toUpperCase()} territory: ${enemyUnitsOnHex.length} units${tile.business ? `, ${tile.business.type} ($${tile.business.income}/turn)` : ''}.`,
+      }],
+    };
+  };
+
+  // ============ SETUP SAFEHOUSE ============
+  const processSafehouse = (prev: EnhancedMafiaGameState, unit: DeployedUnit): EnhancedMafiaGameState => {
+    const tile = prev.hexMap.find(t => t.q === unit.q && t.r === unit.r && t.s === unit.s);
+    if (!tile || tile.controllingFamily !== prev.playerFamily) return prev;
+
+    const newUnits = [...prev.deployedUnits];
+    const uIdx = newUnits.findIndex(u => u.id === unit.id);
+    newUnits[uIdx] = { ...unit, movesRemaining: 0 };
+
+    const newSafehouse: Safehouse = {
+      q: unit.q, r: unit.r, s: unit.s,
+      turnsRemaining: SAFEHOUSE_DURATION,
+      createdTurn: prev.turn,
+    };
+
+    return {
+      ...prev, deployedUnits: newUnits, safehouse: newSafehouse,
+      selectedUnitId: null, availableMoveHexes: [],
+      selectedMoveAction: 'move' as MoveAction,
+      pendingNotifications: [...prev.pendingNotifications, {
+        type: 'success' as const, title: '🏠 Safehouse Established',
+        message: `Secondary deploy point active for ${SAFEHOUSE_DURATION} turns.`,
+      }],
+    };
+  };
+
+  // ============ SET MOVE ACTION ============
+  const setMoveAction = useCallback((action: MoveAction) => {
+    setGameState(prev => ({
+      ...prev,
+      selectedMoveAction: action,
+      selectedUnitId: null,
+      availableMoveHexes: [],
+    }));
+  }, []);
+
+  // ============ START ESCORT ============
+  const startEscort = useCallback((capoId: string, soldierIds: string[]) => {
+    setGameState(prev => {
+      if (prev.turnPhase !== 'move') return prev;
+      const capoIdx = prev.deployedUnits.findIndex(u => u.id === capoId && u.type === 'capo' && u.family === prev.playerFamily);
+      if (capoIdx === -1) return prev;
+      const capo = prev.deployedUnits[capoIdx];
+
+      const validSoldierIds = soldierIds.filter(sid => {
+        const s = prev.deployedUnits.find(u => u.id === sid);
+        return s && s.type === 'soldier' && s.family === prev.playerFamily && s.q === capo.q && s.r === capo.r && s.s === capo.s;
+      }).slice(0, MAX_ESCORT_SOLDIERS);
+
+      if (validSoldierIds.length === 0) return prev;
+
+      const newUnits = [...prev.deployedUnits];
+      const newMoves = Math.max(0, capo.movesRemaining - validSoldierIds.length);
+      newUnits[capoIdx] = { ...capo, escortingSoldierIds: validSoldierIds, movesRemaining: newMoves };
+
+      return {
+        ...prev, deployedUnits: newUnits,
+        selectedMoveAction: 'escort' as MoveAction,
+        pendingNotifications: [...prev.pendingNotifications, {
+          type: 'info' as const, title: '🚗 Escort Active',
+          message: `${capo.name || 'Capo'} is escorting ${validSoldierIds.length} soldier(s).`,
+        }],
+      };
     });
   }, []);
 
@@ -687,10 +881,24 @@ export const useEnhancedMafiaGameState = (
       }
 
       const range = unitType === 'soldier' ? 1 : 5;
-      const candidates = unitType === 'soldier'
+      let candidates = unitType === 'soldier'
         ? getHexNeighbors(hq.q, hq.r, hq.s)
         : getHexesInRange(hq.q, hq.r, hq.s, range);
       
+      // Add safehouse neighbors for soldier deployment
+      if (unitType === 'soldier' && prev.safehouse) {
+        const safehouseNeighbors = getHexNeighbors(prev.safehouse.q, prev.safehouse.r, prev.safehouse.s);
+        candidates = [...candidates, ...safehouseNeighbors];
+        // Deduplicate
+        const seen = new Set<string>();
+        candidates = candidates.filter(c => {
+          const k = `${c.q},${c.r},${c.s}`;
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+      }
+
       const validHexes = candidates.filter(h => 
         prev.hexMap.some(t => t.q === h.q && t.r === h.r && t.s === h.s)
       );
@@ -786,10 +994,29 @@ export const useEnhancedMafiaGameState = (
       newState.availableMoveHexes = [];
       newState.deployMode = null;
       newState.availableDeployHexes = [];
+      newState.selectedMoveAction = 'move' as MoveAction;
 
+      // Clear fortified status and escort, reset moves
       newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
-        ...u, movesRemaining: u.maxMoves,
+        ...u, movesRemaining: u.maxMoves, fortified: false, escortingSoldierIds: undefined,
       }));
+
+      // Tick scouted hexes
+      newState.scoutedHexes = newState.scoutedHexes
+        .map(s => ({ ...s, turnsRemaining: s.turnsRemaining - 1 }))
+        .filter(s => s.turnsRemaining > 0);
+
+      // Tick safehouse
+      if (newState.safehouse) {
+        newState.safehouse = { ...newState.safehouse, turnsRemaining: newState.safehouse.turnsRemaining - 1 };
+        if (newState.safehouse.turnsRemaining <= 0) {
+          newState.safehouse = null;
+          newState.pendingNotifications = [...newState.pendingNotifications, {
+            type: 'warning' as const, title: '🏠 Safehouse Expired',
+            message: 'Your safehouse has been dismantled.',
+          }];
+        }
+      }
       
       const seasons = ['spring', 'summer', 'fall', 'winter'] as const;
       newState.season = seasons[Math.floor((newState.turn - 1) / 3) % 4];
@@ -1300,6 +1527,17 @@ export const useEnhancedMafiaGameState = (
       // Base chance: 80% if outnumbering, 20% if not
       let chance = playerUnits.length > enemyUnits.length ? 0.8 : 0.2;
       
+      // Apply fortified defense bonus for defenders
+      const fortifiedDefenders = enemyUnits.filter(u => u.fortified);
+      if (fortifiedDefenders.length > 0) {
+        chance -= FORTIFY_DEFENSE_BONUS / 100;
+      }
+      // Apply fortified bonus for player attackers (shouldn't normally be fortified when attacking, but check)
+      const fortifiedAttackers = playerUnits.filter(u => u.fortified);
+      if (fortifiedAttackers.length > 0) {
+        chance += FORTIFY_DEFENSE_BONUS / 200; // Half bonus for fortified attackers
+      }
+      
       // Apply family combat bonus
       chance += state.familyBonuses.combatBonus / 100;
       
@@ -1573,5 +1811,8 @@ export const useEnhancedMafiaGameState = (
     deployUnit,
     isWinner,
     clearNotifications,
+    fortifyUnit,
+    setMoveAction,
+    startEscort,
   };
 };

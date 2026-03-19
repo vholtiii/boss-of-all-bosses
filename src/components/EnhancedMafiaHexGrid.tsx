@@ -6,6 +6,7 @@ import { ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
+import { ScoutedHex, Safehouse } from '@/types/game-mechanics';
 
 interface EnhancedMafiaHexGridProps {
   width: number;
@@ -318,6 +319,37 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     {tile.isHeadquarters ? '🏛️' : tile.business ? (businessIcons[tile.business.type] || '🏢') : ''}
                   </text>
 
+                  {/* Scouted hex indicator */}
+                  {gameState?.scoutedHexes?.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s) && (
+                    <g className="pointer-events-none">
+                      <circle cx={x + baseHexRadius * 0.55} cy={y - baseHexRadius * 0.55} r="8" fill="#3B82F6" stroke="#ffffff" strokeWidth="1" />
+                      <text x={x + baseHexRadius * 0.55} y={y - baseHexRadius * 0.55 + 3.5} textAnchor="middle" fontSize="9" className="select-none">👁️</text>
+                    </g>
+                  )}
+
+                  {/* Safehouse indicator */}
+                  {gameState?.safehouse && gameState.safehouse.q === tile.q && gameState.safehouse.r === tile.r && gameState.safehouse.s === tile.s && (
+                    <g className="pointer-events-none">
+                      <circle cx={x - baseHexRadius * 0.55} cy={y - baseHexRadius * 0.55} r="8" fill="#F59E0B" stroke="#ffffff" strokeWidth="1" />
+                      <text x={x - baseHexRadius * 0.55} y={y - baseHexRadius * 0.55 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🏠</text>
+                    </g>
+                  )}
+
+                  {/* Fortified units indicator */}
+                  {(() => {
+                    const key2 = `${tile.q},${tile.r},${tile.s}`;
+                    const fortifiedHere = (gameState?.deployedUnits || []).filter((u: DeployedUnit) => 
+                      u.fortified && u.q === tile.q && u.r === tile.r && u.s === tile.s
+                    );
+                    if (fortifiedHere.length === 0) return null;
+                    return (
+                      <g className="pointer-events-none">
+                        <circle cx={x} cy={y - baseHexRadius * 0.7} r="8" fill="#10B981" stroke="#ffffff" strokeWidth="1" />
+                        <text x={x} y={y - baseHexRadius * 0.7 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🛡️</text>
+                      </g>
+                    );
+                  })()}
+
                   {/* Income on hover */}
                   {isHovered && tile.business && (
                     <text x={x} y={y + baseHexRadius + 12} textAnchor="middle" fontSize="9" fill="#ffffff" fontWeight="600" className="pointer-events-none">
@@ -514,6 +546,18 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               {hoveredHex.isHeadquarters && (
                 <p className="text-mafia-gold font-bold">🏛️ {hoveredHex.isHeadquarters.toUpperCase()} HQ</p>
               )}
+              {/* Scouted intel */}
+              {(() => {
+                const scoutInfo = (gameState?.scoutedHexes || []).find((s: ScoutedHex) => s.q === hoveredHex.q && s.r === hoveredHex.r && s.s === hoveredHex.s);
+                if (!scoutInfo) return null;
+                return (
+                  <div className="mt-1 p-1.5 rounded bg-blue-900/40 border border-blue-500/30">
+                    <p className="text-blue-300 font-bold text-xs">👁️ SCOUTED ({scoutInfo.turnsRemaining}t left)</p>
+                    <p><span className="text-muted-foreground">Enemy:</span> {scoutInfo.enemySoldierCount} units ({scoutInfo.enemyFamily})</p>
+                    {scoutInfo.businessType && <p><span className="text-muted-foreground">Business:</span> {scoutInfo.businessType} (${scoutInfo.businessIncome?.toLocaleString()}/turn)</p>}
+                  </div>
+                );
+              })()}
               {(() => {
                 const key = `${hoveredHex.q},${hoveredHex.r},${hoveredHex.s}`;
                 const units = unitsByHex.get(key) || [];
@@ -521,7 +565,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 return units.map(u => (
                   <p key={u.id} className={u.family === playerFamily ? 'text-green-400' : 'text-red-400'}>
                     {u.type === 'capo' ? `👔 ${u.name} (Lvl ${u.level})${u.personality ? ` ${u.personality === 'diplomat' ? '🕊️' : u.personality === 'enforcer' ? '💪' : '🧠'}` : ''}` : '👤 Soldier'} — {u.family.toUpperCase()}
-                    {u.family === playerFamily && ` (${u.movesRemaining} moves)`}
+                    {u.family === playerFamily && ` (${u.movesRemaining} moves${u.fortified ? ', 🛡️ Fortified' : ''})`}
                   </p>
                 ));
               })()}
