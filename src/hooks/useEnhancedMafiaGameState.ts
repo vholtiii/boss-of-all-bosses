@@ -51,7 +51,7 @@ export interface EnhancedMafiaGameState {
   // UI state
   selectedTerritory?: any;
   activeEvent?: GameEvent;
-  showMissionBoard: boolean;
+  
   
   // Movement state
   movementPhase: boolean;
