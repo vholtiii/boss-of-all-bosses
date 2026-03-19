@@ -520,7 +520,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 if (units.length === 0) return null;
                 return units.map(u => (
                   <p key={u.id} className={u.family === playerFamily ? 'text-green-400' : 'text-red-400'}>
-                    {u.type === 'capo' ? `👔 ${u.name} (Lvl ${u.level})` : '👤 Soldier'} — {u.family.toUpperCase()}
+                    {u.type === 'capo' ? `👔 ${u.name} (Lvl ${u.level})${u.personality ? ` ${u.personality === 'diplomat' ? '🕊️' : u.personality === 'enforcer' ? '💪' : '🧠'}` : ''}` : '👤 Soldier'} — {u.family.toUpperCase()}
                     {u.family === playerFamily && ` (${u.movesRemaining} moves)`}
                   </p>
                 ));
