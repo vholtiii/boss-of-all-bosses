@@ -221,8 +221,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Corruption"
           icon={<Gavel className="h-4 w-4" />}
-          isOpen={openSection === 'corruption'}
-          onToggle={() => toggle('corruption')}
+          isOpen={!actionsLocked && openSection === 'corruption'}
+          onToggle={() => !actionsLocked && toggle('corruption')}
+          disabled={actionsLocked}
         >
           <CorruptionPanel
             money={resources.money}
