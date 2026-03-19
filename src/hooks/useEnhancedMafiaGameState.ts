@@ -97,6 +97,8 @@ export interface EnhancedMafiaGameState {
   soldierStats: Record<string, SoldierStats>;
   hitmen: Hitman[];
   activeBribes: BribeContract[];
+  alliances: AlliancePact[];
+  ceasefires: CeasefirePact[];
   victoryProgress: VictoryProgress;
   victoryType: VictoryType;
   familyBonuses: FamilyBonuses;
