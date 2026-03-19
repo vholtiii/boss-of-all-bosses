@@ -343,8 +343,6 @@ export const useEnhancedMafiaGameState = (
       // Process seasonal events
       processSeasonalEvents(newState);
       
-      // Process missions
-      processMissions(newState);
       
       // Process technology research
       processTechnology(newState);
