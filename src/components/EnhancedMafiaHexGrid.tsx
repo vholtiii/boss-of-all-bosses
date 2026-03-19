@@ -78,8 +78,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey) {
         switch (event.key) {
-          case '=': case '+': event.preventDefault(); setZoom(prev => Math.min(prev + 0.1, 2)); break;
-          case '-': event.preventDefault(); setZoom(prev => Math.max(prev - 0.1, 0.5)); break;
+          case '=': case '+': event.preventDefault(); setZoom(prev => Math.min(prev + 0.1, 2.5)); break;
+          case '-': event.preventDefault(); setZoom(prev => Math.max(prev - 0.1, 0.3)); break;
           case '0': event.preventDefault(); setZoom(1); break;
         }
       }
