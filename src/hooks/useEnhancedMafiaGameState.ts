@@ -999,6 +999,27 @@ export const useEnhancedMafiaGameState = (
       const newState = { ...prev };
       newState.turn += 1;
       
+      // Snapshot before-state for turn report
+      const prevMoney = newState.resources.money;
+      const prevSoldierCount = newState.deployedUnits.filter(u => u.family === newState.playerFamily).length;
+      const prevRespect = newState.reputation.respect;
+      const prevPlayerHexes = new Set(
+        newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).map(t => `${t.q},${t.r},${t.s}`)
+      );
+
+      // Initialize turn report
+      const turnReport: TurnReport = {
+        turn: newState.turn,
+        income: 0,
+        maintenance: 0,
+        netIncome: 0,
+        aiActions: [],
+        events: [],
+        resourceDeltas: { money: 0, soldiers: 0, respect: 0, territories: 0 },
+        territoriesLost: [],
+        territoriesGained: [],
+      };
+
       // Reset to deploy phase for next turn
       newState.turnPhase = 'deploy';
       newState.movementPhase = false;
@@ -1034,9 +1055,16 @@ export const useEnhancedMafiaGameState = (
       newState.season = seasons[Math.floor((newState.turn - 1) / 3) % 4];
       
       processEconomy(newState);
-      processAITurn(newState);
+      turnReport.income = newState.finances.totalIncome;
+      turnReport.maintenance = newState.finances.totalExpenses;
+      turnReport.netIncome = newState.finances.totalProfit;
+
+      processAITurn(newState, turnReport);
       processWeather(newState);
       processEvents(newState);
+      if (newState.events.length > 0) {
+        newState.events.forEach(e => turnReport.events.push(e.title));
+      }
       processBribes(newState);
       processPacts(newState);
       
