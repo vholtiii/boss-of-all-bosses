@@ -37,6 +37,10 @@ export const useSoundSystem = () => {
       money: { freq: 1200, duration: 0.2, type: 'sine' },
       levelup: { freq: 1500, duration: 0.5, type: 'sine' },
       danger: { freq: 400, duration: 1.0, type: 'sawtooth' },
+      hit_success: { freq: 180, duration: 0.6, type: 'square' },
+      hit_fail: { freq: 250, duration: 0.7, type: 'sawtooth' },
+      extort_success: { freq: 1400, duration: 0.25, type: 'sine' },
+      extort_fail: { freq: 200, duration: 0.4, type: 'sawtooth' },
     };
 
     const preset = soundPresets[type as keyof typeof soundPresets] || soundPresets.click;

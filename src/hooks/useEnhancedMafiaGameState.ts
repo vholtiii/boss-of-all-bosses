@@ -2009,9 +2009,17 @@ export const useEnhancedMafiaGameState = (
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
+        const extortDetails = `+$3,000, +5 respect${casualties > 0 ? `, ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}` : ''}`;
+        state.lastCombatResult = {
+          q: targetQ, r: targetR, s: targetS,
+          success: true, type: 'extort',
+          title: 'EXTORTION SUCCESSFUL!',
+          details: extortDetails,
+          timestamp: Date.now(),
+        };
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: 'Extortion Successful!',
-          message: `Territory claimed! +$3,000, +5 respect.`,
+          message: `Territory claimed! ${extortDetails}.`,
         }];
       } else {
         const casualties = Math.max(1, Math.floor(playerUnits.length * 0.2));
@@ -2019,6 +2027,14 @@ export const useEnhancedMafiaGameState = (
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
+        const failDetails = `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} — resistance was strong`;
+        state.lastCombatResult = {
+          q: targetQ, r: targetR, s: targetS,
+          success: false, type: 'extort',
+          title: 'EXTORTION FAILED!',
+          details: failDetails,
+          timestamp: Date.now(),
+        };
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'error', title: 'Extortion Failed!',
           message: `Resistance was stronger than expected. ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}.`,
