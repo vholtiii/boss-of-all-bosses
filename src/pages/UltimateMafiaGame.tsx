@@ -13,6 +13,7 @@ import { useSoundSystem } from '@/hooks/useSoundSystem';
 import SaveLoadDialog from '@/components/SaveLoadDialog';
 import TutorialSystem from '@/components/TutorialSystem';
 import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
+import FamilySelectionScreen from '@/components/FamilySelectionScreen';
 import { Button } from '@/components/ui/button';
 import { 
   Play, 
@@ -26,10 +27,18 @@ import {
   Brain,
   Target,
   Cloud,
-  Zap
+  Zap,
+  SkipForward
 } from 'lucide-react';
 
-const GameContent: React.FC = () => {
+type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
+
+interface GameConfig {
+  family: FamilyId;
+  resources: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number };
+}
+
+const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
   const {
     gameState,
     endTurn,
@@ -46,7 +55,7 @@ const GameContent: React.FC = () => {
     selectUnitFromHeadquarters,
     deployUnit,
     isWinner
-  } = useEnhancedMafiaGameState();
+  } = useEnhancedMafiaGameState(config.family, config.resources);
 
   // Handle action wrapper function
   const handleAction = useCallback((action: any) => {
@@ -99,7 +108,7 @@ const GameContent: React.FC = () => {
       content: (
         <div className="h-full">
           <EnhancedMafiaHexGrid 
-            key={`hex-grid-refresh-${Date.now()}`}
+            key="hex-grid-mobile"
             width={12}
             height={12}
             onBusinessClick={(business) => {
@@ -329,6 +338,18 @@ const GameContent: React.FC = () => {
         >
           <Info className="h-4 w-4" />
         </Button>
+        <Button
+          onClick={() => {
+            playSound('notification');
+            endTurn();
+          }}
+          size="sm"
+          className="bg-primary text-primary-foreground font-bold font-playfair hover:bg-primary/90"
+          disabled={gameState.legalStatus.jailTime > 0}
+        >
+          <SkipForward className="h-4 w-4 mr-2" />
+          {gameState.legalStatus.jailTime > 0 ? `JAILED (${gameState.legalStatus.jailTime})` : 'END TURN'}
+        </Button>
       </div>
     </div>
   );
@@ -416,7 +437,7 @@ const GameContent: React.FC = () => {
       )} />
       
           <EnhancedMafiaHexGrid 
-            key={`hex-grid-refresh-${Date.now()}`}
+            key="hex-grid-desktop"
             width={12}
             height={12}
             onBusinessClick={(business) => {
@@ -647,9 +668,19 @@ const AIOpponentsPanel: React.FC<{ gameState: any }> = ({ gameState }) => {
 };
 
 const UltimateMafiaGame: React.FC = () => {
+  const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
+
+  if (!gameConfig) {
+    return (
+      <FamilySelectionScreen
+        onSelectFamily={(family, resources) => setGameConfig({ family, resources })}
+      />
+    );
+  }
+
   return (
     <NotificationProvider>
-      <GameContent />
+      <GameContent config={gameConfig} />
     </NotificationProvider>
   );
 };

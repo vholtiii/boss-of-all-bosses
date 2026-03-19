@@ -117,17 +117,56 @@ export interface EnhancedMafiaGameState {
   }>;
 }
 
-const initialEnhancedGameState: EnhancedMafiaGameState = {
-  playerFamily: 'gambino',
+const generateInitialTerritories = (playerFamily: string): EnhancedMafiaGameState['territories'] => {
+  const districts = ['Little Italy', 'Bronx', 'Brooklyn', 'Queens', 'Manhattan', 'Staten Island'] as const;
+  const familyAssignments: Record<string, typeof districts[number][]> = {
+    gambino: ['Little Italy'],
+    genovese: ['Manhattan'],
+    lucchese: ['Queens'],
+    bonanno: ['Staten Island'],
+    colombo: ['Brooklyn'],
+  };
+  const businessTypes = ['restaurant', 'nightclub', 'casino', 'docks', 'construction'];
+
+  return districts.map(district => {
+    const ownerEntry = Object.entries(familyAssignments).find(([, dists]) => dists.includes(district));
+    const owner = ownerEntry ? ownerEntry[0] : 'neutral';
+    const numBusinesses = district === 'Manhattan' ? 4 : district === 'Bronx' ? 2 : 3;
+    
+    const businesses = Array.from({ length: numBusinesses }, (_, i) => ({
+      q: Math.floor(Math.random() * 10) - 5,
+      r: Math.floor(Math.random() * 10) - 5,
+      s: 0,
+      businessId: `${district.toLowerCase().replace(' ', '_')}_biz_${i}`,
+      businessType: businessTypes[i % businessTypes.length],
+      isLegal: i % 2 === 0,
+      income: 3000 + Math.floor(Math.random() * 5000),
+      district,
+      family: owner as any,
+      isExtorted: false,
+      heatLevel: 0,
+      soldiers: owner !== 'neutral' ? { count: 1, family: owner as any } : undefined,
+      capo: i === 0 && owner !== 'neutral' ? { name: `Capo ${district}`, family: owner as any, level: 1 } : undefined,
+    }));
+
+    return { district, family: owner as any, businesses };
+  });
+};
+
+const createInitialGameState = (
+  family: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo' = 'gambino',
+  startingResources?: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number }
+): EnhancedMafiaGameState => ({
+  playerFamily: family,
   turn: 1,
   season: 'spring',
   
   resources: {
-    money: 50000,
-    respect: 25,
-    soldiers: 5, // Everyone starts with 5 soldiers
-    influence: 10,
-    politicalPower: 30,
+    money: startingResources?.money ?? 50000,
+    respect: startingResources?.respect ?? 25,
+    soldiers: startingResources?.soldiers ?? 5,
+    influence: startingResources?.influence ?? 10,
+    politicalPower: startingResources?.politicalPower ?? 30,
     loyalty: 75,
     researchPoints: 0,
   },
@@ -136,13 +175,7 @@ const initialEnhancedGameState: EnhancedMafiaGameState = {
     territoryBattles: [],
     soldierTraining: {
       level: 1,
-      equipment: {
-        weapons: 'basic',
-        armor: 'none',
-        vehicles: 'none',
-        cost: 0,
-        effectiveness: 0,
-      },
+      equipment: { weapons: 'basic', armor: 'none', vehicles: 'none', cost: 0, effectiveness: 0 },
       specialization: 'enforcer',
       experience: 0,
     },
@@ -151,111 +184,57 @@ const initialEnhancedGameState: EnhancedMafiaGameState = {
   
   economy: {
     marketConditions: [
-      {
-        type: 'stable',
-        sector: 'legal',
-        modifier: 0,
-        duration: 5,
-        description: 'Legal businesses operating normally',
-      },
+      { type: 'stable', sector: 'legal', modifier: 0, duration: 5, description: 'Legal businesses operating normally' },
     ],
     supplyChains: [],
     investments: [],
     economicEvents: [],
   },
   
-  aiOpponents: [
-    {
-      family: 'genovese',
-      personality: 'aggressive',
-      resources: { money: 45000, soldiers: 5, influence: 8 }, // All start with 5 soldiers
-      strategy: {
-        primaryGoal: 'territory',
-        riskTolerance: 70,
-        aggressionLevel: 80,
-        cooperationTendency: 30,
-        focusAreas: ['Manhattan', 'Bronx'],
-      },
-      relationships: { gambino: -20, lucchese: 10, bonanno: -10, colombo: 5 },
-      lastAction: null,
-      nextAction: null,
-    },
-    {
-      family: 'lucchese',
-      personality: 'opportunistic',
-      resources: { money: 38000, soldiers: 5, influence: 12 }, // All start with 5 soldiers
-      strategy: {
-        primaryGoal: 'money',
-        riskTolerance: 50,
-        aggressionLevel: 40,
-        cooperationTendency: 60,
-        focusAreas: ['Brooklyn', 'Queens'],
-      },
-      relationships: { gambino: 15, genovese: 10, bonanno: 20, colombo: -5 },
-      lastAction: null,
-      nextAction: null,
-    },
-    {
-      family: 'bonanno',
-      personality: 'defensive',
-      resources: { money: 42000, soldiers: 5, influence: 6 }, // All start with 5 soldiers
-      strategy: {
-        primaryGoal: 'reputation',
-        riskTolerance: 30,
-        aggressionLevel: 25,
-        cooperationTendency: 70,
-        focusAreas: ['Staten Island', 'Little Italy'],
-      },
-      relationships: { gambino: 5, genovese: -10, lucchese: 20, colombo: 15 },
-      lastAction: null,
-      nextAction: null,
-    },
-    {
-      family: 'colombo',
-      personality: 'unpredictable',
-      resources: { money: 35000, soldiers: 5, influence: 15 }, // All start with 5 soldiers
-      strategy: {
-        primaryGoal: 'elimination',
-        riskTolerance: 90,
-        aggressionLevel: 95,
-        cooperationTendency: 10,
-        focusAreas: ['Queens', 'Brooklyn'],
-      },
-      relationships: { gambino: -30, genovese: 5, lucchese: -5, bonanno: 15 },
-      lastAction: null,
-      nextAction: null,
-    },
-  ],
+  aiOpponents: (['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'] as const)
+    .filter(f => f !== family)
+    .map(f => {
+      const personalities: Record<string, any> = {
+        gambino: { personality: 'diplomatic', aggressionLevel: 50, cooperationTendency: 60, primaryGoal: 'money', riskTolerance: 40, focusAreas: ['Little Italy', 'Manhattan'] },
+        genovese: { personality: 'aggressive', aggressionLevel: 80, cooperationTendency: 30, primaryGoal: 'territory', riskTolerance: 70, focusAreas: ['Manhattan', 'Bronx'] },
+        lucchese: { personality: 'opportunistic', aggressionLevel: 40, cooperationTendency: 60, primaryGoal: 'money', riskTolerance: 50, focusAreas: ['Brooklyn', 'Queens'] },
+        bonanno: { personality: 'defensive', aggressionLevel: 25, cooperationTendency: 70, primaryGoal: 'reputation', riskTolerance: 30, focusAreas: ['Staten Island', 'Little Italy'] },
+        colombo: { personality: 'unpredictable', aggressionLevel: 95, cooperationTendency: 10, primaryGoal: 'elimination', riskTolerance: 90, focusAreas: ['Queens', 'Brooklyn'] },
+      };
+      const p = personalities[f];
+      const otherFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'].filter(x => x !== f);
+      const relationships: Record<string, number> = {};
+      otherFamilies.forEach(x => { relationships[x] = Math.floor(Math.random() * 40) - 20; });
+
+      return {
+        family: f,
+        personality: p.personality,
+        resources: { money: 35000 + Math.floor(Math.random() * 15000), soldiers: 5, influence: 8 + Math.floor(Math.random() * 8) },
+        strategy: {
+          primaryGoal: p.primaryGoal,
+          riskTolerance: p.riskTolerance,
+          aggressionLevel: p.aggressionLevel,
+          cooperationTendency: p.cooperationTendency,
+          focusAreas: p.focusAreas,
+        },
+        relationships,
+        lastAction: null,
+        nextAction: null,
+      };
+    }),
   
   events: [],
   missions: [
     {
       id: 'tutorial-1',
       title: 'First Territory',
-      description: 'Establish your first business operation in Little Italy',
+      description: 'Establish control in your home district',
       type: 'story',
       difficulty: 'easy',
-      objectives: [
-        {
-          id: 'obj-1',
-          description: 'Acquire a business in Little Italy',
-          type: 'collect',
-          target: 'Little Italy',
-          amount: 1,
-          completed: false,
-        },
-      ],
+      objectives: [{ id: 'obj-1', description: 'Control a territory', type: 'collect', target: 'territory', amount: 1, completed: false }],
       rewards: [
-        {
-          type: 'money',
-          amount: 10000,
-          description: 'Startup capital bonus',
-        },
-        {
-          type: 'reputation',
-          amount: 5,
-          description: 'Respect from the neighborhood',
-        },
+        { type: 'money', amount: 10000, description: 'Startup capital bonus' },
+        { type: 'reputation', amount: 5, description: 'Respect from the neighborhood' },
       ],
       status: 'available',
       progress: 0,
@@ -263,12 +242,7 @@ const initialEnhancedGameState: EnhancedMafiaGameState = {
   ],
   
   weather: {
-    currentWeather: {
-      type: 'clear',
-      intensity: 0,
-      duration: 3,
-      description: 'Clear skies, perfect for business',
-    },
+    currentWeather: { type: 'clear', intensity: 0, duration: 3, description: 'Clear skies, perfect for business' },
     forecast: [],
     effects: [],
   },
@@ -276,28 +250,8 @@ const initialEnhancedGameState: EnhancedMafiaGameState = {
   technology: {
     researched: [],
     available: [
-      {
-        id: 'wiretapping',
-        name: 'Wiretapping',
-        description: 'Listen in on rival family communications',
-        category: 'intelligence',
-        cost: 15000,
-        researchTime: 3,
-        prerequisites: [],
-        effects: { combat: 20 },
-        unlocked: false,
-      },
-      {
-        id: 'armored_cars',
-        name: 'Armored Vehicles',
-        description: 'Protect your soldiers with armored vehicles',
-        category: 'combat',
-        cost: 25000,
-        researchTime: 5,
-        prerequisites: [],
-        effects: { combat: 15 },
-        unlocked: false,
-      },
+      { id: 'wiretapping', name: 'Wiretapping', description: 'Listen in on rival family communications', category: 'intelligence', cost: 15000, researchTime: 3, prerequisites: [], effects: { combat: 20 }, unlocked: false },
+      { id: 'armored_cars', name: 'Armored Vehicles', description: 'Protect your soldiers with armored vehicles', category: 'combat', cost: 25000, researchTime: 5, prerequisites: [], effects: { combat: 15 }, unlocked: false },
     ],
     researchProgress: {},
   },
@@ -305,145 +259,81 @@ const initialEnhancedGameState: EnhancedMafiaGameState = {
   seasonalEvents: [],
   
   reputation: {
-    respect: 25,
+    respect: startingResources?.respect ?? 25,
     reputation: 20,
     loyalty: 75,
     fear: 15,
-    streetInfluence: 10,
-    familyRelationships: {
-      genovese: -20,
-      lucchese: 15,
-      bonanno: 5,
-      colombo: -30,
-    },
-    publicPerception: {
-      criminal: 60,
-      businessman: 30,
-      philanthropist: 10,
-    },
+    streetInfluence: startingResources?.influence ?? 10,
+    familyRelationships: Object.fromEntries(
+      ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo']
+        .filter(f => f !== family)
+        .map(f => [f, Math.floor(Math.random() * 30) - 15])
+    ),
+    publicPerception: { criminal: 60, businessman: 30, philanthropist: 10 },
     reputationHistory: [],
     achievements: [],
   },
   
   violentActions: [],
   businesses: [],
-  finances: {
-    totalIncome: 0,
-    totalExpenses: 0,
-    legalProfit: 0,
-    illegalProfit: 0,
-    totalProfit: 0,
-    dirtyMoney: 0,
-    cleanMoney: 0,
-    legalCosts: 0,
-  },
-  legalStatus: {
-    charges: [],
-    lawyer: null,
-    jailTime: 0,
-    prosecutionRisk: 10,
-    totalLegalCosts: 0,
-  },
-  policeHeat: {
-    level: 15,
-    reductionPerTurn: 2,
-    bribedOfficials: [],
-    arrests: [],
-    rattingRisk: 5,
-  },
+  finances: { totalIncome: 0, totalExpenses: 0, legalProfit: 0, illegalProfit: 0, totalProfit: 0, dirtyMoney: 0, cleanMoney: 0, legalCosts: 0 },
+  legalStatus: { charges: [], lawyer: null, jailTime: 0, prosecutionRisk: 10, totalLegalCosts: 0 },
+  policeHeat: { level: 15, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 },
   
   selectedTerritory: null,
   activeEvent: null,
   showMissionBoard: false,
   
-  // Movement state
   movementPhase: false,
-  selectedUnit: {
-    type: null,
-    location: null,
-    remainingMoves: 0,
-  },
+  selectedUnit: { type: null, location: null, remainingMoves: 0 },
   availableMoves: [],
   
-  // Headquarters and Units System
   headquarters: {
     gambino: { q: -5, r: 5, s: 0, district: 'Little Italy' },
-    genovese: { q: 5, r: -5, s: 0, district: 'Brooklyn Heights' },
+    genovese: { q: 5, r: -5, s: 0, district: 'Manhattan' },
     lucchese: { q: -5, r: -5, s: 10, district: 'Queens' },
     bonanno: { q: 5, r: 5, s: -10, district: 'Staten Island' },
-    colombo: { q: 0, r: 0, s: 0, district: 'Manhattan' },
+    colombo: { q: 0, r: 0, s: 0, district: 'Brooklyn' },
   },
   units: {
     gambino: {
-      soldiers: [
-        { q: -5, r: 5, s: 0, id: 'gambino-soldier-1' },
-        { q: -5, r: 5, s: 0, id: 'gambino-soldier-2' },
-        { q: -5, r: 5, s: 0, id: 'gambino-soldier-3' }
-      ],
-      capos: [
-        { q: -5, r: 5, s: 0, id: 'gambino-capo-1' }
-      ],
-      boss: { q: -5, r: 5, s: 0, id: 'gambino-boss' }
+      soldiers: [{ q: -5, r: 5, s: 0, id: 'gambino-soldier-1' }, { q: -5, r: 5, s: 0, id: 'gambino-soldier-2' }, { q: -5, r: 5, s: 0, id: 'gambino-soldier-3' }],
+      capos: [{ q: -5, r: 5, s: 0, id: 'gambino-capo-1' }],
+      boss: { q: -5, r: 5, s: 0, id: 'gambino-boss' },
     },
     genovese: {
-      soldiers: [
-        { q: 5, r: -5, s: 0, id: 'genovese-soldier-1' },
-        { q: 5, r: -5, s: 0, id: 'genovese-soldier-2' },
-        { q: 5, r: -5, s: 0, id: 'genovese-soldier-3' }
-      ],
-      capos: [
-        { q: 5, r: -5, s: 0, id: 'genovese-capo-1' }
-      ],
-      boss: { q: 5, r: -5, s: 0, id: 'genovese-boss' }
+      soldiers: [{ q: 5, r: -5, s: 0, id: 'genovese-soldier-1' }, { q: 5, r: -5, s: 0, id: 'genovese-soldier-2' }, { q: 5, r: -5, s: 0, id: 'genovese-soldier-3' }],
+      capos: [{ q: 5, r: -5, s: 0, id: 'genovese-capo-1' }],
+      boss: { q: 5, r: -5, s: 0, id: 'genovese-boss' },
     },
     lucchese: {
-      soldiers: [
-        { q: -5, r: -5, s: 10, id: 'lucchese-soldier-1' },
-        { q: -5, r: -5, s: 10, id: 'lucchese-soldier-2' },
-        { q: -5, r: -5, s: 10, id: 'lucchese-soldier-3' }
-      ],
-      capos: [
-        { q: -5, r: -5, s: 10, id: 'lucchese-capo-1' }
-      ],
-      boss: { q: -5, r: -5, s: 10, id: 'lucchese-boss' }
+      soldiers: [{ q: -5, r: -5, s: 10, id: 'lucchese-soldier-1' }, { q: -5, r: -5, s: 10, id: 'lucchese-soldier-2' }, { q: -5, r: -5, s: 10, id: 'lucchese-soldier-3' }],
+      capos: [{ q: -5, r: -5, s: 10, id: 'lucchese-capo-1' }],
+      boss: { q: -5, r: -5, s: 10, id: 'lucchese-boss' },
     },
     bonanno: {
-      soldiers: [
-        { q: 5, r: 5, s: -10, id: 'bonanno-soldier-1' },
-        { q: 5, r: 5, s: -10, id: 'bonanno-soldier-2' },
-        { q: 5, r: 5, s: -10, id: 'bonanno-soldier-3' }
-      ],
-      capos: [
-        { q: 5, r: 5, s: -10, id: 'bonanno-capo-1' }
-      ],
-      boss: { q: 5, r: 5, s: -10, id: 'bonanno-boss' }
+      soldiers: [{ q: 5, r: 5, s: -10, id: 'bonanno-soldier-1' }, { q: 5, r: 5, s: -10, id: 'bonanno-soldier-2' }, { q: 5, r: 5, s: -10, id: 'bonanno-soldier-3' }],
+      capos: [{ q: 5, r: 5, s: -10, id: 'bonanno-capo-1' }],
+      boss: { q: 5, r: 5, s: -10, id: 'bonanno-boss' },
     },
     colombo: {
-      soldiers: [
-        { q: 0, r: 0, s: 0, id: 'colombo-soldier-1' },
-        { q: 0, r: 0, s: 0, id: 'colombo-soldier-2' },
-        { q: 0, r: 0, s: 0, id: 'colombo-soldier-3' }
-      ],
-      capos: [
-        { q: 0, r: 0, s: 0, id: 'colombo-capo-1' }
-      ],
-      boss: { q: 0, r: 0, s: 0, id: 'colombo-boss' }
+      soldiers: [{ q: 0, r: 0, s: 0, id: 'colombo-soldier-1' }, { q: 0, r: 0, s: 0, id: 'colombo-soldier-2' }, { q: 0, r: 0, s: 0, id: 'colombo-soldier-3' }],
+      capos: [{ q: 0, r: 0, s: 0, id: 'colombo-capo-1' }],
+      boss: { q: 0, r: 0, s: 0, id: 'colombo-boss' },
     },
   },
   
-  familyControl: {
-    gambino: 20,
-    genovese: 20,
-    lucchese: 20,
-    bonanno: 20,
-    colombo: 20,
-  },
-  
-  territories: [], // Will be populated by the hex grid component
-};
+  familyControl: { gambino: 20, genovese: 20, lucchese: 20, bonanno: 20, colombo: 20 },
+  territories: generateInitialTerritories(family),
+});
 
-export const useEnhancedMafiaGameState = () => {
-  const [gameState, setGameState] = useState<EnhancedMafiaGameState>(initialEnhancedGameState);
+export const useEnhancedMafiaGameState = (
+  initialFamily?: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo',
+  startingResources?: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number }
+) => {
+  const [gameState, setGameState] = useState<EnhancedMafiaGameState>(() => 
+    createInitialGameState(initialFamily || 'gambino', startingResources)
+  );
 
   // Enhanced turn processing
   const endTurn = useCallback(() => {
