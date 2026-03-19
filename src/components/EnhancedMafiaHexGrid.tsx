@@ -154,6 +154,13 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       }
     }
 
+    // HQ click — during deploy phase, just toggle unit visibility (no modal)
+    if (tile.isHeadquarters && turnPhase === 'deploy' && tile.isHeadquarters === playerFamily) {
+      const hqKey = `${tile.q},${tile.r},${tile.s}`;
+      setExpandedHQKey(prev => prev === hqKey ? null : hqKey);
+      return;
+    }
+
     // HQ click — toggle unit icons and open headquarters panel
     if (tile.isHeadquarters) {
       const hqKey = `${tile.q},${tile.r},${tile.s}`;
