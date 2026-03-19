@@ -32,6 +32,7 @@ export interface DeployedUnit {
   maxMoves: number;
   level: number;
   name?: string;
+  personality?: CapoPersonality;
 }
 
 // ============ HEX TILE ============
