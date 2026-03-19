@@ -265,26 +265,51 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       }
     }
 
-    // Action phase — show context menu if player has soldiers on enemy/neutral hex
+    // Action phase — unit-first selection flow
     if (turnPhase === 'action') {
       const key = `${tile.q},${tile.r},${tile.s}`;
       const unitsHere = unitsByHex.get(key) || [];
       const playerUnitsHere = unitsHere.filter(u => u.family === playerFamily);
-      const playerSoldiersHere = playerUnitsHere.filter(u => u.type === 'soldier');
-      const playerCaposHere = playerUnitsHere.filter(u => u.type === 'capo');
       
-      if (playerUnitsHere.length > 0) {
+      // If no unit selected yet, try to select a player unit on this hex
+      if (!gameState?.selectedUnitId) {
+        if (playerUnitsHere.length > 0 && onSelectUnit) {
+          // Prefer soldiers for action selection, fall back to capos
+          const soldier = playerUnitsHere.find(u => u.type === 'soldier');
+          const capo = playerUnitsHere.find(u => u.type === 'capo');
+          const unitToSelect = soldier || capo;
+          if (unitToSelect) {
+            onSelectUnit(unitToSelect.type, { q: tile.q, r: tile.r, s: tile.s });
+          }
+        }
+        setActionMenu(null);
+        return;
+      }
+      
+      // A unit is selected — check if this hex is a valid action target (highlighted)
+      const isValidTarget = gameState.availableMoveHexes?.some(
+        (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
+      );
+      
+      if (isValidTarget) {
+        // Show context-sensitive action menu for the selected unit on this target
+        const selectedUnit = (gameState.deployedUnits || []).find((u: DeployedUnit) => u.id === gameState.selectedUnitId);
+        if (!selectedUnit) { setActionMenu(null); return; }
+        
         const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== playerFamily;
         const isNeutral = tile.controllingFamily === 'neutral';
         const isOwned = tile.controllingFamily === playerFamily;
         
-        const canHit = isEnemy && !tile.isHeadquarters && playerSoldiersHere.length > 0;
-        const canExtort = isNeutral && !tile.isHeadquarters && playerSoldiersHere.length > 0;
-        const canClaim = isNeutral && !tile.isHeadquarters && playerSoldiersHere.length > 0;
-        const canNegotiate = isEnemy && !tile.isHeadquarters && playerCaposHere.length > 0;
-        const canSabotage = isEnemy && !tile.isHeadquarters && playerSoldiersHere.length > 0 && !!tile.business;
-        const canSafehouse = isOwned && !tile.isHeadquarters && playerUnitsHere.length > 0;
-        const negotiateCapoId = playerCaposHere[0]?.id;
+        const isSoldier = selectedUnit.type === 'soldier';
+        const isCapo = selectedUnit.type === 'capo';
+        
+        const canHit = isEnemy && isSoldier;
+        const canExtort = (isNeutral || (isEnemy && !!tile.business)) && isSoldier;
+        const canClaim = isNeutral && isSoldier;
+        const canNegotiate = isEnemy && isCapo;
+        const canSabotage = isEnemy && isSoldier && !!tile.business;
+        const canSafehouse = isOwned && !tile.isHeadquarters;
+        const negotiateCapoId = isCapo ? selectedUnit.id : undefined;
         
         if (canHit || canExtort || canClaim || canNegotiate || canSabotage || canSafehouse) {
           if (actionMenu && actionMenu.tile.q === tile.q && actionMenu.tile.r === tile.r) {
@@ -295,7 +320,18 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           return;
         }
       }
+      
+      // Clicking a non-target hex or own hex with units — try to select a different unit
+      if (playerUnitsHere.length > 0 && onSelectUnit) {
+        const soldier = playerUnitsHere.find(u => u.type === 'soldier');
+        const capo = playerUnitsHere.find(u => u.type === 'capo');
+        const unitToSelect = soldier || capo;
+        if (unitToSelect) {
+          onSelectUnit(unitToSelect.type, { q: tile.q, r: tile.r, s: tile.s });
+        }
+      }
       setActionMenu(null);
+      return;
     }
 
     // Normal click — show info
