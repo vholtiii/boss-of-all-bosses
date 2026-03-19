@@ -365,7 +365,7 @@ const createInitialGameState = (
     },
 
     hexMap, deployedUnits,
-    turnPhase: 'deploy' as TurnPhase, movementPhase: false,
+    turnPhase: 'deploy' as TurnPhase, movementPhase: true,
     selectedUnitId: null, availableMoveHexes: [],
     deployMode: null, availableDeployHexes: [],
     headquarters: Object.fromEntries(allFamilies.map(f => [f, HQ_POSITIONS[f]])),
@@ -1093,7 +1093,7 @@ export const useEnhancedMafiaGameState = (
 
       // Reset to deploy phase for next turn
       newState.turnPhase = 'deploy';
-      newState.movementPhase = false;
+      newState.movementPhase = true;
       newState.selectedUnitId = null;
       newState.availableMoveHexes = [];
       newState.deployMode = null;
