@@ -640,7 +640,50 @@ export const useEnhancedMafiaGameState = (
   // ============ SELECT UNIT FOR MOVEMENT ============
   const selectUnit = useCallback((unitType: 'soldier' | 'capo', location: { q: number; r: number; s: number }) => {
     setGameState(prev => {
-      if (prev.turnPhase !== 'move' && prev.turnPhase !== 'deploy') return prev;
+      if (prev.turnPhase !== 'move' && prev.turnPhase !== 'deploy' && prev.turnPhase !== 'action') return prev;
+      
+      // Action phase: select unit and compute valid action target hexes
+      if (prev.turnPhase === 'action') {
+        const unit = prev.deployedUnits.find(u => 
+          u.family === prev.playerFamily && u.type === unitType &&
+          u.q === location.q && u.r === location.r && u.s === location.s
+        );
+        if (!unit) return prev;
+        
+        // If clicking the already-selected unit, deselect
+        if (prev.selectedUnitId === unit.id) {
+          return { ...prev, selectedUnitId: null, availableMoveHexes: [] };
+        }
+        
+        // Compute valid action target hexes (adjacent hexes where actions can be performed)
+        const neighbors = getHexNeighbors(unit.q, unit.r, unit.s);
+        // Also include the unit's own hex (for safehouse on owned territory)
+        const candidateHexes = [...neighbors, { q: unit.q, r: unit.r, s: unit.s }];
+        
+        const actionTargets = candidateHexes.filter(h => {
+          const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+          if (!tile || tile.isHeadquarters) return false;
+          
+          const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily;
+          const isNeutral = tile.controllingFamily === 'neutral';
+          const isOwned = tile.controllingFamily === prev.playerFamily;
+          
+          if (unitType === 'soldier') {
+            // Soldiers can hit/sabotage enemy, extort neutral/enemy with business, claim neutral
+            if (isEnemy) return true;
+            if (isNeutral) return true;
+          }
+          if (unitType === 'capo') {
+            // Capos can negotiate on enemy hexes, safehouse on owned
+            if (isEnemy) return true;
+            if (isOwned && h.q === unit.q && h.r === unit.r && h.s === unit.s) return true;
+          }
+          return false;
+        });
+        
+        return { ...prev, selectedUnitId: unit.id, availableMoveHexes: actionTargets, deployMode: null, availableDeployHexes: [] };
+      }
+
       const unit = prev.deployedUnits.find(u => 
         u.family === prev.playerFamily && u.type === unitType &&
         u.q === location.q && u.r === location.r && u.s === location.s &&
@@ -682,7 +725,7 @@ export const useEnhancedMafiaGameState = (
         return prev;
       }
 
-      // Deploy phase: regular movement
+      // Deploy phase: regular movement — soldiers CAN move onto enemy hexes
       const range = unitType === 'soldier' ? 1 : Math.min(5, unit.movesRemaining);
       const candidateHexes = unitType === 'soldier' 
         ? getHexNeighbors(unit.q, unit.r, unit.s)
@@ -692,9 +735,6 @@ export const useEnhancedMafiaGameState = (
         const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
         if (!tile) return false;
         if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
-        if (unitType === 'soldier') {
-          if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) return false;
-        }
         return true;
       });
 
@@ -797,9 +837,6 @@ export const useEnhancedMafiaGameState = (
           const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
           if (!tile) return false;
           if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
-          if (updatedUnit.type === 'soldier') {
-            if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) return false;
-          }
           return true;
         });
       }
@@ -2089,50 +2126,62 @@ export const useEnhancedMafiaGameState = (
 
     if (targetQ !== undefined) {
       const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
-      if (!tile || tile.controllingFamily !== 'neutral' || tile.isHeadquarters) return state;
+      if (!tile || tile.isHeadquarters) return state;
+      
+      const isNeutral = tile.controllingFamily === 'neutral';
+      const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== state.playerFamily;
+      if (!isNeutral && !isEnemy) return state;
 
-      const playerUnits = state.deployedUnits.filter(u => 
+      // Check for player units on OR adjacent to the target hex
+      const playerUnitsOnHex = state.deployedUnits.filter(u => 
         u.family === state.playerFamily && u.q === targetQ && u.r === targetR && u.s === targetS
       );
-      if (playerUnits.length === 0) return state;
+      const neighbors = getHexNeighbors(targetQ, targetR, targetS);
+      const playerUnitsAdjacent = state.deployedUnits.filter(u => 
+        u.family === state.playerFamily && 
+        neighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s)
+      );
+      const allPlayerUnits = [...playerUnitsOnHex, ...playerUnitsAdjacent];
+      if (allPlayerUnits.length === 0) return state;
 
-      // 90% success for extortion of neutral territory
-      let chance = 0.9;
+      // Neutral: 90% success, claims territory. Enemy: 50% success, steals income only.
+      let chance = isNeutral ? 0.9 : 0.5;
       chance += state.familyBonuses.extortion / 100;
       chance = Math.min(0.99, chance);
 
       if (Math.random() < chance) {
-        tile.controllingFamily = state.playerFamily;
-        state.resources.money += 3000;
-        state.resources.respect += 5;
+        if (isNeutral) {
+          tile.controllingFamily = state.playerFamily;
+        }
+        const moneyGain = isEnemy ? (tile.business?.income || 2000) : 3000;
+        const respectGain = isEnemy ? 3 : 5;
+        state.resources.money += moneyGain;
+        state.resources.respect += respectGain;
         
-        playerUnits.forEach(u => {
+        allPlayerUnits.forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].extortions += 1;
           }
         });
         
-        const casualties = Math.floor(playerUnits.length * 0.1);
-        for (let i = 0; i < casualties; i++) {
-          const idx = state.deployedUnits.indexOf(playerUnits[i]);
-          if (idx !== -1) state.deployedUnits.splice(idx, 1);
-        }
-        const extortDetails = `+$3,000, +5 respect${casualties > 0 ? `, ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}` : ''}`;
+        const extortDetails = isEnemy 
+          ? `Stole $${moneyGain.toLocaleString()} from ${tile.controllingFamily} business, +${respectGain} respect`
+          : `+$${moneyGain.toLocaleString()}, +${respectGain} respect`;
         state.lastCombatResult = {
           q: targetQ, r: targetR, s: targetS,
           success: true, type: 'extort',
-          title: 'EXTORTION SUCCESSFUL!',
+          title: isEnemy ? 'EXTORTION RAID!' : 'EXTORTION SUCCESSFUL!',
           details: extortDetails,
           timestamp: Date.now(),
         };
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: 'Extortion Successful!',
-          message: `Territory claimed! ${extortDetails}.`,
+          type: 'success', title: isEnemy ? '💰 Enemy Business Extorted!' : 'Extortion Successful!',
+          message: isEnemy ? `Stole income from ${tile.controllingFamily} territory! ${extortDetails}.` : `Territory claimed! ${extortDetails}.`,
         }];
       } else {
-        const casualties = Math.max(1, Math.floor(playerUnits.length * 0.2));
-        for (let i = 0; i < casualties; i++) {
-          const idx = state.deployedUnits.indexOf(playerUnits[i]);
+        const casualties = Math.max(1, Math.floor(playerUnitsOnHex.length * 0.2));
+        for (let i = 0; i < casualties && i < playerUnitsOnHex.length; i++) {
+          const idx = state.deployedUnits.indexOf(playerUnitsOnHex[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
         const failDetails = `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} — resistance was strong`;
@@ -2148,7 +2197,7 @@ export const useEnhancedMafiaGameState = (
           message: `Resistance was stronger than expected. ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}.`,
         }];
       }
-      state.policeHeat.level = Math.min(100, state.policeHeat.level + 8);
+      state.policeHeat.level = Math.min(100, state.policeHeat.level + (isEnemy ? 12 : 8));
     }
 
     syncLegacyUnits(state);
