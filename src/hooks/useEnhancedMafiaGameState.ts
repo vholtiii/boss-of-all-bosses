@@ -1039,7 +1039,6 @@ export const useEnhancedMafiaGameState = (
               newState.policeHeat.level = Math.max(0, Math.floor(newState.policeHeat.level * 0.7));
             }
             if (tier === 'mayor' && action.targetFamily) {
-              // Shut down a rival territory hex
               const rivalHex = newState.hexMap.find(t => 
                 t.controllingFamily === action.targetFamily && t.business && !t.isHeadquarters
               );
@@ -1049,8 +1048,16 @@ export const useEnhancedMafiaGameState = (
             }
             
             newState.activeBribes = [...newState.activeBribes, contract];
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'success', title: `${config.label} Bribed!`,
+              message: `${config.description}. Active for ${config.duration} turns.`,
+            }];
+          } else {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'error', title: `Bribe Failed!`,
+              message: `The ${config.label} rejected your offer. $${config.cost.toLocaleString()} lost.`,
+            }];
           }
-          // If failed, money is still lost
           return newState;
         }
         case 'promote_hitman': {
