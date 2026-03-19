@@ -103,6 +103,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return points.join(' ');
   };
 
+  // District abbreviations for hex labels
+  const districtAbbreviations: Record<string, string> = {
+    'Little Italy': 'LI',
+    'Bronx': 'BX',
+    'Brooklyn': 'BK',
+    'Queens': 'QN',
+    'Manhattan': 'MH',
+    'Staten Island': 'SI',
+  };
+
   const getHexColor = (tile: HexTile): string => {
     // HQ
     if (tile.isHeadquarters) {
@@ -113,21 +123,21 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     if (gameState?.deployMode && gameState.availableDeployHexes?.some(
       (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
     )) {
-      return '#87CEEB'; // sky blue
+      return '#87CEEB';
     }
 
     // Movement highlights
     if (gameState?.selectedUnitId && gameState.availableMoveHexes?.some(
       (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
     )) {
-      return '#90EE90'; // light green
+      return '#90EE90';
     }
 
     // Selected unit hex
     if (gameState?.selectedUnitId) {
       const unit = deployedUnits.find(u => u.id === gameState.selectedUnitId);
       if (unit && unit.q === tile.q && unit.r === tile.r && unit.s === tile.s) {
-        return '#FFD700'; // gold
+        return '#FFD700';
       }
     }
 
@@ -135,9 +145,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   };
 
   const getHexOpacity = (tile: HexTile): number => {
-    if (tile.controllingFamily === playerFamily) return 1;
-    if (tile.controllingFamily === 'neutral') return 0.5;
-    return 0.7;
+    if (tile.controllingFamily === playerFamily) return 0.85;
+    if (tile.controllingFamily === 'neutral') return 0.35;
+    return 0.65;
   };
 
   const handleHexClick = (tile: HexTile) => {
@@ -337,9 +347,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   )}
 
                   {/* Business/HQ icon */}
-                  <text x={x} y={y + 5} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">
+                  <text x={x} y={y + (tile.business && !tile.isHeadquarters ? 1 : 5)} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">
                     {tile.isHeadquarters ? '🏛️' : tile.business ? (businessIcons[tile.business.type] || '🏢') : ''}
                   </text>
+
+                  {/* District abbreviation label */}
+                  {!tile.isHeadquarters && !tile.business && (
+                    <text x={x} y={y + 3} textAnchor="middle" fontSize="7" fill="#ffffff" fillOpacity="0.3" fontWeight="600" className="pointer-events-none select-none">
+                      {districtAbbreviations[tile.district] || ''}
+                    </text>
+                  )}
+
+                  {/* Always-visible income label */}
+                  {tile.business && !tile.isHeadquarters && (
+                    <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#10B981" fontWeight="700" className="pointer-events-none select-none">
+                      ${tile.business.income >= 1000 ? `${(tile.business.income / 1000).toFixed(1)}k` : tile.business.income}
+                    </text>
+                  )}
 
                   {/* Prompt to click HQ during deploy phase */}
                   {tile.isHeadquarters === playerFamily && gameState?.turnPhase === 'deploy' && expandedHQKey !== key && (
@@ -372,7 +396,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
                   {/* Fortified units indicator */}
                   {(() => {
-                    const key2 = `${tile.q},${tile.r},${tile.s}`;
                     const fortifiedHere = (gameState?.deployedUnits || []).filter((u: DeployedUnit) => 
                       u.fortified && u.q === tile.q && u.r === tile.r && u.s === tile.s
                     );
@@ -385,11 +408,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     );
                   })()}
 
-                  {/* Income on hover */}
-                  {isHovered && tile.business && (
-                    <text x={x} y={y + baseHexRadius + 12} textAnchor="middle" fontSize="9" fill="#ffffff" fontWeight="600" className="pointer-events-none">
-                      ${tile.business.income.toLocaleString()}/turn
-                    </text>
+                  {/* Player territory gold outer glow */}
+                  {isPlayerTerritory && !tile.isHeadquarters && (
+                    <polygon
+                      points={getHexPoints(x, y, baseHexRadius + 2)}
+                      fill="none"
+                      stroke="#D4AF37"
+                      strokeWidth="1.5"
+                      opacity="0.4"
+                      className="pointer-events-none"
+                    />
                   )}
 
                   {/* Render units */}

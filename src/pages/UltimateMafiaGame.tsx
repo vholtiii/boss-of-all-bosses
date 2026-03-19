@@ -14,6 +14,7 @@ import { useSoundSystem } from '@/hooks/useSoundSystem';
 import SaveLoadDialog from '@/components/SaveLoadDialog';
 import TutorialSystem from '@/components/TutorialSystem';
 import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
+import TurnSummaryModal from '@/components/TurnSummaryModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
 import { Button } from '@/components/ui/button';
 import { 
@@ -78,6 +79,13 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
   }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications]);
 
+  // Show turn summary when a new report comes in
+  useEffect(() => {
+    if (gameState.turnReport && gameState.turnReport.turn === gameState.turn) {
+      setShowTurnSummary(true);
+    }
+  }, [gameState.turnReport, gameState.turn]);
+
   // Negotiation dialog state
   const [negotiationState, setNegotiationState] = useState<{
     open: boolean;
@@ -125,6 +133,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const [activeMobileTab, setActiveMobileTab] = useState('map');
   const [showSettings, setShowSettings] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showTurnSummary, setShowTurnSummary] = useState(false);
   const [selectedHeadquarters, setSelectedHeadquarters] = useState<{
     family: string;
     headquarters: any;
@@ -469,8 +478,34 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     </div>
   );
 
+  const phaseConfig: Record<string, { label: string; hint: string; color: string }> = {
+    deploy: { label: '📦 DEPLOY PHASE', hint: 'Click your HQ to deploy soldiers and capos', color: 'bg-blue-600/80' },
+    move: { label: '🚶 MOVE PHASE', hint: 'Select a unit, then click a highlighted hex to move', color: 'bg-amber-600/80' },
+    action: { label: '⚔️ ACTION PHASE', hint: 'Click hexes with your units to Hit, Extort, or Negotiate', color: 'bg-red-600/80' },
+    waiting: { label: '⏳ END TURN', hint: 'Press End Turn to advance', color: 'bg-muted' },
+  };
+  const currentPhaseConfig = phaseConfig[gameState.turnPhase] || phaseConfig.waiting;
+
   const mainContent = (
-    <div className="h-full">
+    <div className="h-full relative">
+      {/* Phase indicator banner */}
+      <motion.div
+        key={gameState.turnPhase}
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={cn(
+          "absolute top-2 left-1/2 -translate-x-1/2 z-20 px-6 py-2 rounded-full backdrop-blur-sm border border-border/30 shadow-lg flex items-center gap-3",
+          currentPhaseConfig.color
+        )}
+      >
+        <span className="text-sm font-bold text-white font-playfair tracking-wide">
+          {currentPhaseConfig.label}
+        </span>
+        <span className="text-xs text-white/70">
+          {currentPhaseConfig.hint}
+        </span>
+      </motion.div>
+
       {/* Enhanced background with seasonal effects */}
       <div className="absolute inset-0 opacity-5 bg-repeat pointer-events-none" 
            style={{
@@ -609,6 +644,13 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         isOpen={showTutorial}
         onClose={() => setShowTutorial(false)}
         onComplete={() => setShowTutorial(false)}
+      />
+
+      {/* Turn Summary Modal */}
+      <TurnSummaryModal
+        report={gameState.turnReport}
+        open={showTurnSummary}
+        onClose={() => setShowTurnSummary(false)}
       />
     </>
   );

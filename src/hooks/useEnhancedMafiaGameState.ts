@@ -59,6 +59,18 @@ export interface HexTile {
 
 export type TurnPhase = 'deploy' | 'move' | 'action' | 'waiting';
 
+export interface TurnReport {
+  turn: number;
+  income: number;
+  maintenance: number;
+  netIncome: number;
+  aiActions: Array<{ family: string; action: string; detail: string }>;
+  events: string[];
+  resourceDeltas: { money: number; soldiers: number; respect: number; territories: number };
+  territoriesLost: string[];
+  territoriesGained: string[];
+}
+
 export interface EnhancedMafiaGameState {
   playerFamily: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
   turn: number;
@@ -132,6 +144,7 @@ export interface EnhancedMafiaGameState {
   legalStatus: LegalStatus;
   policeHeat: PoliceHeat;
   
+  turnReport: TurnReport | null;
   selectedTerritory?: any;
   activeEvent?: GameEvent;
   
@@ -433,6 +446,7 @@ const createInitialGameState = (
     
     selectedTerritory: null,
     activeEvent: null,
+    turnReport: null,
     familyControl: { gambino: 20, genovese: 20, lucchese: 20, bonanno: 20, colombo: 20 },
     territories,
   };
@@ -985,6 +999,27 @@ export const useEnhancedMafiaGameState = (
       const newState = { ...prev };
       newState.turn += 1;
       
+      // Snapshot before-state for turn report
+      const prevMoney = newState.resources.money;
+      const prevSoldierCount = newState.deployedUnits.filter(u => u.family === newState.playerFamily).length;
+      const prevRespect = newState.reputation.respect;
+      const prevPlayerHexes = new Set(
+        newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).map(t => `${t.q},${t.r},${t.s}`)
+      );
+
+      // Initialize turn report
+      const turnReport: TurnReport = {
+        turn: newState.turn,
+        income: 0,
+        maintenance: 0,
+        netIncome: 0,
+        aiActions: [],
+        events: [],
+        resourceDeltas: { money: 0, soldiers: 0, respect: 0, territories: 0 },
+        territoriesLost: [],
+        territoriesGained: [],
+      };
+
       // Reset to deploy phase for next turn
       newState.turnPhase = 'deploy';
       newState.movementPhase = false;
@@ -1020,9 +1055,16 @@ export const useEnhancedMafiaGameState = (
       newState.season = seasons[Math.floor((newState.turn - 1) / 3) % 4];
       
       processEconomy(newState);
-      processAITurn(newState);
+      turnReport.income = newState.finances.totalIncome;
+      turnReport.maintenance = newState.finances.totalExpenses;
+      turnReport.netIncome = newState.finances.totalProfit;
+
+      processAITurn(newState, turnReport);
       processWeather(newState);
       processEvents(newState);
+      if (newState.events.length > 0) {
+        newState.events.forEach(e => turnReport.events.push(e.title));
+      }
       processBribes(newState);
       processPacts(newState);
       
@@ -1031,6 +1073,23 @@ export const useEnhancedMafiaGameState = (
       newState.reputation.loyalty = Math.min(100, newState.reputation.loyalty + 1);
       
       newState.policeHeat.level = Math.max(0, newState.policeHeat.level - newState.policeHeat.reductionPerTurn);
+      
+      // Compute turn report deltas
+      const afterPlayerHexes = new Set(
+        newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).map(t => `${t.q},${t.r},${t.s}`)
+      );
+      afterPlayerHexes.forEach(h => { if (!prevPlayerHexes.has(h)) turnReport.territoriesGained.push(h); });
+      prevPlayerHexes.forEach(h => { if (!afterPlayerHexes.has(h)) turnReport.territoriesLost.push(h); });
+      
+      const afterSoldierCount = newState.deployedUnits.filter(u => u.family === newState.playerFamily).length;
+      turnReport.resourceDeltas = {
+        money: newState.resources.money - prevMoney,
+        soldiers: afterSoldierCount - prevSoldierCount,
+        respect: Math.round(newState.reputation.respect - prevRespect),
+        territories: afterPlayerHexes.size - prevPlayerHexes.size,
+      };
+      
+      newState.turnReport = turnReport;
       
       syncLegacyUnits(newState);
       newState.territories = buildLegacyTerritories(newState.hexMap);
@@ -1123,7 +1182,7 @@ export const useEnhancedMafiaGameState = (
   };
 
   // ============ AI TURN ============
-  const processAITurn = (state: EnhancedMafiaGameState) => {
+  const processAITurn = (state: EnhancedMafiaGameState, turnReport?: TurnReport) => {
     state.aiOpponents.forEach(opponent => {
       const fam = opponent.family as any;
       const hq = state.headquarters[fam];
@@ -1143,6 +1202,7 @@ export const useEnhancedMafiaGameState = (
       // Minimum passive income so AI always grows
       aiIncome = Math.max(aiIncome, 2000 + state.turn * 500);
       opponent.resources.money += aiIncome;
+      if (turnReport) turnReport.aiActions.push({ family: fam, action: 'income', detail: `Earned $${aiIncome.toLocaleString()} income` });
 
       // ── RECRUIT ── (always try to recruit up to a scaling cap)
       const soldierCap = Math.min(8, 3 + Math.floor(state.turn / 2));
@@ -1151,9 +1211,10 @@ export const useEnhancedMafiaGameState = (
       const wantToRecruit = Math.max(0, soldierCap - totalSoldiers);
       if (wantToRecruit > 0) {
         const canAfford = Math.floor(opponent.resources.money / SOLDIER_COST);
-        const toRecruit = Math.min(wantToRecruit, canAfford, 3); // max 3 per turn
+        const toRecruit = Math.min(wantToRecruit, canAfford, 3);
         opponent.resources.soldiers += toRecruit;
         opponent.resources.money -= toRecruit * SOLDIER_COST;
+        if (toRecruit > 0 && turnReport) turnReport.aiActions.push({ family: fam, action: 'recruit', detail: `Recruited ${toRecruit} soldier(s)` });
       }
 
       // ── DEPLOY ── (deploy ALL available soldiers from pool)
@@ -1294,13 +1355,18 @@ export const useEnhancedMafiaGameState = (
                     title: `⚔️ ${fam.charAt(0).toUpperCase() + fam.slice(1)} Attack!`,
                     message: `The ${fam} family attacked your units in ${tile.district || 'unknown territory'}!`,
                   });
+                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'attack', detail: `Attacked your units in ${tile.district}` });
                 }
               }
               break; // Stop moving after combat
             } else {
               // Claim empty territory
               if (tile.controllingFamily !== fam) {
+                const prevOwner = tile.controllingFamily;
                 tile.controllingFamily = fam;
+                if (prevOwner === state.playerFamily && turnReport) {
+                  turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
+                }
               }
             }
           }
