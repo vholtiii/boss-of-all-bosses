@@ -1509,6 +1509,15 @@ export const useEnhancedMafiaGameState = (
                 if (prevOwner === state.playerFamily && turnReport) {
                   turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
                 }
+                // Destroy player safehouse if on this hex
+                if (prevOwner === state.playerFamily && state.safehouse && state.safehouse.q === target.q && state.safehouse.r === target.r && state.safehouse.s === target.s) {
+                  state.safehouse = null;
+                  state.pendingNotifications.push({
+                    type: 'error' as const,
+                    title: '🏠 Safehouse Destroyed',
+                    message: `The ${fam} family captured your territory and destroyed your safehouse!`,
+                  });
+                }
               }
             }
           }
