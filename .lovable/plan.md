@@ -1,59 +1,53 @@
 
 
-# Revised: Phase System Restructure
+# Fix Broken Mechanics: Actions, Unit Selection, and Tactical Descriptions
 
-## Correction Applied
-- **Soldiers**: Move across map but do NOT auto-claim or auto-extort. They must use the Action phase to claim/extort.
-- **Capos**: KEEP auto-claim and auto-extort on arrival (existing behavior is correct for Capos).
+## Problems Identified
 
-## Updated Plan
+1. **Soldiers cannot reach enemy hexes** — Line 695-696 in `useEnhancedMafiaGameState.ts` blocks soldiers from moving onto enemy-controlled territory during Deploy. This means Hit and Sabotage (which require soldiers ON the enemy hex) are impossible.
 
-### Step 1: Deploy Phase — Movement Without Auto-Claim (Soldiers Only)
-- Remove auto-claim logic **only for soldiers** in `moveUnit`. Capos retain their auto-claim and auto-extort on arrival.
-- Deploy phase handles both HQ placement and map movement for all units.
+2. **Units at player HQ are invisible during Deploy** — Lines 491-493 in `EnhancedMafiaHexGrid.tsx` intentionally render nothing for units at the player's HQ during deploy phase. You can't see or click your units to select them for movement.
 
-**Files:** `src/hooks/useEnhancedMafiaGameState.ts`
+3. **Action phase doesn't let you select a unit first** — The action context menu (lines 269-299) just checks if ANY player units are on a hex and shows buttons. There's no way to pick WHICH unit performs the action. For Hit/Extort/Claim, the player should click a unit first, then see valid target hexes highlighted, then click a target.
 
-### Step 2: Move Phase → Tactical Phase
-- Rename to "Tactical" — Scout, Fortify, Safehouse, Escort only.
-- Add `tacticalActionsRemaining` (budget: 3 per turn).
-
-**Files:** `src/hooks/useEnhancedMafiaGameState.ts`, `src/pages/UltimateMafiaGame.tsx`, `src/types/game-mechanics.ts`
-
-### Step 3: Action Phase Limit
-- Add `actionsRemaining` (default 2). Hit, Extort, Claim, Bribe each cost 1 action.
-- Disable action buttons when budget is 0. Show counter in bottom bar.
-- **"Claim Territory"** added as a new action for soldiers on neutral hexes.
-
-**Files:** `src/hooks/useEnhancedMafiaGameState.ts`, `src/components/EnhancedMafiaHexGrid.tsx`, `src/pages/UltimateMafiaGame.tsx`
-
-### Step 4: Bonus Action at 50+ Respect & 50+ Influence
-- `maxActions = 2 + (respect >= 50 && influence >= 50 ? 1 : 0)`
-- Reset each turn. Notify player on first unlock.
-
-**Files:** `src/hooks/useEnhancedMafiaGameState.ts`, `src/types/game-mechanics.ts`
-
-### Step 5: UI Polish
-- Update phase labels: Deploy → DEPLOY, Move → TACTICAL, Action → ACTION.
-- Update phase hints. Add action/tactical counters to bottom bar.
-
-**Files:** `src/pages/UltimateMafiaGame.tsx`
+4. **Tactical action descriptions are tooltips only** — The tactical buttons (Scout, Fortify, Escort, Safehouse) only have `title` attributes (hover tooltips). No visible description panel explains what each action does.
 
 ---
 
-### Key Behavior Summary
+## Fix Plan
+
+### Step 1: Let soldiers move onto enemy hexes
+In `useEnhancedMafiaGameState.ts`, remove the filter on lines 695-696 that blocks soldiers from entering enemy-controlled territory. Soldiers need to reach enemy hexes to perform Hit actions.
+
+### Step 2: Show units at HQ during Deploy phase
+In `EnhancedMafiaHexGrid.tsx`, remove the `isDeployAtHQ` empty block (lines 491-494). Units at HQ should render normally so players can click them to select and move.
+
+### Step 3: Add unit-first selection for Action phase
+Currently: click hex → see action menu. 
+New flow: during Action phase, clicking a player unit selects it and highlights valid target hexes (enemy hexes for Hit/Sabotage, neutral for Extort/Claim, owned for Safehouse). Clicking a highlighted hex then shows the relevant action menu filtered to that unit.
+
+Changes:
+- **`useEnhancedMafiaGameState.ts`**: Allow `selectUnit` to work during `action` phase. Calculate valid action target hexes based on unit type (soldiers: adjacent enemy/neutral hexes; capos: adjacent enemy for negotiate).
+- **`EnhancedMafiaHexGrid.tsx`**: In the action phase click handler, if no unit is selected yet, select the unit (call `onSelectUnit`). If a unit IS selected and user clicks a highlighted target hex, show the filtered action menu. Add visual highlight for the selected unit during action phase.
+
+### Step 4: Add tactical action description panel
+In `UltimateMafiaGame.tsx`, add a small info panel below the tactical action toolbar (visible during Tactical phase) that shows the description of the currently selected tactical action. When no action is selected, show a summary of all four actions.
 
 ```text
-DEPLOY: Move all units. Capos auto-claim/extort on arrival. Soldiers just move.
-TACTICAL: Scout, Fortify, Safehouse, Escort (3/turn budget).
-ACTION: Hit, Extort, Claim (soldiers only), Bribe (2/turn, 3 with bonus).
+Descriptions:
+- Scout: Select a soldier, then click an adjacent enemy hex to reveal unit count and fortification status for 3 turns.
+- Fortify: Select a unit to skip its movement for +25% defense bonus this turn.
+- Escort: Select a capo to carry up to 2 soldiers when it moves.
+- Safehouse: Select a capo on your territory to establish a secondary deploy point lasting 5 turns.
 ```
 
-### New Constants
-```typescript
-export const BASE_ACTIONS_PER_TURN = 2;
-export const BONUS_ACTION_RESPECT_THRESHOLD = 50;
-export const BONUS_ACTION_INFLUENCE_THRESHOLD = 50;
-export const TACTICAL_ACTIONS_PER_TURN = 3;
-```
+### Step 5: Extort should also work on enemy hexes with businesses
+Currently `canExtort` only checks neutral hexes (line 282). Extortion should also be available on enemy hexes that have businesses (different success rate). Update `processTerritoryExtortion` to handle enemy hexes with lower success chance (~50%) and without claiming territory — just stealing income.
+
+---
+
+## Files Modified
+- `src/hooks/useEnhancedMafiaGameState.ts` — Steps 1, 3, 5
+- `src/components/EnhancedMafiaHexGrid.tsx` — Steps 2, 3
+- `src/pages/UltimateMafiaGame.tsx` — Step 4
 
