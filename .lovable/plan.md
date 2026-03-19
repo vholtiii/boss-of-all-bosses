@@ -1,59 +1,31 @@
 
+# ✅ Completed: Fix Broken Mechanics
 
-# Revised: Phase System Restructure
+## Changes Made
 
-## Correction Applied
-- **Soldiers**: Move across map but do NOT auto-claim or auto-extort. They must use the Action phase to claim/extort.
-- **Capos**: KEEP auto-claim and auto-extort on arrival (existing behavior is correct for Capos).
+### 1. Soldiers can now move onto enemy hexes (Deploy phase)
+- Removed the filter in `selectUnit` and `moveUnit` that blocked soldiers from entering enemy-controlled territory.
 
-## Updated Plan
+### 2. Units at HQ visible during Deploy phase
+- Removed the `isDeployAtHQ` empty-render block — units at HQ now render normally and are clickable for movement.
 
-### Step 1: Deploy Phase — Movement Without Auto-Claim (Soldiers Only)
-- Remove auto-claim logic **only for soldiers** in `moveUnit`. Capos retain their auto-claim and auto-extort on arrival.
-- Deploy phase handles both HQ placement and map movement for all units.
+### 3. Unit-first action selection (Action phase)
+- **New flow**: Click a unit → valid action targets highlight (green hexes) → click a target → context menu appears with available actions.
+- `selectUnit` now works during `action` phase, computing adjacent target hexes based on unit type.
+- Units are clickable during action phase in the hex grid.
+- Bottom bar shows "select a unit first" guidance.
 
-**Files:** `src/hooks/useEnhancedMafiaGameState.ts`
+### 4. Tactical action description panel
+- During Tactical phase, a description panel appears below the action toolbar showing the selected action's full description.
 
-### Step 2: Move Phase → Tactical Phase
-- Rename to "Tactical" — Scout, Fortify, Safehouse, Escort only.
-- Add `tacticalActionsRemaining` (budget: 3 per turn).
+### 5. Extortion works on enemy hexes
+- Extortion now targets both neutral (90% success, claims territory) and enemy hexes with businesses (50% success, steals income without claiming).
+- Player units can be on OR adjacent to the target hex.
 
-**Files:** `src/hooks/useEnhancedMafiaGameState.ts`, `src/pages/UltimateMafiaGame.tsx`, `src/types/game-mechanics.ts`
-
-### Step 3: Action Phase Limit
-- Add `actionsRemaining` (default 2). Hit, Extort, Claim, Bribe each cost 1 action.
-- Disable action buttons when budget is 0. Show counter in bottom bar.
-- **"Claim Territory"** added as a new action for soldiers on neutral hexes.
-
-**Files:** `src/hooks/useEnhancedMafiaGameState.ts`, `src/components/EnhancedMafiaHexGrid.tsx`, `src/pages/UltimateMafiaGame.tsx`
-
-### Step 4: Bonus Action at 50+ Respect & 50+ Influence
-- `maxActions = 2 + (respect >= 50 && influence >= 50 ? 1 : 0)`
-- Reset each turn. Notify player on first unlock.
-
-**Files:** `src/hooks/useEnhancedMafiaGameState.ts`, `src/types/game-mechanics.ts`
-
-### Step 5: UI Polish
-- Update phase labels: Deploy → DEPLOY, Move → TACTICAL, Action → ACTION.
-- Update phase hints. Add action/tactical counters to bottom bar.
-
-**Files:** `src/pages/UltimateMafiaGame.tsx`
-
----
-
-### Key Behavior Summary
+## Key Behavior Summary
 
 ```text
-DEPLOY: Move all units. Capos auto-claim/extort on arrival. Soldiers just move.
-TACTICAL: Scout, Fortify, Safehouse, Escort (3/turn budget).
-ACTION: Hit, Extort, Claim (soldiers only), Bribe (2/turn, 3 with bonus).
+DEPLOY: Move all units anywhere (including enemy territory). Capos auto-claim/extort on arrival. Soldiers just move.
+TACTICAL: Scout, Fortify, Safehouse, Escort (3/turn budget). Description panel visible.
+ACTION: Select unit first → click highlighted target → Hit, Extort, Claim, Sabotage, Negotiate (2/turn, 3 with bonus).
 ```
-
-### New Constants
-```typescript
-export const BASE_ACTIONS_PER_TURN = 2;
-export const BONUS_ACTION_RESPECT_THRESHOLD = 50;
-export const BONUS_ACTION_INFLUENCE_THRESHOLD = 50;
-export const TACTICAL_ACTIONS_PER_TURN = 3;
-```
-
