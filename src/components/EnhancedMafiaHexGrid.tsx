@@ -373,6 +373,58 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 </g>
               );
             })}
+            {/* Action context menu on hex */}
+            {actionMenu && (() => {
+              const { x, y } = getHexPosition(actionMenu.tile.q, actionMenu.tile.r);
+              const menuWidth = 120;
+              const menuHeight = actionMenu.canHit && actionMenu.canExtort ? 80 : 50;
+              return (
+                <foreignObject
+                  x={x - menuWidth / 2}
+                  y={y - baseHexRadius - menuHeight - 8}
+                  width={menuWidth}
+                  height={menuHeight}
+                  className="overflow-visible"
+                >
+                  <div className="flex flex-col gap-1 bg-background/95 backdrop-blur-sm border border-primary/40 rounded-lg p-1.5 shadow-xl">
+                    {actionMenu.canHit && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAction) onAction({
+                            type: 'hit_territory',
+                            targetQ: actionMenu.tile.q,
+                            targetR: actionMenu.tile.r,
+                            targetS: actionMenu.tile.s,
+                          });
+                          setActionMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-destructive/90 hover:bg-destructive text-destructive-foreground text-xs font-bold transition-colors"
+                      >
+                        ⚔️ Hit Territory
+                      </button>
+                    )}
+                    {actionMenu.canExtort && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAction) onAction({
+                            type: 'extort_territory',
+                            targetQ: actionMenu.tile.q,
+                            targetR: actionMenu.tile.r,
+                            targetS: actionMenu.tile.s,
+                          });
+                          setActionMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/90 hover:bg-primary text-primary-foreground text-xs font-bold transition-colors"
+                      >
+                        💰 Extort
+                      </button>
+                    )}
+                  </div>
+                </foreignObject>
+              );
+            })()}
           </g>
         </svg>
       </div>
