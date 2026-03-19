@@ -254,7 +254,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           <Button variant="outline" size="sm" onClick={() => setZoom(z => Math.min(z + 0.15, 2.5))} className="h-8 w-8 p-0">
             <ZoomIn className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setZoom(z => Math.max(z - 0.15, 0.4))} className="h-8 w-8 p-0">
+          <Button variant="outline" size="sm" onClick={() => setZoom(z => Math.max(z - 0.15, 0.3))} className="h-8 w-8 p-0">
             <ZoomOut className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="sm" onClick={() => setZoom(1)} className="h-8 w-8 p-0">
