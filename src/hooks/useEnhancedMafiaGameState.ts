@@ -2114,7 +2114,12 @@ export const useEnhancedMafiaGameState = (
           message: `Hit successful! ${hitDetails}.`,
         }];
       } else {
-        const casualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
+        let casualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
+        // Reduce casualties if defending/fortified units
+        const defendersFortified = playerUnits.some(u => u.fortified);
+        if (defendersFortified) {
+          casualties = Math.max(1, Math.floor(casualties * (1 - FORTIFY_CASUALTY_REDUCTION / 100)));
+        }
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);

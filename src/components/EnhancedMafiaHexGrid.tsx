@@ -480,7 +480,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   {/* Fortified units indicator */}
                   {(() => {
                     const fortifiedHere = (gameState?.deployedUnits || []).filter((u: DeployedUnit) => 
-                      u.fortified && u.q === tile.q && u.r === tile.r && u.s === tile.s
+                      u.fortified && u.family === gameState?.playerFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s
                     );
                     if (fortifiedHere.length === 0) return null;
                     return (
