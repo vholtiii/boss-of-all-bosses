@@ -418,7 +418,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         {!gameState.selectedUnitId && !gameState.deployMode && (
           <div className="flex items-center space-x-2 px-3 py-1 bg-muted/50 rounded-full">
             <span className="text-xs font-medium text-muted-foreground uppercase">
-              Phase: {gameState.turnPhase === 'deploy' ? '📦 Deploy units from HQ' : gameState.turnPhase === 'move' ? '🚶 Move your units' : gameState.turnPhase === 'action' ? '⚔️ Take actions (Hit, Extort, Bribe...)' : '⏳ End your turn'}
+              Phase: {gameState.turnPhase === 'deploy' ? '📦 Deploy & move units across the map' : gameState.turnPhase === 'move' ? '📋 Tactical actions (Scout, Fortify, Escort...)' : gameState.turnPhase === 'action' ? `⚔️ Actions: ${gameState.actionsRemaining}/${gameState.maxActions} remaining` : '⏳ End your turn'}
             </span>
           </div>
         )}
