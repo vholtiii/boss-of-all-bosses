@@ -359,16 +359,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       </div>
 
       {/* Grid */}
-      <div
-        className="absolute inset-0"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
-      >
+      <div className="absolute inset-0" style={{ cursor: 'grab' }}>
         <svg width="100%" height="100%" viewBox={viewBox} className="overflow-visible">
-          <g transform={`translate(${pan.x / zoom}, ${pan.y / zoom}) scale(${zoom})`}>
+          <g ref={transformGroupRef} transform={`scale(${zoom})`}>
             {hexMap.map(tile => {
               const { x, y } = getHexPosition(tile.q, tile.r);
               const key = `${tile.q},${tile.r},${tile.s}`;
