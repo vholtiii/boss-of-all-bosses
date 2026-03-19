@@ -291,24 +291,17 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
         </div>
         
         {/* Movement Status */}
-        {gameState.movementPhase && gameState.selectedUnit?.type && (
+        {gameState.movementPhase && (gameState.selectedUnitId || gameState.deployMode) && (
           <div className="flex items-center space-x-2 px-3 py-1 bg-yellow-400/20 rounded-full border border-yellow-400/30">
             <Target className="h-3 w-3 text-yellow-400" />
             <span className="text-xs font-medium text-yellow-400">
-              {(() => {
-                const isAtHeadquarters = gameState.selectedUnit?.location && Object.values(gameState.headquarters).some(
-                  (hq: any) => 
-                    hq.q === gameState.selectedUnit.location.q && 
-                    hq.r === gameState.selectedUnit.location.r && 
-                    hq.s === gameState.selectedUnit.location.s
-                );
-                
-                if (isAtHeadquarters) {
-                  return `Deploying ${gameState.selectedUnit.type} - Click available hexagons`;
-                } else {
-                  return `Moving ${gameState.selectedUnit.type} (${gameState.selectedUnit.remainingMoves} moves left)`;
-                }
-              })()}
+              {gameState.deployMode 
+                ? `Deploying ${gameState.deployMode.unitType} — click a highlighted hex`
+                : (() => {
+                    const unit = gameState.deployedUnits.find(u => u.id === gameState.selectedUnitId);
+                    return unit ? `Moving ${unit.type} (${unit.movesRemaining} moves left)` : 'Select a unit';
+                  })()
+              }
             </span>
           </div>
         )}
