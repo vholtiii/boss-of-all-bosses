@@ -411,8 +411,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       elements.push(
                         <SoldierIcon
                           key={`soldier-${fam}-${key}`}
-                          x={x + baseHexRadius * 0.35 + offsetIdx * 8}
-                          y={y + baseHexRadius * 0.3}
+                          x={x + baseHexRadius * 0.25 + offsetIdx * 10}
+                          y={y + baseHexRadius * 0.35}
                           family={fam as any}
                           count={soldiers.length}
                           isPlayerFamily={fam === playerFamily}
