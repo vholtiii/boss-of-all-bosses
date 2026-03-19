@@ -126,6 +126,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const [activeMobileTab, setActiveMobileTab] = useState('map');
   const [showSettings, setShowSettings] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showTurnSummary, setShowTurnSummary] = useState(false);
   const [selectedHeadquarters, setSelectedHeadquarters] = useState<{
     family: string;
     headquarters: any;
