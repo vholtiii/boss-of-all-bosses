@@ -1572,13 +1572,37 @@ export const useEnhancedMafiaGameState = (
       const bonuses = newState.familyBonuses;
       const discount = bonuses.recruitmentDiscount / 100;
       
+      // Actions that consume the action budget
+      const actionPhaseActions = ['hit_territory', 'extort_territory', 'sabotage_hex', 'claim_territory', 'negotiate'];
+      if (actionPhaseActions.includes(action.type) && newState.actionsRemaining <= 0) {
+        newState.pendingNotifications = [...newState.pendingNotifications, {
+          type: 'warning' as const, title: '⚠️ No Actions Remaining',
+          message: 'You have used all your actions this turn.',
+        }];
+        return newState;
+      }
+      
       switch (action.type) {
-        case 'hit_territory':
-          return processTerritoryHit(newState, action);
-        case 'extort_territory':
-          return processTerritoryExtortion(newState, action);
-        case 'sabotage_hex':
-          return processSabotageHex(newState, action);
+        case 'hit_territory': {
+          const result = processTerritoryHit(newState, action);
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
+        case 'extort_territory': {
+          const result = processTerritoryExtortion(newState, action);
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
+        case 'sabotage_hex': {
+          const result = processSabotageHex(newState, action);
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
+        case 'claim_territory': {
+          const result = processClaimTerritory(newState, action);
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
         case 'establish_safehouse':
           return processEstablishSafehouse(newState, action);
         case 'recruit_soldiers': {
