@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { EnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import HitmanPanel from '@/components/HitmanPanel';
+import CapoPromotionPanel from '@/components/CapoPromotionPanel';
 import CorruptionPanel from '@/components/CorruptionPanel';
 import VictoryTracker from '@/components/VictoryTracker';
 import { SOLDIER_COST, CAPO_COST } from '@/types/game-mechanics';
@@ -254,6 +255,28 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             playerFamily={gameState.playerFamily}
             money={resources.money}
             onPromote={(unitId) => onAction({ type: 'promote_hitman', unitId })}
+          />
+        </CollapsibleSection>
+
+        {/* ── CAPO PROMOTION ── */}
+        <CollapsibleSection
+          title={`Capo Promotion (${gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'capo').length}/${3})`}
+          icon={<Crown className="h-4 w-4" />}
+          isOpen={!actionsLocked && openSection === 'capo_promotion'}
+          onToggle={() => !actionsLocked && toggle('capo_promotion')}
+          disabled={actionsLocked}
+        >
+          <CapoPromotionPanel
+            capoCount={gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'capo').length}
+            soldierStats={gameState.soldierStats}
+            deployedSoldierIds={
+              gameState.deployedUnits
+                .filter(u => u.family === gameState.playerFamily && u.type === 'soldier')
+                .map(u => u.id)
+            }
+            hitmanIds={gameState.hitmen.map(h => h.unitId)}
+            money={resources.money}
+            onPromote={(unitId) => onAction({ type: 'promote_capo', unitId })}
           />
         </CollapsibleSection>
 
