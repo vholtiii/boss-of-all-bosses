@@ -776,7 +776,7 @@ export const useEnhancedMafiaGameState = (
               title: '💰 Capo Auto-Extortion!',
               message: `${unit.name || 'Your Capo'} took over and extorted the territory on arrival! +$3,000, +5 respect.`,
             };
-            return { ...tile, controllingFamily: prev.playerFamily };
+            return { ...tile, controllingFamily: prev.playerFamily, isExtorted: true };
           }
         }
         return tile;
