@@ -1288,19 +1288,25 @@ export const useEnhancedMafiaGameState = (
           }
         });
         
-        // 10% casualties
         const casualties = Math.floor(playerUnits.length * 0.1);
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: 'Extortion Successful!',
+          message: `Territory claimed! +$3,000, +5 respect.`,
+        }];
       } else {
-        // 20% casualties on failure
         const casualties = Math.max(1, Math.floor(playerUnits.length * 0.2));
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'error', title: 'Extortion Failed!',
+          message: `Resistance was stronger than expected. ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}.`,
+        }];
       }
       state.policeHeat.level = Math.min(100, state.policeHeat.level + 8);
     }
