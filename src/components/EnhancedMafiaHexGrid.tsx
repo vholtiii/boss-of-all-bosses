@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -49,28 +49,12 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canNegotiate: boolean; negotiateCapoId?: string } | null>(null);
-  const [hqUnitMenu, setHqUnitMenu] = useState<{ tile: HexTile; units: DeployedUnit[] } | null>(null);
-  const didPanRef = React.useRef(false);
-  const panRef = React.useRef({ x: 0, y: 0 });
-  const isPanningRef = React.useRef(false);
-  const panStartRef = React.useRef({ x: 0, y: 0 });
-  const transformGroupRef = React.useRef<SVGGElement>(null);
-  const zoomRef = React.useRef(zoom);
-  zoomRef.current = zoom;
-
-  const updateTransform = useCallback(() => {
-    if (transformGroupRef.current) {
-      const p = panRef.current;
-      const z = zoomRef.current;
-      transformGroupRef.current.setAttribute('transform', `translate(${p.x / z}, ${p.y / z}) scale(${z})`);
-    }
-  }, []);
 
   // Clear action menu when phase changes
   const turnPhaseRef = gameState?.turnPhase;
   useEffect(() => { setActionMenu(null); }, [turnPhaseRef]);
 
-  const baseHexRadius = 28;
+  const baseHexRadius = 22;
   const hexWidth = baseHexRadius * 2;
   const hexHeight = Math.sqrt(3) * baseHexRadius;
 
@@ -103,48 +87,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-
-  // Sync zoom state to DOM transform
-  useEffect(() => { updateTransform(); }, [zoom, updateTransform]);
-
-  // Pan via native DOM events + refs (no React re-renders during drag)
-  useEffect(() => {
-    const container = document.getElementById('hex-grid-container');
-    if (!container) return;
-
-    const onMouseDown = (e: MouseEvent) => {
-      if (e.button !== 0) return;
-      isPanningRef.current = true;
-      didPanRef.current = false;
-      panStartRef.current = { x: e.clientX - panRef.current.x, y: e.clientY - panRef.current.y };
-      container.style.cursor = 'grabbing';
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isPanningRef.current) return;
-      const nx = e.clientX - panStartRef.current.x;
-      const ny = e.clientY - panStartRef.current.y;
-      if (Math.abs(nx - panRef.current.x) > 3 || Math.abs(ny - panRef.current.y) > 3) {
-        didPanRef.current = true;
-      }
-      panRef.current = { x: nx, y: ny };
-      updateTransform();
-    };
-
-    const onMouseUp = () => {
-      isPanningRef.current = false;
-      container.style.cursor = 'grab';
-    };
-
-    container.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    return () => {
-      container.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-  }, [updateTransform]);
 
   const getHexPosition = (q: number, r: number) => ({
     x: hexWidth * (3/4) * q,
@@ -198,25 +140,21 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   };
 
   const handleHexClick = (tile: HexTile) => {
-    if (didPanRef.current) return; // ignore clicks after dragging
     const turnPhase = gameState?.turnPhase || 'waiting';
 
-    // HQ click — show unit popover for player HQ, or open info panel
-    if (tile.isHeadquarters) {
+    // During move phase, try selecting units on HQ hex before opening the panel
+    if (tile.isHeadquarters && turnPhase === 'move') {
       const key = `${tile.q},${tile.r},${tile.s}`;
       const unitsHere = unitsByHex.get(key) || [];
-      const playerUnitsHere = unitsHere.filter(u => u.family === playerFamily);
-
-      if (tile.isHeadquarters === playerFamily && playerUnitsHere.length > 0 && (turnPhase === 'move' || turnPhase === 'deploy')) {
-        // Toggle the HQ unit menu
-        if (hqUnitMenu && hqUnitMenu.tile.q === tile.q && hqUnitMenu.tile.r === tile.r) {
-          setHqUnitMenu(null);
-        } else {
-          setHqUnitMenu({ tile, units: playerUnitsHere });
-        }
+      const playerUnit = unitsHere.find(u => u.family === playerFamily && u.movesRemaining > 0);
+      if (playerUnit && onSelectUnit) {
+        onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
         return;
       }
+    }
 
+    // HQ click — open headquarters panel
+    if (tile.isHeadquarters) {
       if (onSelectHeadquarters) onSelectHeadquarters(tile.isHeadquarters);
       return;
     }
@@ -309,7 +247,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   }, [hexMap]);
 
   return (
-    <div id="hex-grid-container" className="relative w-full h-full overflow-auto bg-gradient-to-br from-noir-dark/50 to-background/50">
+    <div className="relative w-full h-full overflow-hidden bg-gradient-to-br from-noir-dark/50 to-background/50">
       {/* Controls */}
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
         <div className="flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-3 border border-noir-light shadow-lg">
@@ -337,9 +275,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       </div>
 
       {/* Grid */}
-      <div className="absolute inset-0" style={{ cursor: 'grab' }}>
+      <div className="absolute inset-0 flex items-center justify-center">
         <svg width="100%" height="100%" viewBox={viewBox} className="overflow-visible">
-          <g ref={transformGroupRef} transform={`scale(${zoom})`}>
+          <g transform={`scale(${zoom})`}>
             {hexMap.map(tile => {
               const { x, y } = getHexPosition(tile.q, tile.r);
               const key = `${tile.q},${tile.r},${tile.s}`;
@@ -419,10 +357,11 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     </text>
                   )}
 
-                  {/* Render units — skip HQ hexes (handled by popover) */}
-                  {showSoldiers && unitsHere.length > 0 && !tile.isHeadquarters && (() => {
+                  {/* Render units */}
+                  {showSoldiers && unitsHere.length > 0 && (() => {
                     const turnPhase = gameState?.turnPhase || 'waiting';
                     const selectedUnitId = gameState?.selectedUnitId;
+                    // Group by family and type
                     const soldiersByFamily = new Map<string, DeployedUnit[]>();
                     const caposByFamily = new Map<string, DeployedUnit[]>();
                     unitsHere.forEach(u => {
@@ -493,16 +432,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
                     return elements;
                   })()}
-
-                  {/* HQ unit count badge */}
-                  {tile.isHeadquarters && unitsHere.length > 0 && (
-                    <g className="pointer-events-none">
-                      <circle cx={x + baseHexRadius * 0.5} cy={y - baseHexRadius * 0.5} r="9" fill="#D4AF37" stroke="#000" strokeWidth="1" />
-                      <text x={x + baseHexRadius * 0.5} y={y - baseHexRadius * 0.5 + 4} textAnchor="middle" fontSize="10" fill="#000" fontWeight="bold" className="select-none">
-                        {unitsHere.length}
-                      </text>
-                    </g>
-                  )}
 
                   {/* Territory control dot */}
                   {tile.controllingFamily !== 'neutral' && !tile.isHeadquarters && (
@@ -622,81 +551,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         🤝 Negotiate
                       </button>
                     )}
-                  </div>
-                </foreignObject>
-              );
-            })()}
-
-            {/* HQ unit selection popover */}
-            {hqUnitMenu && (() => {
-              const { x, y } = getHexPosition(hqUnitMenu.tile.q, hqUnitMenu.tile.r);
-              const turnPhase = gameState?.turnPhase || 'waiting';
-              const soldiers = hqUnitMenu.units.filter(u => u.type === 'soldier');
-              const capos = hqUnitMenu.units.filter(u => u.type === 'capo');
-              const itemCount = (soldiers.length > 0 ? 1 : 0) + capos.length + 1; // +1 for HQ info button
-              const menuWidth = 160;
-              const menuHeight = itemCount * 32 + 28;
-              return (
-                <foreignObject
-                  x={x - menuWidth / 2}
-                  y={y - baseHexRadius - menuHeight - 8}
-                  width={menuWidth}
-                  height={menuHeight}
-                  className="overflow-visible"
-                >
-                  <div className="flex flex-col gap-1 bg-background/95 backdrop-blur-sm border border-mafia-gold/40 rounded-lg p-2 shadow-xl">
-                    <div className="text-[10px] font-bold text-mafia-gold uppercase text-center mb-1">
-                      {hqUnitMenu.tile.isHeadquarters} HQ — Units
-                    </div>
-                    {capos.map(capo => (
-                      <button
-                        key={capo.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (turnPhase === 'deploy' && onSelectUnitFromHeadquarters) {
-                            onSelectUnitFromHeadquarters('capo', capo.family);
-                          } else if (turnPhase === 'move' && capo.movesRemaining > 0 && onSelectUnit) {
-                            onSelectUnit('capo', { q: hqUnitMenu.tile.q, r: hqUnitMenu.tile.r, s: hqUnitMenu.tile.s });
-                          }
-                          setHqUnitMenu(null);
-                        }}
-                        disabled={turnPhase === 'move' && capo.movesRemaining === 0}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-mafia-gold/20 hover:bg-mafia-gold/40 text-foreground text-xs font-bold transition-colors disabled:opacity-40"
-                      >
-                        👔 {capo.name || 'Capo'} (Lvl {capo.level})
-                        {turnPhase === 'move' && <span className="ml-auto text-muted-foreground">{capo.movesRemaining}mv</span>}
-                      </button>
-                    ))}
-                    {soldiers.length > 0 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (turnPhase === 'deploy' && onSelectUnitFromHeadquarters) {
-                            onSelectUnitFromHeadquarters('soldier', soldiers[0].family);
-                          } else if (turnPhase === 'move' && onSelectUnit) {
-                            const movable = soldiers.find(s => s.movesRemaining > 0);
-                            if (movable) onSelectUnit('soldier', { q: hqUnitMenu.tile.q, r: hqUnitMenu.tile.r, s: hqUnitMenu.tile.s });
-                          }
-                          setHqUnitMenu(null);
-                        }}
-                        disabled={turnPhase === 'move' && !soldiers.some(s => s.movesRemaining > 0)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-foreground text-xs font-bold transition-colors disabled:opacity-40"
-                      >
-                        👤 Soldiers ×{soldiers.length}
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onSelectHeadquarters && hqUnitMenu.tile.isHeadquarters) {
-                          onSelectHeadquarters(hqUnitMenu.tile.isHeadquarters);
-                        }
-                        setHqUnitMenu(null);
-                      }}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/20 hover:bg-primary/40 text-foreground text-xs font-medium transition-colors mt-0.5 border-t border-border pt-1.5"
-                    >
-                      🏛️ View HQ Info
-                    </button>
                   </div>
                 </foreignObject>
               );

@@ -39,7 +39,7 @@ const families: FamilyInfo[] = [
       { label: 'Influence', icon: <Crown className="h-3.5 w-3.5" />, value: 4 },
     ],
     bonuses: ['+25% combat power', '+10% territory income', '+15% intimidation'],
-    startingResources: { money: 60000, soldiers: 6, influence: 15, politicalPower: 40, respect: 30 },
+    startingResources: { money: 60000, soldiers: 5, influence: 15, politicalPower: 40, respect: 30 },
   },
   {
     id: 'genovese',
@@ -84,7 +84,7 @@ const families: FamilyInfo[] = [
       { label: 'Loyalty', icon: <Users className="h-3.5 w-3.5" />, value: 5 },
     ],
     bonuses: ['+20% extortion income', '+25% intimidation power', '+15% fear generation'],
-    startingResources: { money: 40000, soldiers: 3, influence: 8, politicalPower: 15, respect: 35 },
+    startingResources: { money: 40000, soldiers: 7, influence: 8, politicalPower: 15, respect: 35 },
   },
   {
     id: 'colombo',
@@ -99,7 +99,7 @@ const families: FamilyInfo[] = [
       { label: 'Fear', icon: <Crown className="h-3.5 w-3.5" />, value: 4 },
     ],
     bonuses: ['+20% all income', '-15% recruitment cost', '+10% reputation gain'],
-    startingResources: { money: 35000, soldiers: 2, influence: 18, politicalPower: 10, respect: 25 },
+    startingResources: { money: 35000, soldiers: 8, influence: 18, politicalPower: 10, respect: 25 },
   },
 ];
 
@@ -193,10 +193,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
               <div className="text-lg font-bold font-playfair mb-0.5" style={{ color: family.color }}>
                 {family.name}
               </div>
-              <div className="text-[10px] text-muted-foreground mb-1">{family.difficulty} difficulty</div>
-              <div className="flex items-center gap-1 text-xs font-medium mb-3" style={{ color: family.color }}>
-                <Users className="h-3 w-3" /> {family.startingResources.soldiers} soldiers
-              </div>
+              <div className="text-[10px] text-muted-foreground mb-3">{family.difficulty} difficulty</div>
 
               {/* Stat bars */}
               <div className="space-y-2">

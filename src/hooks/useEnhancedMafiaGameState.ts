@@ -266,14 +266,14 @@ const createInitialGameState = (
   const deployedUnits: DeployedUnit[] = [];
   const soldierStats: Record<string, SoldierStats> = {};
 
-  // Real-life inspired starting soldiers (max 6):
-  // Gambino: 6 — historically the largest and most powerful NYC family (~250 made men)
-  // Genovese: 6 — rivaled Gambino in size, deeply embedded in unions/politics (~250 made men)
-  // Lucchese: 4 — mid-sized but highly effective, strong in garment district (~100-150 made men)
-  // Bonanno: 3 — weakened by Banana War and Donnie Brasco infiltration (~100 made men)
-  // Colombo: 2 — smallest of the Five Families, plagued by leadership instability (~75 made men)
+  // Real-life inspired starting soldiers:
+  // Gambino: 4 — historically the largest and most powerful NYC family
+  // Genovese: 4 — rivaled Gambino in size, deeply embedded in unions/politics
+  // Lucchese: 3 — mid-sized but highly effective, strong in garment district
+  // Bonanno: 2 — suffered internal wars (Banana War), weakened by defections
+  // Colombo: 1 — smallest of the Five Families, plagued by leadership instability
   const familySoldierCount: Record<string, number> = {
-    gambino: 6, genovese: 6, lucchese: 4, bonanno: 3, colombo: 2,
+    gambino: 4, genovese: 4, lucchese: 3, bonanno: 2, colombo: 1,
   };
 
   allFamilies.forEach(fam => {
