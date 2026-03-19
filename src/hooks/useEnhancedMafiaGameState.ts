@@ -21,6 +21,8 @@ import {
   NEGOTIATION_TYPES,
   ScoutedHex, Safehouse, MoveAction,
   FORTIFY_DEFENSE_BONUS, SCOUT_DURATION, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
+  BASE_ACTIONS_PER_TURN, BONUS_ACTION_RESPECT_THRESHOLD, BONUS_ACTION_INFLUENCE_THRESHOLD,
+  TACTICAL_ACTIONS_PER_TURN,
 } from '@/types/game-mechanics';
 
 // ============ UNIT TYPES ============
@@ -126,6 +128,12 @@ export interface EnhancedMafiaGameState {
   scoutedHexes: ScoutedHex[];
   safehouse: Safehouse | null;
   selectedMoveAction: MoveAction;
+  
+  // Action & tactical budgets
+  actionsRemaining: number;
+  maxActions: number;
+  tacticalActionsRemaining: number;
+  maxTacticalActions: number;
   
   // Enhanced systems
   combat: CombatSystem;
@@ -381,6 +389,10 @@ const createInitialGameState = (
     scoutedHexes: [],
     safehouse: null,
     selectedMoveAction: 'move' as MoveAction,
+    actionsRemaining: BASE_ACTIONS_PER_TURN,
+    maxActions: BASE_ACTIONS_PER_TURN,
+    tacticalActionsRemaining: TACTICAL_ACTIONS_PER_TURN,
+    maxTacticalActions: TACTICAL_ACTIONS_PER_TURN,
     
     combat: {
       territoryBattles: [],
@@ -578,15 +590,30 @@ export const useEnhancedMafiaGameState = (
       const phaseOrder: TurnPhase[] = ['deploy', 'move', 'action'];
       const currentIdx = phaseOrder.indexOf(prev.turnPhase);
       const nextPhase = currentIdx < phaseOrder.length - 1 ? phaseOrder[currentIdx + 1] : 'waiting' as TurnPhase;
+      
+      // Calculate action budget when entering action phase
+      let actionsRemaining = prev.actionsRemaining;
+      let maxActions = prev.maxActions;
+      if (nextPhase === 'action') {
+        const hasBonus = prev.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD && 
+                         prev.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
+        maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0);
+        actionsRemaining = maxActions;
+      }
+      
       return {
         ...prev,
         turnPhase: nextPhase,
-        movementPhase: nextPhase === 'move',
+        movementPhase: nextPhase === 'move' || nextPhase === 'deploy',
         selectedUnitId: null,
         availableMoveHexes: [],
         deployMode: null,
         availableDeployHexes: [],
         selectedMoveAction: 'move' as MoveAction,
+        actionsRemaining,
+        maxActions,
+        // Reset tactical budget when entering move (tactical) phase
+        tacticalActionsRemaining: nextPhase === 'move' ? TACTICAL_ACTIONS_PER_TURN : prev.tacticalActionsRemaining,
       };
     });
   }, []);
@@ -613,7 +640,7 @@ export const useEnhancedMafiaGameState = (
   // ============ SELECT UNIT FOR MOVEMENT ============
   const selectUnit = useCallback((unitType: 'soldier' | 'capo', location: { q: number; r: number; s: number }) => {
     setGameState(prev => {
-      if (prev.turnPhase !== 'move') return prev;
+      if (prev.turnPhase !== 'move' && prev.turnPhase !== 'deploy') return prev;
       const unit = prev.deployedUnits.find(u => 
         u.family === prev.playerFamily && u.type === unitType &&
         u.q === location.q && u.r === location.r && u.s === location.s &&
@@ -623,20 +650,25 @@ export const useEnhancedMafiaGameState = (
 
       const moveAction = prev.selectedMoveAction || 'move';
 
-      // Scout: show adjacent enemy hexes
-      if (moveAction === 'scout' && unitType === 'soldier') {
-        const neighbors = getHexNeighbors(unit.q, unit.r, unit.s);
-        const scoutableHexes = neighbors.filter(h => {
-          const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
-          if (!tile) return false;
-          return tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily;
-        });
-        return { ...prev, selectedUnitId: unit.id, availableMoveHexes: scoutableHexes, deployMode: null, availableDeployHexes: [] };
-      }
+      // Tactical actions only during move (tactical) phase
+      if (prev.turnPhase === 'move') {
+        // Scout: show adjacent enemy hexes
+        if (moveAction === 'scout' && unitType === 'soldier') {
+          if (prev.tacticalActionsRemaining <= 0) return prev;
+          const neighbors = getHexNeighbors(unit.q, unit.r, unit.s);
+          const scoutableHexes = neighbors.filter(h => {
+            const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+            if (!tile) return false;
+            return tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily;
+          });
+          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: scoutableHexes, deployMode: null, availableDeployHexes: [] };
+        }
 
-      // Safehouse: highlight current hex
-      if (moveAction === 'safehouse' && unitType === 'capo') {
-        return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
+        // Safehouse: highlight current hex
+        if (moveAction === 'safehouse' && unitType === 'capo') {
+          if (prev.tacticalActionsRemaining <= 0) return prev;
+          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
+        }
       }
 
       const range = unitType === 'soldier' ? 1 : Math.min(5, unit.movesRemaining);
@@ -661,21 +693,25 @@ export const useEnhancedMafiaGameState = (
   // ============ MOVE UNIT (with zone-of-control + escort) ============
   const moveUnit = useCallback((targetLocation: { q: number; r: number; s: number }) => {
     setGameState(prev => {
-      if (prev.turnPhase !== 'move') return prev;
+      if (prev.turnPhase !== 'move' && prev.turnPhase !== 'deploy') return prev;
       if (!prev.selectedUnitId) return prev;
       const unitIdx = prev.deployedUnits.findIndex(u => u.id === prev.selectedUnitId);
       if (unitIdx === -1) return prev;
       const unit = prev.deployedUnits[unitIdx];
       const moveAction = prev.selectedMoveAction || 'move';
 
-      // Handle scout action
-      if (moveAction === 'scout' && unit.type === 'soldier') {
-        return processScout(prev, unit, targetLocation);
+      // Handle scout action (tactical phase only)
+      if (prev.turnPhase === 'move' && moveAction === 'scout' && unit.type === 'soldier') {
+        if (prev.tacticalActionsRemaining <= 0) return prev;
+        const result = processScout(prev, unit, targetLocation);
+        return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
       }
 
-      // Handle safehouse action
-      if (moveAction === 'safehouse' && unit.type === 'capo') {
-        return processSafehouse(prev, unit);
+      // Handle safehouse action (tactical phase only)
+      if (prev.turnPhase === 'move' && moveAction === 'safehouse' && unit.type === 'capo') {
+        if (prev.tacticalActionsRemaining <= 0) return prev;
+        const result = processSafehouse(prev, unit);
+        return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
       }
 
       if (!prev.availableMoveHexes.some(h => h.q === targetLocation.q && h.r === targetLocation.r && h.s === targetLocation.s)) {
@@ -708,24 +744,22 @@ export const useEnhancedMafiaGameState = (
         });
       }
 
-      // Auto-claim neutral tiles on move
-      // Capos auto-extort: claim territory + bonus money/respect instantly
+      // Only Capos auto-claim and auto-extort neutral tiles on move
+      // Soldiers do NOT auto-claim — they must use the Action phase
       let autoExtortNotification: typeof prev.pendingNotifications[0] | null = null;
       let bonusMoney = 0;
       let bonusRespect = 0;
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
-          if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters) {
-            if (unit.type === 'capo') {
-              // Capo auto-extorts on arrival — skip the extort action step
-              bonusMoney = 3000;
-              bonusRespect = 5;
-              autoExtortNotification = {
-                type: 'success' as const,
-                title: '💰 Capo Auto-Extortion!',
-                message: `${unit.name || 'Your Capo'} took over and extorted the territory on arrival! +$3,000, +5 respect.`,
-              };
-            }
+          if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters && unit.type === 'capo') {
+            // Capo auto-extorts on arrival — skip the extort action step
+            bonusMoney = 3000;
+            bonusRespect = 5;
+            autoExtortNotification = {
+              type: 'success' as const,
+              title: '💰 Capo Auto-Extortion!',
+              message: `${unit.name || 'Your Capo'} took over and extorted the territory on arrival! +$3,000, +5 respect.`,
+            };
             return { ...tile, controllingFamily: prev.playerFamily };
           }
         }
@@ -775,6 +809,7 @@ export const useEnhancedMafiaGameState = (
   const fortifyUnit = useCallback(() => {
     setGameState(prev => {
       if (prev.turnPhase !== 'move') return prev;
+      if (prev.tacticalActionsRemaining <= 0) return prev;
       if (!prev.selectedUnitId) return prev;
       const unitIdx = prev.deployedUnits.findIndex(u => u.id === prev.selectedUnitId);
       if (unitIdx === -1) return prev;
@@ -787,6 +822,7 @@ export const useEnhancedMafiaGameState = (
       return {
         ...prev, deployedUnits: newUnits,
         selectedUnitId: null, availableMoveHexes: [],
+        tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
         pendingNotifications: [...prev.pendingNotifications, {
           type: 'info' as const, title: '🛡️ Unit Fortified',
           message: `${unit.type === 'capo' ? unit.name || 'Capo' : 'Soldier'} is fortified (+${FORTIFY_DEFENSE_BONUS}% defense).`,
@@ -1008,10 +1044,10 @@ export const useEnhancedMafiaGameState = (
         };
       }
 
-      // Claim neutral hexes
+      // Only Capos auto-claim neutral hexes on deploy; soldiers do not
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
-          if (tile.controllingFamily === 'neutral' || tile.controllingFamily === family) {
+          if (unitType === 'capo' && (tile.controllingFamily === 'neutral' || tile.controllingFamily === family) && !tile.isHeadquarters) {
             return { ...tile, controllingFamily: family as any };
           }
         }
@@ -1063,6 +1099,14 @@ export const useEnhancedMafiaGameState = (
       newState.deployMode = null;
       newState.availableDeployHexes = [];
       newState.selectedMoveAction = 'move' as MoveAction;
+      
+      // Reset action & tactical budgets for new turn
+      const hasBonus = newState.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD && 
+                       newState.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
+      newState.maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0);
+      newState.actionsRemaining = newState.maxActions;
+      newState.tacticalActionsRemaining = TACTICAL_ACTIONS_PER_TURN;
+      newState.maxTacticalActions = TACTICAL_ACTIONS_PER_TURN;
 
       // Clear fortified status and escort, reset moves
       newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
@@ -1536,13 +1580,37 @@ export const useEnhancedMafiaGameState = (
       const bonuses = newState.familyBonuses;
       const discount = bonuses.recruitmentDiscount / 100;
       
+      // Actions that consume the action budget
+      const actionPhaseActions = ['hit_territory', 'extort_territory', 'sabotage_hex', 'claim_territory', 'negotiate'];
+      if (actionPhaseActions.includes(action.type) && newState.actionsRemaining <= 0) {
+        newState.pendingNotifications = [...newState.pendingNotifications, {
+          type: 'warning' as const, title: '⚠️ No Actions Remaining',
+          message: 'You have used all your actions this turn.',
+        }];
+        return newState;
+      }
+      
       switch (action.type) {
-        case 'hit_territory':
-          return processTerritoryHit(newState, action);
-        case 'extort_territory':
-          return processTerritoryExtortion(newState, action);
-        case 'sabotage_hex':
-          return processSabotageHex(newState, action);
+        case 'hit_territory': {
+          const result = processTerritoryHit(newState, action);
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
+        case 'extort_territory': {
+          const result = processTerritoryExtortion(newState, action);
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
+        case 'sabotage_hex': {
+          const result = processSabotageHex(newState, action);
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
+        case 'claim_territory': {
+          const result = processClaimTerritory(newState, action);
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
         case 'establish_safehouse':
           return processEstablishSafehouse(newState, action);
         case 'recruit_soldiers': {
@@ -1714,7 +1782,9 @@ export const useEnhancedMafiaGameState = (
           }
           return newState;
         case 'negotiate': {
-          return processNegotiation(newState, action);
+          const result = processNegotiation(newState, action);
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
         }
         default:
           return newState;
@@ -1804,6 +1874,29 @@ export const useEnhancedMafiaGameState = (
     state.pendingNotifications = [...state.pendingNotifications, {
       type: 'success', title: '💣 Sabotage Successful!',
       message: `${tile.controllingFamily}'s ${tile.business.type} income reduced from $${oldIncome.toLocaleString()} to $${tile.business.income.toLocaleString()}/turn. +10 Heat.`,
+    }];
+
+    syncLegacyUnits(state);
+    updateVictoryProgress(state);
+    return state;
+  };
+
+  // ============ CLAIM TERRITORY (soldiers only, action phase) ============
+  const processClaimTerritory = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
+    const { targetQ, targetR, targetS } = action;
+    const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
+    if (!tile || tile.controllingFamily !== 'neutral' || tile.isHeadquarters) return state;
+
+    const playerSoldiers = state.deployedUnits.filter(u => 
+      u.family === state.playerFamily && u.type === 'soldier' &&
+      u.q === targetQ && u.r === targetR && u.s === targetS
+    );
+    if (playerSoldiers.length === 0) return state;
+
+    tile.controllingFamily = state.playerFamily;
+    state.pendingNotifications = [...state.pendingNotifications, {
+      type: 'success' as const, title: '🏴 Territory Claimed!',
+      message: `Your soldiers have claimed this territory in ${tile.district}.`,
     }];
 
     syncLegacyUnits(state);

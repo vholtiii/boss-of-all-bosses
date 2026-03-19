@@ -323,18 +323,18 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         {/* Phase indicator */}
         <div className="flex items-center space-x-1 bg-background/80 rounded-lg px-2 py-1 border border-noir-light">
           {(['deploy', 'move', 'action'] as const).map((phase) => (
-            <div
-              key={phase}
-              className={cn(
-                "px-3 py-1 rounded text-xs font-bold uppercase transition-all",
-                gameState.turnPhase === phase
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground"
-              )}
-            >
-              {phase}
-            </div>
-          ))}
+              <div
+                key={phase}
+                className={cn(
+                  "px-3 py-1 rounded text-xs font-bold uppercase transition-all",
+                  gameState.turnPhase === phase
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground"
+                )}
+              >
+                {phase === 'move' ? 'tactical' : phase}
+              </div>
+            ))}
         </div>
 
         <Button
@@ -345,7 +345,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           variant={gameState.turnPhase === 'action' ? 'default' : 'outline'}
         >
           <SkipForward className="h-4 w-4 mr-2" />
-          {gameState.turnPhase === 'action' ? 'Next Phase' : gameState.turnPhase === 'waiting' ? 'Waiting...' : `End ${gameState.turnPhase.charAt(0).toUpperCase() + gameState.turnPhase.slice(1)}`}
+          {gameState.turnPhase === 'action' ? 'Next Phase' : gameState.turnPhase === 'waiting' ? 'Waiting...' : `End ${gameState.turnPhase === 'move' ? 'Tactical' : gameState.turnPhase.charAt(0).toUpperCase() + gameState.turnPhase.slice(1)}`}
         </Button>
 
         <SaveLoadDialog 
@@ -418,16 +418,17 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         {!gameState.selectedUnitId && !gameState.deployMode && (
           <div className="flex items-center space-x-2 px-3 py-1 bg-muted/50 rounded-full">
             <span className="text-xs font-medium text-muted-foreground uppercase">
-              Phase: {gameState.turnPhase === 'deploy' ? '📦 Deploy units from HQ' : gameState.turnPhase === 'move' ? '🚶 Move your units' : gameState.turnPhase === 'action' ? '⚔️ Take actions (Hit, Extort, Bribe...)' : '⏳ End your turn'}
+              Phase: {gameState.turnPhase === 'deploy' ? '📦 Deploy & move units across the map' : gameState.turnPhase === 'move' ? '📋 Tactical actions (Scout, Fortify, Escort...)' : gameState.turnPhase === 'action' ? `⚔️ Actions: ${gameState.actionsRemaining}/${gameState.maxActions} remaining` : '⏳ End your turn'}
             </span>
           </div>
         )}
 
-        {/* Move action toolbar */}
+        {/* Tactical action toolbar — only during tactical (move) phase */}
+        {/* Tactical action toolbar — only during tactical (move) phase */}
         {gameState.turnPhase === 'move' && (
           <div className="flex items-center gap-1 bg-background/80 rounded-lg px-2 py-1 border border-noir-light">
+            <span className="text-[10px] text-muted-foreground mr-1">📋 {gameState.tacticalActionsRemaining}/{gameState.maxTacticalActions}</span>
             {([
-              { action: 'move' as const, label: '🚶 Move', tip: 'Move unit to adjacent hex' },
               { action: 'scout' as const, label: '👁️ Scout', tip: 'Reveal enemy hex info' },
               { action: 'fortify' as const, label: '🛡️ Fortify', tip: 'Skip move for +25% defense' },
               { action: 'escort' as const, label: '🚗 Escort', tip: 'Capo carries soldiers' },
@@ -439,6 +440,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 variant={gameState.selectedMoveAction === action ? 'default' : 'outline'}
                 className="text-xs h-7 px-2"
                 title={tip}
+                disabled={gameState.tacticalActionsRemaining <= 0}
                 onClick={() => {
                   if (action === 'fortify' && gameState.selectedUnitId) {
                     fortifyUnit();
@@ -497,9 +499,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   );
 
   const phaseConfig: Record<string, { label: string; hint: string; color: string }> = {
-    deploy: { label: '📦 DEPLOY PHASE', hint: 'Click your HQ to deploy soldiers and capos', color: 'bg-blue-600/80' },
-    move: { label: '🚶 MOVE PHASE', hint: 'Select a unit, then click a highlighted hex to move', color: 'bg-amber-600/80' },
-    action: { label: '⚔️ ACTION PHASE', hint: 'Click hexes with your units to Hit, Extort, or Negotiate', color: 'bg-red-600/80' },
+    deploy: { label: '📦 DEPLOY PHASE', hint: 'Deploy units from HQ & move them across the map', color: 'bg-blue-600/80' },
+    move: { label: '📋 TACTICAL PHASE', hint: `Scout, Fortify, Escort, Safehouse (${gameState.tacticalActionsRemaining}/${gameState.maxTacticalActions} left)`, color: 'bg-amber-600/80' },
+    action: { label: '⚔️ ACTION PHASE', hint: `Hit, Extort, Claim, Negotiate (${gameState.actionsRemaining}/${gameState.maxActions} left)`, color: 'bg-red-600/80' },
     waiting: { label: '⏳ END TURN', hint: 'Press End Turn to advance', color: 'bg-muted' },
   };
   const currentPhaseConfig = phaseConfig[gameState.turnPhase] || phaseConfig.waiting;

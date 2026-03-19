@@ -234,3 +234,9 @@ export const FORTIFY_DEFENSE_BONUS = 25; // +25% defense
 export const SCOUT_DURATION = 3; // turns
 export const SAFEHOUSE_DURATION = 2; // turns
 export const MAX_ESCORT_SOLDIERS = 2;
+
+// ============ ACTION BUDGET ============
+export const BASE_ACTIONS_PER_TURN = 2;
+export const BONUS_ACTION_RESPECT_THRESHOLD = 50;
+export const BONUS_ACTION_INFLUENCE_THRESHOLD = 50;
+export const TACTICAL_ACTIONS_PER_TURN = 3;
