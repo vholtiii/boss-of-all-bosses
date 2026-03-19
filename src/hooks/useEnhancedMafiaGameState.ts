@@ -1873,6 +1873,29 @@ export const useEnhancedMafiaGameState = (
     return state;
   };
 
+  // ============ CLAIM TERRITORY (soldiers only, action phase) ============
+  const processClaimTerritory = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
+    const { targetQ, targetR, targetS } = action;
+    const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
+    if (!tile || tile.controllingFamily !== 'neutral' || tile.isHeadquarters) return state;
+
+    const playerSoldiers = state.deployedUnits.filter(u => 
+      u.family === state.playerFamily && u.type === 'soldier' &&
+      u.q === targetQ && u.r === targetR && u.s === targetS
+    );
+    if (playerSoldiers.length === 0) return state;
+
+    tile.controllingFamily = state.playerFamily;
+    state.pendingNotifications = [...state.pendingNotifications, {
+      type: 'success' as const, title: '🏴 Territory Claimed!',
+      message: `Your soldiers have claimed this territory in ${tile.district}.`,
+    }];
+
+    syncLegacyUnits(state);
+    updateVictoryProgress(state);
+    return state;
+  };
+
   // ============ ESTABLISH SAFEHOUSE (action phase) ============
   const processEstablishSafehouse = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
     const { targetQ, targetR, targetS } = action;
