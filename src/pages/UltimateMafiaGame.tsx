@@ -229,53 +229,11 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
   }
 
   const leftSidebar = (
-    <div className="space-y-6 p-4">
-      {/* Family Status */}
-      <div className="bg-gradient-to-br from-noir-dark to-background border border-noir-light rounded-lg p-4">
-        <h3 className="text-lg font-bold text-mafia-gold font-playfair mb-4 flex items-center">
-          <div className="w-3 h-3 bg-mafia-gold rounded-full mr-2" />
-          {gameState.playerFamily.toUpperCase()} FAMILY
-        </h3>
-        <ResourcePanel gameState={gameState} />
-      </div>
-
-      {/* Game Mechanics */}
-      <div className="bg-gradient-to-br from-noir-dark to-background border border-noir-light rounded-lg p-4">
-        <h3 className="text-lg font-bold text-mafia-gold font-playfair mb-4 flex items-center">
-          <div className="w-3 h-3 bg-blue-500 rounded-full mr-2" />
-          Game Mechanics
-        </h3>
-        <EnhancedGameMechanics 
-          gameState={gameState} 
-          onAction={performAction}
-        />
-      </div>
-    </div>
+    <LeftSidePanel gameState={gameState} onAction={performAction} />
   );
 
   const rightSidebar = (
-    <div className="space-y-6 p-4">
-      {/* Events & Intel */}
-      <div className="bg-gradient-to-br from-noir-dark to-background border border-noir-light rounded-lg p-4">
-        <h3 className="text-lg font-bold text-mafia-gold font-playfair mb-4 flex items-center">
-          <div className="w-3 h-3 bg-destructive rounded-full mr-2" />
-          Events & Intel
-        </h3>
-        <EventsPanel 
-          gameState={gameState} 
-          onEventChoice={handleEventChoice}
-        />
-      </div>
-      
-      {/* AI Opponents */}
-      <div className="bg-gradient-to-br from-noir-dark to-background border border-noir-light rounded-lg p-4">
-        <h3 className="text-lg font-bold text-mafia-gold font-playfair mb-4 flex items-center">
-          <div className="w-3 h-3 bg-red-500 rounded-full mr-2" />
-          AI Opponents
-        </h3>
-        <AIOpponentsPanel gameState={gameState} />
-      </div>
-    </div>
+    <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} />
   );
 
   const topBar = (
