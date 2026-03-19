@@ -54,7 +54,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const turnPhaseRef = gameState?.turnPhase;
   useEffect(() => { setActionMenu(null); }, [turnPhaseRef]);
 
-  const baseHexRadius = 22;
+  const baseHexRadius = 28;
   const hexWidth = baseHexRadius * 2;
   const hexHeight = Math.sqrt(3) * baseHexRadius;
 
