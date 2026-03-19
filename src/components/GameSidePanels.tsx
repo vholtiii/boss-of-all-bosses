@@ -78,6 +78,23 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
 
         <Separator />
 
+        {/* ── Phase guidance banner ── */}
+        {actionsLocked && (
+          <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-center">
+            <p className="text-xs font-semibold text-primary uppercase tracking-wide">
+              {phase === 'deploy' ? '📦 Deploy Phase' : '🚶 Move Phase'}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              {phase === 'deploy'
+                ? 'Place your units from HQ onto the map.'
+                : 'Move, fortify, scout, or escort your units.'}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              Complete this phase to unlock actions.
+            </p>
+          </div>
+        )}
+
         {/* ── ACTIONS ── */}
         <CollapsibleSection
           title="Strategic Actions"
