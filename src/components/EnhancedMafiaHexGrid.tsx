@@ -177,6 +177,29 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       }
     }
 
+    // Action phase — show context menu if player has soldiers on enemy/neutral hex
+    if (turnPhase === 'action') {
+      const key = `${tile.q},${tile.r},${tile.s}`;
+      const unitsHere = unitsByHex.get(key) || [];
+      const playerSoldiersHere = unitsHere.filter(u => u.family === playerFamily && u.type === 'soldier');
+      
+      if (playerSoldiersHere.length > 0 && tile.controllingFamily !== playerFamily) {
+        const canHit = tile.controllingFamily !== 'neutral' && !tile.isHeadquarters;
+        const canExtort = tile.controllingFamily === 'neutral' && !tile.isHeadquarters;
+        if (canHit || canExtort) {
+          // Toggle menu — click same hex again to close
+          if (actionMenu && actionMenu.tile.q === tile.q && actionMenu.tile.r === tile.r) {
+            setActionMenu(null);
+          } else {
+            setActionMenu({ tile, canHit, canExtort });
+          }
+          return;
+        }
+      }
+      // Close menu on clicking elsewhere
+      setActionMenu(null);
+    }
+
     // Normal click — show info
     onBusinessClick({
       q: tile.q, r: tile.r, s: tile.s,
