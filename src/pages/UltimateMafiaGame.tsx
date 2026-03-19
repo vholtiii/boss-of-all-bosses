@@ -255,21 +255,34 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       
       {/* Right side - Actions */}
       <div className="flex items-center space-x-2">
+        {/* Phase indicator */}
+        <div className="flex items-center space-x-1 bg-background/80 rounded-lg px-2 py-1 border border-noir-light">
+          {(['deploy', 'move', 'action'] as const).map((phase) => (
+            <div
+              key={phase}
+              className={cn(
+                "px-3 py-1 rounded text-xs font-bold uppercase transition-all",
+                gameState.turnPhase === phase
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground"
+              )}
+            >
+              {phase}
+            </div>
+          ))}
+        </div>
+
         <Button
-          variant={gameState.movementPhase ? "default" : "outline"}
           size="sm"
-          onClick={() => {
-            if (gameState.movementPhase) {
-              endMovementPhase();
-            } else {
-              startMovementPhase();
-            }
-          }}
+          onClick={() => advancePhase()}
+          disabled={gameState.turnPhase === 'waiting'}
           className="font-medium"
+          variant={gameState.turnPhase === 'action' ? 'default' : 'outline'}
         >
-          <Target className="h-4 w-4 mr-2" />
-          {gameState.movementPhase ? 'End Movement' : 'Movement'}
+          <SkipForward className="h-4 w-4 mr-2" />
+          {gameState.turnPhase === 'action' ? 'Next Phase' : gameState.turnPhase === 'waiting' ? 'Waiting...' : `End ${gameState.turnPhase.charAt(0).toUpperCase() + gameState.turnPhase.slice(1)}`}
         </Button>
+
         <SaveLoadDialog 
           gameState={gameState} 
           onLoadGame={handleLoadGame}
@@ -300,7 +313,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           }}
           size="sm"
           className="bg-primary text-primary-foreground font-bold font-playfair hover:bg-primary/90"
-          disabled={gameState.legalStatus.jailTime > 0}
+          disabled={gameState.legalStatus.jailTime > 0 || gameState.turnPhase !== 'waiting'}
         >
           <SkipForward className="h-4 w-4 mr-2" />
           {gameState.legalStatus.jailTime > 0 ? `JAILED (${gameState.legalStatus.jailTime})` : 'END TURN'}
