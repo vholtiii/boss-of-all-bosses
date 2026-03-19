@@ -241,7 +241,7 @@ const createInitialGameState = (
   family: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo' = 'gambino',
   startingResources?: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number }
 ): EnhancedMafiaGameState => {
-  const mapRadius = 6;
+  const mapRadius = 10;
   let hexMap = generateHexMap(mapRadius);
 
   const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'] as const;
