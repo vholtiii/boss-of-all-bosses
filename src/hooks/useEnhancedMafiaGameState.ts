@@ -446,6 +446,7 @@ const createInitialGameState = (
     
     selectedTerritory: null,
     activeEvent: null,
+    turnReport: null,
     familyControl: { gambino: 20, genovese: 20, lucchese: 20, bonanno: 20, colombo: 20 },
     territories,
   };
