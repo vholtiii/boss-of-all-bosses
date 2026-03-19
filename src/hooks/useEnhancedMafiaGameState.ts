@@ -549,6 +549,7 @@ export const useEnhancedMafiaGameState = (
   // ============ SELECT UNIT FOR MOVEMENT ============
   const selectUnit = useCallback((unitType: 'soldier' | 'capo', location: { q: number; r: number; s: number }) => {
     setGameState(prev => {
+      if (prev.turnPhase !== 'move') return prev; // Only allow during move phase
       const unit = prev.deployedUnits.find(u => 
         u.family === prev.playerFamily && u.type === unitType &&
         u.q === location.q && u.r === location.r && u.s === location.s &&
@@ -561,9 +562,20 @@ export const useEnhancedMafiaGameState = (
         ? getHexNeighbors(unit.q, unit.r, unit.s)
         : getHexesInRange(unit.q, unit.r, unit.s, range);
       
-      const validHexes = candidateHexes.filter(h => 
-        prev.hexMap.some(t => t.q === h.q && t.r === h.r && t.s === h.s)
-      );
+      const validHexes = candidateHexes.filter(h => {
+        const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+        if (!tile) return false;
+        if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+        
+        if (unitType === 'soldier') {
+          // Soldiers cannot enter enemy-controlled hexes — must Hit first
+          if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) return false;
+        } else {
+          // Capos can only move to own territory
+          if (tile.controllingFamily !== prev.playerFamily) return false;
+        }
+        return true;
+      });
 
       return { ...prev, selectedUnitId: unit.id, availableMoveHexes: validHexes, deployMode: null, availableDeployHexes: [] };
     });
