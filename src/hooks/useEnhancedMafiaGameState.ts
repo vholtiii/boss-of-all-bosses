@@ -700,14 +700,18 @@ export const useEnhancedMafiaGameState = (
       const unit = prev.deployedUnits[unitIdx];
       const moveAction = prev.selectedMoveAction || 'move';
 
-      // Handle scout action
-      if (moveAction === 'scout' && unit.type === 'soldier') {
-        return processScout(prev, unit, targetLocation);
+      // Handle scout action (tactical phase only)
+      if (prev.turnPhase === 'move' && moveAction === 'scout' && unit.type === 'soldier') {
+        if (prev.tacticalActionsRemaining <= 0) return prev;
+        const result = processScout(prev, unit, targetLocation);
+        return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
       }
 
-      // Handle safehouse action
-      if (moveAction === 'safehouse' && unit.type === 'capo') {
-        return processSafehouse(prev, unit);
+      // Handle safehouse action (tactical phase only)
+      if (prev.turnPhase === 'move' && moveAction === 'safehouse' && unit.type === 'capo') {
+        if (prev.tacticalActionsRemaining <= 0) return prev;
+        const result = processSafehouse(prev, unit);
+        return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
       }
 
       if (!prev.availableMoveHexes.some(h => h.q === targetLocation.q && h.r === targetLocation.r && h.s === targetLocation.s)) {
