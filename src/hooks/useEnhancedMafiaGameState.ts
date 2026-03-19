@@ -881,10 +881,24 @@ export const useEnhancedMafiaGameState = (
       }
 
       const range = unitType === 'soldier' ? 1 : 5;
-      const candidates = unitType === 'soldier'
+      let candidates = unitType === 'soldier'
         ? getHexNeighbors(hq.q, hq.r, hq.s)
         : getHexesInRange(hq.q, hq.r, hq.s, range);
       
+      // Add safehouse neighbors for soldier deployment
+      if (unitType === 'soldier' && prev.safehouse) {
+        const safehouseNeighbors = getHexNeighbors(prev.safehouse.q, prev.safehouse.r, prev.safehouse.s);
+        candidates = [...candidates, ...safehouseNeighbors];
+        // Deduplicate
+        const seen = new Set<string>();
+        candidates = candidates.filter(c => {
+          const k = `${c.q},${c.r},${c.s}`;
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+      }
+
       const validHexes = candidates.filter(h => 
         prev.hexMap.some(t => t.q === h.q && t.r === h.r && t.s === h.s)
       );
