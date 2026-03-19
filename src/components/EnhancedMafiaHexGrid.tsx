@@ -347,9 +347,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   )}
 
                   {/* Business/HQ icon */}
-                  <text x={x} y={y + 5} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">
+                  <text x={x} y={y + (tile.business && !tile.isHeadquarters ? 1 : 5)} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">
                     {tile.isHeadquarters ? '🏛️' : tile.business ? (businessIcons[tile.business.type] || '🏢') : ''}
                   </text>
+
+                  {/* District abbreviation label */}
+                  {!tile.isHeadquarters && !tile.business && (
+                    <text x={x} y={y + 3} textAnchor="middle" fontSize="7" fill="#ffffff" fillOpacity="0.3" fontWeight="600" className="pointer-events-none select-none">
+                      {districtAbbreviations[tile.district] || ''}
+                    </text>
+                  )}
+
+                  {/* Always-visible income label */}
+                  {tile.business && !tile.isHeadquarters && (
+                    <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#10B981" fontWeight="700" className="pointer-events-none select-none">
+                      ${tile.business.income >= 1000 ? `${(tile.business.income / 1000).toFixed(1)}k` : tile.business.income}
+                    </text>
+                  )}
 
                   {/* Prompt to click HQ during deploy phase */}
                   {tile.isHeadquarters === playerFamily && gameState?.turnPhase === 'deploy' && expandedHQKey !== key && (
@@ -382,7 +396,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
                   {/* Fortified units indicator */}
                   {(() => {
-                    const key2 = `${tile.q},${tile.r},${tile.s}`;
                     const fortifiedHere = (gameState?.deployedUnits || []).filter((u: DeployedUnit) => 
                       u.fortified && u.q === tile.q && u.r === tile.r && u.s === tile.s
                     );
