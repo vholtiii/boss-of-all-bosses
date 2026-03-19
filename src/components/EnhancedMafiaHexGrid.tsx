@@ -196,22 +196,25 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     if (turnPhase === 'action') {
       const key = `${tile.q},${tile.r},${tile.s}`;
       const unitsHere = unitsByHex.get(key) || [];
-      const playerSoldiersHere = unitsHere.filter(u => u.family === playerFamily && u.type === 'soldier');
+      const playerUnitsHere = unitsHere.filter(u => u.family === playerFamily);
+      const playerSoldiersHere = playerUnitsHere.filter(u => u.type === 'soldier');
+      const playerCaposHere = playerUnitsHere.filter(u => u.type === 'capo');
       
-      if (playerSoldiersHere.length > 0 && tile.controllingFamily !== playerFamily) {
-        const canHit = tile.controllingFamily !== 'neutral' && !tile.isHeadquarters;
-        const canExtort = tile.controllingFamily === 'neutral' && !tile.isHeadquarters;
-        if (canHit || canExtort) {
-          // Toggle menu — click same hex again to close
+      if (playerUnitsHere.length > 0 && tile.controllingFamily !== playerFamily) {
+        const canHit = tile.controllingFamily !== 'neutral' && !tile.isHeadquarters && playerSoldiersHere.length > 0;
+        const canExtort = tile.controllingFamily === 'neutral' && !tile.isHeadquarters && playerSoldiersHere.length > 0;
+        const canNegotiate = tile.controllingFamily !== 'neutral' && !tile.isHeadquarters && playerCaposHere.length > 0;
+        const negotiateCapoId = playerCaposHere[0]?.id;
+        
+        if (canHit || canExtort || canNegotiate) {
           if (actionMenu && actionMenu.tile.q === tile.q && actionMenu.tile.r === tile.r) {
             setActionMenu(null);
           } else {
-            setActionMenu({ tile, canHit, canExtort });
+            setActionMenu({ tile, canHit, canExtort, canNegotiate, negotiateCapoId });
           }
           return;
         }
       }
-      // Close menu on clicking elsewhere
       setActionMenu(null);
     }
 
