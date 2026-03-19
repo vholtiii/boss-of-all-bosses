@@ -327,8 +327,13 @@ const createInitialGameState = (
   territories: generateInitialTerritories(family),
 });
 
-export const useEnhancedMafiaGameState = () => {
-  const [gameState, setGameState] = useState<EnhancedMafiaGameState>(initialEnhancedGameState);
+export const useEnhancedMafiaGameState = (
+  initialFamily?: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo',
+  startingResources?: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number }
+) => {
+  const [gameState, setGameState] = useState<EnhancedMafiaGameState>(() => 
+    createInitialGameState(initialFamily || 'gambino', startingResources)
+  );
 
   // Enhanced turn processing
   const endTurn = useCallback(() => {
