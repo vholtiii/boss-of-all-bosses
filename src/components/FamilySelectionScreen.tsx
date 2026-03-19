@@ -54,7 +54,7 @@ const families: FamilyInfo[] = [
       { label: 'Stealth', icon: <Eye className="h-3.5 w-3.5" />, value: 5 },
     ],
     bonuses: ['+30% business income', '+20% laundering efficiency', '+25% business upgrade discount'],
-    startingResources: { money: 45000, soldiers: 4, influence: 10, politicalPower: 25, respect: 20 },
+    startingResources: { money: 45000, soldiers: 6, influence: 10, politicalPower: 25, respect: 20 },
   },
   {
     id: 'lucchese',
