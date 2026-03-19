@@ -786,6 +786,7 @@ export const useEnhancedMafiaGameState = (
       processWeather(newState);
       processEvents(newState);
       processBribes(newState);
+      processPacts(newState);
       
       newState.reputation.reputation = Math.max(0, newState.reputation.reputation - 0.5);
       newState.reputation.fear = Math.max(0, newState.reputation.fear - 1);
