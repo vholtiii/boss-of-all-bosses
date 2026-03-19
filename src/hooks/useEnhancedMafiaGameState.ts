@@ -1378,7 +1378,132 @@ export const useEnhancedMafiaGameState = (
     return state;
   };
 
-  // ============ CLEAR NOTIFICATIONS ============
+  // ============ NEGOTIATION HANDLER ============
+  const processNegotiation = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
+    const { negotiationType, targetQ, targetR, targetS, capoId, extraData } = action;
+    const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
+    if (!tile || tile.controllingFamily === state.playerFamily || tile.controllingFamily === 'neutral') return state;
+
+    const capo = state.deployedUnits.find(u => u.id === capoId);
+    if (!capo || capo.type !== 'capo' || capo.family !== state.playerFamily) return state;
+
+    const enemyFamily = tile.controllingFamily;
+    const config = NEGOTIATION_TYPES.find(n => n.type === negotiationType);
+    if (!config) return state;
+
+    const cost = config.baseCost + (negotiationType === 'bribe_territory' ? (state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS).length * 2000 + (tile.business?.income || 0)) : 0);
+    if (state.resources.money < cost) return state;
+
+    state.resources.money -= cost;
+
+    // Reputation cost
+    if (config.reputationCost > 0) {
+      state.reputation.respect = Math.max(0, state.reputation.respect - config.reputationCost);
+    }
+
+    switch (negotiationType as NegotiationType) {
+      case 'ceasefire': {
+        const duration = 3 + Math.floor(Math.random() * 3); // 3-5 turns
+        state.ceasefires = [...state.ceasefires, {
+          id: `ceasefire-${Date.now()}`,
+          family: enemyFamily,
+          turnsRemaining: duration,
+          turnFormed: state.turn,
+          active: true,
+        }];
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: '🤝 Ceasefire Agreed!',
+          message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} won't attack for ${duration} turns. -${config.reputationCost} respect.`,
+        }];
+        break;
+      }
+      case 'bribe_territory': {
+        // Peacefully claim the hex
+        const enemyUnits = state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS);
+        enemyUnits.forEach(eu => {
+          const idx = state.deployedUnits.indexOf(eu);
+          if (idx !== -1) state.deployedUnits.splice(idx, 1);
+        });
+        tile.controllingFamily = state.playerFamily;
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: '💵 Territory Acquired!',
+          message: `Peacefully bribed for the hex. Cost: $${cost.toLocaleString()}.`,
+        }];
+        break;
+      }
+      case 'alliance': {
+        const condition: AllianceCondition = extraData?.condition || { type: 'no_attack_family', target: enemyFamily, violated: false };
+        const duration = 5 + Math.floor(Math.random() * 4); // 5-8 turns
+        state.alliances = [...state.alliances, {
+          id: `alliance-${Date.now()}`,
+          alliedFamily: enemyFamily,
+          conditions: [condition],
+          turnsRemaining: duration,
+          turnFormed: state.turn,
+          active: true,
+        }];
+        // Also boost relationship
+        if (state.reputation.familyRelationships[enemyFamily] !== undefined) {
+          state.reputation.familyRelationships[enemyFamily] += 20;
+        }
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: '⚖️ Alliance Formed!',
+          message: `Pact with ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} for ${duration} turns. Condition: ${condition.type.replace(/_/g, ' ')}.`,
+        }];
+        break;
+      }
+    }
+
+    syncLegacyUnits(state);
+    return state;
+  };
+
+  // ============ PROCESS PACTS AT END OF TURN ============
+  const processPacts = (state: EnhancedMafiaGameState) => {
+    // Tick down ceasefires
+    state.ceasefires = state.ceasefires.map(c => {
+      if (!c.active) return c;
+      const remaining = c.turnsRemaining - 1;
+      if (remaining <= 0) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'warning', title: '⏰ Ceasefire Expired',
+          message: `Ceasefire with ${c.family.charAt(0).toUpperCase() + c.family.slice(1)} has ended.`,
+        }];
+        return { ...c, turnsRemaining: 0, active: false };
+      }
+      return { ...c, turnsRemaining: remaining };
+    }).filter(c => c.active);
+
+    // Tick down alliances and check conditions
+    state.alliances = state.alliances.map(a => {
+      if (!a.active) return a;
+      const remaining = a.turnsRemaining - 1;
+
+      // Check conditions
+      a.conditions.forEach(cond => {
+        if (cond.violated) return;
+        if (cond.type === 'no_attack_family') {
+          // Check if player attacked ally this turn (we can't retroactively check, but if relationship dropped significantly)
+          // Simple: if any ally territory was taken by player this turn, condition violated
+        }
+        if (cond.type === 'no_expand_district') {
+          // Check if player expanded into the target district
+          // For simplicity we don't enforce this retroactively here
+        }
+      });
+
+      if (remaining <= 0) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'info', title: '📜 Alliance Ended',
+          message: `Alliance with ${a.alliedFamily.charAt(0).toUpperCase() + a.alliedFamily.slice(1)} has expired naturally.`,
+        }];
+        return { ...a, turnsRemaining: 0, active: false };
+      }
+      return { ...a, turnsRemaining: remaining };
+    }).filter(a => a.active);
+  };
+
+
   const clearNotifications = useCallback(() => {
     setGameState(prev => ({ ...prev, pendingNotifications: [] }));
   }, []);
