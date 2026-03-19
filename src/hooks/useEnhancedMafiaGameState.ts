@@ -35,7 +35,7 @@ export interface EnhancedMafiaGameState {
   economy: EconomySystem;
   aiOpponents: AIOpponent[];
   events: GameEvent[];
-  missions: Mission[];
+  missions?: never[]; // deprecated
   weather: WeatherSystem;
   technology: TechnologySystem;
   seasonalEvents: SeasonalEvent[];
@@ -51,7 +51,7 @@ export interface EnhancedMafiaGameState {
   // UI state
   selectedTerritory?: any;
   activeEvent?: GameEvent;
-  showMissionBoard: boolean;
+  
   
   // Movement state
   movementPhase: boolean;
@@ -224,22 +224,6 @@ const createInitialGameState = (
     }),
   
   events: [],
-  missions: [
-    {
-      id: 'tutorial-1',
-      title: 'First Territory',
-      description: 'Establish control in your home district',
-      type: 'story',
-      difficulty: 'easy',
-      objectives: [{ id: 'obj-1', description: 'Control a territory', type: 'collect', target: 'territory', amount: 1, completed: false }],
-      rewards: [
-        { type: 'money', amount: 10000, description: 'Startup capital bonus' },
-        { type: 'reputation', amount: 5, description: 'Respect from the neighborhood' },
-      ],
-      status: 'available',
-      progress: 0,
-    },
-  ],
   
   weather: {
     currentWeather: { type: 'clear', intensity: 0, duration: 3, description: 'Clear skies, perfect for business' },
@@ -282,7 +266,7 @@ const createInitialGameState = (
   
   selectedTerritory: null,
   activeEvent: null,
-  showMissionBoard: false,
+  
   
   movementPhase: false,
   selectedUnit: { type: null, location: null, remainingMoves: 0 },
@@ -359,8 +343,6 @@ export const useEnhancedMafiaGameState = (
       // Process seasonal events
       processSeasonalEvents(newState);
       
-      // Process missions
-      processMissions(newState);
       
       // Process technology research
       processTechnology(newState);
@@ -407,12 +389,6 @@ export const useEnhancedMafiaGameState = (
           break;
         case 'research_technology':
           startTechnologyResearch(newState, action.technologyId);
-          break;
-        case 'accept_mission':
-          acceptMission(newState, action.missionId);
-          break;
-        case 'complete_mission':
-          completeMission(newState, action.missionId);
           break;
         case 'make_investment':
           makeInvestment(newState, action);
@@ -592,14 +568,6 @@ export const useEnhancedMafiaGameState = (
     }
   };
 
-  const processMissions = (state: EnhancedMafiaGameState) => {
-    // Update mission progress
-    state.missions.forEach(mission => {
-      if (mission.status === 'active') {
-        updateMissionProgress(state, mission);
-      }
-    });
-  };
 
   const processTechnology = (state: EnhancedMafiaGameState) => {
     // Update research progress
@@ -1310,50 +1278,6 @@ export const useEnhancedMafiaGameState = (
     }
   };
 
-  const updateMissionProgress = (state: EnhancedMafiaGameState, mission: Mission) => {
-    // Update mission progress based on current game state
-    mission.objectives.forEach(objective => {
-      if (!objective.completed) {
-        switch (objective.type) {
-          case 'collect':
-            // Check if player has collected the required items
-            if (objective.target === 'Little Italy' && state.familyControl[state.playerFamily] > 25) {
-              objective.completed = true;
-            }
-            break;
-          case 'eliminate':
-            // Check if target has been eliminated
-            break;
-          case 'protect':
-            // Check if target is still protected
-            break;
-        }
-      }
-    });
-
-    // Calculate overall progress
-    const completedObjectives = mission.objectives.filter(obj => obj.completed).length;
-    mission.progress = Math.round((completedObjectives / mission.objectives.length) * 100);
-
-    // Check if mission is complete
-    if (mission.progress >= 100 && mission.status === 'active') {
-      mission.status = 'completed';
-      // Apply rewards
-      mission.rewards.forEach(reward => {
-        switch (reward.type) {
-          case 'money':
-            state.resources.money += reward.amount;
-            break;
-          case 'reputation':
-            state.reputation.reputation += reward.amount;
-            break;
-          case 'soldiers':
-            state.resources.soldiers += reward.amount;
-            break;
-        }
-      });
-    }
-  };
 
   const completeTechnologyResearch = (state: EnhancedMafiaGameState, techId: string) => {
     const tech = state.technology.available.find(t => t.id === techId);
@@ -1612,32 +1536,6 @@ export const useEnhancedMafiaGameState = (
     }
   };
 
-  const acceptMission = (state: EnhancedMafiaGameState, missionId: string) => {
-    const mission = state.missions.find(m => m.id === missionId);
-    if (mission) {
-      mission.status = 'active';
-    }
-  };
-
-  const completeMission = (state: EnhancedMafiaGameState, missionId: string) => {
-    const mission = state.missions.find(m => m.id === missionId);
-    if (mission) {
-      mission.status = 'completed';
-      mission.rewards.forEach(reward => {
-        switch (reward.type) {
-          case 'money':
-            state.resources.money += reward.amount;
-            break;
-          case 'reputation':
-            state.reputation.reputation += reward.amount;
-            break;
-          case 'soldiers':
-            state.resources.soldiers += reward.amount;
-            break;
-        }
-      });
-    }
-  };
 
   // Deploy soldiers to a territory
   const deploySoldiers = (state: EnhancedMafiaGameState, action: any) => {

@@ -255,11 +255,11 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
 
   const rightSidebar = (
     <div className="space-y-6 p-4">
-      {/* Events & Missions */}
+      {/* Events & Intel */}
       <div className="bg-gradient-to-br from-noir-dark to-background border border-noir-light rounded-lg p-4">
         <h3 className="text-lg font-bold text-mafia-gold font-playfair mb-4 flex items-center">
-          <div className="w-3 h-3 bg-purple-500 rounded-full mr-2" />
-          Events & Missions
+          <div className="w-3 h-3 bg-destructive rounded-full mr-2" />
+          Events & Intel
         </h3>
         <EventsPanel 
           gameState={gameState} 
@@ -571,31 +571,30 @@ const EventsPanel: React.FC<{ gameState: any; onEventChoice: (eventId: string, c
   gameState, 
   onEventChoice 
 }) => {
-  const { events, missions } = gameState;
+  const { events } = gameState;
 
   return (
     <div className="space-y-4">
-      {/* Active Events */}
-      {events.length > 0 && (
+      {events.length > 0 ? (
         <div>
           <h4 className="font-semibold text-sm mb-2">Active Events</h4>
           <div className="space-y-2">
-            {events.slice(0, 2).map((event: any, index: number) => (
+            {events.slice(0, 3).map((event: any, index: number) => (
               <motion.div
                 key={event.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="p-2 border rounded bg-yellow-50 dark:bg-yellow-950"
+                className="p-3 border border-border rounded-lg bg-card"
               >
-                <p className="font-medium text-sm">{event.title}</p>
-                <p className="text-xs text-muted-foreground">{event.description}</p>
-                <div className="flex gap-1 mt-2">
-                  {event.choices.slice(0, 2).map((choice: any) => (
+                <p className="font-medium text-sm text-foreground">{event.title}</p>
+                <p className="text-xs text-muted-foreground mt-1">{event.description}</p>
+                <div className="flex gap-1 mt-2 flex-wrap">
+                  {event.choices.map((choice: any) => (
                     <button
                       key={choice.id}
                       onClick={() => onEventChoice(event.id, choice.id)}
-                      className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                      className="text-xs px-2 py-1 bg-primary text-primary-foreground rounded hover:bg-primary/80 transition-colors"
                     >
                       {choice.text}
                     </button>
@@ -605,35 +604,9 @@ const EventsPanel: React.FC<{ gameState: any; onEventChoice: (eventId: string, c
             ))}
           </div>
         </div>
+      ) : (
+        <p className="text-xs text-muted-foreground italic">No active events. End your turn to see what happens on the streets.</p>
       )}
-
-      {/* Active Missions */}
-      <div>
-        <h4 className="font-semibold text-sm mb-2">Missions</h4>
-        <div className="space-y-2">
-          {missions.filter((m: any) => m.status === 'active').slice(0, 2).map((mission: any, index: number) => (
-            <motion.div
-              key={mission.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="p-2 border rounded"
-            >
-              <div className="flex justify-between items-center mb-1">
-                <span className="font-medium text-sm">{mission.title}</span>
-                <Badge variant="outline" className="text-xs">{mission.difficulty}</Badge>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-1 mb-1">
-                <div 
-                  className="bg-blue-500 h-1 rounded-full" 
-                  style={{ width: `${mission.progress}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">{mission.progress}% complete</p>
-            </motion.div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 };
