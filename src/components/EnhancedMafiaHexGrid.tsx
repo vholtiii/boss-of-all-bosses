@@ -208,8 +208,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       );
       if (isValid && onDeployUnit) {
         onDeployUnit(gameState.deployMode.unitType, { q: tile.q, r: tile.r, s: tile.s }, gameState.deployMode.family);
+        return;
       }
-      return;
+      // Clicked a non-deploy hex — fall through to unit selection below
     }
 
     // Deploy phase — select units for movement OR place from HQ
