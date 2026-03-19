@@ -52,8 +52,21 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     selectHeadquarters,
     selectUnitFromHeadquarters,
     deployUnit,
-    isWinner
+    isWinner,
+    clearNotifications,
   } = useEnhancedMafiaGameState(config.family, config.resources);
+
+  const { addNotification } = useMafiaNotifications();
+
+  // Drain pending notifications from game state into the notification system
+  useEffect(() => {
+    if (gameState.pendingNotifications.length > 0) {
+      gameState.pendingNotifications.forEach(n => {
+        addNotification({ type: n.type, title: n.title, message: n.message, duration: 5000 });
+      });
+      clearNotifications();
+    }
+  }, [gameState.pendingNotifications, addNotification, clearNotifications]);
 
   // Handle action wrapper function
   const handleAction = useCallback((action: any) => {
