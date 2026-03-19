@@ -1536,32 +1536,6 @@ export const useEnhancedMafiaGameState = (
     }
   };
 
-  const acceptMission = (state: EnhancedMafiaGameState, missionId: string) => {
-    const mission = state.missions.find(m => m.id === missionId);
-    if (mission) {
-      mission.status = 'active';
-    }
-  };
-
-  const completeMission = (state: EnhancedMafiaGameState, missionId: string) => {
-    const mission = state.missions.find(m => m.id === missionId);
-    if (mission) {
-      mission.status = 'completed';
-      mission.rewards.forEach(reward => {
-        switch (reward.type) {
-          case 'money':
-            state.resources.money += reward.amount;
-            break;
-          case 'reputation':
-            state.reputation.reputation += reward.amount;
-            break;
-          case 'soldiers':
-            state.resources.soldiers += reward.amount;
-            break;
-        }
-      });
-    }
-  };
 
   // Deploy soldiers to a territory
   const deploySoldiers = (state: EnhancedMafiaGameState, action: any) => {
