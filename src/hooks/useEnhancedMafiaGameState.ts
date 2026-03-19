@@ -2104,6 +2104,7 @@ export const useEnhancedMafiaGameState = (
 
       if (Math.random() < chance) {
         tile.controllingFamily = state.playerFamily;
+        tile.isExtorted = true;
         state.resources.money += 3000;
         state.resources.respect += 5;
         
