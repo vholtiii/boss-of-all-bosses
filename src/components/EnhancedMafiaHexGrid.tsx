@@ -48,7 +48,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [zoom, setZoom] = useState(1);
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
-  const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canNegotiate: boolean; negotiateCapoId?: string } | null>(null);
+  const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; negotiateCapoId?: string } | null>(null);
   const [expandedHQKey, setExpandedHQKey] = useState<string | null>(null);
 
   // Clear action menu when phase changes
@@ -208,17 +208,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       const playerSoldiersHere = playerUnitsHere.filter(u => u.type === 'soldier');
       const playerCaposHere = playerUnitsHere.filter(u => u.type === 'capo');
       
-      if (playerUnitsHere.length > 0 && tile.controllingFamily !== playerFamily) {
-        const canHit = tile.controllingFamily !== 'neutral' && !tile.isHeadquarters && playerSoldiersHere.length > 0;
-        const canExtort = tile.controllingFamily === 'neutral' && !tile.isHeadquarters && playerSoldiersHere.length > 0;
-        const canNegotiate = tile.controllingFamily !== 'neutral' && !tile.isHeadquarters && playerCaposHere.length > 0;
+      if (playerUnitsHere.length > 0) {
+        const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== playerFamily;
+        const isNeutral = tile.controllingFamily === 'neutral';
+        const isOwned = tile.controllingFamily === playerFamily;
+        
+        const canHit = isEnemy && !tile.isHeadquarters && playerSoldiersHere.length > 0;
+        const canExtort = isNeutral && !tile.isHeadquarters && playerSoldiersHere.length > 0;
+        const canNegotiate = isEnemy && !tile.isHeadquarters && playerCaposHere.length > 0;
+        const canSabotage = isEnemy && !tile.isHeadquarters && playerSoldiersHere.length > 0 && !!tile.business;
+        const canSafehouse = isOwned && !tile.isHeadquarters && playerUnitsHere.length > 0;
         const negotiateCapoId = playerCaposHere[0]?.id;
         
-        if (canHit || canExtort || canNegotiate) {
+        if (canHit || canExtort || canNegotiate || canSabotage || canSafehouse) {
           if (actionMenu && actionMenu.tile.q === tile.q && actionMenu.tile.r === tile.r) {
             setActionMenu(null);
           } else {
-            setActionMenu({ tile, canHit, canExtort, canNegotiate, negotiateCapoId });
+            setActionMenu({ tile, canHit, canExtort, canNegotiate, canSabotage, canSafehouse, negotiateCapoId });
           }
           return;
         }
@@ -497,7 +503,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             {actionMenu && (() => {
               const { x, y } = getHexPosition(actionMenu.tile.q, actionMenu.tile.r);
               const menuWidth = 140;
-              const buttonCount = [actionMenu.canHit, actionMenu.canExtort, actionMenu.canNegotiate].filter(Boolean).length;
+              const buttonCount = [actionMenu.canHit, actionMenu.canExtort, actionMenu.canNegotiate, actionMenu.canSabotage, actionMenu.canSafehouse].filter(Boolean).length;
               const menuHeight = buttonCount * 32 + 12;
               return (
                 <foreignObject
@@ -523,6 +529,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-destructive/90 hover:bg-destructive text-destructive-foreground text-xs font-bold transition-colors"
                       >
                         ⚔️ Hit Territory
+                      </button>
+                    )}
+                    {actionMenu.canSabotage && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAction) onAction({
+                            type: 'sabotage_hex',
+                            targetQ: actionMenu.tile.q,
+                            targetR: actionMenu.tile.r,
+                            targetS: actionMenu.tile.s,
+                          });
+                          setActionMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-orange-600/90 hover:bg-orange-600 text-white text-xs font-bold transition-colors"
+                      >
+                        💣 Sabotage
                       </button>
                     )}
                     {actionMenu.canExtort && (
@@ -558,6 +581,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-accent/90 hover:bg-accent text-accent-foreground text-xs font-bold transition-colors"
                       >
                         🤝 Negotiate
+                      </button>
+                    )}
+                    {actionMenu.canSafehouse && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAction) onAction({
+                            type: 'establish_safehouse',
+                            targetQ: actionMenu.tile.q,
+                            targetR: actionMenu.tile.r,
+                            targetS: actionMenu.tile.s,
+                          });
+                          setActionMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-600/90 hover:bg-amber-600 text-white text-xs font-bold transition-colors"
+                      >
+                        🏠 Safehouse
                       </button>
                     )}
                   </div>

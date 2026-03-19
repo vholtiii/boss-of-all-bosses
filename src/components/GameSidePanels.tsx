@@ -38,10 +38,13 @@ interface GameSidePanelProps {
 
 // ─── LEFT PANEL: Resources + Actions ──────────────────────────────────
 
-export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: any) => void }> = ({
+export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: any) => void; turnPhase?: string }> = ({
   gameState,
   onAction,
+  turnPhase,
 }) => {
+  const phase = turnPhase || gameState.turnPhase || 'action';
+  const actionsLocked = phase === 'deploy' || phase === 'move';
   const [openSection, setOpenSection] = useState<string>('actions');
   const { resources, reputation, policeHeat, legalStatus } = gameState;
 
@@ -75,12 +78,30 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
 
         <Separator />
 
+        {/* ── Phase guidance banner ── */}
+        {actionsLocked && (
+          <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-center">
+            <p className="text-xs font-semibold text-primary uppercase tracking-wide">
+              {phase === 'deploy' ? '📦 Deploy Phase' : '🚶 Move Phase'}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              {phase === 'deploy'
+                ? 'Place your units from HQ onto the map.'
+                : 'Move, fortify, scout, or escort your units.'}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              Complete this phase to unlock actions.
+            </p>
+          </div>
+        )}
+
         {/* ── ACTIONS ── */}
         <CollapsibleSection
           title="Strategic Actions"
           icon={<Swords className="h-4 w-4" />}
-          isOpen={openSection === 'actions'}
-          onToggle={() => toggle('actions')}
+          isOpen={!actionsLocked && openSection === 'actions'}
+          onToggle={() => !actionsLocked && toggle('actions')}
+          disabled={actionsLocked}
         >
           <div className="space-y-1.5">
             <ActionButton
@@ -120,8 +141,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Economy"
           icon={<TrendingUp className="h-4 w-4" />}
-          isOpen={openSection === 'economy'}
-          onToggle={() => toggle('economy')}
+          isOpen={!actionsLocked && openSection === 'economy'}
+          onToggle={() => !actionsLocked && toggle('economy')}
+          disabled={actionsLocked}
         >
           <div className="space-y-1.5">
             <ActionButton
@@ -166,8 +188,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Defense & Law"
           icon={<Gavel className="h-4 w-4" />}
-          isOpen={openSection === 'defense'}
-          onToggle={() => toggle('defense')}
+          isOpen={!actionsLocked && openSection === 'defense'}
+          onToggle={() => !actionsLocked && toggle('defense')}
+          disabled={actionsLocked}
         >
           <div className="space-y-1.5">
             <ActionButton
@@ -198,8 +221,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Corruption"
           icon={<Gavel className="h-4 w-4" />}
-          isOpen={openSection === 'corruption'}
-          onToggle={() => toggle('corruption')}
+          isOpen={!actionsLocked && openSection === 'corruption'}
+          onToggle={() => !actionsLocked && toggle('corruption')}
+          disabled={actionsLocked}
         >
           <CorruptionPanel
             money={resources.money}
@@ -215,8 +239,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title={`Hitmen (${gameState.hitmen.length}/3)`}
           icon={<Crosshair className="h-4 w-4" />}
-          isOpen={openSection === 'hitmen'}
-          onToggle={() => toggle('hitmen')}
+          isOpen={!actionsLocked && openSection === 'hitmen'}
+          onToggle={() => !actionsLocked && toggle('hitmen')}
+          disabled={actionsLocked}
         >
           <HitmanPanel
             hitmen={gameState.hitmen}
@@ -509,15 +534,19 @@ const CollapsibleSection: React.FC<{
   isOpen: boolean;
   onToggle: () => void;
   children: React.ReactNode;
-}> = ({ title, icon, isOpen, onToggle, children }) => (
-  <div>
+  disabled?: boolean;
+}> = ({ title, icon, isOpen, onToggle, children, disabled }) => (
+  <div className={cn(disabled && 'opacity-40 pointer-events-none')}>
     <button
       onClick={onToggle}
-      className="flex items-center gap-2 w-full text-left text-sm font-semibold text-foreground hover:text-primary transition-colors py-1"
+      disabled={disabled}
+      className="flex items-center gap-2 w-full text-left text-sm font-semibold text-foreground hover:text-primary transition-colors py-1 disabled:cursor-not-allowed"
     >
       {icon}
       <span className="flex-1">{title}</span>
-      {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+      {disabled ? (
+        <span className="text-[9px] text-muted-foreground font-normal">🔒</span>
+      ) : isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
     </button>
     <AnimatePresence>
       {isOpen && (
