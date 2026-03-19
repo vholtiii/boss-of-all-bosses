@@ -918,7 +918,9 @@ export const useEnhancedMafiaGameState = (
       selectedMoveAction: 'move' as MoveAction,
       pendingNotifications: [...prev.pendingNotifications, {
         type: 'info' as const, title: '👁️ Hex Scouted',
-        message: `${tile.controllingFamily.toUpperCase()} territory: ${enemyUnitsOnHex.length} units${tile.business ? `, ${tile.business.type} ($${tile.business.income}/turn)` : ''}.`,
+        message: tile.controllingFamily === 'neutral'
+          ? `Neutral territory${tile.business ? `: ${tile.business.type} generating $${tile.business.income}/turn` : ': no businesses'}.`
+          : `${tile.controllingFamily.toUpperCase()} territory: ${enemyUnitsOnHex.length} units${tile.business ? `, ${tile.business.type} ($${tile.business.income}/turn)` : ''}.`,
       }],
     };
   };
