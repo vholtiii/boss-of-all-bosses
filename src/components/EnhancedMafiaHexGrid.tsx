@@ -415,11 +415,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     </text>
                   )}
 
-                  {/* Render units */}
-                  {showSoldiers && unitsHere.length > 0 && (() => {
+                  {/* Render units — skip HQ hexes (handled by popover) */}
+                  {showSoldiers && unitsHere.length > 0 && !tile.isHeadquarters && (() => {
                     const turnPhase = gameState?.turnPhase || 'waiting';
                     const selectedUnitId = gameState?.selectedUnitId;
-                    // Group by family and type
                     const soldiersByFamily = new Map<string, DeployedUnit[]>();
                     const caposByFamily = new Map<string, DeployedUnit[]>();
                     unitsHere.forEach(u => {
@@ -490,6 +489,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
                     return elements;
                   })()}
+
+                  {/* HQ unit count badge */}
+                  {tile.isHeadquarters && unitsHere.length > 0 && (
+                    <g className="pointer-events-none">
+                      <circle cx={x + baseHexRadius * 0.5} cy={y - baseHexRadius * 0.5} r="9" fill="#D4AF37" stroke="#000" strokeWidth="1" />
+                      <text x={x + baseHexRadius * 0.5} y={y - baseHexRadius * 0.5 + 4} textAnchor="middle" fontSize="10" fill="#000" fontWeight="bold" className="select-none">
+                        {unitsHere.length}
+                      </text>
+                    </g>
+                  )}
 
                   {/* Territory control dot */}
                   {tile.controllingFamily !== 'neutral' && !tile.isHeadquarters && (
