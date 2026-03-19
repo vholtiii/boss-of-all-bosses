@@ -520,7 +520,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         offsetIdx++;
                       });
                     }
-                    });
 
                     return elements;
                   })()}
