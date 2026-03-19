@@ -1063,11 +1063,14 @@ export const useEnhancedMafiaGameState = (
             const hq = newState.headquarters[newState.playerFamily];
             if (hq) {
               const newId = `${newState.playerFamily}-capo-${Date.now()}`;
+              const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
+              const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
               newState.deployedUnits = [...newState.deployedUnits, {
                 id: newId, type: 'capo' as const, family: newState.playerFamily,
                 q: hq.q, r: hq.r, s: hq.s,
                 movesRemaining: 0, maxMoves: 3, level: 1,
                 name: `Capo ${Math.floor(Math.random() * 100)}`,
+                personality: randomPersonality,
               }];
             }
           }
