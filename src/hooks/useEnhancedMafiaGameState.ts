@@ -650,8 +650,26 @@ export const useEnhancedMafiaGameState = (
 
       const moveAction = prev.selectedMoveAction || 'move';
 
-      // Scout: show adjacent enemy hexes
-      if (moveAction === 'scout' && unitType === 'soldier') {
+      // Tactical actions only during move (tactical) phase
+      if (prev.turnPhase === 'move') {
+        // Scout: show adjacent enemy hexes
+        if (moveAction === 'scout' && unitType === 'soldier') {
+          if (prev.tacticalActionsRemaining <= 0) return prev;
+          const neighbors = getHexNeighbors(unit.q, unit.r, unit.s);
+          const scoutableHexes = neighbors.filter(h => {
+            const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+            if (!tile) return false;
+            return tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily;
+          });
+          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: scoutableHexes, deployMode: null, availableDeployHexes: [] };
+        }
+
+        // Safehouse: highlight current hex
+        if (moveAction === 'safehouse' && unitType === 'capo') {
+          if (prev.tacticalActionsRemaining <= 0) return prev;
+          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
+        }
+      }
         const neighbors = getHexNeighbors(unit.q, unit.r, unit.s);
         const scoutableHexes = neighbors.filter(h => {
           const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
