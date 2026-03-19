@@ -514,8 +514,8 @@ export const useEnhancedMafiaGameState = (
     });
 
     state.victoryProgress = {
-      territory: { current: playerHexes, target: 6, met: playerHexes >= 6 },
-      economic: { current: income, target: 8000, met: income >= 8000 },
+      territory: { current: playerHexes, target: 25, met: playerHexes >= 25 },
+      economic: { current: income, target: 25000, met: income >= 25000 },
       legacy: { current: playerRep, highestRival, met: playerRep > highestRival && state.turn > 5 },
     };
 
