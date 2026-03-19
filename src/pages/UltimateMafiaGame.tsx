@@ -656,9 +656,19 @@ const AIOpponentsPanel: React.FC<{ gameState: any }> = ({ gameState }) => {
 };
 
 const UltimateMafiaGame: React.FC = () => {
+  const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
+
+  if (!gameConfig) {
+    return (
+      <FamilySelectionScreen
+        onSelectFamily={(family, resources) => setGameConfig({ family, resources })}
+      />
+    );
+  }
+
   return (
     <NotificationProvider>
-      <GameContent />
+      <GameContent config={gameConfig} />
     </NotificationProvider>
   );
 };
