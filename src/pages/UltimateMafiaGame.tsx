@@ -323,18 +323,18 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         {/* Phase indicator */}
         <div className="flex items-center space-x-1 bg-background/80 rounded-lg px-2 py-1 border border-noir-light">
           {(['deploy', 'move', 'action'] as const).map((phase) => (
-            <div
-              key={phase}
-              className={cn(
-                "px-3 py-1 rounded text-xs font-bold uppercase transition-all",
-                gameState.turnPhase === phase
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground"
-              )}
-            >
-              {phase}
-            </div>
-          ))}
+              <div
+                key={phase}
+                className={cn(
+                  "px-3 py-1 rounded text-xs font-bold uppercase transition-all",
+                  gameState.turnPhase === phase
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground"
+                )}
+              >
+                {phase === 'move' ? 'tactical' : phase}
+              </div>
+            ))}
         </div>
 
         <Button

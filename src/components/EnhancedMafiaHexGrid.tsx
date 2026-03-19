@@ -212,7 +212,30 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       return;
     }
 
-    // Move phase — select or move units
+    // Deploy phase — select units for movement OR place from HQ
+    if (turnPhase === 'deploy') {
+      // If we have a selected unit, try to move it
+      if (gameState?.selectedUnitId) {
+        const isValidMove = gameState.availableMoveHexes?.some(
+          (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
+        );
+        if (isValidMove && onMoveUnit) {
+          onMoveUnit({ q: tile.q, r: tile.r, s: tile.s });
+          return;
+        }
+      }
+
+      // Try to select a player unit on this hex for movement
+      const key = `${tile.q},${tile.r},${tile.s}`;
+      const unitsHere = unitsByHex.get(key) || [];
+      const playerUnit = unitsHere.find(u => u.family === playerFamily && u.movesRemaining > 0);
+      if (playerUnit && onSelectUnit) {
+        onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
+        return;
+      }
+    }
+
+    // Move (tactical) phase — select units for tactical actions
     if (turnPhase === 'move') {
       // If we have a selected unit, try to move it
       if (gameState?.selectedUnitId) {
