@@ -50,10 +50,26 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; negotiateCapoId?: string } | null>(null);
   const [expandedHQKey, setExpandedHQKey] = useState<string | null>(null);
+  const [combatOverlay, setCombatOverlay] = useState<{
+    q: number; r: number; s: number;
+    success: boolean; type: string;
+    title: string; details: string;
+    timestamp: number;
+  } | null>(null);
 
   // Clear action menu when phase changes
   const turnPhaseRef = gameState?.turnPhase;
   useEffect(() => { setActionMenu(null); }, [turnPhaseRef]);
+
+  // Show combat result overlay when lastCombatResult changes
+  const lastCombatResult = gameState?.lastCombatResult;
+  useEffect(() => {
+    if (lastCombatResult && lastCombatResult.timestamp) {
+      setCombatOverlay(lastCombatResult);
+      const timer = setTimeout(() => setCombatOverlay(null), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [lastCombatResult?.timestamp]);
 
   const baseHexRadius = 22;
   const hexWidth = baseHexRadius * 2;
@@ -661,6 +677,70 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 </foreignObject>
               );
             })()}
+
+            {/* Combat Result Overlay */}
+            <AnimatePresence>
+              {combatOverlay && (() => {
+                const { x, y } = getHexPosition(combatOverlay.q, combatOverlay.r);
+                const isSuccess = combatOverlay.success;
+                const flashColor = isSuccess ? '#22c55e' : '#ef4444';
+                return (
+                  <g key={`combat-overlay-${combatOverlay.timestamp}`}>
+                    {/* Hex flash circle */}
+                    <motion.circle
+                      cx={x}
+                      cy={y}
+                      r={baseHexRadius * 1.3}
+                      fill={flashColor}
+                      initial={{ opacity: 0.8, scale: 0.5 }}
+                      animate={{ opacity: [0.8, 0.4, 0.6, 0], scale: [0.5, 1.4, 1.2, 1.5] }}
+                      transition={{ duration: 2, ease: 'easeOut' }}
+                    />
+                    {/* Pulsing hex border */}
+                    <motion.polygon
+                      points={getHexPoints(x, y, baseHexRadius + 2)}
+                      fill="none"
+                      stroke={isSuccess ? '#D4AF37' : '#ef4444'}
+                      strokeWidth={3}
+                      initial={{ opacity: 1 }}
+                      animate={{ opacity: [1, 0.3, 1, 0.3, 1, 0], strokeWidth: [3, 5, 3, 5, 3, 2] }}
+                      transition={{ duration: 2, ease: 'easeOut' }}
+                    />
+                    {/* Title text */}
+                    <motion.text
+                      x={x}
+                      y={y - 8}
+                      textAnchor="middle"
+                      fill={isSuccess ? '#22c55e' : '#ef4444'}
+                      fontSize="11"
+                      fontWeight="900"
+                      fontFamily="'Playfair Display', serif"
+                      initial={{ opacity: 0, y: y }}
+                      animate={{ opacity: [0, 1, 1, 0], y: [y, y - 20, y - 30, y - 50] }}
+                      transition={{ duration: 2.5, ease: 'easeOut' }}
+                      style={{ textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}
+                    >
+                      {combatOverlay.title}
+                    </motion.text>
+                    {/* Details text */}
+                    <motion.text
+                      x={x}
+                      y={y + 6}
+                      textAnchor="middle"
+                      fill="#ffffff"
+                      fontSize="8"
+                      fontWeight="700"
+                      initial={{ opacity: 0, y: y + 10 }}
+                      animate={{ opacity: [0, 1, 1, 0], y: [y + 10, y - 6, y - 16, y - 36] }}
+                      transition={{ duration: 2.5, ease: 'easeOut', delay: 0.15 }}
+                      style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}
+                    >
+                      {combatOverlay.details}
+                    </motion.text>
+                  </g>
+                );
+              })()}
+            </AnimatePresence>
           </g>
         </svg>
       </div>

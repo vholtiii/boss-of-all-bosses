@@ -146,6 +146,14 @@ export interface EnhancedMafiaGameState {
   policeHeat: PoliceHeat;
   
   turnReport: TurnReport | null;
+  lastCombatResult?: {
+    q: number; r: number; s: number;
+    success: boolean;
+    type: 'hit' | 'extort' | 'sabotage';
+    title: string;
+    details: string;
+    timestamp: number;
+  };
   selectedTerritory?: any;
   activeEvent?: GameEvent;
   
@@ -1922,9 +1930,17 @@ export const useEnhancedMafiaGameState = (
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
+        const hitDetails = `+$5,000, +10 respect${casualties > 0 ? `, ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}` : ''}`;
+        state.lastCombatResult = {
+          q: targetQ, r: targetR, s: targetS,
+          success: true, type: 'hit',
+          title: 'TERRITORY CAPTURED!',
+          details: hitDetails,
+          timestamp: Date.now(),
+        };
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: 'Territory Captured!',
-          message: `Hit successful! +$5,000, +10 respect.${casualties > 0 ? ` ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}.` : ''}`,
+          message: `Hit successful! ${hitDetails}.`,
         }];
       } else {
         const casualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
@@ -1937,9 +1953,17 @@ export const useEnhancedMafiaGameState = (
             state.soldierStats[u.id].survivedConflicts += 1;
           }
         });
+        const failDetails = `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} suffered`;
+        state.lastCombatResult = {
+          q: targetQ, r: targetR, s: targetS,
+          success: false, type: 'hit',
+          title: 'HIT FAILED!',
+          details: failDetails,
+          timestamp: Date.now(),
+        };
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'error', title: 'Hit Failed!',
-          message: `The attack was repelled. ${casualties} casualt${casualties > 1 ? 'ies' : 'y'} suffered.`,
+          message: `The attack was repelled. ${failDetails}.`,
         }];
       }
       state.policeHeat.level = Math.min(100, state.policeHeat.level + 15);
@@ -1985,9 +2009,17 @@ export const useEnhancedMafiaGameState = (
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
+        const extortDetails = `+$3,000, +5 respect${casualties > 0 ? `, ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}` : ''}`;
+        state.lastCombatResult = {
+          q: targetQ, r: targetR, s: targetS,
+          success: true, type: 'extort',
+          title: 'EXTORTION SUCCESSFUL!',
+          details: extortDetails,
+          timestamp: Date.now(),
+        };
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: 'Extortion Successful!',
-          message: `Territory claimed! +$3,000, +5 respect.`,
+          message: `Territory claimed! ${extortDetails}.`,
         }];
       } else {
         const casualties = Math.max(1, Math.floor(playerUnits.length * 0.2));
@@ -1995,6 +2027,14 @@ export const useEnhancedMafiaGameState = (
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
+        const failDetails = `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} — resistance was strong`;
+        state.lastCombatResult = {
+          q: targetQ, r: targetR, s: targetS,
+          success: false, type: 'extort',
+          title: 'EXTORTION FAILED!',
+          details: failDetails,
+          timestamp: Date.now(),
+        };
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'error', title: 'Extortion Failed!',
           message: `Resistance was stronger than expected. ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}.`,
