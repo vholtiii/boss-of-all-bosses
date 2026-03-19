@@ -35,6 +35,8 @@ const businessIcons: Record<string, string> = {
   casino: '🎰', restaurant: '🍝', laundromat: '🧽', construction: '🏗️',
   drug_trafficking: '💊', gambling: '🎲', nightclub: '🍸', docks: '⚓',
   speakeasy: '🥃', headquarters: '🏛️',
+  // Doc business types
+  brothel: '💋', gambling_den: '🎲', loan_sharking: '💰', store_front: '🏪',
 };
 
 const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({ 

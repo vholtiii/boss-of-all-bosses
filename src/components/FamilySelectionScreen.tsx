@@ -40,7 +40,7 @@ const families: FamilyInfo[] = [
       { label: 'Military', icon: <Swords className="h-4 w-4" />, value: '★★★☆☆' },
       { label: 'Influence', icon: <Crown className="h-4 w-4" />, value: '★★★★☆' },
     ],
-    bonuses: ['+20% business income', 'Start with political connections', 'Cheaper bribes'],
+    bonuses: ['+25% combat power', '+10% territory income', '+15% intimidation'],
     startingResources: { money: 60000, soldiers: 5, influence: 15, politicalPower: 40, respect: 30 },
   },
   {
@@ -56,7 +56,7 @@ const families: FamilyInfo[] = [
       { label: 'Military', icon: <Swords className="h-4 w-4" />, value: '★★★★☆' },
       { label: 'Stealth', icon: <Eye className="h-4 w-4" />, value: '★★★★★' },
     ],
-    bonuses: ['-30% police heat gain', 'Intelligence reports each turn', 'Bonus to sabotage actions'],
+    bonuses: ['+30% business income', '+20% laundering efficiency', '+25% business upgrade discount'],
     startingResources: { money: 45000, soldiers: 6, influence: 10, politicalPower: 25, respect: 20 },
   },
   {
@@ -72,7 +72,7 @@ const families: FamilyInfo[] = [
       { label: 'Military', icon: <Swords className="h-4 w-4" />, value: '★★☆☆☆' },
       { label: 'Trade', icon: <Shield className="h-4 w-4" />, value: '★★★★★' },
     ],
-    bonuses: ['+40% laundering efficiency', 'Cheaper business upgrades', 'Supply chain bonuses'],
+    bonuses: ['+25% hit success rate', '+15% heat reduction', '+20% intelligence gathering'],
     startingResources: { money: 70000, soldiers: 4, influence: 12, politicalPower: 20, respect: 15 },
   },
   {
@@ -88,7 +88,7 @@ const families: FamilyInfo[] = [
       { label: 'Defense', icon: <Shield className="h-4 w-4" />, value: '★★★★★' },
       { label: 'Loyalty', icon: <Users className="h-4 w-4" />, value: '★★★★★' },
     ],
-    bonuses: ['+50% territory defense', 'Soldiers never betray', 'Higher starting loyalty'],
+    bonuses: ['+20% extortion income', '+25% intimidation power', '+15% fear generation'],
     startingResources: { money: 40000, soldiers: 7, influence: 8, politicalPower: 15, respect: 35 },
   },
   {
@@ -104,7 +104,7 @@ const families: FamilyInfo[] = [
       { label: 'Economy', icon: <DollarSign className="h-4 w-4" />, value: '★★☆☆☆' },
       { label: 'Fear', icon: <Crown className="h-4 w-4" />, value: '★★★★☆' },
     ],
-    bonuses: ['+30% combat power', 'Intimidation actions are free', 'Fear decays slower'],
+    bonuses: ['+20% all income', '-15% recruitment cost', '+10% reputation gain'],
     startingResources: { money: 35000, soldiers: 8, influence: 18, politicalPower: 10, respect: 25 },
   },
 ];

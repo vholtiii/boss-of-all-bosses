@@ -12,6 +12,12 @@ import {
 } from '@/types/enhanced-mechanics';
 import { Business, BusinessFinances, LegalStatus, PoliceHeat } from '@/types/business';
 import { ViolentAction } from '@/types/reputation';
+import {
+  SoldierStats, Hitman, BribeContract, BribeTier, VictoryProgress, VictoryType,
+  FAMILY_BONUSES, BRIBE_TIERS, DOC_BUSINESS_TYPES,
+  SOLDIER_COST, CAPO_COST, HITMAN_MAINTENANCE_MULTIPLIER, MAX_HITMEN, HITMAN_REQUIREMENTS,
+  FamilyBonuses,
+} from '@/types/game-mechanics';
 
 // ============ UNIT TYPES ============
 export interface DeployedUnit {
@@ -21,10 +27,10 @@ export interface DeployedUnit {
   q: number;
   r: number;
   s: number;
-  movesRemaining: number;  // resets each turn
-  maxMoves: number;        // soldiers=2, capos=3
-  level: number;           // capo level 1-5, soldier always 1
-  name?: string;           // capo name
+  movesRemaining: number;
+  maxMoves: number;
+  level: number;
+  name?: string;
 }
 
 // ============ HEX TILE ============
@@ -40,28 +46,26 @@ export interface HexTile {
     income: number;
     isLegal: boolean;
     heatLevel: number;
+    launderingCapacity?: number;
   };
-  isHeadquarters?: string; // family name if this is an HQ
+  isHeadquarters?: string;
 }
 
 export interface EnhancedMafiaGameState {
-  // Core game state
   playerFamily: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
   turn: number;
   season: 'spring' | 'summer' | 'fall' | 'winter';
   
-  // Resources
   resources: {
     money: number;
     respect: number;
-    soldiers: number;      // pool at HQ (undeployed)
+    soldiers: number;
     influence: number;
     politicalPower: number;
     loyalty: number;
     researchPoints: number;
   };
   
-  // ============ NEW: Hex map & units ============
   hexMap: HexTile[];
   deployedUnits: DeployedUnit[];
   
@@ -72,17 +76,10 @@ export interface EnhancedMafiaGameState {
   deployMode: { unitType: 'soldier' | 'capo'; family: string } | null;
   availableDeployHexes: Array<{ q: number; r: number; s: number }>;
   
-  // Headquarters positions
   headquarters: {
-    [family: string]: {
-      q: number;
-      r: number;
-      s: number;
-      district: string;
-    };
+    [family: string]: { q: number; r: number; s: number; district: string };
   };
   
-  // Keep units for backward compat with HQ info panel
   units: {
     [family: string]: {
       soldiers: Array<{ q: number; r: number; s: number; id: string }>;
@@ -90,6 +87,15 @@ export interface EnhancedMafiaGameState {
       boss: { q: number; r: number; s: number; id: string };
     };
   };
+  
+  // === NEW SYSTEMS ===
+  soldierStats: Record<string, SoldierStats>;
+  hitmen: Hitman[];
+  activeBribes: BribeContract[];
+  victoryProgress: VictoryProgress;
+  victoryType: VictoryType;
+  familyBonuses: FamilyBonuses;
+  lastTurnIncome: number;
   
   // Enhanced systems
   combat: CombatSystem;
@@ -109,20 +115,13 @@ export interface EnhancedMafiaGameState {
   legalStatus: LegalStatus;
   policeHeat: PoliceHeat;
   
-  // UI state
   selectedTerritory?: any;
   activeEvent?: GameEvent;
   
-  // Family control
   familyControl: {
-    gambino: number;
-    genovese: number;
-    lucchese: number;
-    bonanno: number;
-    colombo: number;
+    gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
   };
   
-  // Territory system (kept for economy processing compat)
   territories: Array<{
     district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
     family: 'neutral' | 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
@@ -166,9 +165,7 @@ const getHexesInRange = (q:number, r:number, s:number, range:number) => {
 // ============ MAP GENERATION ============
 const generateHexMap = (radius: number): HexTile[] => {
   const tiles: HexTile[] = [];
-  const districtMap: Record<string, HexTile['district']> = {};
   
-  // Assign districts by quadrant
   const getDistrict = (q: number, r: number): HexTile['district'] => {
     if (q <= -3 && r >= 2) return 'Little Italy';
     if (q >= 2 && r <= -3) return 'Manhattan';
@@ -182,7 +179,6 @@ const generateHexMap = (radius: number): HexTile[] => {
   };
 
   const terrainTypes: HexTile['terrain'][] = ['urban', 'industrial', 'residential', 'docks', 'commercial'];
-  const businessTypes = ['restaurant', 'nightclub', 'casino', 'docks', 'construction', 'speakeasy', 'laundromat'];
 
   for (let q = -radius; q <= radius; q++) {
     for (let r = -radius; r <= radius; r++) {
@@ -192,21 +188,19 @@ const generateHexMap = (radius: number): HexTile[] => {
       const district = getDistrict(q, r);
       const terrain = terrainTypes[Math.abs((q * 7 + r * 13) % terrainTypes.length)];
       
-      // ~30% of hexes have a business
+      // ~30% of hexes have a business (use doc business types)
       const hasBusiness = ((q * 31 + r * 47) % 10) < 3;
       
-      const tile: HexTile = {
-        q, r, s, district, terrain,
-        controllingFamily: 'neutral',
-      };
+      const tile: HexTile = { q, r, s, district, terrain, controllingFamily: 'neutral' };
 
       if (hasBusiness) {
-        const bType = businessTypes[Math.abs((q * 17 + r * 23) % businessTypes.length)];
+        const bConfig = DOC_BUSINESS_TYPES[Math.abs((q * 17 + r * 23) % DOC_BUSINESS_TYPES.length)];
         tile.business = {
-          type: bType,
-          income: 2000 + Math.abs((q * 13 + r * 29) % 6000),
-          isLegal: ((q + r) % 3) !== 0,
-          heatLevel: 0,
+          type: bConfig.type,
+          income: bConfig.baseIncome + Math.abs((q * 13 + r * 29) % 2000),
+          isLegal: bConfig.type === 'store_front',
+          heatLevel: bConfig.baseHeat,
+          launderingCapacity: bConfig.launderingCapacity,
         };
       }
 
@@ -233,19 +227,16 @@ const createInitialGameState = (
   const mapRadius = 6;
   let hexMap = generateHexMap(mapRadius);
 
-  // Mark HQ hexes and assign starting territory (HQ + adjacent)
   const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'] as const;
   
   allFamilies.forEach(fam => {
     const hq = HQ_POSITIONS[fam];
-    // Set HQ tile
     const hqTile = hexMap.find(t => t.q === hq.q && t.r === hq.r && t.s === hq.s);
     if (hqTile) {
       hqTile.isHeadquarters = fam;
       hqTile.controllingFamily = fam;
-      hqTile.business = undefined; // HQ is not a business
+      hqTile.business = undefined;
     }
-    // Set adjacent tiles as controlled territory
     const neighbors = getHexNeighbors(hq.q, hq.r, hq.s);
     neighbors.forEach(n => {
       const tile = hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
@@ -255,40 +246,36 @@ const createInitialGameState = (
     });
   });
 
-  // Create initial deployed units (all start at HQ)
   const deployedUnits: DeployedUnit[] = [];
+  const soldierStats: Record<string, SoldierStats> = {};
+
   allFamilies.forEach(fam => {
     const hq = HQ_POSITIONS[fam];
-    // 3 soldiers at HQ
     for (let i = 0; i < 3; i++) {
+      const id = `${fam}-soldier-${i}`;
       deployedUnits.push({
-        id: `${fam}-soldier-${i}`,
-        type: 'soldier',
-        family: fam,
+        id, type: 'soldier', family: fam,
         q: hq.q, r: hq.r, s: hq.s,
-        movesRemaining: 2,
-        maxMoves: 2,
-        level: 1,
+        movesRemaining: 2, maxMoves: 2, level: 1,
       });
+      soldierStats[id] = {
+        loyalty: 50 + Math.floor(Math.random() * 30),
+        training: 3 + Math.floor(Math.random() * 3),
+        equipment: 2 + Math.floor(Math.random() * 3),
+        hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+      };
     }
-    // 1 capo at HQ
     const capoNames: Record<string, string> = {
       gambino: 'Vito Scaletta', genovese: 'Sal Marcano', lucchese: 'Tommy Angelo',
       bonanno: 'Joe Barbaro', colombo: 'Frank Colletti'
     };
     deployedUnits.push({
-      id: `${fam}-capo-0`,
-      type: 'capo',
-      family: fam,
+      id: `${fam}-capo-0`, type: 'capo', family: fam,
       q: hq.q, r: hq.r, s: hq.s,
-      movesRemaining: 3,
-      maxMoves: 3,
-      level: 1,
-      name: capoNames[fam],
+      movesRemaining: 3, maxMoves: 3, level: 1, name: capoNames[fam],
     });
   });
 
-  // Build legacy units for HQ info panel
   const units: EnhancedMafiaGameState['units'] = {};
   allFamilies.forEach(fam => {
     const hq = HQ_POSITIONS[fam];
@@ -299,8 +286,9 @@ const createInitialGameState = (
     };
   });
 
-  // Build legacy territories from hexMap for economy compat
   const territories = buildLegacyTerritories(hexMap);
+
+  const bonuses = FAMILY_BONUSES[family] || FAMILY_BONUSES.gambino;
 
   return {
     playerFamily: family,
@@ -310,31 +298,38 @@ const createInitialGameState = (
     resources: {
       money: startingResources?.money ?? 50000,
       respect: startingResources?.respect ?? 25,
-      soldiers: startingResources?.soldiers ?? 2, // undeployed pool
+      soldiers: startingResources?.soldiers ?? 2,
       influence: startingResources?.influence ?? 10,
       politicalPower: startingResources?.politicalPower ?? 30,
       loyalty: 75,
       researchPoints: 0,
     },
 
-    hexMap,
-    deployedUnits,
-    movementPhase: false,
-    selectedUnitId: null,
-    availableMoveHexes: [],
-    deployMode: null,
-    availableDeployHexes: [],
-
+    hexMap, deployedUnits,
+    movementPhase: false, selectedUnitId: null, availableMoveHexes: [],
+    deployMode: null, availableDeployHexes: [],
     headquarters: Object.fromEntries(allFamilies.map(f => [f, HQ_POSITIONS[f]])),
     units,
+    
+    // New systems
+    soldierStats,
+    hitmen: [],
+    activeBribes: [],
+    victoryProgress: {
+      territory: { current: 0, target: 6, met: false },
+      economic: { current: 0, target: 8000, met: false },
+      legacy: { current: 0, highestRival: 0, met: false },
+    },
+    victoryType: null,
+    familyBonuses: bonuses,
+    lastTurnIncome: 0,
     
     combat: {
       territoryBattles: [],
       soldierTraining: {
         level: 1,
         equipment: { weapons: 'basic', armor: 'none', vehicles: 'none', cost: 0, effectiveness: 0 },
-        specialization: 'enforcer',
-        experience: 0,
+        specialization: 'enforcer', experience: 0,
       },
       combatModifiers: [],
     },
@@ -343,9 +338,7 @@ const createInitialGameState = (
       marketConditions: [
         { type: 'stable', sector: 'legal', modifier: 0, duration: 5, description: 'Legal businesses operating normally' },
       ],
-      supplyChains: [],
-      investments: [],
-      economicEvents: [],
+      supplyChains: [], investments: [], economicEvents: [],
     },
     
     aiOpponents: allFamilies
@@ -362,29 +355,18 @@ const createInitialGameState = (
         const otherFamilies = allFamilies.filter(x => x !== f);
         const relationships: Record<string, number> = {};
         otherFamilies.forEach(x => { relationships[x] = Math.floor(Math.random() * 40) - 20; });
-
         return {
-          family: f,
-          personality: p.personality,
+          family: f, personality: p.personality,
           resources: { money: 35000 + Math.floor(Math.random() * 15000), soldiers: 2, influence: 8 + Math.floor(Math.random() * 8) },
-          strategy: {
-            primaryGoal: p.primaryGoal,
-            riskTolerance: p.riskTolerance,
-            aggressionLevel: p.aggressionLevel,
-            cooperationTendency: p.cooperationTendency,
-            focusAreas: p.focusAreas,
-          },
-          relationships,
-          lastAction: null,
-          nextAction: null,
+          strategy: { primaryGoal: p.primaryGoal, riskTolerance: p.riskTolerance, aggressionLevel: p.aggressionLevel, cooperationTendency: p.cooperationTendency, focusAreas: p.focusAreas },
+          relationships, lastAction: null, nextAction: null,
         };
       }),
     
     events: [],
     weather: {
       currentWeather: { type: 'clear', intensity: 0, duration: 3, description: 'Clear skies, perfect for business' },
-      forecast: [],
-      effects: [],
+      forecast: [], effects: [],
     },
     technology: {
       researched: [],
@@ -398,16 +380,13 @@ const createInitialGameState = (
     
     reputation: {
       respect: startingResources?.respect ?? 25,
-      reputation: 20,
-      loyalty: 75,
-      fear: 15,
+      reputation: 20, loyalty: 75, fear: 15,
       streetInfluence: startingResources?.influence ?? 10,
       familyRelationships: Object.fromEntries(
         allFamilies.filter(f => f !== family).map(f => [f, Math.floor(Math.random() * 30) - 15])
       ),
       publicPerception: { criminal: 60, businessman: 30, philanthropist: 10 },
-      reputationHistory: [],
-      achievements: [],
+      reputationHistory: [], achievements: [],
     },
     
     violentActions: [],
@@ -419,11 +398,10 @@ const createInitialGameState = (
     selectedTerritory: null,
     activeEvent: null,
     familyControl: { gambino: 20, genovese: 20, lucchese: 20, bonanno: 20, colombo: 20 },
-    territories: territories,
+    territories,
   };
 };
 
-// Build legacy territory data from hexMap
 function buildLegacyTerritories(hexMap: HexTile[]): EnhancedMafiaGameState['territories'] {
   const districts = ['Little Italy', 'Bronx', 'Brooklyn', 'Queens', 'Manhattan', 'Staten Island'] as const;
   return districts.map(district => {
@@ -479,7 +457,6 @@ export const useEnhancedMafiaGameState = (
     });
     state.units = newUnits;
 
-    // Update family control based on hex ownership
     allFamilies.forEach(fam => {
       const controlled = state.hexMap.filter(t => t.controllingFamily === fam).length;
       const total = state.hexMap.length;
@@ -487,59 +464,68 @@ export const useEnhancedMafiaGameState = (
     });
   };
 
+  // ============ VICTORY CHECK ============
+  const updateVictoryProgress = (state: EnhancedMafiaGameState) => {
+    const playerHexes = state.hexMap.filter(t => t.controllingFamily === state.playerFamily).length;
+    const income = state.lastTurnIncome;
+    const playerRep = state.reputation.respect + state.reputation.reputation + state.reputation.fear + state.reputation.streetInfluence;
+    
+    // Find highest rival reputation
+    let highestRival = 0;
+    state.aiOpponents.forEach(opp => {
+      const rivalRep = opp.resources.influence * 3; // approximation
+      if (rivalRep > highestRival) highestRival = rivalRep;
+    });
+
+    state.victoryProgress = {
+      territory: { current: playerHexes, target: 6, met: playerHexes >= 6 },
+      economic: { current: income, target: 8000, met: income >= 8000 },
+      legacy: { current: playerRep, highestRival, met: playerRep > highestRival && state.turn > 5 },
+    };
+
+    if (state.victoryProgress.territory.met) state.victoryType = 'territory';
+    else if (state.victoryProgress.economic.met) state.victoryType = 'economic';
+    else if (state.victoryProgress.legacy.met) state.victoryType = 'legacy';
+    else state.victoryType = null;
+  };
+
   // ============ MOVEMENT PHASE ============
   const startMovementPhase = useCallback(() => {
     setGameState(prev => ({
       ...prev,
-      movementPhase: true,
-      selectedUnitId: null,
-      availableMoveHexes: [],
-      deployMode: null,
-      availableDeployHexes: [],
+      movementPhase: true, selectedUnitId: null, availableMoveHexes: [],
+      deployMode: null, availableDeployHexes: [],
     }));
   }, []);
 
   const endMovementPhase = useCallback(() => {
     setGameState(prev => ({
       ...prev,
-      movementPhase: false,
-      selectedUnitId: null,
-      availableMoveHexes: [],
-      deployMode: null,
-      availableDeployHexes: [],
+      movementPhase: false, selectedUnitId: null, availableMoveHexes: [],
+      deployMode: null, availableDeployHexes: [],
     }));
   }, []);
 
   // ============ SELECT UNIT FOR MOVEMENT ============
   const selectUnit = useCallback((unitType: 'soldier' | 'capo', location: { q: number; r: number; s: number }) => {
     setGameState(prev => {
-      // Find a unit of this type at this location belonging to player
       const unit = prev.deployedUnits.find(u => 
-        u.family === prev.playerFamily &&
-        u.type === unitType &&
+        u.family === prev.playerFamily && u.type === unitType &&
         u.q === location.q && u.r === location.r && u.s === location.s &&
         u.movesRemaining > 0
       );
       if (!unit) return prev;
 
-      // Calculate available moves
       const range = unitType === 'soldier' ? 1 : Math.min(5, unit.movesRemaining);
       const candidateHexes = unitType === 'soldier' 
         ? getHexNeighbors(unit.q, unit.r, unit.s)
         : getHexesInRange(unit.q, unit.r, unit.s, range);
       
-      // Filter to hexes that exist on the map
       const validHexes = candidateHexes.filter(h => 
         prev.hexMap.some(t => t.q === h.q && t.r === h.r && t.s === h.s)
       );
 
-      return {
-        ...prev,
-        selectedUnitId: unit.id,
-        availableMoveHexes: validHexes,
-        deployMode: null,
-        availableDeployHexes: [],
-      };
+      return { ...prev, selectedUnitId: unit.id, availableMoveHexes: validHexes, deployMode: null, availableDeployHexes: [] };
     });
   }, []);
 
@@ -551,14 +537,10 @@ export const useEnhancedMafiaGameState = (
       if (unitIdx === -1) return prev;
       const unit = prev.deployedUnits[unitIdx];
 
-      // Validate the target is in available moves
       if (!prev.availableMoveHexes.some(h => h.q === targetLocation.q && h.r === targetLocation.r && h.s === targetLocation.s)) {
         return prev;
       }
 
-      const dist = hexDistance(unit, targetLocation);
-      
-      // Soldiers: 1 hex per move action, capos: distance counts as 1 move
       const moveCost = 1;
       if (unit.movesRemaining < moveCost) return prev;
 
@@ -566,17 +548,17 @@ export const useEnhancedMafiaGameState = (
       const updatedUnit = { ...unit, q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: unit.movesRemaining - moveCost };
       newUnits[unitIdx] = updatedUnit;
 
-      // If moving to enemy territory, claim it
+      // Moving to enemy territory does NOT auto-claim — use hit/extort
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
-          if (tile.controllingFamily !== prev.playerFamily && !tile.isHeadquarters) {
+          // Only auto-claim neutral tiles
+          if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters) {
             return { ...tile, controllingFamily: prev.playerFamily };
           }
         }
         return tile;
       });
 
-      // Recalculate moves if unit still has moves left
       let newAvailableMoves: Array<{q:number;r:number;s:number}> = [];
       if (updatedUnit.movesRemaining > 0) {
         const range = updatedUnit.type === 'soldier' ? 1 : Math.min(5, updatedUnit.movesRemaining);
@@ -589,9 +571,7 @@ export const useEnhancedMafiaGameState = (
       }
 
       const newState = {
-        ...prev,
-        deployedUnits: newUnits,
-        hexMap: newHexMap,
+        ...prev, deployedUnits: newUnits, hexMap: newHexMap,
         selectedUnitId: updatedUnit.movesRemaining > 0 ? updatedUnit.id : null,
         availableMoveHexes: newAvailableMoves,
       };
@@ -601,9 +581,7 @@ export const useEnhancedMafiaGameState = (
   }, []);
 
   // ============ DEPLOY FROM HQ ============
-  const selectHeadquarters = useCallback((family: string) => {
-    // Just open the HQ panel — handled in UltimateMafiaGame
-  }, []);
+  const selectHeadquarters = useCallback((family: string) => {}, []);
 
   const selectUnitFromHeadquarters = useCallback((unitType: 'soldier' | 'capo', family: string) => {
     setGameState(prev => {
@@ -611,12 +589,8 @@ export const useEnhancedMafiaGameState = (
       const hq = prev.headquarters[family];
       if (!hq) return prev;
 
-      // Check if there's an undeployed unit of this type at HQ
-      // For soldiers: also check the pool
       if (unitType === 'soldier') {
-        // Check pool first
         if (prev.resources.soldiers <= 0) {
-          // Check if any soldiers are at HQ
           const atHQ = prev.deployedUnits.filter(u => 
             u.family === family && u.type === 'soldier' &&
             u.q === hq.q && u.r === hq.r && u.s === hq.s
@@ -624,7 +598,6 @@ export const useEnhancedMafiaGameState = (
           if (atHQ.length === 0) return prev;
         }
       } else {
-        // For capos, check if any are at HQ
         const caposAtHQ = prev.deployedUnits.filter(u => 
           u.family === family && u.type === 'capo' &&
           u.q === hq.q && u.r === hq.r && u.s === hq.s
@@ -632,7 +605,6 @@ export const useEnhancedMafiaGameState = (
         if (caposAtHQ.length === 0) return prev;
       }
 
-      // Calculate deploy targets: adjacent for soldiers, range 5 for capos
       const range = unitType === 'soldier' ? 1 : 5;
       const candidates = unitType === 'soldier'
         ? getHexNeighbors(hq.q, hq.r, hq.s)
@@ -642,13 +614,7 @@ export const useEnhancedMafiaGameState = (
         prev.hexMap.some(t => t.q === h.q && t.r === h.r && t.s === h.s)
       );
 
-      return {
-        ...prev,
-        deployMode: { unitType, family },
-        availableDeployHexes: validHexes,
-        selectedUnitId: null,
-        availableMoveHexes: [],
-      };
+      return { ...prev, deployMode: { unitType, family }, availableDeployHexes: validHexes, selectedUnitId: null, availableMoveHexes: [] };
     });
   }, []);
 
@@ -656,8 +622,6 @@ export const useEnhancedMafiaGameState = (
     setGameState(prev => {
       if (family !== prev.playerFamily) return prev;
       if (!prev.deployMode) return prev;
-      
-      // Validate target
       if (!prev.availableDeployHexes.some(h => h.q === targetLocation.q && h.r === targetLocation.r && h.s === targetLocation.s)) {
         return prev;
       }
@@ -667,23 +631,22 @@ export const useEnhancedMafiaGameState = (
 
       let newDeployedUnits = [...prev.deployedUnits];
       let newResources = { ...prev.resources };
+      let newSoldierStats = { ...prev.soldierStats };
 
       if (unitType === 'soldier') {
-        // Try to deploy from pool first
         if (prev.resources.soldiers > 0) {
           const newId = `${family}-soldier-${Date.now()}-${Math.random().toString(36).substr(2,4)}`;
           newDeployedUnits.push({
-            id: newId,
-            type: 'soldier',
-            family: family as any,
+            id: newId, type: 'soldier', family: family as any,
             q: targetLocation.q, r: targetLocation.r, s: targetLocation.s,
-            movesRemaining: 0, // deployed this turn, can't move
-            maxMoves: 2,
-            level: 1,
+            movesRemaining: 0, maxMoves: 2, level: 1,
           });
+          newSoldierStats[newId] = {
+            loyalty: 50, training: 3, equipment: 2,
+            hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+          };
           newResources.soldiers -= 1;
         } else {
-          // Move a soldier from HQ
           const soldierAtHQ = newDeployedUnits.findIndex(u => 
             u.family === family && u.type === 'soldier' &&
             u.q === hq.q && u.r === hq.r && u.s === hq.s
@@ -691,12 +654,10 @@ export const useEnhancedMafiaGameState = (
           if (soldierAtHQ === -1) return prev;
           newDeployedUnits[soldierAtHQ] = {
             ...newDeployedUnits[soldierAtHQ],
-            q: targetLocation.q, r: targetLocation.r, s: targetLocation.s,
-            movesRemaining: 0,
+            q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0,
           };
         }
       } else {
-        // Move capo from HQ
         const capoAtHQ = newDeployedUnits.findIndex(u => 
           u.family === family && u.type === 'capo' &&
           u.q === hq.q && u.r === hq.r && u.s === hq.s
@@ -704,12 +665,11 @@ export const useEnhancedMafiaGameState = (
         if (capoAtHQ === -1) return prev;
         newDeployedUnits[capoAtHQ] = {
           ...newDeployedUnits[capoAtHQ],
-          q: targetLocation.q, r: targetLocation.r, s: targetLocation.s,
-          movesRemaining: 0,
+          q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0,
         };
       }
 
-      // Claim the hex if neutral
+      // Claim neutral hexes
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
           if (tile.controllingFamily === 'neutral' || tile.controllingFamily === family) {
@@ -720,12 +680,9 @@ export const useEnhancedMafiaGameState = (
       });
 
       const newState = {
-        ...prev,
-        deployedUnits: newDeployedUnits,
-        hexMap: newHexMap,
-        resources: newResources,
-        deployMode: null,
-        availableDeployHexes: [],
+        ...prev, deployedUnits: newDeployedUnits, hexMap: newHexMap,
+        resources: newResources, soldierStats: newSoldierStats,
+        deployMode: null, availableDeployHexes: [],
       };
       syncLegacyUnits(newState);
       return newState;
@@ -738,58 +695,47 @@ export const useEnhancedMafiaGameState = (
       const newState = { ...prev };
       newState.turn += 1;
       
-      // End movement phase
       newState.movementPhase = false;
       newState.selectedUnitId = null;
       newState.availableMoveHexes = [];
       newState.deployMode = null;
       newState.availableDeployHexes = [];
 
-      // Reset all player unit moves
       newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
-        ...u,
-        movesRemaining: u.maxMoves,
+        ...u, movesRemaining: u.maxMoves,
       }));
       
-      // Update season
       const seasons = ['spring', 'summer', 'fall', 'winter'] as const;
       newState.season = seasons[Math.floor((newState.turn - 1) / 3) % 4];
       
-      // Process economy — income from controlled hexes
       processEconomy(newState);
-      
-      // Process AI
       processAITurn(newState);
-      
-      // Process weather
       processWeather(newState);
-      
-      // Process events
       processEvents(newState);
+      processBribes(newState);
       
-      // Update reputation
       newState.reputation.reputation = Math.max(0, newState.reputation.reputation - 0.5);
       newState.reputation.fear = Math.max(0, newState.reputation.fear - 1);
       newState.reputation.loyalty = Math.min(100, newState.reputation.loyalty + 1);
       
-      // Reduce police heat
       newState.policeHeat.level = Math.max(0, newState.policeHeat.level - newState.policeHeat.reductionPerTurn);
       
-      // Sync
       syncLegacyUnits(newState);
       newState.territories = buildLegacyTerritories(newState.hexMap);
+      updateVictoryProgress(newState);
       
       return newState;
     });
   }, []);
 
-  // ============ ECONOMY ============
+  // ============ ECONOMY (with family bonuses) ============
   const processEconomy = (state: EnhancedMafiaGameState) => {
     let income = 0;
     const units = state.deployedUnits || [];
+    const bonuses = state.familyBonuses;
+    
     (state.hexMap || []).forEach(tile => {
       if (tile.controllingFamily === state.playerFamily && tile.business) {
-        // Check if a capo is on this hex
         const hasCapo = units.some(u => 
           u.family === state.playerFamily && u.type === 'capo' &&
           u.q === tile.q && u.r === tile.r && u.s === tile.s
@@ -799,24 +745,69 @@ export const useEnhancedMafiaGameState = (
           u.q === tile.q && u.r === tile.r && u.s === tile.s
         );
         
+        let tileIncome = 0;
         if (hasCapo) {
-          income += tile.business.income; // 100%
+          tileIncome = tile.business.income; // 100%
         } else if (hasSoldier) {
-          income += Math.floor(tile.business.income * 0.3); // 30%
+          tileIncome = Math.floor(tile.business.income * 0.3); // 30%
         } else {
-          income += Math.floor(tile.business.income * 0.1); // 10% passive from territory
+          tileIncome = Math.floor(tile.business.income * 0.1); // 10% passive
         }
+
+        // Apply family bonuses
+        if (bonuses.businessIncome > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.businessIncome / 100));
+        if (bonuses.territoryIncome > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.territoryIncome / 100));
+        if (bonuses.income > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.income / 100));
+        
+        income += tileIncome;
       }
     });
     
-    // Soldier maintenance
-    const totalSoldiers = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier').length + state.resources.soldiers;
-    const maintenance = totalSoldiers * 500;
+    // Soldier maintenance — $500/soldier base, hitmen cost 50% more
+    const playerSoldiers = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier');
+    let maintenance = 0;
+    playerSoldiers.forEach(s => {
+      const isHitman = state.hitmen.some(h => h.unitId === s.id);
+      maintenance += isHitman ? Math.floor(SOLDIER_COST * HITMAN_MAINTENANCE_MULTIPLIER) : SOLDIER_COST;
+    });
+    maintenance += state.resources.soldiers * SOLDIER_COST; // undeployed pool
     
+    state.lastTurnIncome = income;
     state.resources.money += income - maintenance;
     state.finances.totalIncome = income;
     state.finances.totalExpenses = maintenance;
     state.finances.totalProfit = income - maintenance;
+  };
+
+  // ============ PROCESS BRIBES ============
+  const processBribes = (state: EnhancedMafiaGameState) => {
+    state.activeBribes = state.activeBribes.map(b => {
+      if (!b.active) return b;
+      const remaining = b.turnsRemaining - 1;
+      if (remaining <= 0) return { ...b, turnsRemaining: 0, active: false };
+
+      // Apply effects each turn
+      switch (b.tier) {
+        case 'patrol_officer':
+          state.policeHeat.level = Math.max(0, state.policeHeat.level - 2);
+          break;
+        case 'police_captain':
+          // 20% economic pressure on rival illegal businesses — reduce their money
+          if (b.targetFamily) {
+            const rival = state.aiOpponents.find(o => o.family === b.targetFamily);
+            if (rival) rival.resources.money = Math.floor(rival.resources.money * 0.96);
+          }
+          break;
+        case 'police_chief':
+          // Intel bonus — handled passively
+          break;
+        case 'mayor':
+          // Territory shutdown handled at bribe initiation
+          break;
+      }
+
+      return { ...b, turnsRemaining: remaining };
+    }).filter(b => b.active);
   };
 
   // ============ AI TURN ============
@@ -826,7 +817,6 @@ export const useEnhancedMafiaGameState = (
       const hq = state.headquarters[fam];
       if (!hq) return;
 
-      // AI income
       let aiIncome = 0;
       state.hexMap.forEach(tile => {
         if (tile.controllingFamily === fam && tile.business) {
@@ -839,14 +829,14 @@ export const useEnhancedMafiaGameState = (
       });
       opponent.resources.money += aiIncome;
 
-      // AI recruit if wealthy
-      if (opponent.resources.money > 30000 && opponent.resources.soldiers < 5) {
-        const recruit = Math.min(2, Math.floor((opponent.resources.money - 20000) / 8000));
+      // AI recruit at new costs
+      if (opponent.resources.money > 5000 && opponent.resources.soldiers < 5) {
+        const recruit = Math.min(2, Math.floor((opponent.resources.money - 3000) / SOLDIER_COST));
         opponent.resources.soldiers += recruit;
-        opponent.resources.money -= recruit * 8000;
+        opponent.resources.money -= recruit * SOLDIER_COST;
       }
 
-      // AI deploy soldiers from pool
+      // AI deploy
       if (opponent.resources.soldiers > 0 && Math.random() < 0.6) {
         const neighbors = getHexNeighbors(hq.q, hq.r, hq.s);
         const validTargets = neighbors.filter(n => state.hexMap.some(t => t.q === n.q && t.r === n.r && t.s === n.s));
@@ -858,9 +848,12 @@ export const useEnhancedMafiaGameState = (
             q: target.q, r: target.r, s: target.s,
             movesRemaining: 2, maxMoves: 2, level: 1,
           });
+          state.soldierStats[newId] = {
+            loyalty: 40 + Math.floor(Math.random() * 30), training: 2 + Math.floor(Math.random() * 3),
+            equipment: 2, hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+          };
           opponent.resources.soldiers -= 1;
 
-          // Claim hex
           const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
           if (tile && tile.controllingFamily === 'neutral' && !tile.isHeadquarters) {
             tile.controllingFamily = fam;
@@ -868,7 +861,7 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // AI move existing units outward
+      // AI move existing units
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
       if (aiUnits.length > 0 && Math.random() < 0.4) {
         const unit = aiUnits[Math.floor(Math.random() * aiUnits.length)];
@@ -880,7 +873,6 @@ export const useEnhancedMafiaGameState = (
           return tile && !tile.isHeadquarters;
         });
         if (validMoves.length > 0) {
-          // Prefer neutral or enemy territory
           const preferred = validMoves.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
             return tile && tile.controllingFamily !== fam;
@@ -893,15 +885,12 @@ export const useEnhancedMafiaGameState = (
           
           const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
           if (tile && !tile.isHeadquarters) {
-            // Combat: if player units are here, resolve
             const playerUnitsHere = state.deployedUnits.filter(u => 
               u.family === state.playerFamily && u.q === target.q && u.r === target.r && u.s === target.s
             );
             if (playerUnitsHere.length > 0) {
-              // Simple combat: compare counts
               const aiStrength = state.deployedUnits.filter(u => u.family === fam && u.q === target.q && u.r === target.r && u.s === target.s).length;
               if (aiStrength > playerUnitsHere.length && Math.random() < 0.6) {
-                // AI wins — remove player units
                 playerUnitsHere.forEach(pu => {
                   const idx = state.deployedUnits.indexOf(pu);
                   if (idx !== -1) state.deployedUnits.splice(idx, 1);
@@ -977,21 +966,119 @@ export const useEnhancedMafiaGameState = (
   const performAction = useCallback((action: any) => {
     setGameState(prev => {
       const newState = { ...prev };
+      const bonuses = newState.familyBonuses;
+      const discount = bonuses.recruitmentDiscount / 100;
+      
       switch (action.type) {
         case 'hit_territory':
           return processTerritoryHit(newState, action);
         case 'extort_territory':
           return processTerritoryExtortion(newState, action);
-        case 'recruit_soldiers':
-          if (newState.resources.money >= 8000) {
-            newState.resources.money -= 8000;
+        case 'recruit_soldiers': {
+          const cost = Math.floor(SOLDIER_COST * (1 - discount));
+          if (newState.resources.money >= cost) {
+            newState.resources.money -= cost;
             newState.resources.soldiers += 1;
           }
           return newState;
+        }
+        case 'recruit_capo': {
+          const cost = Math.floor(CAPO_COST * (1 - discount));
+          if (newState.resources.money >= cost) {
+            newState.resources.money -= cost;
+            // Deploy capo at HQ
+            const hq = newState.headquarters[newState.playerFamily];
+            if (hq) {
+              const newId = `${newState.playerFamily}-capo-${Date.now()}`;
+              newState.deployedUnits = [...newState.deployedUnits, {
+                id: newId, type: 'capo' as const, family: newState.playerFamily,
+                q: hq.q, r: hq.r, s: hq.s,
+                movesRemaining: 0, maxMoves: 3, level: 1,
+                name: `Capo ${Math.floor(Math.random() * 100)}`,
+              }];
+            }
+          }
+          return newState;
+        }
         case 'bribe_official':
+          // Legacy fallback — use corruption panel for new system
           if (newState.resources.money >= 15000) {
             newState.resources.money -= 15000;
             newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 20);
+          }
+          return newState;
+        case 'bribe_corruption': {
+          const tier = action.tier as BribeTier;
+          const config = BRIBE_TIERS.find(t => t.tier === tier);
+          if (!config || newState.resources.money < config.cost) return newState;
+          
+          // Check if already active
+          if (newState.activeBribes.some(b => b.tier === tier && b.active)) return newState;
+          
+          // Calculate success
+          let successChance = config.baseSuccess;
+          successChance += Math.floor(newState.reputation.reputation / 10);
+          successChance -= Math.floor(newState.policeHeat.level / 5);
+          successChance = Math.max(5, Math.min(95, successChance));
+          
+          newState.resources.money -= config.cost;
+          
+          if (Math.random() * 100 < successChance) {
+            const contract: BribeContract = {
+              id: `bribe-${Date.now()}`,
+              tier,
+              turnsRemaining: config.duration,
+              targetFamily: action.targetFamily,
+              active: true,
+            };
+            
+            // Immediate effects
+            if (tier === 'patrol_officer') {
+              newState.policeHeat.level = Math.max(0, Math.floor(newState.policeHeat.level * 0.7));
+            }
+            if (tier === 'mayor' && action.targetFamily) {
+              // Shut down a rival territory hex
+              const rivalHex = newState.hexMap.find(t => 
+                t.controllingFamily === action.targetFamily && t.business && !t.isHeadquarters
+              );
+              if (rivalHex) {
+                rivalHex.controllingFamily = 'neutral';
+              }
+            }
+            
+            newState.activeBribes = [...newState.activeBribes, contract];
+          }
+          // If failed, money is still lost
+          return newState;
+        }
+        case 'promote_hitman': {
+          const unitId = action.unitId as string;
+          if (newState.hitmen.length >= MAX_HITMEN) return newState;
+          const stats = newState.soldierStats[unitId];
+          if (!stats) return newState;
+          if (stats.training * 10 < HITMAN_REQUIREMENTS.minStrength) return newState;
+          if (stats.loyalty < HITMAN_REQUIREMENTS.minReputation) return newState;
+          if (stats.hits < HITMAN_REQUIREMENTS.minHits) return newState;
+          if (newState.hitmen.some(h => h.unitId === unitId)) return newState;
+          
+          newState.hitmen = [...newState.hitmen, {
+            unitId, hitmanLevel: 1, promotedTurn: newState.turn,
+          }];
+          return newState;
+        }
+        case 'charitable_donation':
+          if (newState.resources.money >= 5000) {
+            newState.resources.money -= 5000;
+            const repGain = 10 * (1 + bonuses.reputationGain / 100);
+            newState.reputation.reputation += repGain;
+            newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 5);
+          }
+          return newState;
+        case 'public_appearance':
+          if (newState.resources.money >= 3000) {
+            newState.resources.money -= 3000;
+            const repGain = 5 * (1 + bonuses.reputationGain / 100);
+            newState.reputation.reputation += repGain;
           }
           return newState;
         default:
@@ -1059,15 +1146,13 @@ export const useEnhancedMafiaGameState = (
     });
   }, []);
 
-  // ============ COMBAT ============
+  // ============ 3-STEP TAKEOVER: HIT ============
   const processTerritoryHit = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
-    // Find target hex or district
     const targetQ = action.targetQ;
     const targetR = action.targetR;
     const targetS = action.targetS;
     
     if (targetQ !== undefined) {
-      // Hex-level combat
       const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
       if (!tile || tile.controllingFamily === state.playerFamily || tile.isHeadquarters) return state;
 
@@ -1078,7 +1163,24 @@ export const useEnhancedMafiaGameState = (
         u.family === tile.controllingFamily && u.q === targetQ && u.r === targetR && u.s === targetS
       );
 
-      const chance = playerUnits.length > enemyUnits.length ? 0.8 : 0.3;
+      // Base chance: 80% if outnumbering, 20% if not
+      let chance = playerUnits.length > enemyUnits.length ? 0.8 : 0.2;
+      
+      // Apply family combat bonus
+      chance += state.familyBonuses.combatBonus / 100;
+      
+      // Apply hitman bonus
+      const hitmenOnTile = playerUnits.filter(u => state.hitmen.some(h => h.unitId === u.id));
+      hitmenOnTile.forEach(h => {
+        const hitman = state.hitmen.find(hm => hm.unitId === h.id)!;
+        chance += (0.3 + (hitman.hitmanLevel - 1) * 0.1);
+      });
+      
+      // Apply Lucchese hit success bonus
+      chance += state.familyBonuses.hitSuccess / 100;
+      
+      chance = Math.min(0.95, chance);
+
       if (Math.random() < chance) {
         // Victory
         enemyUnits.forEach(eu => {
@@ -1088,6 +1190,15 @@ export const useEnhancedMafiaGameState = (
         tile.controllingFamily = state.playerFamily;
         state.resources.money += 5000;
         state.resources.respect += 10;
+        
+        // Record hits for soldiers involved
+        playerUnits.forEach(u => {
+          if (state.soldierStats[u.id]) {
+            state.soldierStats[u.id].hits += 1;
+            state.soldierStats[u.id].survivedConflicts += 1;
+          }
+        });
+        
         // 20% player casualties
         const casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
         for (let i = 0; i < casualties; i++) {
@@ -1101,6 +1212,12 @@ export const useEnhancedMafiaGameState = (
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
+        // Surviving soldiers still get experience
+        playerUnits.slice(casualties).forEach(u => {
+          if (state.soldierStats[u.id]) {
+            state.soldierStats[u.id].survivedConflicts += 1;
+          }
+        });
       }
       state.policeHeat.level = Math.min(100, state.policeHeat.level + 15);
     }
@@ -1109,13 +1226,60 @@ export const useEnhancedMafiaGameState = (
     return state;
   };
 
+  // ============ 3-STEP TAKEOVER: EXTORT (neutral only) ============
   const processTerritoryExtortion = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
-    // Similar but for neutral territory
+    const targetQ = action.targetQ;
+    const targetR = action.targetR;
+    const targetS = action.targetS;
+
+    if (targetQ !== undefined) {
+      const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
+      if (!tile || tile.controllingFamily !== 'neutral' || tile.isHeadquarters) return state;
+
+      const playerUnits = state.deployedUnits.filter(u => 
+        u.family === state.playerFamily && u.q === targetQ && u.r === targetR && u.s === targetS
+      );
+      if (playerUnits.length === 0) return state;
+
+      // 90% success for extortion of neutral territory
+      let chance = 0.9;
+      chance += state.familyBonuses.extortion / 100;
+      chance = Math.min(0.99, chance);
+
+      if (Math.random() < chance) {
+        tile.controllingFamily = state.playerFamily;
+        state.resources.money += 3000;
+        state.resources.respect += 5;
+        
+        playerUnits.forEach(u => {
+          if (state.soldierStats[u.id]) {
+            state.soldierStats[u.id].extortions += 1;
+          }
+        });
+        
+        // 10% casualties
+        const casualties = Math.floor(playerUnits.length * 0.1);
+        for (let i = 0; i < casualties; i++) {
+          const idx = state.deployedUnits.indexOf(playerUnits[i]);
+          if (idx !== -1) state.deployedUnits.splice(idx, 1);
+        }
+      } else {
+        // 20% casualties on failure
+        const casualties = Math.max(1, Math.floor(playerUnits.length * 0.2));
+        for (let i = 0; i < casualties; i++) {
+          const idx = state.deployedUnits.indexOf(playerUnits[i]);
+          if (idx !== -1) state.deployedUnits.splice(idx, 1);
+        }
+      }
+      state.policeHeat.level = Math.min(100, state.policeHeat.level + 8);
+    }
+
+    syncLegacyUnits(state);
     return state;
   };
 
   // ============ WINNER CHECK ============
-  const isWinner = gameState.familyControl ? gameState.familyControl[gameState.playerFamily] >= 60 : false;
+  const isWinner = gameState.victoryType !== null;
 
   return {
     gameState,

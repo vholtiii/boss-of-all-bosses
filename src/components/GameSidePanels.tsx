@@ -22,8 +22,13 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  Crosshair,
 } from 'lucide-react';
 import { EnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
+import HitmanPanel from '@/components/HitmanPanel';
+import CorruptionPanel from '@/components/CorruptionPanel';
+import VictoryTracker from '@/components/VictoryTracker';
+import { SOLDIER_COST, CAPO_COST } from '@/types/game-mechanics';
 
 interface GameSidePanelProps {
   gameState: EnhancedMafiaGameState;
@@ -142,10 +147,17 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             />
             <ActionButton
               icon={<Users className="h-4 w-4" />}
-              label="Recruit Soldiers"
-              sublabel={`$8,000 each`}
-              disabled={resources.money < 8000}
-              onClick={() => onAction({ type: 'recruit_soldiers', cost: 8000 })}
+              label="Recruit Soldier"
+              sublabel={`$${SOLDIER_COST}`}
+              disabled={resources.money < SOLDIER_COST}
+              onClick={() => onAction({ type: 'recruit_soldiers', cost: SOLDIER_COST })}
+            />
+            <ActionButton
+              icon={<Crown className="h-4 w-4" />}
+              label="Recruit Capo"
+              sublabel={`$${CAPO_COST.toLocaleString()}`}
+              disabled={resources.money < CAPO_COST}
+              onClick={() => onAction({ type: 'recruit_capo', cost: CAPO_COST })}
             />
           </div>
         </CollapsibleSection>
@@ -166,13 +178,6 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               onClick={() => onAction({ type: 'train_soldiers' })}
             />
             <ActionButton
-              icon={<Gavel className="h-4 w-4" />}
-              label="Bribe Official"
-              sublabel={`$15,000 · −20 Heat`}
-              disabled={resources.money < 15000}
-              onClick={() => onAction({ type: 'bribe_official', amount: 15000 })}
-            />
-            <ActionButton
               icon={<Crown className="h-4 w-4" />}
               label="Public Appearance"
               sublabel={`$3,000 · +Rep`}
@@ -188,6 +193,47 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             />
           </div>
         </CollapsibleSection>
+
+        {/* ── CORRUPTION (4-tier bribe system) ── */}
+        <CollapsibleSection
+          title="Corruption"
+          icon={<Gavel className="h-4 w-4" />}
+          isOpen={openSection === 'corruption'}
+          onToggle={() => toggle('corruption')}
+        >
+          <CorruptionPanel
+            money={resources.money}
+            activeBribes={gameState.activeBribes}
+            rivalFamilies={gameState.aiOpponents.map(o => o.family)}
+            reputation={gameState.reputation.reputation}
+            heat={gameState.policeHeat.level}
+            onBribe={(tier, targetFamily) => onAction({ type: 'bribe_corruption', tier, targetFamily })}
+          />
+        </CollapsibleSection>
+
+        {/* ── HITMAN SYSTEM ── */}
+        <CollapsibleSection
+          title={`Hitmen (${gameState.hitmen.length}/3)`}
+          icon={<Crosshair className="h-4 w-4" />}
+          isOpen={openSection === 'hitmen'}
+          onToggle={() => toggle('hitmen')}
+        >
+          <HitmanPanel
+            hitmen={gameState.hitmen}
+            soldierStats={gameState.soldierStats}
+            deployedSoldierIds={
+              gameState.deployedUnits
+                .filter(u => u.family === gameState.playerFamily && u.type === 'soldier')
+                .map(u => u.id)
+            }
+            playerFamily={gameState.playerFamily}
+            money={resources.money}
+            onPromote={(unitId) => onAction({ type: 'promote_hitman', unitId })}
+          />
+        </CollapsibleSection>
+
+        {/* ── VICTORY TRACKER ── */}
+        <VictoryTracker progress={gameState.victoryProgress} />
 
         {/* ── Selected Territory ── */}
         {gameState.selectedTerritory && (
