@@ -72,7 +72,7 @@ const families: FamilyInfo[] = [
       { label: 'Military', icon: <Swords className="h-4 w-4" />, value: '★★☆☆☆' },
       { label: 'Trade', icon: <Shield className="h-4 w-4" />, value: '★★★★★' },
     ],
-    bonuses: ['+40% laundering efficiency', 'Cheaper business upgrades', 'Supply chain bonuses'],
+    bonuses: ['+25% hit success rate', '+15% heat reduction', '+20% intelligence gathering'],
     startingResources: { money: 70000, soldiers: 4, influence: 12, politicalPower: 20, respect: 15 },
   },
   {
