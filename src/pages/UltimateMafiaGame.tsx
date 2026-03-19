@@ -112,19 +112,11 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
             width={12}
             height={12}
             onBusinessClick={(business) => {
-              console.log('🏢 Business clicked:', business);
               selectTerritory({
-                q: business.q,
-                r: business.r,
-                s: business.s,
-                district: business.district,
-                family: business.family,
-                business: {
-                  type: business.businessType as any,
-                  income: business.income
-                }
+                q: business.q, r: business.r, s: business.s,
+                district: business.district, family: business.family,
+                business: { type: business.businessType as any, income: business.income }
               });
-              
               if (business.family === gameState.playerFamily) {
                 notifyTerritoryCaptured(business.district);
               }
@@ -143,41 +135,17 @@ const GameContent: React.FC<{ config: GameConfig }> = ({ config }) => {
       )
     },
     {
-      id: 'mechanics',
-      label: 'Game',
-      icon: <Zap className="h-4 w-4" />,
-      content: (
-        <div className="p-4 h-full overflow-y-auto">
-          <EnhancedGameMechanics 
-            gameState={gameState} 
-            onAction={performAction}
-          />
-        </div>
-      )
+      id: 'actions',
+      label: 'Actions',
+      icon: <Swords className="h-4 w-4" />,
+      content: <LeftSidePanel gameState={gameState} onAction={performAction} />
     },
     {
-      id: 'resources',
-      label: 'Resources',
-      icon: <DollarSign className="h-4 w-4" />,
-      content: (
-        <div className="p-4 space-y-4">
-          <ResourcePanel gameState={gameState} />
-        </div>
-      )
+      id: 'intel',
+      label: 'Intel',
+      icon: <Eye className="h-4 w-4" />,
+      content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} />
     },
-    {
-      id: 'events',
-      label: 'Events',
-      icon: <Calendar className="h-4 w-4" />,
-      content: (
-        <div className="p-4">
-          <EventsPanel 
-            gameState={gameState} 
-            onEventChoice={handleEventChoice}
-          />
-        </div>
-      )
-    }
   ];
 
   if (isWinner) {
