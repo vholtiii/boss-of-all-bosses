@@ -63,6 +63,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   } = useEnhancedMafiaGameState(config.family, config.resources);
 
   const { notifySuccess, notifyError, notifyWarning, notifyInfo, notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
+  const { playSound, playSoundSequence } = useSoundSystem();
 
   // Drain pending notifications from game state into the notification system
   useEffect(() => {
@@ -78,6 +79,23 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       clearNotifications();
     }
   }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications]);
+
+  // Play sounds on combat results
+  useEffect(() => {
+    if (gameState.lastCombatResult) {
+      const { success, type } = gameState.lastCombatResult;
+      if (type === 'hit') {
+        if (success) playSoundSequence(['hit_success', 'success']);
+        else playSoundSequence(['hit_fail', 'error']);
+      } else if (type === 'extort') {
+        if (success) playSoundSequence(['extort_success', 'money']);
+        else playSound('extort_fail');
+      } else if (type === 'sabotage') {
+        if (success) playSound('combat');
+        else playSound('error');
+      }
+    }
+  }, [gameState.lastCombatResult, playSound, playSoundSequence]);
 
   // Show turn summary when a new report comes in
   useEffect(() => {
