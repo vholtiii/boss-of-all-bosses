@@ -1218,7 +1218,6 @@ export const useEnhancedMafiaGameState = (
         state.resources.money += 5000;
         state.resources.respect += 10;
         
-        // Record hits for soldiers involved
         playerUnits.forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].hits += 1;
@@ -1226,25 +1225,30 @@ export const useEnhancedMafiaGameState = (
           }
         });
         
-        // 20% player casualties
         const casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: 'Territory Captured!',
+          message: `Hit successful! +$5,000, +10 respect.${casualties > 0 ? ` ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}.` : ''}`,
+        }];
       } else {
-        // Defeat — 40% casualties
         const casualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(playerUnits[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
-        // Surviving soldiers still get experience
         playerUnits.slice(casualties).forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].survivedConflicts += 1;
           }
         });
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'error', title: 'Hit Failed!',
+          message: `The attack was repelled. ${casualties} casualt${casualties > 1 ? 'ies' : 'y'} suffered.`,
+        }];
       }
       state.policeHeat.level = Math.min(100, state.policeHeat.level + 15);
     }
