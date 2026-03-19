@@ -646,6 +646,7 @@ export const useEnhancedMafiaGameState = (
 
   const selectUnitFromHeadquarters = useCallback((unitType: 'soldier' | 'capo', family: string) => {
     setGameState(prev => {
+      if (prev.turnPhase !== 'deploy') return prev; // Only during deploy phase
       if (family !== prev.playerFamily) return prev;
       const hq = prev.headquarters[family];
       if (!hq) return prev;
