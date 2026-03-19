@@ -178,7 +178,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       id: 'actions',
       label: 'Actions',
       icon: <Swords className="h-4 w-4" />,
-      content: <LeftSidePanel gameState={gameState} onAction={performAction} />
+      content: <LeftSidePanel gameState={gameState} onAction={performAction} turnPhase={gameState.turnPhase} />
     },
     {
       id: 'intel',
