@@ -324,6 +324,8 @@ const createInitialGameState = (
     soldierStats,
     hitmen: [],
     activeBribes: [],
+    alliances: [],
+    ceasefires: [],
     victoryProgress: {
       territory: { current: 0, target: 6, met: false },
       economic: { current: 0, target: 8000, met: false },
