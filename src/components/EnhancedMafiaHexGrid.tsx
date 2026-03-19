@@ -547,7 +547,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                               e.stopPropagation();
                               if (turnPhase === 'deploy' && isAtHQ && onSelectUnitFromHeadquarters) {
                                 onSelectUnitFromHeadquarters('capo', fam);
-                              } else if ((turnPhase === 'deploy' || turnPhase === 'move') && capo.movesRemaining > 0 && onSelectUnit) {
+                              } else if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
                                 onSelectUnit('capo', { q: tile.q, r: tile.r, s: tile.s });
                               }
                             } : undefined}
