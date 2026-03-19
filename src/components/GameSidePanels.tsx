@@ -258,6 +258,28 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           />
         </CollapsibleSection>
 
+        {/* ── CAPO PROMOTION ── */}
+        <CollapsibleSection
+          title={`Capo Promotion (${gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'capo').length}/${3})`}
+          icon={<Crown className="h-4 w-4" />}
+          isOpen={!actionsLocked && openSection === 'capo_promotion'}
+          onToggle={() => !actionsLocked && toggle('capo_promotion')}
+          disabled={actionsLocked}
+        >
+          <CapoPromotionPanel
+            capoCount={gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'capo').length}
+            soldierStats={gameState.soldierStats}
+            deployedSoldierIds={
+              gameState.deployedUnits
+                .filter(u => u.family === gameState.playerFamily && u.type === 'soldier')
+                .map(u => u.id)
+            }
+            hitmanIds={gameState.hitmen.map(h => h.unitId)}
+            money={resources.money}
+            onPromote={(unitId) => onAction({ type: 'promote_capo', unitId })}
+          />
+        </CollapsibleSection>
+
         {/* ── VICTORY TRACKER ── */}
         <VictoryTracker progress={gameState.victoryProgress} />
 
