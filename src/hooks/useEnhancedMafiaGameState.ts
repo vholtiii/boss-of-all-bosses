@@ -1355,13 +1355,18 @@ export const useEnhancedMafiaGameState = (
                     title: `⚔️ ${fam.charAt(0).toUpperCase() + fam.slice(1)} Attack!`,
                     message: `The ${fam} family attacked your units in ${tile.district || 'unknown territory'}!`,
                   });
+                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'attack', detail: `Attacked your units in ${tile.district}` });
                 }
               }
               break; // Stop moving after combat
             } else {
               // Claim empty territory
               if (tile.controllingFamily !== fam) {
+                const prevOwner = tile.controllingFamily;
                 tile.controllingFamily = fam;
+                if (prevOwner === state.playerFamily && turnReport) {
+                  turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
+                }
               }
             }
           }
