@@ -134,14 +134,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   };
 
   const handleHexClick = (tile: HexTile) => {
-    // HQ click
+    const turnPhase = gameState?.turnPhase || 'waiting';
+
+    // HQ click — always allow viewing, deploy only during deploy phase
     if (tile.isHeadquarters) {
       if (onSelectHeadquarters) onSelectHeadquarters(tile.isHeadquarters);
       return;
     }
 
-    // Deploy mode — place unit
-    if (gameState?.deployMode) {
+    // Deploy mode — place unit (deploy phase)
+    if (turnPhase === 'deploy' && gameState?.deployMode) {
       const isValid = gameState.availableDeployHexes?.some(
         (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
       );
@@ -151,10 +153,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       return;
     }
 
-    // Movement phase
-    if (gameState?.movementPhase) {
+    // Move phase — select or move units
+    if (turnPhase === 'move') {
       // If we have a selected unit, try to move it
-      if (gameState.selectedUnitId) {
+      if (gameState?.selectedUnitId) {
         const isValidMove = gameState.availableMoveHexes?.some(
           (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
         );

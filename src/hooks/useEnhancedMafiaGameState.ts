@@ -51,6 +51,8 @@ export interface HexTile {
   isHeadquarters?: string;
 }
 
+export type TurnPhase = 'deploy' | 'move' | 'action' | 'waiting';
+
 export interface EnhancedMafiaGameState {
   playerFamily: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
   turn: number;
@@ -69,8 +71,9 @@ export interface EnhancedMafiaGameState {
   hexMap: HexTile[];
   deployedUnits: DeployedUnit[];
   
-  // Movement UI state
-  movementPhase: boolean;
+  // Phase-based turn system
+  turnPhase: TurnPhase;
+  movementPhase: boolean; // kept for compat — derived from turnPhase
   selectedUnitId: string | null;
   availableMoveHexes: Array<{ q: number; r: number; s: number }>;
   deployMode: { unitType: 'soldier' | 'capo'; family: string } | null;
@@ -307,7 +310,8 @@ const createInitialGameState = (
     },
 
     hexMap, deployedUnits,
-    movementPhase: false, selectedUnitId: null, availableMoveHexes: [],
+    turnPhase: 'deploy' as TurnPhase, movementPhase: false,
+    selectedUnitId: null, availableMoveHexes: [],
     deployMode: null, availableDeployHexes: [],
     headquarters: Object.fromEntries(allFamilies.map(f => [f, HQ_POSITIONS[f]])),
     units,
@@ -505,10 +509,29 @@ export const useEnhancedMafiaGameState = (
     }
   };
 
-  // ============ MOVEMENT PHASE ============
+  // ============ PHASE-BASED TURN SYSTEM ============
+  const advancePhase = useCallback(() => {
+    setGameState(prev => {
+      const phaseOrder: TurnPhase[] = ['deploy', 'move', 'action'];
+      const currentIdx = phaseOrder.indexOf(prev.turnPhase);
+      const nextPhase = currentIdx < phaseOrder.length - 1 ? phaseOrder[currentIdx + 1] : 'waiting' as TurnPhase;
+      return {
+        ...prev,
+        turnPhase: nextPhase,
+        movementPhase: nextPhase === 'move',
+        selectedUnitId: null,
+        availableMoveHexes: [],
+        deployMode: null,
+        availableDeployHexes: [],
+      };
+    });
+  }, []);
+
+  // Legacy compat — map to advancePhase
   const startMovementPhase = useCallback(() => {
     setGameState(prev => ({
       ...prev,
+      turnPhase: 'move' as TurnPhase,
       movementPhase: true, selectedUnitId: null, availableMoveHexes: [],
       deployMode: null, availableDeployHexes: [],
     }));
@@ -517,6 +540,7 @@ export const useEnhancedMafiaGameState = (
   const endMovementPhase = useCallback(() => {
     setGameState(prev => ({
       ...prev,
+      turnPhase: 'action' as TurnPhase,
       movementPhase: false, selectedUnitId: null, availableMoveHexes: [],
       deployMode: null, availableDeployHexes: [],
     }));
@@ -525,6 +549,7 @@ export const useEnhancedMafiaGameState = (
   // ============ SELECT UNIT FOR MOVEMENT ============
   const selectUnit = useCallback((unitType: 'soldier' | 'capo', location: { q: number; r: number; s: number }) => {
     setGameState(prev => {
+      if (prev.turnPhase !== 'move') return prev; // Only allow during move phase
       const unit = prev.deployedUnits.find(u => 
         u.family === prev.playerFamily && u.type === unitType &&
         u.q === location.q && u.r === location.r && u.s === location.s &&
@@ -537,9 +562,20 @@ export const useEnhancedMafiaGameState = (
         ? getHexNeighbors(unit.q, unit.r, unit.s)
         : getHexesInRange(unit.q, unit.r, unit.s, range);
       
-      const validHexes = candidateHexes.filter(h => 
-        prev.hexMap.some(t => t.q === h.q && t.r === h.r && t.s === h.s)
-      );
+      const validHexes = candidateHexes.filter(h => {
+        const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+        if (!tile) return false;
+        if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+        
+        if (unitType === 'soldier') {
+          // Soldiers cannot enter enemy-controlled hexes — must Hit first
+          if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) return false;
+        } else {
+          // Capos can only move to own territory
+          if (tile.controllingFamily !== prev.playerFamily) return false;
+        }
+        return true;
+      });
 
       return { ...prev, selectedUnitId: unit.id, availableMoveHexes: validHexes, deployMode: null, availableDeployHexes: [] };
     });
@@ -548,6 +584,7 @@ export const useEnhancedMafiaGameState = (
   // ============ MOVE UNIT ============
   const moveUnit = useCallback((targetLocation: { q: number; r: number; s: number }) => {
     setGameState(prev => {
+      if (prev.turnPhase !== 'move') return prev;
       if (!prev.selectedUnitId) return prev;
       const unitIdx = prev.deployedUnits.findIndex(u => u.id === prev.selectedUnitId);
       if (unitIdx === -1) return prev;
@@ -564,10 +601,9 @@ export const useEnhancedMafiaGameState = (
       const updatedUnit = { ...unit, q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: unit.movesRemaining - moveCost };
       newUnits[unitIdx] = updatedUnit;
 
-      // Moving to enemy territory does NOT auto-claim — use hit/extort
+      // Auto-claim neutral tiles on move
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
-          // Only auto-claim neutral tiles
           if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters) {
             return { ...tile, controllingFamily: prev.playerFamily };
           }
@@ -581,9 +617,17 @@ export const useEnhancedMafiaGameState = (
         const candidates = updatedUnit.type === 'soldier'
           ? getHexNeighbors(updatedUnit.q, updatedUnit.r, updatedUnit.s)
           : getHexesInRange(updatedUnit.q, updatedUnit.r, updatedUnit.s, range);
-        newAvailableMoves = candidates.filter(h => 
-          newHexMap.some(t => t.q === h.q && t.r === h.r && t.s === h.s)
-        );
+        newAvailableMoves = candidates.filter(h => {
+          const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+          if (!tile) return false;
+          if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+          if (updatedUnit.type === 'soldier') {
+            if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) return false;
+          } else {
+            if (tile.controllingFamily !== prev.playerFamily) return false;
+          }
+          return true;
+        });
       }
 
       const newState = {
@@ -596,11 +640,13 @@ export const useEnhancedMafiaGameState = (
     });
   }, []);
 
+
   // ============ DEPLOY FROM HQ ============
   const selectHeadquarters = useCallback((family: string) => {}, []);
 
   const selectUnitFromHeadquarters = useCallback((unitType: 'soldier' | 'capo', family: string) => {
     setGameState(prev => {
+      if (prev.turnPhase !== 'deploy') return prev; // Only during deploy phase
       if (family !== prev.playerFamily) return prev;
       const hq = prev.headquarters[family];
       if (!hq) return prev;
@@ -711,6 +757,8 @@ export const useEnhancedMafiaGameState = (
       const newState = { ...prev };
       newState.turn += 1;
       
+      // Reset to deploy phase for next turn
+      newState.turnPhase = 'deploy';
       newState.movementPhase = false;
       newState.selectedUnitId = null;
       newState.availableMoveHexes = [];
@@ -1335,6 +1383,7 @@ export const useEnhancedMafiaGameState = (
     selectUnit,
     moveUnit,
     endMovementPhase,
+    advancePhase,
     selectHeadquarters,
     selectUnitFromHeadquarters,
     deployUnit,

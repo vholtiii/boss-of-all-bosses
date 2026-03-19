@@ -49,6 +49,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     selectUnit,
     moveUnit,
     endMovementPhase,
+    advancePhase,
     selectHeadquarters,
     selectUnitFromHeadquarters,
     deployUnit,
@@ -254,21 +255,34 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       
       {/* Right side - Actions */}
       <div className="flex items-center space-x-2">
+        {/* Phase indicator */}
+        <div className="flex items-center space-x-1 bg-background/80 rounded-lg px-2 py-1 border border-noir-light">
+          {(['deploy', 'move', 'action'] as const).map((phase) => (
+            <div
+              key={phase}
+              className={cn(
+                "px-3 py-1 rounded text-xs font-bold uppercase transition-all",
+                gameState.turnPhase === phase
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground"
+              )}
+            >
+              {phase}
+            </div>
+          ))}
+        </div>
+
         <Button
-          variant={gameState.movementPhase ? "default" : "outline"}
           size="sm"
-          onClick={() => {
-            if (gameState.movementPhase) {
-              endMovementPhase();
-            } else {
-              startMovementPhase();
-            }
-          }}
+          onClick={() => advancePhase()}
+          disabled={gameState.turnPhase === 'waiting'}
           className="font-medium"
+          variant={gameState.turnPhase === 'action' ? 'default' : 'outline'}
         >
-          <Target className="h-4 w-4 mr-2" />
-          {gameState.movementPhase ? 'End Movement' : 'Movement'}
+          <SkipForward className="h-4 w-4 mr-2" />
+          {gameState.turnPhase === 'action' ? 'Next Phase' : gameState.turnPhase === 'waiting' ? 'Waiting...' : `End ${gameState.turnPhase.charAt(0).toUpperCase() + gameState.turnPhase.slice(1)}`}
         </Button>
+
         <SaveLoadDialog 
           gameState={gameState} 
           onLoadGame={handleLoadGame}
@@ -299,7 +313,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           }}
           size="sm"
           className="bg-primary text-primary-foreground font-bold font-playfair hover:bg-primary/90"
-          disabled={gameState.legalStatus.jailTime > 0}
+          disabled={gameState.legalStatus.jailTime > 0 || gameState.turnPhase !== 'waiting'}
         >
           <SkipForward className="h-4 w-4 mr-2" />
           {gameState.legalStatus.jailTime > 0 ? `JAILED (${gameState.legalStatus.jailTime})` : 'END TURN'}
@@ -321,18 +335,25 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           </span>
         </div>
         
-        {/* Movement Status */}
-        {gameState.movementPhase && (gameState.selectedUnitId || gameState.deployMode) && (
-          <div className="flex items-center space-x-2 px-3 py-1 bg-yellow-400/20 rounded-full border border-yellow-400/30">
-            <Target className="h-3 w-3 text-yellow-400" />
-            <span className="text-xs font-medium text-yellow-400">
+        {/* Phase Status */}
+        {(gameState.selectedUnitId || gameState.deployMode) && (
+          <div className="flex items-center space-x-2 px-3 py-1 bg-accent/20 rounded-full border border-accent/30">
+            <Target className="h-3 w-3 text-accent-foreground" />
+            <span className="text-xs font-medium text-accent-foreground">
               {gameState.deployMode 
                 ? `Deploying ${gameState.deployMode.unitType} — click a highlighted hex`
                 : (() => {
-                    const unit = gameState.deployedUnits.find(u => u.id === gameState.selectedUnitId);
+                    const unit = gameState.deployedUnits.find((u: any) => u.id === gameState.selectedUnitId);
                     return unit ? `Moving ${unit.type} (${unit.movesRemaining} moves left)` : 'Select a unit';
                   })()
               }
+            </span>
+          </div>
+        )}
+        {!gameState.selectedUnitId && !gameState.deployMode && (
+          <div className="flex items-center space-x-2 px-3 py-1 bg-muted/50 rounded-full">
+            <span className="text-xs font-medium text-muted-foreground uppercase">
+              Phase: {gameState.turnPhase === 'deploy' ? '📦 Deploy units from HQ' : gameState.turnPhase === 'move' ? '🚶 Move your units' : gameState.turnPhase === 'action' ? '⚔️ Take actions (Hit, Extort, Bribe...)' : '⏳ End your turn'}
             </span>
           </div>
         )}
