@@ -388,61 +388,138 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     });
 
                     const elements: React.ReactNode[] = [];
-                    let offsetIdx = 0;
+                    const isAtHQ = !!tile.isHeadquarters;
+                    const isDeployAtHQ = isAtHQ && turnPhase === 'deploy' && tile.isHeadquarters === playerFamily;
 
-                    caposByFamily.forEach((capos, fam) => {
-                      const capo = capos[0];
-                      const isSelected = selectedUnitId === capo.id;
-                      const isAtHQ = !!tile.isHeadquarters;
-                      const isClickable = fam === playerFamily && (turnPhase === 'move' || (turnPhase === 'deploy' && isAtHQ));
-                      elements.push(
-                        <CapoIcon
-                          key={`capo-${fam}-${key}`}
-                          x={x - baseHexRadius * 0.3 + offsetIdx * 10}
-                          y={y - baseHexRadius * 0.15}
-                          family={fam as any}
-                          name={capo.name || 'Capo'}
-                          level={capo.level}
-                          isPlayerFamily={fam === playerFamily}
-                          selected={isSelected}
-                          onClick={isClickable ? (e) => {
-                            e.stopPropagation();
-                            if (turnPhase === 'deploy' && isAtHQ && onSelectUnitFromHeadquarters) {
-                              onSelectUnitFromHeadquarters('capo', fam);
-                            } else if (turnPhase === 'move' && capo.movesRemaining > 0 && onSelectUnit) {
-                              onSelectUnit('capo', { q: tile.q, r: tile.r, s: tile.s });
-                            }
-                          } : undefined}
-                        />
-                      );
-                      offsetIdx++;
-                    });
+                    // For HQ during deploy, lay out units in a clear grid around the hex
+                    // For normal hexes, use compact layout
+                    if (isDeployAtHQ) {
+                      // Spread units around the HQ hex in a ring for easy clicking
+                      const allPlayerUnits: { unit: DeployedUnit; type: 'soldier' | 'capo' }[] = [];
+                      caposByFamily.forEach((capos, fam) => {
+                        if (fam === playerFamily) capos.forEach(c => allPlayerUnits.push({ unit: c, type: 'capo' }));
+                      });
+                      soldiersByFamily.forEach((soldiers, fam) => {
+                        if (fam === playerFamily) soldiers.forEach(s => allPlayerUnits.push({ unit: s, type: 'soldier' }));
+                      });
 
-                    soldiersByFamily.forEach((soldiers, fam) => {
-                      const firstSoldier = soldiers[0];
-                      const isSelected = soldiers.some(s => s.id === selectedUnitId);
-                      const isAtHQ = !!tile.isHeadquarters;
-                      const isClickable = fam === playerFamily && (turnPhase === 'move' || (turnPhase === 'deploy' && isAtHQ));
+                      const spacing = 28;
+                      const totalWidth = (allPlayerUnits.length - 1) * spacing;
+                      const startX = x - totalWidth / 2;
+
+                      allPlayerUnits.forEach((item, idx) => {
+                        const unitX = startX + idx * spacing;
+                        const unitY = y + baseHexRadius + 18;
+                        const isSelected = selectedUnitId === item.unit.id;
+
+                        if (item.type === 'capo') {
+                          elements.push(
+                            <CapoIcon
+                              key={`capo-deploy-${item.unit.id}`}
+                              x={unitX}
+                              y={unitY}
+                              family={item.unit.family as any}
+                              name={item.unit.name || 'Capo'}
+                              level={item.unit.level}
+                              isPlayerFamily={true}
+                              selected={isSelected}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onSelectUnitFromHeadquarters) onSelectUnitFromHeadquarters('capo', item.unit.family);
+                              }}
+                            />
+                          );
+                        } else {
+                          elements.push(
+                            <SoldierIcon
+                              key={`soldier-deploy-${item.unit.id}`}
+                              x={unitX}
+                              y={unitY}
+                              family={item.unit.family as any}
+                              count={1}
+                              isPlayerFamily={true}
+                              selected={isSelected}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onSelectUnitFromHeadquarters) onSelectUnitFromHeadquarters('soldier', item.unit.family);
+                              }}
+                            />
+                          );
+                        }
+                      });
+
+                      // Label
                       elements.push(
-                        <SoldierIcon
-                          key={`soldier-${fam}-${key}`}
-                          x={x + baseHexRadius * 0.25 + offsetIdx * 10}
-                          y={y + baseHexRadius * 0.35}
-                          family={fam as any}
-                          count={soldiers.length}
-                          isPlayerFamily={fam === playerFamily}
-                          selected={isSelected}
-                          onClick={isClickable ? (e) => {
-                            e.stopPropagation();
-                            if (turnPhase === 'deploy' && isAtHQ && onSelectUnitFromHeadquarters) {
-                              onSelectUnitFromHeadquarters('soldier', fam);
-                            } else if (turnPhase === 'move' && firstSoldier.movesRemaining > 0 && onSelectUnit) {
-                              onSelectUnit('soldier', { q: tile.q, r: tile.r, s: tile.s });
-                            }
-                          } : undefined}
-                        />
+                        <text
+                          key={`deploy-label-${key}`}
+                          x={x}
+                          y={y + baseHexRadius + 42}
+                          textAnchor="middle"
+                          fontSize="8"
+                          fill="#D4AF37"
+                          fontWeight="bold"
+                          className="pointer-events-none select-none"
+                        >
+                          ▲ CLICK TO DEPLOY ▲
+                        </text>
                       );
-                      offsetIdx++;
+                    } else {
+                      // Normal compact layout for non-deploy or non-HQ
+                      let offsetIdx = 0;
+
+                      caposByFamily.forEach((capos, fam) => {
+                        const capo = capos[0];
+                        const isSelected = selectedUnitId === capo.id;
+                        const isClickable = fam === playerFamily && (turnPhase === 'move' || (turnPhase === 'deploy' && isAtHQ));
+                        elements.push(
+                          <CapoIcon
+                            key={`capo-${fam}-${key}`}
+                            x={x - baseHexRadius * 0.3 + offsetIdx * 12}
+                            y={y - baseHexRadius * 0.15}
+                            family={fam as any}
+                            name={capo.name || 'Capo'}
+                            level={capo.level}
+                            isPlayerFamily={fam === playerFamily}
+                            selected={isSelected}
+                            onClick={isClickable ? (e) => {
+                              e.stopPropagation();
+                              if (turnPhase === 'deploy' && isAtHQ && onSelectUnitFromHeadquarters) {
+                                onSelectUnitFromHeadquarters('capo', fam);
+                              } else if (turnPhase === 'move' && capo.movesRemaining > 0 && onSelectUnit) {
+                                onSelectUnit('capo', { q: tile.q, r: tile.r, s: tile.s });
+                              }
+                            } : undefined}
+                          />
+                        );
+                        offsetIdx++;
+                      });
+
+                      soldiersByFamily.forEach((soldiers, fam) => {
+                        const firstSoldier = soldiers[0];
+                        const isSelected = soldiers.some(s => s.id === selectedUnitId);
+                        const isClickable = fam === playerFamily && (turnPhase === 'move' || (turnPhase === 'deploy' && isAtHQ));
+                        elements.push(
+                          <SoldierIcon
+                            key={`soldier-${fam}-${key}`}
+                            x={x + baseHexRadius * 0.25 + offsetIdx * 12}
+                            y={y + baseHexRadius * 0.35}
+                            family={fam as any}
+                            count={soldiers.length}
+                            isPlayerFamily={fam === playerFamily}
+                            selected={isSelected}
+                            onClick={isClickable ? (e) => {
+                              e.stopPropagation();
+                              if (turnPhase === 'deploy' && isAtHQ && onSelectUnitFromHeadquarters) {
+                                onSelectUnitFromHeadquarters('soldier', fam);
+                              } else if (turnPhase === 'move' && firstSoldier.movesRemaining > 0 && onSelectUnit) {
+                                onSelectUnit('soldier', { q: tile.q, r: tile.r, s: tile.s });
+                              }
+                            } : undefined}
+                          />
+                        );
+                        offsetIdx++;
+                      });
+                    }
                     });
 
                     return elements;
