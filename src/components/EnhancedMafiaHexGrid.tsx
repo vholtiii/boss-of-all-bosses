@@ -411,94 +411,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     const isAtHQ = !!tile.isHeadquarters;
                     const isDeployAtHQ = isAtHQ && turnPhase === 'deploy' && tile.isHeadquarters === playerFamily;
 
-                    // For HQ during deploy, render a compact picker by unit type/count
-                    // For normal hexes, use compact layout
+                    // Keep the HQ hex clear during deploy; the picker renders in the outer side panel
                     if (isDeployAtHQ) {
-                      const playerCapos = caposByFamily.get(playerFamily) || [];
-                      const playerSoldiers = soldiersByFamily.get(playerFamily) || [];
-                      const deployableOptions = [
-                        ...(playerCapos.length > 0 ? [{ type: 'capo' as const, units: playerCapos }] : []),
-                        ...(playerSoldiers.length > 0 ? [{ type: 'soldier' as const, units: playerSoldiers }] : []),
-                      ];
-
-                      const pickerWidth = 92;
-                      const pickerHeight = 64;
-                      const pickerY = y + baseHexRadius + 10;
-                      const spacing = 36;
-                      const totalWidth = (deployableOptions.length - 1) * spacing;
-                      const startX = x - totalWidth / 2;
-
-                      elements.push(
-                        <g key={`deploy-picker-bg-${key}`} className="pointer-events-none">
-                          <rect
-                            x={x - pickerWidth / 2}
-                            y={pickerY - 14}
-                            width={pickerWidth}
-                            height={pickerHeight}
-                            rx={12}
-                            fill="rgba(15, 23, 42, 0.88)"
-                            stroke="#D4AF37"
-                            strokeWidth="1.5"
-                          />
-                        </g>
-                      );
-
-                      deployableOptions.forEach((option, idx) => {
-                        const optionX = startX + idx * spacing;
-                        const optionY = pickerY + 10;
-                        const representativeUnit = option.units[0];
-                        const isSelected = option.units.some(unit => unit.id === selectedUnitId);
-
-                        if (option.type === 'capo') {
-                          elements.push(
-                            <CapoIcon
-                              key={`capo-deploy-${key}`}
-                              x={optionX}
-                              y={optionY}
-                              family={playerFamily}
-                              name={representativeUnit.name || 'Capo'}
-                              level={representativeUnit.level}
-                              isPlayerFamily={true}
-                              selected={isSelected}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onSelectUnitFromHeadquarters?.('capo', playerFamily);
-                              }}
-                            />
-                          );
-                        } else {
-                          elements.push(
-                            <SoldierIcon
-                              key={`soldier-deploy-${key}`}
-                              x={optionX}
-                              y={optionY}
-                              family={playerFamily}
-                              count={option.units.length}
-                              isPlayerFamily={true}
-                              selected={isSelected}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onSelectUnitFromHeadquarters?.('soldier', playerFamily);
-                              }}
-                            />
-                          );
-                        }
-                      });
-
-                      elements.push(
-                        <text
-                          key={`deploy-label-${key}`}
-                          x={x}
-                          y={pickerY + 38}
-                          textAnchor="middle"
-                          fontSize="8"
-                          fill="#D4AF37"
-                          fontWeight="bold"
-                          className="pointer-events-none select-none"
-                        >
-                          SELECT A UNIT TO DEPLOY
-                        </text>
-                      );
+                      // Intentionally render nothing here.
                     } else {
                       // Normal compact layout for non-deploy or non-HQ
                       let offsetIdx = 0;
@@ -719,6 +634,73 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           </g>
         </svg>
       </div>
+
+      {gameState?.turnPhase === 'deploy' && expandedHQKey && (() => {
+        const expandedTile = hexMap.find(tile => `${tile.q},${tile.r},${tile.s}` === expandedHQKey);
+        if (!expandedTile || expandedTile.isHeadquarters !== playerFamily) return null;
+
+        const expandedUnits = unitsByHex.get(expandedHQKey) || [];
+        const playerCapos = expandedUnits.filter(unit => unit.family === playerFamily && unit.type === 'capo');
+        const playerSoldiers = expandedUnits.filter(unit => unit.family === playerFamily && unit.type === 'soldier');
+
+        if (playerCapos.length === 0 && playerSoldiers.length === 0) return null;
+
+        return (
+          <div className="absolute right-4 top-1/2 z-20 w-64 -translate-y-1/2 rounded-2xl border border-primary/40 bg-background/95 p-4 shadow-2xl backdrop-blur-sm">
+            <div className="mb-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">HQ deployment</p>
+              <h3 className="text-sm font-bold text-foreground">Select a unit to deploy</h3>
+            </div>
+
+            <div className="space-y-3">
+              {playerCapos.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onSelectUnitFromHeadquarters?.('capo', playerFamily)}
+                  className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 text-left transition-colors hover:border-primary/50 hover:bg-accent"
+                >
+                  <svg width="52" height="58" viewBox="0 0 52 58" className="shrink-0 overflow-visible">
+                    <CapoIcon
+                      x={26}
+                      y={28}
+                      family={playerFamily}
+                      name={playerCapos[0].name || 'Capo'}
+                      level={playerCapos[0].level}
+                      isPlayerFamily={true}
+                    />
+                  </svg>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">Capo</p>
+                    <p className="text-xs text-muted-foreground">{playerCapos.length} available</p>
+                  </div>
+                </button>
+              )}
+
+              {playerSoldiers.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onSelectUnitFromHeadquarters?.('soldier', playerFamily)}
+                  className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 text-left transition-colors hover:border-primary/50 hover:bg-accent"
+                >
+                  <svg width="52" height="58" viewBox="0 0 52 58" className="shrink-0 overflow-visible">
+                    <SoldierIcon
+                      x={26}
+                      y={30}
+                      family={playerFamily}
+                      count={playerSoldiers.length}
+                      isPlayerFamily={true}
+                    />
+                  </svg>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">Soldiers</p>
+                    <p className="text-xs text-muted-foreground">{playerSoldiers.length} available</p>
+                  </div>
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Hover Info */}
       <AnimatePresence>
