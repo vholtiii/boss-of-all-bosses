@@ -420,7 +420,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         {!gameState.selectedUnitId && !gameState.deployMode && (
           <div className="flex items-center space-x-2 px-3 py-1 bg-muted/50 rounded-full">
             <span className="text-xs font-medium text-muted-foreground uppercase">
-              Phase: {gameState.turnPhase === 'deploy' ? '📦 Deploy & move units across the map' : gameState.turnPhase === 'move' ? '📋 Tactical actions only (Scout, Fortify, Escort) — no movement' : gameState.turnPhase === 'action' ? `⚔️ Actions: ${gameState.actionsRemaining}/${gameState.maxActions} remaining` : '⏳ End your turn'}
+              Phase: {gameState.turnPhase === 'deploy' ? '📦 Deploy & move units across the map' : gameState.turnPhase === 'move' ? '📋 Tactical actions only (Scout, Fortify, Escort) — no movement' : gameState.turnPhase === 'action' ? `⚔️ Select a unit first, then click a target — ${gameState.actionsRemaining}/${gameState.maxActions} actions left` : '⏳ End your turn'}
             </span>
           </div>
         )}
