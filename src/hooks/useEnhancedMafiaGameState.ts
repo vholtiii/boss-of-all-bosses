@@ -16,6 +16,7 @@ import {
   SoldierStats, Hitman, BribeContract, BribeTier, VictoryProgress, VictoryType,
   FAMILY_BONUSES, BRIBE_TIERS, DOC_BUSINESS_TYPES,
   SOLDIER_COST, CAPO_COST, HITMAN_MAINTENANCE_MULTIPLIER, MAX_HITMEN, HITMAN_REQUIREMENTS,
+  MAX_CAPOS, CAPO_PROMOTION_COST, CAPO_PROMOTION_REQUIREMENTS,
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType,
   NEGOTIATION_TYPES,
   ScoutedHex, Safehouse, MoveAction,
@@ -1417,6 +1418,48 @@ export const useEnhancedMafiaGameState = (
           capo.r = bestTile.r;
           capo.s = bestTile.s;
           capo.movesRemaining = 0;
+        }
+      }
+
+      // ── PROMOTE SOLDIERS TO CAPOS ── (AI follows same rules as player)
+      const aiCapoCount = state.deployedUnits.filter(u => u.family === fam && u.type === 'capo').length;
+      if (aiCapoCount < MAX_CAPOS && opponent.resources.money >= CAPO_PROMOTION_COST) {
+        const aiSoldierUnits = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
+        const aiHitmanIds = state.hitmen.filter(h => aiSoldierUnits.some(u => u.id === h.unitId)).map(h => h.unitId);
+        
+        // Find the best eligible soldier (highest survivedConflicts)
+        let bestCandidate: { unit: typeof aiSoldierUnits[0]; stats: SoldierStats } | null = null;
+        for (const unit of aiSoldierUnits) {
+          if (aiHitmanIds.includes(unit.id)) continue; // skip hitmen
+          const stats = state.soldierStats[unit.id];
+          if (!stats) continue;
+          if (
+            stats.survivedConflicts >= CAPO_PROMOTION_REQUIREMENTS.minVictories &&
+            stats.loyalty >= CAPO_PROMOTION_REQUIREMENTS.minLoyalty &&
+            stats.training >= CAPO_PROMOTION_REQUIREMENTS.minTraining
+          ) {
+            if (!bestCandidate || stats.survivedConflicts > bestCandidate.stats.survivedConflicts) {
+              bestCandidate = { unit, stats };
+            }
+          }
+        }
+
+        if (bestCandidate) {
+          const { unit } = bestCandidate;
+          unit.type = 'capo' as any;
+          unit.maxMoves = 3;
+          unit.movesRemaining = 3;
+          (unit as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
+          (unit as any).name = `${fam.charAt(0).toUpperCase() + fam.slice(1)} Capo`;
+          opponent.resources.money -= CAPO_PROMOTION_COST;
+          
+          if (turnReport) {
+            turnReport.aiActions.push({
+              family: fam,
+              action: 'promote',
+              detail: `Promoted a soldier to Capo`,
+            });
+          }
         }
       }
     });
