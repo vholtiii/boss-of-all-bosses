@@ -59,6 +59,18 @@ export interface HexTile {
 
 export type TurnPhase = 'deploy' | 'move' | 'action' | 'waiting';
 
+export interface TurnReport {
+  turn: number;
+  income: number;
+  maintenance: number;
+  netIncome: number;
+  aiActions: Array<{ family: string; action: string; detail: string }>;
+  events: string[];
+  resourceDeltas: { money: number; soldiers: number; respect: number; territories: number };
+  territoriesLost: string[];
+  territoriesGained: string[];
+}
+
 export interface EnhancedMafiaGameState {
   playerFamily: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
   turn: number;

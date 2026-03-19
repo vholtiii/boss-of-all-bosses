@@ -103,6 +103,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return points.join(' ');
   };
 
+  // District abbreviations for hex labels
+  const districtAbbreviations: Record<string, string> = {
+    'Little Italy': 'LI',
+    'Bronx': 'BX',
+    'Brooklyn': 'BK',
+    'Queens': 'QN',
+    'Manhattan': 'MH',
+    'Staten Island': 'SI',
+  };
+
   const getHexColor = (tile: HexTile): string => {
     // HQ
     if (tile.isHeadquarters) {
@@ -113,21 +123,21 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     if (gameState?.deployMode && gameState.availableDeployHexes?.some(
       (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
     )) {
-      return '#87CEEB'; // sky blue
+      return '#87CEEB';
     }
 
     // Movement highlights
     if (gameState?.selectedUnitId && gameState.availableMoveHexes?.some(
       (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
     )) {
-      return '#90EE90'; // light green
+      return '#90EE90';
     }
 
     // Selected unit hex
     if (gameState?.selectedUnitId) {
       const unit = deployedUnits.find(u => u.id === gameState.selectedUnitId);
       if (unit && unit.q === tile.q && unit.r === tile.r && unit.s === tile.s) {
-        return '#FFD700'; // gold
+        return '#FFD700';
       }
     }
 
@@ -135,9 +145,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   };
 
   const getHexOpacity = (tile: HexTile): number => {
-    if (tile.controllingFamily === playerFamily) return 1;
-    if (tile.controllingFamily === 'neutral') return 0.5;
-    return 0.7;
+    if (tile.controllingFamily === playerFamily) return 0.85;
+    if (tile.controllingFamily === 'neutral') return 0.35;
+    return 0.65;
   };
 
   const handleHexClick = (tile: HexTile) => {
