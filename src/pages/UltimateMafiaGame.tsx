@@ -49,6 +49,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     selectUnit,
     moveUnit,
     endMovementPhase,
+    advancePhase,
     selectHeadquarters,
     selectUnitFromHeadquarters,
     deployUnit,
