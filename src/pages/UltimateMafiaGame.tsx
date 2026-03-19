@@ -409,7 +409,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 ? `Deploying ${gameState.deployMode.unitType} — click a highlighted hex`
                 : (() => {
                     const unit = gameState.deployedUnits.find((u: any) => u.id === gameState.selectedUnitId);
-                    return unit ? `Moving ${unit.type} (${unit.movesRemaining} moves left)` : 'Select a unit';
+                    if (!unit) return 'Select a unit';
+                    if (gameState.turnPhase === 'action') return `${unit.type === 'capo' ? '👔' : '👤'} ${unit.type} selected — click a highlighted hex to act`;
+                    return `Moving ${unit.type} (${unit.movesRemaining} moves left)`;
                   })()
               }
             </span>
