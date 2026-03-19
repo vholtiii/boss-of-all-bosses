@@ -670,19 +670,6 @@ export const useEnhancedMafiaGameState = (
           return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
         }
       }
-        const neighbors = getHexNeighbors(unit.q, unit.r, unit.s);
-        const scoutableHexes = neighbors.filter(h => {
-          const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
-          if (!tile) return false;
-          return tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily;
-        });
-        return { ...prev, selectedUnitId: unit.id, availableMoveHexes: scoutableHexes, deployMode: null, availableDeployHexes: [] };
-      }
-
-      // Safehouse: highlight current hex
-      if (moveAction === 'safehouse' && unitType === 'capo') {
-        return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
-      }
 
       const range = unitType === 'soldier' ? 1 : Math.min(5, unit.movesRemaining);
       const candidateHexes = unitType === 'soldier' 
