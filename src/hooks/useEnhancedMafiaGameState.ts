@@ -2599,15 +2599,13 @@ export const useEnhancedMafiaGameState = (
           message: isEnemy ? `Stole income from ${tile.controllingFamily} territory! ${extortDetails}.` : `Territory claimed! ${extortDetails}.`,
         }];
       } else {
-        const shuffled = [...allPlayerUnits].sort(() => Math.random() - 0.5);
-        const casualties = Math.max(1, Math.floor(shuffled.length * 0.2));
-        for (let i = 0; i < casualties && i < shuffled.length; i++) {
-          const idx = state.deployedUnits.indexOf(shuffled[i]);
-          if (idx !== -1) state.deployedUnits.splice(idx, 1);
-        }
-        const failDetails = tile.district === 'Manhattan' 
-          ? `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} — heavy police presence in Manhattan`
-          : `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} — resistance was strong`;
+        // Failed extortion: no casualties, but reputation and heat consequences
+        const respectPenalty = 3;
+        const fearPenalty = 2;
+        const extraHeat = 5;
+        state.reputation.respect = Math.max(0, state.reputation.respect - respectPenalty);
+        state.reputation.fear = Math.max(0, state.reputation.fear - fearPenalty);
+        const failDetails = `Respect -${respectPenalty}, Fear -${fearPenalty}, Heat +${(isEnemy ? 12 : 8) + extraHeat} — the locals refused and word spread`;
         state.lastCombatResult = {
           q: targetQ, r: targetR, s: targetS,
           success: false, type: 'extort',
@@ -2617,10 +2615,10 @@ export const useEnhancedMafiaGameState = (
         };
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'error', title: 'Extortion Failed!',
-          message: `Resistance was stronger than expected. ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}.`,
+          message: `The locals refused to pay and word spread. Your reputation takes a hit.`,
         }];
       }
-      state.policeHeat.level = Math.min(100, state.policeHeat.level + (isEnemy ? 12 : 8));
+      state.policeHeat.level = Math.min(100, state.policeHeat.level + (isEnemy ? 12 : 8) + (Math.random() > 0.5 ? 5 : 0));
     }
 
     syncLegacyUnits(state);
