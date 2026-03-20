@@ -1309,7 +1309,91 @@ export const useEnhancedMafiaGameState = (
       
       newState.reputation.reputation = Math.max(0, newState.reputation.reputation - 0.5);
       newState.reputation.fear = Math.max(0, newState.reputation.fear - 1);
-      newState.reputation.loyalty = Math.min(100, newState.reputation.loyalty + 1);
+      
+      // --- Dynamic Loyalty Calculation ---
+      {
+        let loyaltyDelta = 0.5; // baseline recovery
+        
+        // +0.5 per successful extortion this turn (check turn report events)
+        const extortionCount = turnReport.events.filter(e => e.toLowerCase().includes('extort')).length;
+        loyaltyDelta += extortionCount * 0.5;
+        
+        // Soldiers lost this turn
+        const afterSoldierCountForLoyalty = newState.deployedUnits.filter(u => u.family === newState.playerFamily).length;
+        const soldiersLost = prevSoldierCount - afterSoldierCountForLoyalty;
+        if (soldiersLost > 0) loyaltyDelta -= soldiersLost * 2;
+        
+        // Territories lost this turn
+        const currentPlayerHexes = new Set(
+          newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).map(t => `${t.q},${t.r},${t.s}`)
+        );
+        let territoriesLostCount = 0;
+        prevPlayerHexes.forEach(h => { if (!currentPlayerHexes.has(h)) territoriesLostCount++; });
+        if (territoriesLostCount > 0) loyaltyDelta -= territoriesLostCount * 3;
+        
+        // Can't afford soldier maintenance?
+        const playerSoldiersForMaint = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+        const totalMaint = playerSoldiersForMaint.length * SOLDIER_COST + newState.resources.soldiers * SOLDIER_COST;
+        if (newState.resources.money < totalMaint) loyaltyDelta -= 5;
+        
+        newState.reputation.loyalty = Math.min(100, Math.max(0, newState.reputation.loyalty + loyaltyDelta));
+      }
+      
+      // --- Loyalty Mechanical Effects ---
+      {
+        const loyalty = newState.reputation.loyalty;
+        
+        // High loyalty: combat bonus tracked via reputation (applied in combat calculations)
+        // 80-100: +10% combat effectiveness — this is read from reputation.loyalty in combat
+        
+        // 30-49: Ratting risk — 15% chance someone talks to police
+        if (loyalty >= 30 && loyalty < 50) {
+          if (Math.random() < 0.15) {
+            newState.policeHeat.level = Math.min(100, newState.policeHeat.level + 10);
+            turnReport.events.push('🐀 Low loyalty! Someone in your crew talked to the police (+10 Heat)');
+          }
+        }
+        
+        // 10-29: Desertion risk — 15% chance of losing a soldier
+        if (loyalty >= 10 && loyalty < 30) {
+          if (Math.random() < 0.15) {
+            const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+            if (playerSoldiers.length > 0) {
+              const deserter = playerSoldiers[Math.floor(Math.random() * playerSoldiers.length)];
+              newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== deserter.id);
+              turnReport.events.push(`🚪 A soldier deserted due to dangerously low loyalty!`);
+            }
+          }
+          // Also has ratting risk at this level
+          if (Math.random() < 0.15) {
+            newState.policeHeat.level = Math.min(100, newState.policeHeat.level + 10);
+            turnReport.events.push('🐀 Critically low loyalty! Someone ratted you out (+10 Heat)');
+          }
+        }
+        
+        // 0-9: Mutiny — 20% chance of losing a soldier + respect penalty
+        if (loyalty < 10) {
+          if (Math.random() < 0.20) {
+            const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+            if (playerSoldiers.length > 0) {
+              const mutineer = playerSoldiers[Math.floor(Math.random() * playerSoldiers.length)];
+              newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== mutineer.id);
+              newState.reputation.respect = Math.max(0, newState.reputation.respect - 5);
+              turnReport.events.push(`⚔️ MUTINY! A soldier turned against you! (-5 Respect)`);
+            }
+          }
+          // Also has ratting risk
+          if (Math.random() < 0.20) {
+            newState.policeHeat.level = Math.min(100, newState.policeHeat.level + 25);
+            newState.reputation.loyalty = Math.max(0, newState.reputation.loyalty - 15);
+            newState.reputation.respect = Math.max(0, newState.reputation.respect - 10);
+            turnReport.events.push('🐀 MUTINY! Someone ratted to the feds! (+25 Heat, -15 Loyalty, -10 Respect)');
+          }
+        }
+      }
+      
+      // Sync resources.loyalty from reputation.loyalty
+      newState.resources.loyalty = Math.round(newState.reputation.loyalty);
       
       // --- Per-turn Influence growth ---
       const playerControlledHexes = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).length;
