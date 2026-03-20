@@ -101,7 +101,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             <p className="text-[10px] text-muted-foreground mt-1">
               {phase === 'deploy'
                 ? 'Place your units from HQ onto the map.'
-                : 'Move, fortify, scout, or escort your units.'}
+                : 'Move, fortify, scout, escort, or recruit units.'}
             </p>
             <p className="text-[10px] text-muted-foreground mt-0.5">
               Complete this phase to unlock actions.
