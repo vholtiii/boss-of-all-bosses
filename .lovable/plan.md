@@ -1,25 +1,17 @@
 
 
-# HQ Panel: Toggle Instead of Modal Overlay
+# Hide Unit Icons on HQ Hex
 
 ## Problem
-The HeadquartersInfoPanel renders as a full-screen modal overlay (`fixed inset-0 bg-black/50 z-50`) that blocks all map interaction. The user must click the X button or click outside to dismiss it before they can select units on the HQ hex. This forces a double-click pattern.
+Unit icons rendered on the HQ hex take up space and block clicking. The deployment menu already shows available units, so displaying them on the hex is redundant and makes toggling the HQ panel difficult.
 
 ## Solution
-Two changes:
+**File**: `src/components/EnhancedMafiaHexGrid.tsx` (~line 527-583)
 
-### 1. Toggle behavior on HQ click
-**File**: `src/pages/UltimateMafiaGame.tsx` (line 132-143)
-- Change `handleHeadquartersClick`: if the same family's HQ is already selected, set `selectedHeadquarters` to `null` (toggle off). Otherwise, open it.
+Skip rendering Capo and Soldier icons when the tile is a headquarters (`isAtHQ === true`). The deployment picker and HeadquartersInfoPanel already provide unit selection, so the on-hex icons are unnecessary for HQ tiles.
 
-### 2. Convert panel from blocking modal to side panel
-**File**: `src/components/HeadquartersInfoPanel.tsx`
-- Remove the full-screen `fixed inset-0 bg-black/50` overlay wrapper.
-- Position the panel as a non-blocking side panel (e.g., `fixed top-4 right-4 z-40 w-80`) so the map remains fully clickable underneath.
-- Keep the X close button for manual dismissal.
-- Remove the outer `motion.div` backdrop; keep the inner card with slide-in animation.
+Change: wrap the unit rendering block (capos + soldiers forEach loops, lines ~532-583) in a condition `if (!isAtHQ)` so units are never drawn on any HQ hex. The HQ building icon remains visible.
 
-### Files Modified
-- `src/pages/UltimateMafiaGame.tsx` — toggle logic
-- `src/components/HeadquartersInfoPanel.tsx` — non-blocking positioning
+## Files Modified
+- `src/components/EnhancedMafiaHexGrid.tsx` — skip unit icon rendering on HQ tiles
 
