@@ -1309,7 +1309,7 @@ export const useEnhancedMafiaGameState = (
       
       // --- Per-turn Influence growth ---
       const playerControlledHexes = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).length;
-      const activeAlliances = newState.pacts.filter(p => p.type === 'alliance' && p.turnsRemaining > 0).length;
+      const activeAlliances = newState.alliances.filter(a => a.active).length;
       const influenceGain = Math.floor(playerControlledHexes / 3) + activeAlliances;
       const influenceDecay = 0.5;
       newState.resources.influence = Math.min(100, Math.max(0, newState.resources.influence + influenceGain - influenceDecay));
