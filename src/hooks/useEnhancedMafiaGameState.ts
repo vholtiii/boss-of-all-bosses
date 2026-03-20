@@ -943,7 +943,8 @@ export const useEnhancedMafiaGameState = (
       const unitIdx = prev.deployedUnits.findIndex(u => u.id === prev.selectedUnitId);
       if (unitIdx === -1) return prev;
       const unit = prev.deployedUnits[unitIdx];
-      if (unit.family !== prev.playerFamily || unit.movesRemaining <= 0) return prev;
+      if (unit.family !== prev.playerFamily) return prev;
+      if (unit.fortified) return prev; // Already fortified, don't waste action
 
       const newUnits = [...prev.deployedUnits];
       newUnits[unitIdx] = { ...unit, fortified: true, movesRemaining: 0 };
