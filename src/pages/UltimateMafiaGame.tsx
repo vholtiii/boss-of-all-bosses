@@ -128,25 +128,6 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     performAction(action);
   }, [performAction]);
 
-  // Handle headquarters selection
-  const handleHeadquartersClick = useCallback((family: string) => {
-    const headquarters = gameState.headquarters[family];
-    const units = gameState.units[family];
-    
-    if (headquarters && units) {
-      setSelectedHeadquarters({
-        family,
-        headquarters,
-        units
-      });
-    }
-  }, [gameState.headquarters, gameState.units]);
-
-  // Close headquarters panel
-  const closeHeadquartersPanel = useCallback(() => {
-    setSelectedHeadquarters(null);
-  }, []);
-
   // playSound/playSoundSequence already destructured above
   const [activeMobileTab, setActiveMobileTab] = useState('map');
   const [showSettings, setShowSettings] = useState(false);
@@ -157,6 +138,30 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     headquarters: any;
     units: any;
   } | null>(null);
+
+  // Handle headquarters selection
+  const handleHeadquartersClick = useCallback((family: string) => {
+    // Toggle: if same HQ is already open, close it
+    if (selectedHeadquarters?.family === family) {
+      setSelectedHeadquarters(null);
+      return;
+    }
+    const headquarters = gameState.headquarters[family];
+    const units = gameState.units[family];
+    
+    if (headquarters && units) {
+      setSelectedHeadquarters({
+        family,
+        headquarters,
+        units
+      });
+    }
+  }, [gameState.headquarters, gameState.units, selectedHeadquarters?.family]);
+
+  // Close headquarters panel
+  const closeHeadquartersPanel = useCallback(() => {
+    setSelectedHeadquarters(null);
+  }, []);
   // notifyTerritoryCaptured and notifyReputationChange already destructured above
 
   // Handle loading a saved game

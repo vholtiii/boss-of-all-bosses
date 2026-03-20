@@ -90,159 +90,152 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      initial={{ opacity: 0, x: 80 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 80 }}
+      transition={{ type: 'tween', duration: 0.25 }}
+      className="fixed top-4 right-4 z-40 w-80 max-h-[calc(100vh-2rem)] overflow-y-auto"
     >
-      <motion.div
-        initial={{ y: 50 }}
-        animate={{ y: 0 }}
-        className="w-full max-w-md"
-      >
-        <Card className="bg-gradient-to-br from-noir-dark to-background border-noir-light">
+      <Card className="bg-gradient-to-br from-noir-dark to-background border-noir-light shadow-xl">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-3 text-mafia-gold font-playfair">
-                <Building2 className="h-6 w-6" style={{ color: familyColor }} />
+              <CardTitle className="flex items-center gap-3 text-mafia-gold font-playfair text-base">
+                <Building2 className="h-5 w-5" style={{ color: familyColor }} />
                 {familyName} FAMILY HQ
               </CardTitle>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground h-6 w-6 p-0"
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <div className="text-sm text-muted-foreground font-source">
+            <div className="text-xs text-muted-foreground font-source">
               {headquarters.district} • {headquarters.q}, {headquarters.r}, {headquarters.s}
             </div>
           </CardHeader>
           
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4 pt-0">
             {/* Profits Section */}
-            <div className="space-y-3">
-              <h3 className="text-lg font-semibold text-mafia-gold font-playfair flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-mafia-gold font-playfair flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
                 Financial Overview
               </h3>
               
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-                  <div className="text-sm text-green-400 font-medium">Legal Profits</div>
-                  <div className="text-lg font-bold text-green-400">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-2">
+                  <div className="text-xs text-green-400 font-medium">Legal</div>
+                  <div className="text-sm font-bold text-green-400">
                     ${legalProfits.toLocaleString()}
                   </div>
                 </div>
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-                  <div className="text-sm text-red-400 font-medium">Illegal Profits</div>
-                  <div className="text-lg font-bold text-red-400">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2">
+                  <div className="text-xs text-red-400 font-medium">Illegal</div>
+                  <div className="text-sm font-bold text-red-400">
                     ${illegalProfits.toLocaleString()}
                   </div>
                 </div>
               </div>
               
-              <div className="bg-mafia-gold/10 border border-mafia-gold/20 rounded-lg p-3">
-                <div className="text-sm text-mafia-gold font-medium">Total Profits</div>
-                <div className="text-xl font-bold text-mafia-gold">
+              <div className="bg-mafia-gold/10 border border-mafia-gold/20 rounded-lg p-2">
+                <div className="text-xs text-mafia-gold font-medium">Total Profits</div>
+                <div className="text-base font-bold text-mafia-gold">
                   ${totalProfits.toLocaleString()}
                 </div>
               </div>
             </div>
 
             {/* Units Section */}
-            <div className="space-y-3">
-              <h3 className="text-lg font-semibold text-mafia-gold font-playfair flex items-center gap-2">
-                <Users className="h-5 w-5" />
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-mafia-gold font-playfair flex items-center gap-2">
+                <Users className="h-4 w-4" />
                 Unit Status
               </h3>
               
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Shield className="h-4 w-4 text-blue-400" />
-                    <span className="text-sm font-medium text-blue-400">Soldiers</span>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2">
+                  <div className="flex items-center gap-1 mb-1">
+                    <Shield className="h-3 w-3 text-blue-400" />
+                    <span className="text-xs font-medium text-blue-400">Soldiers</span>
                   </div>
-                  <div className="text-lg font-bold text-blue-400">
+                  <div className="text-sm font-bold text-blue-400">
                     {units.soldiers.length}
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-[10px] text-muted-foreground">
                     {soldiersAtHQ} at HQ • {deployedSoldiers} deployed
                   </div>
                 </div>
                 
-                <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap className="h-4 w-4 text-purple-400" />
-                    <span className="text-sm font-medium text-purple-400">Capos</span>
+                <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-2">
+                  <div className="flex items-center gap-1 mb-1">
+                    <Zap className="h-3 w-3 text-purple-400" />
+                    <span className="text-xs font-medium text-purple-400">Capos</span>
                   </div>
-                  <div className="text-lg font-bold text-purple-400">
+                  <div className="text-sm font-bold text-purple-400">
                     {units.capos.length}
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-[10px] text-muted-foreground">
                     {caposAtHQ} at HQ • {deployedCapos} deployed
                   </div>
                 </div>
               </div>
               
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <Target className="h-4 w-4 text-yellow-400" />
-                  <span className="text-sm font-medium text-yellow-400">Boss</span>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Present at headquarters
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2">
+                <div className="flex items-center gap-1">
+                  <Target className="h-3 w-3 text-yellow-400" />
+                  <span className="text-xs font-medium text-yellow-400">Boss</span>
+                  <span className="text-[10px] text-muted-foreground ml-1">at headquarters</span>
                 </div>
               </div>
             </div>
 
             {/* Business Count */}
-            <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-3">
-              <div className="text-sm font-medium text-gray-400">Controlled Businesses</div>
-              <div className="text-lg font-bold text-gray-400">
+            <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-2">
+              <div className="text-xs font-medium text-gray-400">Controlled Businesses</div>
+              <div className="text-sm font-bold text-gray-400">
                 {familyBusinesses.length}
               </div>
             </div>
 
             {/* Action Buttons for Player Family */}
             {isPlayerFamily && movementPhase && onSelectUnitFromHeadquarters && (
-              <div className="space-y-2 pt-4 border-t border-noir-light">
-                <div className="text-sm font-medium text-mafia-gold">Deploy Units</div>
+              <div className="space-y-2 pt-2 border-t border-noir-light">
+                <div className="text-xs font-medium text-mafia-gold">Deploy Units</div>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => {
                       onSelectUnitFromHeadquarters('soldier', family);
-                      onClose(); // Close the panel after selecting unit type
+                      onClose();
                     }}
                     disabled={soldiersAtHQ === 0}
-                    className="flex-1"
+                    className="flex-1 text-xs h-7"
                   >
-                    <Shield className="h-4 w-4 mr-2" />
-                    Deploy Soldier
+                    <Shield className="h-3 w-3 mr-1" />
+                    Soldier
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => {
                       onSelectUnitFromHeadquarters('capo', family);
-                      onClose(); // Close the panel after selecting unit type
+                      onClose();
                     }}
                     disabled={caposAtHQ === 0}
-                    className="flex-1"
+                    className="flex-1 text-xs h-7"
                   >
-                    <Zap className="h-4 w-4 mr-2" />
-                    Deploy Capo
+                    <Zap className="h-3 w-3 mr-1" />
+                    Capo
                   </Button>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
-      </motion.div>
     </motion.div>
   );
 };
