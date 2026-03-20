@@ -1566,6 +1566,13 @@ export const useEnhancedMafiaGameState = (
     });
     maintenance += state.resources.soldiers * SOLDIER_COST; // undeployed pool
     
+    // Apply arrest profit penalties
+    const activeArrests = state.policeHeat.arrests.filter(a => state.turn - a.turn < a.sentence);
+    const totalProfitPenalty = activeArrests.reduce((sum, a) => sum + a.impactOnProfit, 0);
+    if (totalProfitPenalty > 0) {
+      income = Math.floor(income * Math.max(0.1, (100 - totalProfitPenalty) / 100));
+    }
+    
     state.lastTurnIncome = income;
     state.resources.money += income - maintenance;
     state.finances.totalIncome = income;
