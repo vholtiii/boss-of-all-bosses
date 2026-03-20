@@ -49,6 +49,15 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
   const [openSection, setOpenSection] = useState<string>('actions');
   const { resources, reputation, policeHeat, legalStatus } = gameState;
 
+  // Compute respect-based recruitment discount (mirrors logic in useEnhancedMafiaGameState)
+  const respectDiscount = (reputation.respect / 100) * 0.3;
+  const familyDiscount = gameState.familyBonuses?.recruitDiscount || 0;
+  const totalSoldierDiscount = Math.min(0.5, respectDiscount + familyDiscount);
+  const totalCapoDiscount = Math.min(0.5, respectDiscount + familyDiscount);
+  const discountedSoldierCost = Math.round(SOLDIER_COST * (1 - totalSoldierDiscount));
+  const discountedCapoCost = Math.round(CAPO_COST * (1 - totalCapoDiscount));
+  const respectPct = Math.round(respectDiscount * 100);
+
   const toggle = (id: string) => setOpenSection(prev => (prev === id ? '' : id));
 
   return (
