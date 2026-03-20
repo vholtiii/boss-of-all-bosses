@@ -2298,6 +2298,10 @@ export const useEnhancedMafiaGameState = (
       // Neutral: 90% success, claims territory. Enemy: 50% success, steals income only.
       let chance = isNeutral ? 0.9 : 0.5;
       chance += state.familyBonuses.extortion / 100;
+      // Manhattan has heavy police presence — extortion is 20% harder
+      if (tile.district === 'Manhattan') {
+        chance *= 0.8;
+      }
       chance = Math.min(0.99, chance);
 
       if (Math.random() < chance) {
