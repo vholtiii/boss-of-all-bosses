@@ -561,11 +561,11 @@ export const useEnhancedMafiaGameState = (
     const income = state.lastTurnIncome;
     const playerRep = state.reputation.respect + state.reputation.reputation + state.reputation.fear + state.reputation.streetInfluence;
     
-    // Find highest rival reputation
+    // Find highest rival legacy using comparable composite score
     let highestRival = 0;
     state.aiOpponents.forEach(opp => {
-      const rivalRep = opp.resources.influence * 3; // approximation
-      if (rivalRep > highestRival) highestRival = rivalRep;
+      const rivalRep = (opp.resources.soldiers * 2) + (opp.resources.influence * 2) + (opp.resources.money / 1000);
+      if (rivalRep > highestRival) highestRival = Math.round(rivalRep);
     });
 
     state.victoryProgress = {
