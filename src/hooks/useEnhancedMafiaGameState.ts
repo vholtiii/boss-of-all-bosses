@@ -69,7 +69,7 @@ export interface TurnReport {
   netIncome: number;
   aiActions: Array<{ family: string; action: string; detail: string }>;
   events: string[];
-  resourceDeltas: { money: number; soldiers: number; respect: number; territories: number };
+  resourceDeltas: { money: number; soldiers: number; respect: number; influence: number; territories: number };
   territoriesLost: string[];
   territoriesGained: string[];
 }
@@ -1232,6 +1232,7 @@ export const useEnhancedMafiaGameState = (
       const prevMoney = newState.resources.money;
       const prevSoldierCount = newState.deployedUnits.filter(u => u.family === newState.playerFamily).length;
       const prevRespect = newState.reputation.respect;
+      const prevInfluence = newState.resources.influence;
       const prevPlayerHexes = new Set(
         newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).map(t => `${t.q},${t.r},${t.s}`)
       );
@@ -1244,7 +1245,7 @@ export const useEnhancedMafiaGameState = (
         netIncome: 0,
         aiActions: [],
         events: [],
-        resourceDeltas: { money: 0, soldiers: 0, respect: 0, territories: 0 },
+        resourceDeltas: { money: 0, soldiers: 0, respect: 0, influence: 0, territories: 0 },
         territoriesLost: [],
         territoriesGained: [],
       };
@@ -1339,6 +1340,7 @@ export const useEnhancedMafiaGameState = (
         money: newState.resources.money - prevMoney,
         soldiers: afterSoldierCount - prevSoldierCount,
         respect: Math.round(newState.reputation.respect - prevRespect),
+        influence: Math.round((newState.resources.influence - prevInfluence) * 10) / 10,
         territories: afterPlayerHexes.size - prevPlayerHexes.size,
       };
       
