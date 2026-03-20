@@ -2645,9 +2645,10 @@ export const useEnhancedMafiaGameState = (
     state.reputation.respect = Math.min(100, state.reputation.respect + respectGain);
     state.reputation.streetInfluence = Math.min(100, state.reputation.streetInfluence + influenceGain);
 
+    const claimBonus = hasRecruitedSoldier ? ' (Recruit bonus!)' : '';
     state.pendingNotifications = [...state.pendingNotifications, {
       type: 'success' as const, title: '🏴 Territory Claimed!',
-      message: `Your family takes ${tile.district} under its wing. The locals appreciate the protection. (+1 Respect, +1 Influence)`,
+      message: `Your family takes ${tile.district} under its wing.${claimBonus} (+${respectGain} Respect, +${influenceGain} Influence)`,
     }];
 
     syncLegacyUnits(state);
