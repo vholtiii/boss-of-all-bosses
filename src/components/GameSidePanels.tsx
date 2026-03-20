@@ -184,9 +184,33 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             <ActionButton
               icon={<Users className="h-4 w-4" />}
               label="Recruit Soldier"
-              sublabel={respectPct > 0 ? `$${discountedSoldierCost} (${respectPct}% respect)` : `$${SOLDIER_COST}`}
-              disabled={resources.money < discountedSoldierCost}
+          </div>
+        </CollapsibleSection>
+
+        {/* ── RECRUITMENT (tactical phase only) ── */}
+        <CollapsibleSection
+          title="Recruitment"
+          icon={<Users className="h-4 w-4" />}
+          isOpen={isTacticalPhase && openSection === 'recruitment'}
+          onToggle={() => isTacticalPhase && toggle('recruitment')}
+          disabled={!isTacticalPhase}
+        >
+          <div className="space-y-1.5">
+            <ActionButton
+              icon={<Users className="h-4 w-4" />}
+              label="Buy Soldier (Mercenary)"
+              sublabel={respectPct > 0 ? `$${discountedMercCost.toLocaleString()} · -3 loyalty (${respectPct}% respect)` : `$${SOLDIER_COST.toLocaleString()} · -3 loyalty`}
+              disabled={resources.money < discountedMercCost}
               onClick={() => onAction({ type: 'recruit_soldiers', cost: SOLDIER_COST })}
+            />
+            <ActionButton
+              icon={<Users className="h-4 w-4" />}
+              label="Recruit Soldier (Loyal)"
+              sublabel={canRecruit 
+                ? (respectPct > 0 ? `$${discountedRecruitCost} · +2 loyalty (${respectPct}% respect)` : `$${LOCAL_SOLDIER_COST} · +2 loyalty`)
+                : `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (${playerTerritoryCount} owned)`}
+              disabled={!canRecruit || resources.money < discountedRecruitCost}
+              onClick={() => onAction({ type: 'recruit_local_soldier' })}
             />
             <ActionButton
               icon={<Crown className="h-4 w-4" />}
