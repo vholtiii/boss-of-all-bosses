@@ -713,7 +713,19 @@ export const useEnhancedMafiaGameState = (
 
         if (moveAction === 'fortify') {
           if (prev.tacticalActionsRemaining <= 0) return prev;
-          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
+          if (unit.fortified) return prev; // Already fortified
+          const newUnits = [...prev.deployedUnits];
+          const fIdx = newUnits.findIndex(u => u.id === unit.id);
+          newUnits[fIdx] = { ...unit, fortified: true, movesRemaining: 0 };
+          return {
+            ...prev, deployedUnits: newUnits,
+            selectedUnitId: null, availableMoveHexes: [],
+            tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
+            pendingNotifications: [...prev.pendingNotifications, {
+              type: 'info' as const, title: '🛡️ Unit Fortified',
+              message: `${unit.type === 'capo' ? unit.name || 'Capo' : 'Soldier'} is fortified (+${FORTIFY_DEFENSE_BONUS}% defense, persists until movement).`,
+            }],
+          };
         }
 
         if (moveAction === 'escort') {
