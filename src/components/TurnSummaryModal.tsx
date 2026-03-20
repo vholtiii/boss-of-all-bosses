@@ -24,6 +24,7 @@ export interface TurnReport {
     respect: number;
     influence: number;
     loyalty: number;
+    heat: number;
     territories: number;
   };
   territoriesLost: string[];
