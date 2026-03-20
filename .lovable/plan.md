@@ -1,17 +1,15 @@
 
 
-# Hide Unit Icons on HQ Hex
+# Auto-Close HQ Panel on Outside Click
 
-## Problem
-Unit icons rendered on the HQ hex take up space and block clicking. The deployment menu already shows available units, so displaying them on the hex is redundant and makes toggling the HQ panel difficult.
+## Change
+Add a click-outside listener to `HeadquartersInfoPanel` using a `useRef` + `useEffect` with a `mousedown` event handler.
 
-## Solution
-**File**: `src/components/EnhancedMafiaHexGrid.tsx` (~line 527-583)
+### File: `src/components/HeadquartersInfoPanel.tsx`
+- Add a `ref` on the outer `motion.div` container
+- Add a `useEffect` that listens for `mousedown` on `document`
+- If the click target is outside the ref'd element, call `onClose()`
+- Clean up the listener on unmount
 
-Skip rendering Capo and Soldier icons when the tile is a headquarters (`isAtHQ === true`). The deployment picker and HeadquartersInfoPanel already provide unit selection, so the on-hex icons are unnecessary for HQ tiles.
-
-Change: wrap the unit rendering block (capos + soldiers forEach loops, lines ~532-583) in a condition `if (!isAtHQ)` so units are never drawn on any HQ hex. The HQ building icon remains visible.
-
-## Files Modified
-- `src/components/EnhancedMafiaHexGrid.tsx` — skip unit icon rendering on HQ tiles
+This is a standard click-outside pattern — no other files need changes.
 
