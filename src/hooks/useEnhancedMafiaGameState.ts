@@ -69,7 +69,7 @@ export interface TurnReport {
   netIncome: number;
   aiActions: Array<{ family: string; action: string; detail: string }>;
   events: string[];
-  resourceDeltas: { money: number; soldiers: number; respect: number; influence: number; territories: number };
+  resourceDeltas: { money: number; soldiers: number; respect: number; influence: number; loyalty: number; territories: number };
   territoriesLost: string[];
   territoriesGained: string[];
 }
