@@ -180,15 +180,15 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             <ActionButton
               icon={<Users className="h-4 w-4" />}
               label="Recruit Soldier"
-              sublabel={`$${SOLDIER_COST}`}
-              disabled={resources.money < SOLDIER_COST}
+              sublabel={respectPct > 0 ? `$${discountedSoldierCost} (${respectPct}% respect)` : `$${SOLDIER_COST}`}
+              disabled={resources.money < discountedSoldierCost}
               onClick={() => onAction({ type: 'recruit_soldiers', cost: SOLDIER_COST })}
             />
             <ActionButton
               icon={<Crown className="h-4 w-4" />}
               label="Recruit Capo"
-              sublabel={`$${CAPO_COST.toLocaleString()}`}
-              disabled={resources.money < CAPO_COST}
+              sublabel={respectPct > 0 ? `$${discountedCapoCost.toLocaleString()} (${respectPct}% respect)` : `$${CAPO_COST.toLocaleString()}`}
+              disabled={resources.money < discountedCapoCost}
               onClick={() => onAction({ type: 'recruit_capo', cost: CAPO_COST })}
             />
           </div>
