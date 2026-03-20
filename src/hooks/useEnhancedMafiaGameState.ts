@@ -724,7 +724,6 @@ export const useEnhancedMafiaGameState = (
       );
       if (!unit) return prev;
 
-      const moveAction = prev.selectedMoveAction || 'move';
 
       // Tactical phase: only tactical actions (scout, fortify, safehouse, escort) — no regular movement
       if (prev.turnPhase === 'move') {
