@@ -2504,6 +2504,8 @@ export const useEnhancedMafiaGameState = (
       // Neutral: 90% success, claims territory. Enemy: 50% success, steals income only.
       let chance = isNeutral ? 0.9 : 0.5;
       chance += state.familyBonuses.extortion / 100;
+      // Heat penalty: up to -10% at max heat
+      chance -= state.policeHeat.level / 1000;
       // Influence bonus: up to +15% at 100 influence
       chance += (state.resources.influence / 100) * 0.15;
       // Manhattan has heavy police presence — extortion is 20% harder
