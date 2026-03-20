@@ -1,218 +1,236 @@
-# 🗡️ Combat System Guide - Boss of All Bosses
+# 🗡️ Combat System Guide — Boss of All Bosses
 
-## Overview
+## 📋 Table of Contents
 
-The combat system in Boss of All Bosses is a sophisticated, multi-layered strategic system that simulates realistic mafia warfare. It combines tactical decision-making, resource management, and risk assessment to create engaging territorial battles.
-
-## 🎯 Core Combat Mechanics
-
-### 1. **Combat Effectiveness Calculation**
-
-The system calculates combat effectiveness using multiple factors:
-
-```
-Combat Effectiveness = (Soldiers × Training Multiplier × Equipment Bonus) + Modifiers
-```
-
-#### **Training Multiplier Formula:**
-- **Base Multiplier:** 1.0
-- **Level Bonus:** (Training Level - 1) × 0.2 (20% per level)
-- **Experience Bonus:** (Experience / 100) × 0.5 (up to 50% from experience)
-
-**Example:**
-- Level 3 Training + 60% Experience = 1.0 + (2 × 0.2) + (0.6 × 0.5) = **1.9x multiplier**
-
-#### **Equipment Effectiveness:**
-- **Weapons:** Basic (+5%), Advanced (+15%), Military Grade (+30%)
-- **Armor:** None (0%), Light (+8%), Heavy (+20%)
-- **Vehicles:** None (0%), Cars (+10%), Armored (+25%)
-
-### 2. **Victory Chance Calculation**
-
-```
-Victory Chance = (Attacker Effectiveness / Total Effectiveness) × 100
-```
-
-**Example Battle:**
-- **Attacker:** 10 soldiers, Level 2 training, Advanced weapons = 10 × 1.4 × 1.15 = **16.1 effectiveness**
-- **Defender:** 8 soldiers, Level 1 training, Basic weapons = 8 × 1.0 × 1.05 = **8.4 effectiveness**
-- **Victory Chance:** 16.1 / (16.1 + 8.4) × 100 = **65.7%**
-
-## ⚔️ Combat Actions
-
-### **1. Territory Attack**
-- **Purpose:** Capture enemy territory
-- **Soldiers Required:** 5-15 (depending on target)
-- **Cost:** $10,000-$25,000
-- **Risk Level:** 30-50%
-- **Rewards:** Territory control, money, reputation
-
-### **2. Business Raid**
-- **Purpose:** Disrupt enemy operations
-- **Soldiers Required:** 3-8
-- **Cost:** $5,000-$15,000
-- **Risk Level:** 20-40%
-- **Rewards:** Money, intelligence, reputation
-
-### **3. Assassination**
-- **Purpose:** Eliminate key targets
-- **Soldiers Required:** 2-4
-- **Cost:** $15,000-$50,000
-- **Risk Level:** 50-80%
-- **Rewards:** Reputation, fear, strategic advantage
-
-## 🏆 Battle Outcomes
-
-### **Victory Conditions:**
-- **Territory Control:** Gain control of the target territory
-- **Money Spoils:** 10% of territory value
-- **Reputation Gain:** 2 points per enemy casualty
-- **Experience:** +10 experience points for soldiers
-
-### **Defeat Consequences:**
-- **Soldier Losses:** 15-30% of attacking force
-- **Reputation Loss:** -5 to -15 points
-- **Money Loss:** Full cost of the operation
-- **Experience:** +5 experience points (learning from defeat)
-
-### **Casualty Calculation:**
-```
-Base Casualty Rate = 15%
-Attacker Casualties = Soldiers × Base Rate × (1 - Effectiveness Ratio)
-Defender Casualties = Soldiers × Base Rate × (1 + Effectiveness Ratio)
-```
-
-## 🎲 Combat Modifiers
-
-### **Terrain Modifiers:**
-- **Little Italy:** +10% (Familiar territory)
-- **Bronx:** -5% (Urban warfare)
-- **Brooklyn:** +5% (Industrial advantage)
-- **Queens:** 0% (Neutral)
-- **Manhattan:** -10% (High police presence)
-- **Staten Island:** +15% (Isolated advantage)
-
-### **Weather Effects:**
-- **Clear:** 0% (No modifier)
-- **Rain:** -10% (Reduced visibility)
-- **Snow:** -15% (Movement hampered)
-- **Fog:** -20% (Confusion and reduced accuracy)
-- **Storm:** -25% (Extremely difficult conditions)
-
-### **Surprise Attacks:**
-- **Intelligence Bonus:** +5% to +25% (based on intel quality)
-- **Timing Bonus:** +10% (night attacks)
-- **Coordination Bonus:** +15% (multi-pronged attacks)
-
-## 🛡️ Soldier Training System
-
-### **Training Levels (1-5):**
-- **Level 1:** Basic training (1.0x multiplier)
-- **Level 2:** Improved skills (1.2x multiplier)
-- **Level 3:** Advanced tactics (1.4x multiplier)
-- **Level 4:** Expert level (1.6x multiplier)
-- **Level 5:** Elite forces (1.8x multiplier)
-
-### **Experience System:**
-- **Gained Through:** Combat, training, successful operations
-- **Maximum:** 100% (50% effectiveness bonus)
-- **Decay:** -2% per turn without action
-
-### **Specializations:**
-- **Enforcer:** +10% close combat, +5% intimidation
-- **Sniper:** +15% long-range, +10% precision
-- **Infiltrator:** +20% stealth, +15% intelligence gathering
-- **Negotiator:** +25% diplomacy, +10% information extraction
-
-## 💰 Equipment System
-
-### **Weapon Upgrades:**
-- **Basic Weapons:** $5,000 (+5% effectiveness)
-- **Advanced Weapons:** $15,000 (+15% effectiveness)
-- **Military Grade:** $35,000 (+30% effectiveness)
-
-### **Armor Upgrades:**
-- **Light Armor:** $8,000 (+8% effectiveness)
-- **Heavy Armor:** $25,000 (+20% effectiveness)
-
-### **Vehicle Upgrades:**
-- **Cars:** $12,000 (+10% effectiveness)
-- **Armored Vehicles:** $40,000 (+25% effectiveness)
-
-## 🎯 Strategic Combat Tips
-
-### **Early Game (Turns 1-20):**
-1. **Focus on Training:** Upgrade soldier training before expensive equipment
-2. **Target Weak Territories:** Attack neutral or lightly defended areas
-3. **Build Experience:** Use smaller raids to gain combat experience
-4. **Manage Resources:** Balance combat costs with business income
-
-### **Mid Game (Turns 21-50):**
-1. **Equipment Priority:** Invest in advanced weapons and armor
-2. **Territory Control:** Focus on strategic territories (Manhattan, Brooklyn)
-3. **Intelligence:** Use infiltrators to gather enemy information
-4. **Alliances:** Coordinate attacks with friendly families
-
-### **Late Game (Turns 51+):**
-1. **Elite Forces:** Max out training and equipment
-2. **Decisive Battles:** Launch major offensives against rival families
-3. **Territory Domination:** Control key districts for victory
-4. **Reputation Management:** Balance fear and respect
-
-## 🔥 Advanced Combat Strategies
-
-### **Combined Arms Approach:**
-- **Enforcers:** Lead frontal assaults
-- **Snipers:** Provide covering fire and eliminate key targets
-- **Infiltrators:** Gather intelligence and sabotage enemy operations
-- **Negotiators:** Extract information and manage relationships
-
-### **Terrain Exploitation:**
-- **Urban Areas:** Use infiltrators and negotiators
-- **Industrial Zones:** Deploy enforcers with heavy equipment
-- **Residential Areas:** Minimize collateral damage, use precision strikes
-- **Isolated Territories:** Full-scale assaults with maximum force
-
-### **Weather Adaptation:**
-- **Clear Weather:** Optimal conditions for all operations
-- **Poor Weather:** Focus on intelligence gathering and preparation
-- **Storm Conditions:** Avoid major operations, focus on defense
-
-## 📊 Combat Statistics Tracking
-
-The system tracks:
-- **Battle History:** All previous engagements
-- **Victory/Loss Ratios:** Performance metrics
-- **Casualty Rates:** Efficiency analysis
-- **Territory Control:** Strategic progress
-- **Reputation Impact:** Long-term consequences
-
-## 🎮 Interactive Combat Interface
-
-The combat interface provides:
-- **Real-time Calculations:** Live victory chance updates
-- **Visual Feedback:** Progress bars and color-coded risk levels
-- **Battle Simulation:** Animated combat results
-- **Strategic Planning:** Multi-turn operation planning
-- **Resource Management:** Cost-benefit analysis
-
-## 🏁 Victory Conditions
-
-### **Territory Control Victory:**
-- Control 80% of all territories
-- Maintain control for 5 consecutive turns
-- Eliminate all rival family presence
-
-### **Reputation Victory:**
-- Achieve 90% reputation across all metrics
-- Maintain dominance for 10 consecutive turns
-- Become the undisputed "Boss of All Bosses"
-
-### **Economic Victory:**
-- Control 70% of all businesses
-- Generate $1,000,000+ monthly income
-- Maintain economic dominance for 15 turns
+- [1. Overview](#1-overview)
+- [2. Hit (Attack Enemy Territory)](#2-hit-attack-enemy-territory)
+  - [2.1 Who Participates](#21-who-participates)
+  - [2.2 Success Chance Formula](#22-success-chance-formula)
+  - [2.3 Victory Outcome](#23-victory-outcome)
+  - [2.4 Defeat Outcome](#24-defeat-outcome)
+  - [2.5 Police Heat from Hits](#25-police-heat-from-hits)
+  - [2.6 Diplomacy Interactions](#26-diplomacy-interactions)
+- [3. Extort](#3-extort)
+  - [3.1 Neutral vs Enemy Extortion](#31-neutral-vs-enemy-extortion)
+  - [3.2 Success Chance Formula](#32-success-chance-formula)
+  - [3.3 Success Outcome](#33-success-outcome)
+  - [3.4 Failure Outcome](#34-failure-outcome)
+  - [3.5 Police Heat from Extortion](#35-police-heat-from-extortion)
+- [4. Claim Territory](#4-claim-territory)
+- [5. Combat Modifiers](#5-combat-modifiers)
+  - [5.1 Fortification](#51-fortification)
+  - [5.2 Scouting](#52-scouting)
+  - [5.3 Hitmen](#53-hitmen)
+  - [5.4 Family Bonuses](#54-family-bonuses)
+- [6. Casualty System](#6-casualty-system)
+- [7. Victory Conditions](#7-victory-conditions)
 
 ---
 
-*The combat system is designed to reward strategic thinking, resource management, and tactical planning while maintaining the authentic mafia atmosphere of the game.*
+## 1. Overview
+
+Combat in Boss of All Bosses is resolved through three distinct actions available during the **Action Phase**: **Hit**, **Extort**, and **Claim**. Each consumes 1 action point from your turn budget (2–3 per turn).
+
+---
+
+## 2. Hit (Attack Enemy Territory)
+
+The primary offensive action. Attacks an enemy-controlled hex to capture it.
+
+### 2.1 Who Participates
+
+- The **selected unit** (initiator, typically adjacent to target)
+- Any **player units already on the target hex**
+- Enemy units on the target hex defend
+
+### 2.2 Success Chance Formula
+
+```
+chance = 50% + (attackers - defenders) × 15%
+       + family combat bonus (e.g., Gambino +25%)
+       + hitman bonus per hitman (+30% + 10% per level above 1)
+       + family hit success bonus (e.g., Lucchese +25%)
+       + scout bonus (+15% if hex scouted)
+       + fortified attacker bonus (+12.5%)
+       - fortified defender penalty (-25%)
+
+Clamped to range: 10% – 95%
+```
+
+**Example:**
+- 2 attackers vs 1 defender: 50% + (1 × 15%) = 65%
+- With Gambino bonus: 65% + 25% = 90%
+- With 1 fortified defender: 90% - 25% = 65%
+
+### 2.3 Victory Outcome
+
+| Effect | Value |
+|---|---|
+| Territory captured | ✅ |
+| Enemy units on hex | Removed |
+| Respect gained | +5 |
+| Fear gained | +5 |
+| Attacker casualties | 20% of attackers (random, min 0) |
+| Fortified casualty reduction | 50% fewer casualties |
+
+Surviving attackers gain +1 "survived conflicts" stat.
+
+### 2.4 Defeat Outcome
+
+| Effect | Value |
+|---|---|
+| Territory captured | ❌ |
+| Attacker casualties | 40% of attackers (random, min 1) |
+| Fortified casualty reduction | 50% fewer casualties |
+
+Surviving units gain +1 "survived conflicts" stat.
+
+### 2.5 Police Heat from Hits
+
+```
+heatGain = min(25, 8 + totalUnitsInvolved × 2)
+```
+
+Heat scales with battle size. A 2v1 fight generates 14 heat; a 5v3 fight generates 24 heat.
+
+### 2.6 Diplomacy Interactions
+
+| Situation | Penalty |
+|---|---|
+| Attack an allied family | Alliance broken, −25 respect, −15 reputation, −40 relationship |
+| Break a ceasefire | Ceasefire voided, −15 respect |
+
+Both penalties apply if both are active. The attack still proceeds after penalties.
+
+---
+
+## 3. Extort
+
+A shakedown operation. Works on **neutral** and **enemy** hexes.
+
+### 3.1 Neutral vs Enemy Extortion
+
+| | Neutral | Enemy |
+|---|---|---|
+| Base success | 90% | 50% |
+| On success | Claims territory + money | Steals income only (no territory change) |
+| Base money | $3,000 | Business income or $2,000 |
+| Respect gained | +5 | +3 |
+
+### 3.2 Success Chance Formula
+
+```
+chance = base (90% or 50%)
+       + family extortion bonus (e.g., Bonanno +20%)
+       - heat / 1000 (up to −10% at max heat)
+       + (influence / 100) × 15% (up to +15%)
+       × 0.8 if Manhattan (20% harder)
+
+Max: 99%
+```
+
+**Participants**: Player units on the target hex + player units on adjacent hexes.
+
+### 3.3 Success Outcome
+
+- Neutral: territory claimed to player
+- Money gained = base × respect multiplier (0.5 + respect/100)
+- Respect gained (+5 neutral, +3 enemy)
+- All participating units get +1 extortion stat
+
+### 3.4 Failure Outcome
+
+**No casualties.** Failed extortion is a reputational blow, not a firefight.
+
+| Penalty | Value |
+|---|---|
+| Respect lost | −3 |
+| Fear lost | −2 |
+| Extra police heat | +5 (on top of base) |
+
+### 3.5 Police Heat from Extortion
+
+| Target | Base Heat | Failed Bonus |
+|---|---|---|
+| Neutral | +8 | +5 |
+| Enemy | +12 | +5 |
+
+---
+
+## 4. Claim Territory
+
+The peaceful way to expand. **Neutral hexes only.**
+
+| Property | Value |
+|---|---|
+| Combat roll | None — automatic success |
+| Requires | ≥1 player soldier on or adjacent to the hex |
+| Reward | +1 respect, +1 influence |
+| Casualties | None |
+| Heat | None |
+
+---
+
+## 5. Combat Modifiers
+
+### 5.1 Fortification
+
+| Modifier | Value |
+|---|---|
+| Defense bonus | +25% for defenders |
+| Attack bonus | +12.5% for attackers (half value) |
+| Casualty reduction | 50% fewer casualties |
+| Duration | Persists until the unit moves |
+| Visibility | Hidden from enemies |
+
+### 5.2 Scouting
+
+| Modifier | Value |
+|---|---|
+| Hit success bonus | +15% on scouted hexes |
+| Duration | 3 turns after scouting |
+| Intel revealed | Enemy count, family, business details |
+
+### 5.3 Hitmen
+
+| Level | Hit Bonus |
+|---|---|
+| Level 1 | +30% |
+| Level 2 | +40% |
+| Level 3 | +50% |
+
+Multiple hitmen stack their bonuses.
+
+### 5.4 Family Bonuses
+
+| Family | Combat Modifier |
+|---|---|
+| Gambino | +25% combat bonus |
+| Lucchese | +25% hit success |
+| Bonanno | +20% extortion |
+| Others | See family bonus table |
+
+---
+
+## 6. Casualty System
+
+- Casualties are selected **randomly** from the participant pool (shuffled before removal)
+- On hit victory: 20% of attackers (min 0)
+- On hit defeat: 40% of attackers (min 1)
+- Fortified units reduce casualties by 50%
+- **Extortion failures cause NO casualties** — only reputation and heat penalties
+- **Claim territory causes NO casualties**
+
+---
+
+## 7. Victory Conditions
+
+| Path | Target | Details |
+|---|---|---|
+| Territory Domination | 60 hexes | ~18% of the map |
+| Economic Empire | $50,000/month | Requires capos on high-value businesses |
+| Legacy of Power | Beat rivals by 25% after turn 15 | Player rep vs rival score: (territory×3 + soldiers×2 + money/500) |
+
+---
+
+*See also: [GAME_MECHANICS.md](./GAME_MECHANICS.md) for full game systems overview.*
