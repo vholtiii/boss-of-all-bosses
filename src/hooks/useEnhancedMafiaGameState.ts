@@ -2618,7 +2618,8 @@ export const useEnhancedMafiaGameState = (
           message: `The locals refused to pay and word spread. Your reputation takes a hit.`,
         }];
       }
-      state.policeHeat.level = Math.min(100, state.policeHeat.level + (isEnemy ? 12 : 8) + (Math.random() > 0.5 ? 5 : 0));
+      const extortionFailed = !state.lastCombatResult?.success;
+      state.policeHeat.level = Math.min(100, state.policeHeat.level + (isEnemy ? 12 : 8) + (extortionFailed ? 5 : 0));
     }
 
     syncLegacyUnits(state);
