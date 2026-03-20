@@ -29,7 +29,7 @@ import HitmanPanel from '@/components/HitmanPanel';
 import CapoPromotionPanel from '@/components/CapoPromotionPanel';
 import CorruptionPanel from '@/components/CorruptionPanel';
 import VictoryTracker from '@/components/VictoryTracker';
-import { SOLDIER_COST, CAPO_COST } from '@/types/game-mechanics';
+import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST } from '@/types/game-mechanics';
 
 interface GameSidePanelProps {
   gameState: EnhancedMafiaGameState;
@@ -54,9 +54,13 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
   const familyDiscount = gameState.familyBonuses?.recruitmentDiscount || 0;
   const totalSoldierDiscount = Math.min(0.5, respectDiscount + familyDiscount);
   const totalCapoDiscount = Math.min(0.5, respectDiscount + familyDiscount);
-  const discountedSoldierCost = Math.round(SOLDIER_COST * (1 - totalSoldierDiscount));
+  const discountedMercCost = Math.round(SOLDIER_COST * (1 - totalSoldierDiscount));
+  const discountedRecruitCost = Math.round(LOCAL_SOLDIER_COST * (1 - totalSoldierDiscount));
   const discountedCapoCost = Math.round(CAPO_COST * (1 - totalCapoDiscount));
   const respectPct = Math.round(respectDiscount * 100);
+  const playerTerritoryCount = gameState.hexMap?.filter((t: any) => t.controllingFamily === gameState.playerFamily).length || 0;
+  const canRecruit = playerTerritoryCount >= RECRUIT_TERRITORY_REQUIREMENT;
+  const isTacticalPhase = phase === 'move';
 
   const toggle = (id: string) => setOpenSection(prev => (prev === id ? '' : id));
 
@@ -97,7 +101,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             <p className="text-[10px] text-muted-foreground mt-1">
               {phase === 'deploy'
                 ? 'Place your units from HQ onto the map.'
-                : 'Move, fortify, scout, or escort your units.'}
+                : 'Move, fortify, scout, escort, or recruit units.'}
             </p>
             <p className="text-[10px] text-muted-foreground mt-0.5">
               Complete this phase to unlock actions.
@@ -177,12 +181,33 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               disabled={resources.money < 20000}
               onClick={() => onAction({ type: 'make_investment', investmentType: 'stocks', amount: 20000, expectedReturn: 1.15, duration: 5 })}
             />
+          </div>
+        </CollapsibleSection>
+
+        {/* ── RECRUITMENT (tactical phase only) ── */}
+        <CollapsibleSection
+          title="Recruitment"
+          icon={<Users className="h-4 w-4" />}
+          isOpen={isTacticalPhase && openSection === 'recruitment'}
+          onToggle={() => isTacticalPhase && toggle('recruitment')}
+          disabled={!isTacticalPhase}
+        >
+          <div className="space-y-1.5">
             <ActionButton
               icon={<Users className="h-4 w-4" />}
-              label="Recruit Soldier"
-              sublabel={respectPct > 0 ? `$${discountedSoldierCost} (${respectPct}% respect)` : `$${SOLDIER_COST}`}
-              disabled={resources.money < discountedSoldierCost}
+              label="Buy Soldier (Mercenary)"
+              sublabel={respectPct > 0 ? `$${discountedMercCost.toLocaleString()} · -3 loyalty (${respectPct}% respect)` : `$${SOLDIER_COST.toLocaleString()} · -3 loyalty`}
+              disabled={resources.money < discountedMercCost}
               onClick={() => onAction({ type: 'recruit_soldiers', cost: SOLDIER_COST })}
+            />
+            <ActionButton
+              icon={<Users className="h-4 w-4" />}
+              label="Recruit Soldier (Loyal)"
+              sublabel={canRecruit 
+                ? (respectPct > 0 ? `$${discountedRecruitCost} · +2 loyalty (${respectPct}% respect)` : `$${LOCAL_SOLDIER_COST} · +2 loyalty`)
+                : `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (${playerTerritoryCount} owned)`}
+              disabled={!canRecruit || resources.money < discountedRecruitCost}
+              onClick={() => onAction({ type: 'recruit_local_soldier' })}
             />
             <ActionButton
               icon={<Crown className="h-4 w-4" />}

@@ -15,7 +15,7 @@ import { ViolentAction } from '@/types/reputation';
 import {
   SoldierStats, Hitman, BribeContract, BribeTier, VictoryProgress, VictoryType,
   FAMILY_BONUSES, BRIBE_TIERS, DOC_BUSINESS_TYPES,
-  SOLDIER_COST, CAPO_COST, HITMAN_MAINTENANCE_MULTIPLIER, MAX_HITMEN, HITMAN_REQUIREMENTS,
+  SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, HITMAN_MAINTENANCE_MULTIPLIER, MAX_HITMEN, HITMAN_REQUIREMENTS,
   MAX_CAPOS, CAPO_PROMOTION_COST, CAPO_PROMOTION_REQUIREMENTS,
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType,
   NEGOTIATION_TYPES,
@@ -40,6 +40,7 @@ export interface DeployedUnit {
   personality?: CapoPersonality;
   fortified?: boolean;
   escortingSoldierIds?: string[]; // capo only — IDs of soldiers being escorted
+  recruited?: boolean; // true = locally recruited (loyal), false/undefined = mercenary (bought)
 }
 
 // ============ HEX TILE ============
@@ -2028,18 +2029,60 @@ export const useEnhancedMafiaGameState = (
         case 'establish_safehouse':
           return processEstablishSafehouse(newState, action);
         case 'recruit_soldiers': {
+          // Buy Mercenary — expensive, combat-ready, hurts loyalty
           const respectDiscount = (newState.reputation.respect / 100) * 0.3;
           const cost = Math.floor(SOLDIER_COST * (1 - discount) * (1 - respectDiscount));
           if (newState.resources.money >= cost) {
             newState.resources.money -= cost;
             newState.resources.soldiers += 1;
-            if (respectDiscount > 0.01) {
-              newState.pendingNotifications = [...newState.pendingNotifications, {
-                type: 'info' as const,
-                title: '🤝 Reputation Discount',
-                message: `Your respect saved $${(Math.floor(SOLDIER_COST * (1 - discount)) - cost).toLocaleString()} on recruitment.`,
+            // Mercenary loyalty penalty
+            newState.reputation.loyalty = Math.max(0, newState.reputation.loyalty - 3);
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'info' as const,
+              title: '💰 Mercenary Hired',
+              message: `A hired gun joins the family for $${cost.toLocaleString()}. Loyalty -3 (outsider).${respectDiscount > 0.01 ? ` Respect saved $${(Math.floor(SOLDIER_COST * (1 - discount)) - cost).toLocaleString()}.` : ''}`,
+            }];
+          }
+          return newState;
+        }
+        case 'recruit_local_soldier': {
+          // Recruit Loyal — cheap, territory-gated, boosts loyalty, lower combat stats
+          const playerTerritoryCount = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).length;
+          if (playerTerritoryCount < RECRUIT_TERRITORY_REQUIREMENT) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const,
+              title: '❌ Not Enough Territory',
+              message: `You need ${RECRUIT_TERRITORY_REQUIREMENT} hexes to recruit locals. You have ${playerTerritoryCount}.`,
+            }];
+            return newState;
+          }
+          const respectDiscount2 = (newState.reputation.respect / 100) * 0.3;
+          const cost2 = Math.floor(LOCAL_SOLDIER_COST * (1 - discount) * (1 - respectDiscount2));
+          if (newState.resources.money >= cost2) {
+            newState.resources.money -= cost2;
+            newState.resources.soldiers += 1;
+            // Loyal recruit boosts loyalty
+            newState.reputation.loyalty = Math.min(100, newState.reputation.loyalty + 2);
+            // Deploy at HQ with recruited flag and lower training
+            const hq = newState.headquarters[newState.playerFamily];
+            if (hq) {
+              const newId = `${newState.playerFamily}-soldier-recruit-${Date.now()}`;
+              newState.deployedUnits = [...newState.deployedUnits, {
+                id: newId, type: 'soldier' as const, family: newState.playerFamily,
+                q: hq.q, r: hq.r, s: hq.s,
+                movesRemaining: 0, maxMoves: 2, level: 1,
+                recruited: true,
               }];
+              newState.soldierStats[newId] = {
+                loyalty: 65, training: 2, equipment: 2,
+                hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+              };
             }
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'success' as const,
+              title: '🏘️ Local Recruited',
+              message: `A loyal local joins the family for $${cost2.toLocaleString()}. Loyalty +2. Good at claiming & extortion.`,
+            }];
           }
           return newState;
         }
@@ -2591,12 +2634,21 @@ export const useEnhancedMafiaGameState = (
     tile.controllingFamily = state.playerFamily;
 
     // Community expansion: +1 respect, +1 influence, no money
-    state.reputation.respect = Math.min(100, state.reputation.respect + 1);
-    state.reputation.streetInfluence = Math.min(100, state.reputation.streetInfluence + 1);
+    let respectGain = 1;
+    let influenceGain = 1;
+    // Recruited soldier bonus: +15% translates to extra respect/influence
+    const hasRecruitedSoldier = playerSoldiers.some(u => u.recruited);
+    if (hasRecruitedSoldier) {
+      respectGain += 1; // bonus from local knowledge
+      influenceGain += 1;
+    }
+    state.reputation.respect = Math.min(100, state.reputation.respect + respectGain);
+    state.reputation.streetInfluence = Math.min(100, state.reputation.streetInfluence + influenceGain);
 
+    const claimBonus = hasRecruitedSoldier ? ' (Recruit bonus!)' : '';
     state.pendingNotifications = [...state.pendingNotifications, {
       type: 'success' as const, title: '🏴 Territory Claimed!',
-      message: `Your family takes ${tile.district} under its wing. The locals appreciate the protection. (+1 Respect, +1 Influence)`,
+      message: `Your family takes ${tile.district} under its wing.${claimBonus} (+${respectGain} Respect, +${influenceGain} Influence)`,
     }];
 
     syncLegacyUnits(state);
@@ -2840,6 +2892,11 @@ export const useEnhancedMafiaGameState = (
       // Manhattan has heavy police presence — extortion is 20% harder
       if (tile.district === 'Manhattan') {
         chance *= 0.8;
+      }
+      // Recruited soldier bonus: +10% extortion success
+      const hasRecruitedUnit = allPlayerUnits.some(u => u.recruited);
+      if (hasRecruitedUnit) {
+        chance += 0.10;
       }
       chance = Math.min(0.99, chance);
 
