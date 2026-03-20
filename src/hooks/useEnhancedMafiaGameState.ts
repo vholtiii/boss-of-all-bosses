@@ -2634,8 +2634,16 @@ export const useEnhancedMafiaGameState = (
     tile.controllingFamily = state.playerFamily;
 
     // Community expansion: +1 respect, +1 influence, no money
-    state.reputation.respect = Math.min(100, state.reputation.respect + 1);
-    state.reputation.streetInfluence = Math.min(100, state.reputation.streetInfluence + 1);
+    let respectGain = 1;
+    let influenceGain = 1;
+    // Recruited soldier bonus: +15% translates to extra respect/influence
+    const hasRecruitedSoldier = playerSoldiers.some(u => u.recruited);
+    if (hasRecruitedSoldier) {
+      respectGain += 1; // bonus from local knowledge
+      influenceGain += 1;
+    }
+    state.reputation.respect = Math.min(100, state.reputation.respect + respectGain);
+    state.reputation.streetInfluence = Math.min(100, state.reputation.streetInfluence + influenceGain);
 
     state.pendingNotifications = [...state.pendingNotifications, {
       type: 'success' as const, title: '🏴 Territory Claimed!',
