@@ -1761,8 +1761,13 @@ export const useEnhancedMafiaGameState = (
           unit.q = target.q;
           unit.r = target.r;
           unit.s = target.s;
-          unit.movesRemaining -= 1;
-          movesLeft--;
+
+          // Community resistance: entering player's empty claimed territory costs an extra move
+          const targetTile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
+          const isCommunityHex = targetTile && targetTile.controllingFamily === state.playerFamily && !targetTile.business && !targetTile.isHeadquarters;
+          const moveCost = isCommunityHex ? 2 : 1;
+          unit.movesRemaining = Math.max(0, unit.movesRemaining - moveCost);
+          movesLeft = Math.max(0, movesLeft - moveCost);
 
           const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
           if (tile && !tile.isHeadquarters) {
