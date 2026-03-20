@@ -2380,32 +2380,39 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
+      // Fix 1: Only selected unit + player units already ON target hex participate
+      const selectedUnitId = action.selectedUnitId;
       const playerUnitsOnHex = state.deployedUnits.filter(u => 
         u.family === state.playerFamily && u.q === targetQ && u.r === targetR && u.s === targetS
       );
-      const hitNeighbors = getHexNeighbors(targetQ, targetR, targetS);
-      const playerUnitsAdjacent = state.deployedUnits.filter(u => 
-        u.family === state.playerFamily && 
-        hitNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s)
-      );
-      const playerUnits = [...playerUnitsOnHex, ...playerUnitsAdjacent];
+      const selectedUnit = state.deployedUnits.find(u => u.id === selectedUnitId);
+      const playerUnits: typeof playerUnitsOnHex = [];
+      // Add selected unit first (if not already on hex)
+      if (selectedUnit && !playerUnitsOnHex.some(u => u.id === selectedUnit.id)) {
+        playerUnits.push(selectedUnit);
+      }
+      // Add units already on the target hex
+      playerUnits.push(...playerUnitsOnHex);
       if (playerUnits.length === 0) return state;
+
       const enemyUnits = state.deployedUnits.filter(u => 
         u.family === tile.controllingFamily && u.q === targetQ && u.r === targetR && u.s === targetS
       );
 
-      // Base chance: 80% if outnumbering, 20% if not
-      let chance = playerUnits.length > enemyUnits.length ? 0.8 : 0.2;
+      // Fix 2: Scaled success chance based on force ratio
+      const attackers = playerUnits.length;
+      const defenders = enemyUnits.length;
+      let chance = 0.5 + (attackers - defenders) * 0.15;
       
       // Apply fortified defense bonus for defenders
       const fortifiedDefenders = enemyUnits.filter(u => u.fortified);
       if (fortifiedDefenders.length > 0) {
         chance -= FORTIFY_DEFENSE_BONUS / 100;
       }
-      // Apply fortified bonus for player attackers (shouldn't normally be fortified when attacking, but check)
+      // Apply fortified bonus for player attackers
       const fortifiedAttackers = playerUnits.filter(u => u.fortified);
       if (fortifiedAttackers.length > 0) {
-        chance += FORTIFY_DEFENSE_BONUS / 200; // Half bonus for fortified attackers
+        chance += FORTIFY_DEFENSE_BONUS / 200;
       }
       
       // Apply family combat bonus
@@ -2427,7 +2434,11 @@ export const useEnhancedMafiaGameState = (
         chance += SCOUT_INTEL_BONUS / 100;
       }
       
-      chance = Math.min(0.95, chance);
+      chance = Math.max(0.1, Math.min(0.95, chance));
+
+      // Fix 5: Scale heat with battle size
+      const totalUnitsInvolved = attackers + defenders;
+      const heatGain = Math.min(25, 8 + totalUnitsInvolved * 2);
 
       if (Math.random() < chance) {
         // Victory
@@ -2436,8 +2447,10 @@ export const useEnhancedMafiaGameState = (
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         });
         tile.controllingFamily = state.playerFamily;
-        state.resources.money += 5000;
-        state.resources.respect += 10;
+        
+        // Fix 3: Replace money with fear/respect
+        state.resources.respect += 5;
+        state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + 5);
         
         playerUnits.forEach(u => {
           if (state.soldierStats[u.id]) {
@@ -2447,16 +2460,17 @@ export const useEnhancedMafiaGameState = (
         });
         
         let casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
-        // Reduce casualties if attacking units are fortified
         const attackersFortified = playerUnits.some(u => u.fortified);
         if (attackersFortified) {
           casualties = Math.max(0, Math.floor(casualties * (1 - FORTIFY_CASUALTY_REDUCTION / 100)));
         }
+        // Fix 4: Random casualty selection — shuffle before removing
+        const shuffled = [...playerUnits].sort(() => Math.random() - 0.5);
         for (let i = 0; i < casualties; i++) {
-          const idx = state.deployedUnits.indexOf(playerUnits[i]);
+          const idx = state.deployedUnits.indexOf(shuffled[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
-        const hitDetails = `+$5,000, +10 respect${casualties > 0 ? `, ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}` : ''}`;
+        const hitDetails = `+5 fear, +5 respect${casualties > 0 ? `, ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}` : ''}`;
         state.lastCombatResult = {
           q: targetQ, r: targetR, s: targetS,
           success: true, type: 'hit',
@@ -2470,16 +2484,17 @@ export const useEnhancedMafiaGameState = (
         }];
       } else {
         let casualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
-        // Reduce casualties if defending/fortified units
         const defendersFortified = playerUnits.some(u => u.fortified);
         if (defendersFortified) {
           casualties = Math.max(1, Math.floor(casualties * (1 - FORTIFY_CASUALTY_REDUCTION / 100)));
         }
+        // Fix 4: Random casualty selection on failure too
+        const shuffled = [...playerUnits].sort(() => Math.random() - 0.5);
         for (let i = 0; i < casualties; i++) {
-          const idx = state.deployedUnits.indexOf(playerUnits[i]);
+          const idx = state.deployedUnits.indexOf(shuffled[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
-        playerUnits.slice(casualties).forEach(u => {
+        shuffled.slice(casualties).forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].survivedConflicts += 1;
           }
@@ -2497,7 +2512,7 @@ export const useEnhancedMafiaGameState = (
           message: `The attack was repelled. ${failDetails}.`,
         }];
       }
-      state.policeHeat.level = Math.min(100, state.policeHeat.level + 15);
+      state.policeHeat.level = Math.min(100, state.policeHeat.level + heatGain);
     }
     
     syncLegacyUnits(state);

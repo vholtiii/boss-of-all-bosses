@@ -305,7 +305,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         const isSoldier = selectedUnit.type === 'soldier';
         const isCapo = selectedUnit.type === 'capo';
         
-        const canHit = isEnemy && isSoldier;
+        const canHit = isEnemy && (isSoldier || isCapo);
         const canExtort = (isNeutral || (isEnemy && !!tile.business)) && isSoldier;
         const canClaim = isNeutral && isSoldier;
         const canNegotiate = isEnemy && isCapo;
