@@ -713,7 +713,19 @@ export const useEnhancedMafiaGameState = (
 
         if (moveAction === 'fortify') {
           if (prev.tacticalActionsRemaining <= 0) return prev;
-          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
+          if (unit.fortified) return prev; // Already fortified
+          const newUnits = [...prev.deployedUnits];
+          const fIdx = newUnits.findIndex(u => u.id === unit.id);
+          newUnits[fIdx] = { ...unit, fortified: true, movesRemaining: 0 };
+          return {
+            ...prev, deployedUnits: newUnits,
+            selectedUnitId: null, availableMoveHexes: [],
+            tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
+            pendingNotifications: [...prev.pendingNotifications, {
+              type: 'info' as const, title: '🛡️ Unit Fortified',
+              message: `${unit.type === 'capo' ? unit.name || 'Capo' : 'Soldier'} is fortified (+${FORTIFY_DEFENSE_BONUS}% defense, persists until movement).`,
+            }],
+          };
         }
 
         if (moveAction === 'escort') {
@@ -931,7 +943,8 @@ export const useEnhancedMafiaGameState = (
       const unitIdx = prev.deployedUnits.findIndex(u => u.id === prev.selectedUnitId);
       if (unitIdx === -1) return prev;
       const unit = prev.deployedUnits[unitIdx];
-      if (unit.family !== prev.playerFamily || unit.movesRemaining <= 0) return prev;
+      if (unit.family !== prev.playerFamily) return prev;
+      if (unit.fortified) return prev; // Already fortified, don't waste action
 
       const newUnits = [...prev.deployedUnits];
       newUnits[unitIdx] = { ...unit, fortified: true, movesRemaining: 0 };
@@ -974,8 +987,6 @@ export const useEnhancedMafiaGameState = (
     newScoutedHexes.push(scoutInfo);
 
     const newUnits = [...prev.deployedUnits];
-    const uIdx = newUnits.findIndex(u => u.id === unit.id);
-    newUnits[uIdx] = { ...unit, movesRemaining: unit.movesRemaining - 1 };
 
     return {
       ...prev, deployedUnits: newUnits, scoutedHexes: newScoutedHexes,
@@ -996,8 +1007,6 @@ export const useEnhancedMafiaGameState = (
     if (!tile || tile.controllingFamily !== prev.playerFamily) return prev;
 
     const newUnits = [...prev.deployedUnits];
-    const uIdx = newUnits.findIndex(u => u.id === unit.id);
-    newUnits[uIdx] = { ...unit, movesRemaining: 0 };
 
     const newSafehouse: Safehouse = {
       q: unit.q, r: unit.r, s: unit.s,
@@ -1235,7 +1244,7 @@ export const useEnhancedMafiaGameState = (
       newState.tacticalActionsRemaining = TACTICAL_ACTIONS_PER_TURN;
       newState.maxTacticalActions = TACTICAL_ACTIONS_PER_TURN;
 
-      // Clear fortified status and escort, reset moves
+      // Reset moves and escort for new turn (fortified persists until unit moves)
       newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
         ...u, movesRemaining: u.maxMoves, escortingSoldierIds: undefined,
       }));
