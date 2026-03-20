@@ -130,6 +130,11 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
 
   // Handle headquarters selection
   const handleHeadquartersClick = useCallback((family: string) => {
+    // Toggle: if same HQ is already open, close it
+    if (selectedHeadquarters?.family === family) {
+      setSelectedHeadquarters(null);
+      return;
+    }
     const headquarters = gameState.headquarters[family];
     const units = gameState.units[family];
     
@@ -140,7 +145,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         units
       });
     }
-  }, [gameState.headquarters, gameState.units]);
+  }, [gameState.headquarters, gameState.units, selectedHeadquarters?.family]);
 
   // Close headquarters panel
   const closeHeadquartersPanel = useCallback(() => {
