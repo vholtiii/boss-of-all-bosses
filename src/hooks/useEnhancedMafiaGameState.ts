@@ -2292,9 +2292,14 @@ export const useEnhancedMafiaGameState = (
     if (playerSoldiers.length === 0) return state;
 
     tile.controllingFamily = state.playerFamily;
+
+    // Community expansion: +1 respect, +1 influence, no money
+    state.reputation.respect = Math.min(100, state.reputation.respect + 1);
+    state.reputation.streetInfluence = Math.min(100, state.reputation.streetInfluence + 1);
+
     state.pendingNotifications = [...state.pendingNotifications, {
       type: 'success' as const, title: '🏴 Territory Claimed!',
-      message: `Your soldiers have claimed this territory in ${tile.district}.`,
+      message: `Your family takes ${tile.district} under its wing. The locals appreciate the protection. (+1 Respect, +1 Influence)`,
     }];
 
     syncLegacyUnits(state);
