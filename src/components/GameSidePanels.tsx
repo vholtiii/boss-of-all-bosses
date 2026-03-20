@@ -54,9 +54,13 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
   const familyDiscount = gameState.familyBonuses?.recruitmentDiscount || 0;
   const totalSoldierDiscount = Math.min(0.5, respectDiscount + familyDiscount);
   const totalCapoDiscount = Math.min(0.5, respectDiscount + familyDiscount);
-  const discountedSoldierCost = Math.round(SOLDIER_COST * (1 - totalSoldierDiscount));
+  const discountedMercCost = Math.round(SOLDIER_COST * (1 - totalSoldierDiscount));
+  const discountedRecruitCost = Math.round(LOCAL_SOLDIER_COST * (1 - totalSoldierDiscount));
   const discountedCapoCost = Math.round(CAPO_COST * (1 - totalCapoDiscount));
   const respectPct = Math.round(respectDiscount * 100);
+  const playerTerritoryCount = gameState.hexMap?.filter((t: any) => t.controllingFamily === gameState.playerFamily).length || 0;
+  const canRecruit = playerTerritoryCount >= RECRUIT_TERRITORY_REQUIREMENT;
+  const isTacticalPhase = phase === 'move';
 
   const toggle = (id: string) => setOpenSection(prev => (prev === id ? '' : id));
 
