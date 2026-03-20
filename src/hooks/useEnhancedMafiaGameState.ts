@@ -1007,8 +1007,6 @@ export const useEnhancedMafiaGameState = (
     if (!tile || tile.controllingFamily !== prev.playerFamily) return prev;
 
     const newUnits = [...prev.deployedUnits];
-    const uIdx = newUnits.findIndex(u => u.id === unit.id);
-    newUnits[uIdx] = { ...unit, movesRemaining: 0 };
 
     const newSafehouse: Safehouse = {
       q: unit.q, r: unit.r, s: unit.s,
