@@ -1906,6 +1906,8 @@ export const useEnhancedMafiaGameState = (
           // Calculate success
           let successChance = config.baseSuccess;
           successChance += Math.floor(newState.reputation.reputation / 10);
+          // Influence bonus: up to +12% at 100 influence
+          successChance += Math.floor(newState.resources.influence / 8);
           successChance -= Math.floor(newState.policeHeat.level / 5);
           successChance = Math.max(5, Math.min(95, successChance));
           
