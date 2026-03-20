@@ -621,6 +621,16 @@ export const useEnhancedMafiaGameState = (
         actionsRemaining = maxActions;
       }
       
+      // Reset movesRemaining for all player units when entering tactical phase
+      let deployedUnits = prev.deployedUnits;
+      if (nextPhase === 'move') {
+        deployedUnits = prev.deployedUnits.map(u => {
+          if (u.family !== prev.playerFamily) return u;
+          const baseMoves = u.type === 'capo' ? 3 : 2;
+          return { ...u, movesRemaining: baseMoves };
+        });
+      }
+
       return {
         ...prev,
         turnPhase: nextPhase,
@@ -632,6 +642,7 @@ export const useEnhancedMafiaGameState = (
         selectedMoveAction: 'move' as MoveAction,
         actionsRemaining,
         maxActions,
+        deployedUnits,
         // Reset tactical budget when entering move (tactical) phase
         tacticalActionsRemaining: nextPhase === 'move' ? TACTICAL_ACTIONS_PER_TURN : prev.tacticalActionsRemaining,
       };
