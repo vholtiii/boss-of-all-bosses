@@ -59,6 +59,18 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   movementPhase = false,
   playerFamily
 }) => {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
+
   // Calculate profits from businesses owned by this family
   const familyBusinesses = businesses.filter(business => business.family === family);
   
