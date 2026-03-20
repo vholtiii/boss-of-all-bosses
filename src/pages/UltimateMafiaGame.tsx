@@ -80,6 +80,18 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
   }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications]);
 
+  // Global button click sound
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('button') && !target.closest('[data-no-sound]')) {
+        playSound('click');
+      }
+    };
+    document.addEventListener('click', handleGlobalClick);
+    return () => document.removeEventListener('click', handleGlobalClick);
+  }, [playSound]);
+
   // Play sounds on combat results
   useEffect(() => {
     if (gameState.lastCombatResult) {
