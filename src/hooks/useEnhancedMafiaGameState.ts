@@ -715,10 +715,12 @@ export const useEnhancedMafiaGameState = (
         return { ...prev, selectedUnitId: unit.id, availableMoveHexes: actionTargets, deployMode: null, availableDeployHexes: [] };
       }
 
+      const moveAction = prev.selectedMoveAction || 'move';
+      const bypassMovesCheck = prev.turnPhase === 'move' && (moveAction === 'escort' || moveAction === 'fortify');
       const unit = prev.deployedUnits.find(u => 
         u.family === prev.playerFamily && u.type === unitType &&
         u.q === location.q && u.r === location.r && u.s === location.s &&
-        u.movesRemaining > 0
+        (bypassMovesCheck || u.movesRemaining > 0)
       );
       if (!unit) return prev;
 

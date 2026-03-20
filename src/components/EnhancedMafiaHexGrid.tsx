@@ -258,7 +258,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       // Try to select a player unit on this hex
       const key = `${tile.q},${tile.r},${tile.s}`;
       const unitsHere = unitsByHex.get(key) || [];
-      const playerUnit = unitsHere.find(u => u.family === playerFamily && u.movesRemaining > 0);
+      const currentMoveAction = gameState?.selectedMoveAction || 'move';
+      const bypassMoves = currentMoveAction === 'escort' || currentMoveAction === 'fortify';
+      const playerUnit = unitsHere.find(u => u.family === playerFamily && (bypassMoves || u.movesRemaining > 0));
       if (playerUnit && onSelectUnit) {
         onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
         return;
