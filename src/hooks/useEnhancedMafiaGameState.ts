@@ -1234,6 +1234,7 @@ export const useEnhancedMafiaGameState = (
       const prevRespect = newState.reputation.respect;
       const prevInfluence = newState.resources.influence;
       const prevLoyalty = newState.reputation.loyalty;
+      const prevHeat = newState.policeHeat.level;
       const prevPlayerHexes = new Set(
         newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).map(t => `${t.q},${t.r},${t.s}`)
       );
