@@ -100,6 +100,7 @@ const TurnSummaryModal: React.FC<TurnSummaryModalProps> = ({ report, open, onClo
                 { label: 'Soldiers', val: report.resourceDeltas.soldiers, prefix: '' },
                 { label: 'Respect', val: report.resourceDeltas.respect, prefix: '' },
                 { label: 'Influence', val: report.resourceDeltas.influence, prefix: '' },
+                { label: 'Loyalty', val: report.resourceDeltas.loyalty, prefix: '' },
                 { label: 'Territories', val: report.resourceDeltas.territories, prefix: '' },
               ].map(({ label, val, prefix }) => (
                 <div key={label} className="flex items-center gap-1">

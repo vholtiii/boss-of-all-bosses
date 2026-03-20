@@ -1426,6 +1426,7 @@ export const useEnhancedMafiaGameState = (
         soldiers: afterSoldierCount - prevSoldierCount,
         respect: Math.round(newState.reputation.respect - prevRespect),
         influence: Math.round((newState.resources.influence - prevInfluence) * 10) / 10,
+        loyalty: Math.round((newState.reputation.loyalty - prevLoyalty) * 10) / 10,
         territories: afterPlayerHexes.size - prevPlayerHexes.size,
       };
       
