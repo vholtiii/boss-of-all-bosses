@@ -467,7 +467,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 <p><span className="text-foreground font-semibold">🛡️ Fortify:</span> Click any unit to fortify it — grants +25% defense and 50% casualty reduction. Persists until the unit moves.</p>
               )}
               {gameState.selectedMoveAction === 'escort' && (
-                <p><span className="text-foreground font-semibold">🚗 Escort:</span> Select a soldier, then click a hex with your capo to call the soldier there (1 tactical action). The capo can carry up to 2 soldiers — they'll auto-travel and detach at the destination.</p>
+                <p><span className="text-foreground font-semibold">🚗 Escort:</span> Select a soldier, then click a capo unit (or their hex) to call the soldier there (1 tactical action). The capo can carry up to 2 soldiers — they'll auto-travel and detach at the destination.</p>
               )}
               {gameState.selectedMoveAction === 'safehouse' && (
                 <p><span className="text-foreground font-semibold">🏠 Safehouse:</span> Select a capo on your territory to establish a secondary deploy point lasting 5 turns.</p>

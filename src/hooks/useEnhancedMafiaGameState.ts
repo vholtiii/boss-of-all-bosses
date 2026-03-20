@@ -1244,7 +1244,7 @@ export const useEnhancedMafiaGameState = (
       newState.tacticalActionsRemaining = TACTICAL_ACTIONS_PER_TURN;
       newState.maxTacticalActions = TACTICAL_ACTIONS_PER_TURN;
 
-      // Clear fortified status and escort, reset moves
+      // Reset moves and escort for new turn (fortified persists until unit moves)
       newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
         ...u, movesRemaining: u.maxMoves, escortingSoldierIds: undefined,
       }));
