@@ -23,6 +23,7 @@ export interface TurnReport {
     soldiers: number;
     respect: number;
     influence: number;
+    loyalty: number;
     territories: number;
   };
   territoriesLost: string[];
