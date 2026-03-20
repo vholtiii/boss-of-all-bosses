@@ -2339,7 +2339,9 @@ export const useEnhancedMafiaGameState = (
           const idx = state.deployedUnits.indexOf(playerUnitsOnHex[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
-        const failDetails = `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} — resistance was strong`;
+        const failDetails = tile.district === 'Manhattan' 
+          ? `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} — heavy police presence in Manhattan`
+          : `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} — resistance was strong`;
         state.lastCombatResult = {
           q: targetQ, r: targetR, s: targetS,
           success: false, type: 'extort',
