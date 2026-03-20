@@ -81,7 +81,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
 
         {/* ── Status Bars ── */}
         <div className="space-y-2">
-          <StatusBar label="Loyalty" value={resources.loyalty} max={100} color="bg-primary" />
+          <StatusBar label="Loyalty" value={Math.round(reputation.loyalty)} max={100} color="bg-primary" />
           <StatusBar label="Police Heat" value={policeHeat.level} max={100} color="bg-destructive" />
           <StatusBar label="Prosecution Risk" value={legalStatus.prosecutionRisk} max={100} color="bg-orange-500" />
         </div>
