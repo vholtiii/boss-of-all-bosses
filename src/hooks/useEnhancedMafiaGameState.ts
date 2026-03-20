@@ -2884,6 +2884,11 @@ export const useEnhancedMafiaGameState = (
       if (tile.district === 'Manhattan') {
         chance *= 0.8;
       }
+      // Recruited soldier bonus: +10% extortion success
+      const hasRecruitedUnit = allPlayerUnits.some(u => u.recruited);
+      if (hasRecruitedUnit) {
+        chance += 0.10;
+      }
       chance = Math.min(0.99, chance);
 
       if (Math.random() < chance) {
