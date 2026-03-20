@@ -40,6 +40,7 @@ export interface DeployedUnit {
   personality?: CapoPersonality;
   fortified?: boolean;
   escortingSoldierIds?: string[]; // capo only — IDs of soldiers being escorted
+  recruited?: boolean; // true = locally recruited (loyal), false/undefined = mercenary (bought)
 }
 
 // ============ HEX TILE ============
