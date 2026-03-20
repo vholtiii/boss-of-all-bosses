@@ -1,46 +1,43 @@
 
 
-# Review & Fix Respect and Influence Systems
+# Make Respect & Influence Impact Core Mechanics
 
-## Current Problems
-
-1. **Influence never increases** — `resources.influence` starts at 10, is never incremented anywhere in the enhanced game state. It can only decrease (jail penalties). The bonus action threshold of 50 is unreachable.
-
-2. **Respect gains are sparse** — only gained from combat victories (+10 territory capture, +3/+5 fights). No passive growth from territory holdings or business operations.
-
-3. **Victory "Legacy" calculation is inconsistent** — player legacy uses `reputation.respect + reputation.reputation + reputation.fear + reputation.streetInfluence`, but rival legacy uses `opp.resources.influence * 3` (a completely different metric).
-
-4. **No turn-over-turn feedback loop** — players don't see respect/influence growing from their strategic decisions (territory control, business empire), making the bonus action reward feel disconnected.
-
-## Proposed Changes
+## Changes
 
 ### File: `src/hooks/useEnhancedMafiaGameState.ts`
 
-**1. Add per-turn influence growth based on territory control**
-In the end-of-turn processing (around line 1292-1310), calculate influence gain:
-- +1 influence per 3 controlled hexes (territory = influence)
-- +1 influence per active alliance
-- Cap at 100, with a small decay of -0.5 per turn to keep it dynamic
+**1. Recruitment Cost Discount from Respect**
+In deployment/recruit logic (~line 1175-1190):
+- Up to **30% discount** at 100 respect: `cost = baseCost * (1 - (respect / 100) * 0.3)`
+- Show discount in notifications
 
-**2. Add per-turn respect growth based on economic power**
-In the same end-of-turn block:
-- +1 respect per 5 controlled hexes with businesses
-- +1 respect per $5,000 of turn income (capped at +5)
-- Keep existing combat bonuses as they are
-- Small decay of -0.5 per turn
+**2. Extortion Success Bonus from Influence**
+In `processTerritoryExtortion` (~line 2315):
+- Up to **+15%** success chance at 100 influence: `+ influence / 100 * 0.15`
+- Stacks with family bonus and Manhattan penalty
 
-**3. Fix the Legacy victory calculation**
-In `updateVictoryProgress` (line ~560), make rival legacy use a comparable formula instead of just `influence * 3`. Use `(soldiers * 2) + (influence * 2) + (money / 1000)` or similar composite score so it's a meaningful comparison.
+**3. Extortion Payout Scaling from Respect (bidirectional)**
+In `processTerritoryExtortion` (~line 2327) and Capo auto-extort (~line 908):
+- Use a linear scale centered at 50 respect:
+  - At 100 respect: **+50%** payout (`multiplier = 1.5`)
+  - At 50 respect: **base** payout (`multiplier = 1.0`)
+  - At 0 respect: **-50%** payout (`multiplier = 0.5`)
+- Formula: `payout * (0.5 + (respect / 100))` — this naturally gives the full range from 0.5x to 1.5x
+- Low respect means businesses don't fear you and pay less; high respect means they pay up without question
 
-**4. Sync influence resource with reputation.streetInfluence**
-After computing the new influence value, sync `resources.influence` to `reputation.streetInfluence` so both always reflect the same thing — eliminating the confusing dual-tracking.
+**4. Corruption Success Bonus from Influence**
+In `bribe_corruption` handler (~line 1898):
+- Add `+ Math.floor(resources.influence / 8)` — up to **+12%** at 100 influence
 
-### Summary of Gameplay Impact
-- **Influence becomes earnable** through territory control, making expansion strategically important beyond just income
-- **Respect grows with economic success**, rewarding business-focused play
-- **Bonus action (+1 at 50/50)** becomes a realistic mid-game milestone that rewards balanced play
-- **Legacy victory** becomes a fair race against AI opponents using consistent metrics
+### Impact Summary
+
+| Mechanic | At 0 Respect/Influence | At 50 | At 100 |
+|---|---|---|---|
+| Recruit cost | Full price | -15% | -30% |
+| Extort success | Base | Base +7.5% | Base +15% |
+| Extort payout | **0.5x (50% penalty)** | 1.0x (base) | 1.5x (+50% bonus) |
+| Bribe success | Base | Base +6% | Base +12% |
 
 ### Files Modified
-- `src/hooks/useEnhancedMafiaGameState.ts` — turn processing, victory calculation, resource sync
+- `src/hooks/useEnhancedMafiaGameState.ts`
 
