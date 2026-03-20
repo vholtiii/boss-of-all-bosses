@@ -235,16 +235,36 @@ const generateHexMap = (radius: number): HexTile[] => {
       const district = getDistrict(q, r);
       const terrain = terrainTypes[Math.abs((q * 7 + r * 13) % terrainTypes.length)];
       
-      // ~30% of hexes have a business (use doc business types)
-      const hasBusiness = ((q * 31 + r * 47) % 10) < 3;
+      // District-specific business density, income multiplier, and type weights
+      const districtConfig: Record<string, { density: number; incomeMult: number; weights: number[] }> = {
+        'Manhattan':      { density: 0.35, incomeMult: 1.8, weights: [5, 40, 15, 40] },  // gambling dens & store fronts
+        'Little Italy':   { density: 0.25, incomeMult: 1.0, weights: [5, 30, 10, 55] },  // restaurants/store fronts, card games
+        'Brooklyn':       { density: 0.20, incomeMult: 0.9, weights: [20, 25, 30, 25] }, // balanced, more loan sharking
+        'Bronx':          { density: 0.15, incomeMult: 0.7, weights: [35, 15, 35, 15] }, // grittier: brothels & loan sharking
+        'Queens':         { density: 0.15, incomeMult: 0.8, weights: [10, 25, 15, 50] }, // immigrant businesses, store fronts
+        'Staten Island':  { density: 0.10, incomeMult: 0.75, weights: [5, 10, 20, 65] }, // suburban, mostly store fronts
+      };
+      // weights order: [brothel, gambling_den, loan_sharking, store_front]
+      const cfg = districtConfig[district] || { density: 0.20, incomeMult: 1.0, weights: [25, 25, 25, 25] };
+      const hashVal = Math.abs((q * 31 + r * 47) % 100);
+      const hasBusiness = hashVal < (cfg.density * 100);
       
       const tile: HexTile = { q, r, s, district, terrain, controllingFamily: 'neutral' };
 
       if (hasBusiness) {
-        const bConfig = DOC_BUSINESS_TYPES[Math.abs((q * 17 + r * 23) % DOC_BUSINESS_TYPES.length)];
+        // Weighted business type selection using cumulative weights
+        const typeHash = Math.abs((q * 17 + r * 23) % 100);
+        const cumWeights = cfg.weights.reduce((acc: number[], w, i) => {
+          acc.push((acc[i - 1] || 0) + w);
+          return acc;
+        }, []);
+        const typeIdx = cumWeights.findIndex(cw => typeHash < cw);
+        const bConfig = DOC_BUSINESS_TYPES[typeIdx >= 0 ? typeIdx : 0];
+        
+        const baseIncome = Math.round((bConfig.baseIncome + Math.abs((q * 13 + r * 29) % 2000)) * cfg.incomeMult);
         tile.business = {
           type: bConfig.type,
-          income: bConfig.baseIncome + Math.abs((q * 13 + r * 29) % 2000),
+          income: baseIncome,
           isLegal: bConfig.type === 'store_front',
           heatLevel: bConfig.baseHeat,
           launderingCapacity: bConfig.launderingCapacity,
