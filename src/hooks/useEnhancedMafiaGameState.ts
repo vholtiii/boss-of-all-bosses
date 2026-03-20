@@ -1233,6 +1233,7 @@ export const useEnhancedMafiaGameState = (
       const prevSoldierCount = newState.deployedUnits.filter(u => u.family === newState.playerFamily).length;
       const prevRespect = newState.reputation.respect;
       const prevInfluence = newState.resources.influence;
+      const prevLoyalty = newState.reputation.loyalty;
       const prevPlayerHexes = new Set(
         newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).map(t => `${t.q},${t.r},${t.s}`)
       );
