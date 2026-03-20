@@ -1245,7 +1245,7 @@ export const useEnhancedMafiaGameState = (
         netIncome: 0,
         aiActions: [],
         events: [],
-        resourceDeltas: { money: 0, soldiers: 0, respect: 0, territories: 0 },
+        resourceDeltas: { money: 0, soldiers: 0, respect: 0, influence: 0, territories: 0 },
         territoriesLost: [],
         territoriesGained: [],
       };
