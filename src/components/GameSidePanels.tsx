@@ -51,7 +51,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
 
   // Compute respect-based recruitment discount (mirrors logic in useEnhancedMafiaGameState)
   const respectDiscount = (reputation.respect / 100) * 0.3;
-  const familyDiscount = gameState.familyBonuses?.recruitDiscount || 0;
+  const familyDiscount = gameState.familyBonuses?.recruitmentDiscount || 0;
   const totalSoldierDiscount = Math.min(0.5, respectDiscount + familyDiscount);
   const totalCapoDiscount = Math.min(0.5, respectDiscount + familyDiscount);
   const discountedSoldierCost = Math.round(SOLDIER_COST * (1 - totalSoldierDiscount));
