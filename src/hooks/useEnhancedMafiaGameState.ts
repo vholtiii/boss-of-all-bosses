@@ -1804,10 +1804,18 @@ export const useEnhancedMafiaGameState = (
         case 'establish_safehouse':
           return processEstablishSafehouse(newState, action);
         case 'recruit_soldiers': {
-          const cost = Math.floor(SOLDIER_COST * (1 - discount));
+          const respectDiscount = (newState.reputation.respect / 100) * 0.3;
+          const cost = Math.floor(SOLDIER_COST * (1 - discount) * (1 - respectDiscount));
           if (newState.resources.money >= cost) {
             newState.resources.money -= cost;
             newState.resources.soldiers += 1;
+            if (respectDiscount > 0.01) {
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'info' as const,
+                title: '🤝 Reputation Discount',
+                message: `Your respect saved $${(Math.floor(SOLDIER_COST * (1 - discount)) - cost).toLocaleString()} on recruitment.`,
+              }];
+            }
           }
           return newState;
         }
