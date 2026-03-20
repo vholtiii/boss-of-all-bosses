@@ -69,7 +69,7 @@ export interface TurnReport {
   netIncome: number;
   aiActions: Array<{ family: string; action: string; detail: string }>;
   events: string[];
-  resourceDeltas: { money: number; soldiers: number; respect: number; influence: number; loyalty: number; territories: number };
+  resourceDeltas: { money: number; soldiers: number; respect: number; influence: number; loyalty: number; heat: number; territories: number };
   territoriesLost: string[];
   territoriesGained: string[];
 }
@@ -1234,6 +1234,7 @@ export const useEnhancedMafiaGameState = (
       const prevRespect = newState.reputation.respect;
       const prevInfluence = newState.resources.influence;
       const prevLoyalty = newState.reputation.loyalty;
+      const prevHeat = newState.policeHeat.level;
       const prevPlayerHexes = new Set(
         newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).map(t => `${t.q},${t.r},${t.s}`)
       );
@@ -1246,7 +1247,7 @@ export const useEnhancedMafiaGameState = (
         netIncome: 0,
         aiActions: [],
         events: [],
-        resourceDeltas: { money: 0, soldiers: 0, respect: 0, influence: 0, loyalty: 0, territories: 0 },
+        resourceDeltas: { money: 0, soldiers: 0, respect: 0, influence: 0, loyalty: 0, heat: 0, territories: 0 },
         territoriesLost: [],
         territoriesGained: [],
       };
@@ -1395,6 +1396,85 @@ export const useEnhancedMafiaGameState = (
       // Sync resources.loyalty from reputation.loyalty
       newState.resources.loyalty = Math.round(newState.reputation.loyalty);
       
+      // --- Passive heat from illegal operations ---
+      {
+        const illegalBizCount = newState.hexMap.filter(t => 
+          t.controllingFamily === newState.playerFamily && t.business && !t.business.isLegal
+        ).length;
+        const passiveHeat = Math.floor(illegalBizCount / 3);
+        if (passiveHeat > 0) {
+          newState.policeHeat.level = Math.min(100, newState.policeHeat.level + passiveHeat);
+        }
+      }
+      
+      // --- Arrest System (after loyalty effects, before heat decay) ---
+      {
+        const heat = newState.policeHeat.level;
+        
+        // Heat 90-100: Player arrest risk (10%)
+        if (heat >= 90 && Math.random() < 0.10) {
+          const sentence = 3 + Math.floor(Math.random() * 3); // 3-5 turns
+          newState.policeHeat.arrests.push({
+            id: `arrest-player-${newState.turn}`,
+            type: 'player',
+            target: 'You',
+            turn: newState.turn,
+            sentence,
+            impactOnProfit: 30,
+          });
+          turnReport.events.push(`🚨 FEDERAL ARREST! You've been indicted! -30% profits for ${sentence} turns.`);
+          newState.pendingNotifications.push({
+            type: 'error' as const, title: '🚨 You\'ve Been Arrested!',
+            message: `Federal agents raided your operations. -30% profits for ${sentence} turns.`,
+          });
+        }
+        // Heat 70-89: Management arrest (25%)
+        else if (heat >= 70 && Math.random() < 0.25) {
+          newState.policeHeat.arrests.push({
+            id: `arrest-mgmt-${newState.turn}`,
+            type: 'management',
+            target: 'Lieutenant',
+            turn: newState.turn,
+            sentence: 5,
+            impactOnProfit: 15,
+          });
+          newState.resources.influence = Math.max(0, newState.resources.influence - 2);
+          turnReport.events.push('👔 Management arrest! A lieutenant was taken in. -2 Influence, -15% profits for 5 turns.');
+        }
+        // Heat 40-69: Street arrest (15%)
+        else if (heat >= 40 && Math.random() < 0.15) {
+          const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+          if (playerSoldiers.length > 0) {
+            const arrested = playerSoldiers[Math.floor(Math.random() * playerSoldiers.length)];
+            newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== arrested.id);
+          }
+          newState.policeHeat.arrests.push({
+            id: `arrest-street-${newState.turn}`,
+            type: 'street',
+            target: 'Soldier',
+            turn: newState.turn,
+            sentence: 3,
+            impactOnProfit: 5,
+          });
+          turnReport.events.push('🚔 Street arrest! A soldier was picked up by police. -5% profits for 3 turns.');
+        }
+      }
+      
+      // --- Update rattingRisk ---
+      {
+        const recentArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn < 3).length;
+        const loyalty = newState.reputation.loyalty;
+        newState.policeHeat.rattingRisk = Math.min(100, Math.round(recentArrests * 15 * ((100 - loyalty) / 100)));
+      }
+      
+      // --- Update reductionPerTurn from active bribes ---
+      {
+        let reduction = 2; // base
+        const hasPatrol = newState.activeBribes.some(b => b.tier === 'patrol_officer' && b.active);
+        if (hasPatrol) reduction += 2;
+        newState.policeHeat.reductionPerTurn = reduction;
+      }
+      
       // --- Per-turn Influence growth ---
       const playerControlledHexes = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).length;
       const activeAlliances = newState.alliances.filter(a => a.active).length;
@@ -1411,6 +1491,7 @@ export const useEnhancedMafiaGameState = (
       const respectDecay = 0.5;
       newState.reputation.respect = Math.min(100, Math.max(0, newState.reputation.respect + respectGain - respectDecay));
       
+      // --- Heat decay (after arrests) ---
       newState.policeHeat.level = Math.max(0, newState.policeHeat.level - newState.policeHeat.reductionPerTurn);
       
       // Compute turn report deltas
@@ -1427,6 +1508,7 @@ export const useEnhancedMafiaGameState = (
         respect: Math.round(newState.reputation.respect - prevRespect),
         influence: Math.round((newState.resources.influence - prevInfluence) * 10) / 10,
         loyalty: Math.round((newState.reputation.loyalty - prevLoyalty) * 10) / 10,
+        heat: Math.round(newState.policeHeat.level - prevHeat),
         territories: afterPlayerHexes.size - prevPlayerHexes.size,
       };
       
@@ -1483,6 +1565,13 @@ export const useEnhancedMafiaGameState = (
       maintenance += isHitman ? Math.floor(SOLDIER_COST * HITMAN_MAINTENANCE_MULTIPLIER) : SOLDIER_COST;
     });
     maintenance += state.resources.soldiers * SOLDIER_COST; // undeployed pool
+    
+    // Apply arrest profit penalties
+    const activeArrests = state.policeHeat.arrests.filter(a => state.turn - a.turn < a.sentence);
+    const totalProfitPenalty = activeArrests.reduce((sum, a) => sum + a.impactOnProfit, 0);
+    if (totalProfitPenalty > 0) {
+      income = Math.floor(income * Math.max(0.1, (100 - totalProfitPenalty) / 100));
+    }
     
     state.lastTurnIncome = income;
     state.resources.money += income - maintenance;
@@ -2415,6 +2504,8 @@ export const useEnhancedMafiaGameState = (
       // Neutral: 90% success, claims territory. Enemy: 50% success, steals income only.
       let chance = isNeutral ? 0.9 : 0.5;
       chance += state.familyBonuses.extortion / 100;
+      // Heat penalty: up to -10% at max heat
+      chance -= state.policeHeat.level / 1000;
       // Influence bonus: up to +15% at 100 influence
       chance += (state.resources.influence / 100) * 0.15;
       // Manhattan has heavy police presence — extortion is 20% harder

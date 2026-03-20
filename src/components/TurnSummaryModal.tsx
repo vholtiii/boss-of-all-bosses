@@ -24,6 +24,7 @@ export interface TurnReport {
     respect: number;
     influence: number;
     loyalty: number;
+    heat: number;
     territories: number;
   };
   territoriesLost: string[];
@@ -101,6 +102,7 @@ const TurnSummaryModal: React.FC<TurnSummaryModalProps> = ({ report, open, onClo
                 { label: 'Respect', val: report.resourceDeltas.respect, prefix: '' },
                 { label: 'Influence', val: report.resourceDeltas.influence, prefix: '' },
                 { label: 'Loyalty', val: report.resourceDeltas.loyalty, prefix: '' },
+                { label: 'Heat', val: report.resourceDeltas.heat, prefix: '' },
                 { label: 'Territories', val: report.resourceDeltas.territories, prefix: '' },
               ].map(({ label, val, prefix }) => (
                 <div key={label} className="flex items-center gap-1">
