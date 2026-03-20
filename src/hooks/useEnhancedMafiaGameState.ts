@@ -621,6 +621,16 @@ export const useEnhancedMafiaGameState = (
         actionsRemaining = maxActions;
       }
       
+      // Reset movesRemaining for all player units when entering tactical phase
+      let deployedUnits = prev.deployedUnits;
+      if (nextPhase === 'move') {
+        deployedUnits = prev.deployedUnits.map(u => {
+          if (u.family !== prev.playerFamily) return u;
+          const baseMoves = u.type === 'capo' ? 3 : 2;
+          return { ...u, movesRemaining: baseMoves };
+        });
+      }
+
       return {
         ...prev,
         turnPhase: nextPhase,
@@ -632,6 +642,7 @@ export const useEnhancedMafiaGameState = (
         selectedMoveAction: 'move' as MoveAction,
         actionsRemaining,
         maxActions,
+        deployedUnits,
         // Reset tactical budget when entering move (tactical) phase
         tacticalActionsRemaining: nextPhase === 'move' ? TACTICAL_ACTIONS_PER_TURN : prev.tacticalActionsRemaining,
       };
@@ -704,14 +715,15 @@ export const useEnhancedMafiaGameState = (
         return { ...prev, selectedUnitId: unit.id, availableMoveHexes: actionTargets, deployMode: null, availableDeployHexes: [] };
       }
 
+      const moveAction = prev.selectedMoveAction || 'move';
+      const bypassMovesCheck = prev.turnPhase === 'move' && (moveAction === 'escort' || moveAction === 'fortify');
       const unit = prev.deployedUnits.find(u => 
         u.family === prev.playerFamily && u.type === unitType &&
         u.q === location.q && u.r === location.r && u.s === location.s &&
-        u.movesRemaining > 0
+        (bypassMovesCheck || u.movesRemaining > 0)
       );
       if (!unit) return prev;
 
-      const moveAction = prev.selectedMoveAction || 'move';
 
       // Tactical phase: only tactical actions (scout, fortify, safehouse, escort) — no regular movement
       if (prev.turnPhase === 'move') {
