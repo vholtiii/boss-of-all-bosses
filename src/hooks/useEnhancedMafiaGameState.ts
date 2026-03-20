@@ -1307,6 +1307,22 @@ export const useEnhancedMafiaGameState = (
       newState.reputation.fear = Math.max(0, newState.reputation.fear - 1);
       newState.reputation.loyalty = Math.min(100, newState.reputation.loyalty + 1);
       
+      // --- Per-turn Influence growth ---
+      const playerControlledHexes = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).length;
+      const activeAlliances = newState.pacts.filter(p => p.type === 'alliance' && p.turnsRemaining > 0).length;
+      const influenceGain = Math.floor(playerControlledHexes / 3) + activeAlliances;
+      const influenceDecay = 0.5;
+      newState.resources.influence = Math.min(100, Math.max(0, newState.resources.influence + influenceGain - influenceDecay));
+      // Sync influence with streetInfluence
+      newState.reputation.streetInfluence = Math.round(newState.resources.influence);
+      
+      // --- Per-turn Respect growth ---
+      const hexesWithBusinesses = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily && t.business).length;
+      const incomeRespectGain = Math.min(5, Math.floor(newState.finances.totalIncome / 5000));
+      const respectGain = Math.floor(hexesWithBusinesses / 5) + incomeRespectGain;
+      const respectDecay = 0.5;
+      newState.reputation.respect = Math.min(100, Math.max(0, newState.reputation.respect + respectGain - respectDecay));
+      
       newState.policeHeat.level = Math.max(0, newState.policeHeat.level - newState.policeHeat.reductionPerTurn);
       
       // Compute turn report deltas
