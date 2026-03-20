@@ -181,9 +181,6 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               disabled={resources.money < 20000}
               onClick={() => onAction({ type: 'make_investment', investmentType: 'stocks', amount: 20000, expectedReturn: 1.15, duration: 5 })}
             />
-            <ActionButton
-              icon={<Users className="h-4 w-4" />}
-              label="Recruit Soldier"
           </div>
         </CollapsibleSection>
 
