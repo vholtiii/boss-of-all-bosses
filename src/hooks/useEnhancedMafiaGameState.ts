@@ -1577,6 +1577,13 @@ export const useEnhancedMafiaGameState = (
       maintenance += isHitman ? Math.floor(SOLDIER_COST * HITMAN_MAINTENANCE_MULTIPLIER) : SOLDIER_COST;
     });
     maintenance += state.resources.soldiers * SOLDIER_COST; // undeployed pool
+
+    // Community upkeep — $150/turn for each empty claimed hex (neighborhood expenses)
+    const communityHexCount = (state.hexMap || []).filter(tile =>
+      tile.controllingFamily === state.playerFamily && !tile.business && !tile.isHeadquarters
+    ).length;
+    const communityUpkeep = communityHexCount * 150;
+    maintenance += communityUpkeep;
     
     // Apply arrest profit penalties
     const activeArrests = state.policeHeat.arrests.filter(a => state.turn - a.turn < a.sentence);
@@ -1754,8 +1761,13 @@ export const useEnhancedMafiaGameState = (
           unit.q = target.q;
           unit.r = target.r;
           unit.s = target.s;
-          unit.movesRemaining -= 1;
-          movesLeft--;
+
+          // Community resistance: entering player's empty claimed territory costs an extra move
+          const targetTile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
+          const isCommunityHex = targetTile && targetTile.controllingFamily === state.playerFamily && !targetTile.business && !targetTile.isHeadquarters;
+          const moveCost = isCommunityHex ? 2 : 1;
+          unit.movesRemaining = Math.max(0, unit.movesRemaining - moveCost);
+          movesLeft = Math.max(0, movesLeft - moveCost);
 
           const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
           if (tile && !tile.isHeadquarters) {
@@ -2292,9 +2304,14 @@ export const useEnhancedMafiaGameState = (
     if (playerSoldiers.length === 0) return state;
 
     tile.controllingFamily = state.playerFamily;
+
+    // Community expansion: +1 respect, +1 influence, no money
+    state.reputation.respect = Math.min(100, state.reputation.respect + 1);
+    state.reputation.streetInfluence = Math.min(100, state.reputation.streetInfluence + 1);
+
     state.pendingNotifications = [...state.pendingNotifications, {
       type: 'success' as const, title: '🏴 Territory Claimed!',
-      message: `Your soldiers have claimed this territory in ${tile.district}.`,
+      message: `Your family takes ${tile.district} under its wing. The locals appreciate the protection. (+1 Respect, +1 Influence)`,
     }];
 
     syncLegacyUnits(state);
