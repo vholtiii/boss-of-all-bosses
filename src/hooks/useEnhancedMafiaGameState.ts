@@ -2029,18 +2029,60 @@ export const useEnhancedMafiaGameState = (
         case 'establish_safehouse':
           return processEstablishSafehouse(newState, action);
         case 'recruit_soldiers': {
+          // Buy Mercenary — expensive, combat-ready, hurts loyalty
           const respectDiscount = (newState.reputation.respect / 100) * 0.3;
           const cost = Math.floor(SOLDIER_COST * (1 - discount) * (1 - respectDiscount));
           if (newState.resources.money >= cost) {
             newState.resources.money -= cost;
             newState.resources.soldiers += 1;
-            if (respectDiscount > 0.01) {
-              newState.pendingNotifications = [...newState.pendingNotifications, {
-                type: 'info' as const,
-                title: '🤝 Reputation Discount',
-                message: `Your respect saved $${(Math.floor(SOLDIER_COST * (1 - discount)) - cost).toLocaleString()} on recruitment.`,
+            // Mercenary loyalty penalty
+            newState.reputation.loyalty = Math.max(0, newState.reputation.loyalty - 3);
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'info' as const,
+              title: '💰 Mercenary Hired',
+              message: `A hired gun joins the family for $${cost.toLocaleString()}. Loyalty -3 (outsider).${respectDiscount > 0.01 ? ` Respect saved $${(Math.floor(SOLDIER_COST * (1 - discount)) - cost).toLocaleString()}.` : ''}`,
+            }];
+          }
+          return newState;
+        }
+        case 'recruit_local_soldier': {
+          // Recruit Loyal — cheap, territory-gated, boosts loyalty, lower combat stats
+          const playerTerritoryCount = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).length;
+          if (playerTerritoryCount < RECRUIT_TERRITORY_REQUIREMENT) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const,
+              title: '❌ Not Enough Territory',
+              message: `You need ${RECRUIT_TERRITORY_REQUIREMENT} hexes to recruit locals. You have ${playerTerritoryCount}.`,
+            }];
+            return newState;
+          }
+          const respectDiscount2 = (newState.reputation.respect / 100) * 0.3;
+          const cost2 = Math.floor(LOCAL_SOLDIER_COST * (1 - discount) * (1 - respectDiscount2));
+          if (newState.resources.money >= cost2) {
+            newState.resources.money -= cost2;
+            newState.resources.soldiers += 1;
+            // Loyal recruit boosts loyalty
+            newState.reputation.loyalty = Math.min(100, newState.reputation.loyalty + 2);
+            // Deploy at HQ with recruited flag and lower training
+            const hq = newState.headquarters[newState.playerFamily];
+            if (hq) {
+              const newId = `${newState.playerFamily}-soldier-recruit-${Date.now()}`;
+              newState.deployedUnits = [...newState.deployedUnits, {
+                id: newId, type: 'soldier' as const, family: newState.playerFamily,
+                q: hq.q, r: hq.r, s: hq.s,
+                movesRemaining: 0, maxMoves: 2, level: 1,
+                recruited: true,
               }];
+              newState.soldierStats[newId] = {
+                loyalty: 65, training: 2, equipment: 2,
+                hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+              };
             }
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'success' as const,
+              title: '🏘️ Local Recruited',
+              message: `A loyal local joins the family for $${cost2.toLocaleString()}. Loyalty +2. Good at claiming & extortion.`,
+            }];
           }
           return newState;
         }
