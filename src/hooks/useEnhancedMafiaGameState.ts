@@ -557,21 +557,29 @@ export const useEnhancedMafiaGameState = (
 
   // ============ VICTORY CHECK ============
   const updateVictoryProgress = (state: EnhancedMafiaGameState) => {
+    const TERRITORY_TARGET = 60;
+    const ECONOMIC_TARGET = 50000;
+    const LEGACY_MIN_TURN = 15;
+    const LEGACY_MARGIN = 1.25; // Must exceed rival by 25%
+
     const playerHexes = state.hexMap.filter(t => t.controllingFamily === state.playerFamily).length;
     const income = state.lastTurnIncome;
     const playerRep = state.reputation.respect + state.reputation.reputation + state.reputation.fear + state.reputation.streetInfluence;
     
-    // Find highest rival legacy using comparable composite score
+    // Find highest rival legacy using territory + soldiers + wealth
     let highestRival = 0;
     state.aiOpponents.forEach(opp => {
-      const rivalRep = (opp.resources.soldiers * 2) + (opp.resources.influence * 2) + (opp.resources.money / 1000);
+      const oppTerritoryCount = state.hexMap.filter(t => t.controllingFamily === opp.family).length;
+      const rivalRep = (oppTerritoryCount * 3) + (opp.resources.soldiers * 2) + (opp.resources.money / 500);
       if (rivalRep > highestRival) highestRival = Math.round(rivalRep);
     });
 
+    const legacyMet = state.turn > LEGACY_MIN_TURN && highestRival > 0 && playerRep >= highestRival * LEGACY_MARGIN;
+
     state.victoryProgress = {
-      territory: { current: playerHexes, target: 25, met: playerHexes >= 25 },
-      economic: { current: income, target: 25000, met: income >= 25000 },
-      legacy: { current: playerRep, highestRival, met: playerRep > highestRival && state.turn > 5 },
+      territory: { current: playerHexes, target: TERRITORY_TARGET, met: playerHexes >= TERRITORY_TARGET },
+      economic: { current: income, target: ECONOMIC_TARGET, met: income >= ECONOMIC_TARGET },
+      legacy: { current: playerRep, highestRival, met: legacyMet },
     };
 
     const prevVictory = state.victoryType;
@@ -583,9 +591,9 @@ export const useEnhancedMafiaGameState = (
     // Notify on first victory
     if (state.victoryType && !prevVictory) {
       const labels: Record<string, string> = {
-        territory: 'Territory Domination — You control 6+ territories!',
-        economic: 'Economic Empire — $8,000+ monthly income achieved!',
-        legacy: 'Legacy of Power — Your reputation surpasses all rivals!',
+        territory: `Territory Domination — You control ${TERRITORY_TARGET}+ hexes!`,
+        economic: `Economic Empire — $${ECONOMIC_TARGET.toLocaleString()}+ monthly income achieved!`,
+        legacy: 'Legacy of Power — Your reputation surpasses all rivals by 25%!',
       };
       state.pendingNotifications = [...state.pendingNotifications, {
         type: 'success' as const, title: '🏆 VICTORY!',
