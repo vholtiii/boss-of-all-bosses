@@ -525,8 +525,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     const isDeployAtHQ = isAtHQ && turnPhase === 'deploy' && tile.isHeadquarters === playerFamily;
 
                     // Show units at HQ during deploy so players can select them for movement
-                    {
-                      // Normal compact layout for non-deploy or non-HQ
+                    if (!isAtHQ) {
+                      // Normal compact layout — skip HQ hexes (deployment menu handles those)
                       let offsetIdx = 0;
 
                       caposByFamily.forEach((capos, fam) => {
@@ -545,9 +545,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             selected={isSelected}
                             onClick={isClickable ? (e) => {
                               e.stopPropagation();
-                              if (turnPhase === 'deploy' && isAtHQ && onSelectUnitFromHeadquarters) {
-                                onSelectUnitFromHeadquarters('capo', fam);
-                              } else if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
+                              if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
                                 onSelectUnit('capo', { q: tile.q, r: tile.r, s: tile.s });
                               }
                             } : undefined}
@@ -571,9 +569,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             selected={isSelected}
                             onClick={isClickable ? (e) => {
                               e.stopPropagation();
-                              if (turnPhase === 'deploy' && isAtHQ && onSelectUnitFromHeadquarters) {
-                                onSelectUnitFromHeadquarters('soldier', fam);
-                              } else if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
+                              if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
                                 onSelectUnit('soldier', { q: tile.q, r: tile.r, s: tile.s });
                               }
                             } : undefined}
