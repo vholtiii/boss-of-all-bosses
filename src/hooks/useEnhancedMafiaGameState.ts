@@ -987,8 +987,6 @@ export const useEnhancedMafiaGameState = (
     newScoutedHexes.push(scoutInfo);
 
     const newUnits = [...prev.deployedUnits];
-    const uIdx = newUnits.findIndex(u => u.id === unit.id);
-    newUnits[uIdx] = { ...unit, movesRemaining: unit.movesRemaining - 1 };
 
     return {
       ...prev, deployedUnits: newUnits, scoutedHexes: newScoutedHexes,
