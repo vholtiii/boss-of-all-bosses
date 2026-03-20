@@ -464,7 +464,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 <p><span className="text-foreground font-semibold">👁️ Scout:</span> Select a soldier, then click an adjacent enemy hex to reveal unit count and fortification status for 3 turns.</p>
               )}
               {gameState.selectedMoveAction === 'fortify' && (
-                <p><span className="text-foreground font-semibold">🛡️ Fortify:</span> Select a unit to skip its movement for +25% defense bonus this turn.</p>
+                <p><span className="text-foreground font-semibold">🛡️ Fortify:</span> Click any unit to fortify it — grants +25% defense and 50% casualty reduction. Persists until the unit moves.</p>
               )}
               {gameState.selectedMoveAction === 'escort' && (
                 <p><span className="text-foreground font-semibold">🚗 Escort:</span> Select a soldier, then click a hex with your capo to call the soldier there (1 tactical action). The capo can carry up to 2 soldiers — they'll auto-travel and detach at the destination.</p>
