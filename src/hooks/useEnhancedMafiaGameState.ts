@@ -2599,9 +2599,10 @@ export const useEnhancedMafiaGameState = (
           message: isEnemy ? `Stole income from ${tile.controllingFamily} territory! ${extortDetails}.` : `Territory claimed! ${extortDetails}.`,
         }];
       } else {
-        const casualties = Math.max(1, Math.floor(playerUnitsOnHex.length * 0.2));
-        for (let i = 0; i < casualties && i < playerUnitsOnHex.length; i++) {
-          const idx = state.deployedUnits.indexOf(playerUnitsOnHex[i]);
+        const shuffled = [...allPlayerUnits].sort(() => Math.random() - 0.5);
+        const casualties = Math.max(1, Math.floor(shuffled.length * 0.2));
+        for (let i = 0; i < casualties && i < shuffled.length; i++) {
+          const idx = state.deployedUnits.indexOf(shuffled[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
         const failDetails = tile.district === 'Manhattan' 
