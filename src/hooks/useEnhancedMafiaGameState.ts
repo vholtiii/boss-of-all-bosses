@@ -905,12 +905,14 @@ export const useEnhancedMafiaGameState = (
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
           if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters && unit.type === 'capo') {
             // Capo auto-extorts on arrival — skip the extort action step
-            bonusMoney = 3000;
+            // Respect scales payout: 0 respect = 0.5x, 50 = 1.0x, 100 = 1.5x
+            const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
+            bonusMoney = Math.floor(3000 * respectPayoutMult);
             bonusRespect = 5;
             autoExtortNotification = {
               type: 'success' as const,
               title: '💰 Capo Auto-Extortion!',
-              message: `${unit.name || 'Your Capo'} took over and extorted the territory on arrival! +$3,000, +5 respect.`,
+              message: `${unit.name || 'Your Capo'} took over and extorted the territory on arrival! +$${bonusMoney.toLocaleString()}, +5 respect.`,
             };
             return { ...tile, controllingFamily: prev.playerFamily };
           }
@@ -1804,15 +1806,24 @@ export const useEnhancedMafiaGameState = (
         case 'establish_safehouse':
           return processEstablishSafehouse(newState, action);
         case 'recruit_soldiers': {
-          const cost = Math.floor(SOLDIER_COST * (1 - discount));
+          const respectDiscount = (newState.reputation.respect / 100) * 0.3;
+          const cost = Math.floor(SOLDIER_COST * (1 - discount) * (1 - respectDiscount));
           if (newState.resources.money >= cost) {
             newState.resources.money -= cost;
             newState.resources.soldiers += 1;
+            if (respectDiscount > 0.01) {
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'info' as const,
+                title: '🤝 Reputation Discount',
+                message: `Your respect saved $${(Math.floor(SOLDIER_COST * (1 - discount)) - cost).toLocaleString()} on recruitment.`,
+              }];
+            }
           }
           return newState;
         }
         case 'recruit_capo': {
-          const cost = Math.floor(CAPO_COST * (1 - discount));
+          const respectDiscountCapo = (newState.reputation.respect / 100) * 0.3;
+          const cost = Math.floor(CAPO_COST * (1 - discount) * (1 - respectDiscountCapo));
           if (newState.resources.money >= cost) {
             newState.resources.money -= cost;
             // Deploy capo at HQ
@@ -1897,6 +1908,8 @@ export const useEnhancedMafiaGameState = (
           // Calculate success
           let successChance = config.baseSuccess;
           successChance += Math.floor(newState.reputation.reputation / 10);
+          // Influence bonus: up to +12% at 100 influence
+          successChance += Math.floor(newState.resources.influence / 8);
           successChance -= Math.floor(newState.policeHeat.level / 5);
           successChance = Math.max(5, Math.min(95, successChance));
           
@@ -2314,6 +2327,8 @@ export const useEnhancedMafiaGameState = (
       // Neutral: 90% success, claims territory. Enemy: 50% success, steals income only.
       let chance = isNeutral ? 0.9 : 0.5;
       chance += state.familyBonuses.extortion / 100;
+      // Influence bonus: up to +15% at 100 influence
+      chance += (state.resources.influence / 100) * 0.15;
       // Manhattan has heavy police presence — extortion is 20% harder
       if (tile.district === 'Manhattan') {
         chance *= 0.8;
@@ -2324,7 +2339,10 @@ export const useEnhancedMafiaGameState = (
         if (isNeutral) {
           tile.controllingFamily = state.playerFamily;
         }
-        const moneyGain = isEnemy ? (tile.business?.income || 2000) : 3000;
+        const baseMoneyGain = isEnemy ? (tile.business?.income || 2000) : 3000;
+        // Respect scales payout: 0 respect = 0.5x, 50 = 1.0x, 100 = 1.5x
+        const respectPayoutMultiplier = 0.5 + (state.reputation.respect / 100);
+        const moneyGain = Math.floor(baseMoneyGain * respectPayoutMultiplier);
         const respectGain = isEnemy ? 3 : 5;
         state.resources.money += moneyGain;
         state.resources.respect += respectGain;
