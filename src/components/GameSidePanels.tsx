@@ -49,6 +49,15 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
   const [openSection, setOpenSection] = useState<string>('actions');
   const { resources, reputation, policeHeat, legalStatus } = gameState;
 
+  // Compute respect-based recruitment discount (mirrors logic in useEnhancedMafiaGameState)
+  const respectDiscount = (reputation.respect / 100) * 0.3;
+  const familyDiscount = gameState.familyBonuses?.recruitmentDiscount || 0;
+  const totalSoldierDiscount = Math.min(0.5, respectDiscount + familyDiscount);
+  const totalCapoDiscount = Math.min(0.5, respectDiscount + familyDiscount);
+  const discountedSoldierCost = Math.round(SOLDIER_COST * (1 - totalSoldierDiscount));
+  const discountedCapoCost = Math.round(CAPO_COST * (1 - totalCapoDiscount));
+  const respectPct = Math.round(respectDiscount * 100);
+
   const toggle = (id: string) => setOpenSection(prev => (prev === id ? '' : id));
 
   return (
@@ -171,15 +180,15 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             <ActionButton
               icon={<Users className="h-4 w-4" />}
               label="Recruit Soldier"
-              sublabel={`$${SOLDIER_COST}`}
-              disabled={resources.money < SOLDIER_COST}
+              sublabel={respectPct > 0 ? `$${discountedSoldierCost} (${respectPct}% respect)` : `$${SOLDIER_COST}`}
+              disabled={resources.money < discountedSoldierCost}
               onClick={() => onAction({ type: 'recruit_soldiers', cost: SOLDIER_COST })}
             />
             <ActionButton
               icon={<Crown className="h-4 w-4" />}
               label="Recruit Capo"
-              sublabel={`$${CAPO_COST.toLocaleString()}`}
-              disabled={resources.money < CAPO_COST}
+              sublabel={respectPct > 0 ? `$${discountedCapoCost.toLocaleString()} (${respectPct}% respect)` : `$${CAPO_COST.toLocaleString()}`}
+              disabled={resources.money < discountedCapoCost}
               onClick={() => onAction({ type: 'recruit_capo', cost: CAPO_COST })}
             />
           </div>
