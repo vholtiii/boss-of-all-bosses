@@ -2323,6 +2323,8 @@ export const useEnhancedMafiaGameState = (
       // Neutral: 90% success, claims territory. Enemy: 50% success, steals income only.
       let chance = isNeutral ? 0.9 : 0.5;
       chance += state.familyBonuses.extortion / 100;
+      // Influence bonus: up to +15% at 100 influence
+      chance += (state.resources.influence / 100) * 0.15;
       // Manhattan has heavy police presence — extortion is 20% harder
       if (tile.district === 'Manhattan') {
         chance *= 0.8;
@@ -2333,7 +2335,10 @@ export const useEnhancedMafiaGameState = (
         if (isNeutral) {
           tile.controllingFamily = state.playerFamily;
         }
-        const moneyGain = isEnemy ? (tile.business?.income || 2000) : 3000;
+        const baseMoneyGain = isEnemy ? (tile.business?.income || 2000) : 3000;
+        // Respect scales payout: 0 respect = 0.5x, 50 = 1.0x, 100 = 1.5x
+        const respectPayoutMultiplier = 0.5 + (state.reputation.respect / 100);
+        const moneyGain = Math.floor(baseMoneyGain * respectPayoutMultiplier);
         const respectGain = isEnemy ? 3 : 5;
         state.resources.money += moneyGain;
         state.resources.respect += respectGain;
