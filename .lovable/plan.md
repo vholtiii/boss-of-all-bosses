@@ -1,13 +1,13 @@
 
-# ✅ COMPLETED: Hit Territory Mechanic Overhaul
+# ✅ COMPLETED: Victory Conditions Refinement
 
-All 6 fixes implemented. See commit for details.
+All 4 changes implemented.
 
-| Aspect | Before | After |
+| Condition | Before | After |
 |---|---|---|
-| Participants | All adjacent units | Selected unit + units on target hex |
-| Success calc | 80% or 20% | Scaled 0.5 + (attackers-defenders)*0.15, capped 10%-95% |
-| Reward | +$5,000 + 10 respect | +5 fear + 5 respect (no money) |
-| Casualties | First in array die | Random selection (shuffle) |
-| Heat | Flat +15 | 8 + 2 per unit involved (cap 25) |
-| Capo hit | No | Yes |
+| Territory | 25 hexes | 60 hexes (~18% of map) |
+| Economic | $25,000/mo | $50,000/mo |
+| Legacy min turn | 5 | 15 |
+| Legacy margin | > rival | > rival × 1.25 |
+| Rival rep formula | soldiers×2 + influence×2 + money/1000 | territory×3 + soldiers×2 + money/500 |
+| Notification text | Stale ("6+ territories", "$8,000") | Matches actual targets |
