@@ -1820,7 +1820,8 @@ export const useEnhancedMafiaGameState = (
           return newState;
         }
         case 'recruit_capo': {
-          const cost = Math.floor(CAPO_COST * (1 - discount));
+          const respectDiscountCapo = (newState.reputation.respect / 100) * 0.3;
+          const cost = Math.floor(CAPO_COST * (1 - discount) * (1 - respectDiscountCapo));
           if (newState.resources.money >= cost) {
             newState.resources.money -= cost;
             // Deploy capo at HQ
