@@ -1605,6 +1605,19 @@ export const useEnhancedMafiaGameState = (
     state.finances.totalIncome = income;
     state.finances.totalExpenses = maintenance;
     state.finances.totalProfit = income - maintenance;
+
+    // Auto-collect legal business profits each turn
+    const legalBiz = (state.businesses || []).filter((b: any) => b.type === 'legal');
+    const legalAutoIncome = legalBiz.reduce((sum: number, b: any) => {
+      const baseProfit = b.monthlyIncome - b.monthlyExpenses;
+      const extortionBonus = b.isExtorted ? baseProfit * b.extortionRate : 0;
+      return sum + baseProfit + extortionBonus;
+    }, 0) - (state.legalStatus?.totalLegalCosts || 0);
+    if (legalAutoIncome > 0) {
+      state.resources.money += legalAutoIncome;
+      state.finances.totalIncome += legalAutoIncome;
+      state.finances.totalProfit += legalAutoIncome;
+    }
   };
 
   // ============ PROCESS BRIBES ============
