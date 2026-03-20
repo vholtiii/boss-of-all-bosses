@@ -1577,6 +1577,13 @@ export const useEnhancedMafiaGameState = (
       maintenance += isHitman ? Math.floor(SOLDIER_COST * HITMAN_MAINTENANCE_MULTIPLIER) : SOLDIER_COST;
     });
     maintenance += state.resources.soldiers * SOLDIER_COST; // undeployed pool
+
+    // Community upkeep — $150/turn for each empty claimed hex (neighborhood expenses)
+    const communityHexCount = (state.hexMap || []).filter(tile =>
+      tile.controllingFamily === state.playerFamily && !tile.business && !tile.isHeadquarters
+    ).length;
+    const communityUpkeep = communityHexCount * 150;
+    maintenance += communityUpkeep;
     
     // Apply arrest profit penalties
     const activeArrests = state.policeHeat.arrests.filter(a => state.turn - a.turn < a.sentence);
