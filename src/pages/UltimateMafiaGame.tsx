@@ -128,6 +128,17 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     performAction(action);
   }, [performAction]);
 
+  // playSound/playSoundSequence already destructured above
+  const [activeMobileTab, setActiveMobileTab] = useState('map');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [showTurnSummary, setShowTurnSummary] = useState(false);
+  const [selectedHeadquarters, setSelectedHeadquarters] = useState<{
+    family: string;
+    headquarters: any;
+    units: any;
+  } | null>(null);
+
   // Handle headquarters selection
   const handleHeadquartersClick = useCallback((family: string) => {
     // Toggle: if same HQ is already open, close it
@@ -151,17 +162,6 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const closeHeadquartersPanel = useCallback(() => {
     setSelectedHeadquarters(null);
   }, []);
-
-  // playSound/playSoundSequence already destructured above
-  const [activeMobileTab, setActiveMobileTab] = useState('map');
-  const [showSettings, setShowSettings] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [showTurnSummary, setShowTurnSummary] = useState(false);
-  const [selectedHeadquarters, setSelectedHeadquarters] = useState<{
-    family: string;
-    headquarters: any;
-    units: any;
-  } | null>(null);
   // notifyTerritoryCaptured and notifyReputationChange already destructured above
 
   // Handle loading a saved game
