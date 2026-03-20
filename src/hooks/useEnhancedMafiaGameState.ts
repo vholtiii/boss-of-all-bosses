@@ -905,12 +905,14 @@ export const useEnhancedMafiaGameState = (
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
           if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters && unit.type === 'capo') {
             // Capo auto-extorts on arrival — skip the extort action step
-            bonusMoney = 3000;
+            // Respect scales payout: 0 respect = 0.5x, 50 = 1.0x, 100 = 1.5x
+            const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
+            bonusMoney = Math.floor(3000 * respectPayoutMult);
             bonusRespect = 5;
             autoExtortNotification = {
               type: 'success' as const,
               title: '💰 Capo Auto-Extortion!',
-              message: `${unit.name || 'Your Capo'} took over and extorted the territory on arrival! +$3,000, +5 respect.`,
+              message: `${unit.name || 'Your Capo'} took over and extorted the territory on arrival! +$${bonusMoney.toLocaleString()}, +5 respect.`,
             };
             return { ...tile, controllingFamily: prev.playerFamily };
           }
