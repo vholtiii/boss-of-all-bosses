@@ -27,3 +27,22 @@
 - Lawyer active badge with turns remaining
 - Arrested units summary with return turns
 - PoliceSystem shows tier effects, RICO timer, jailed units
+
+---
+
+# ✅ COMPLETED: Legal Business Construction — Capo Requirement
+
+## Rules
+- **Legal businesses** can only be built on a player-owned hex where a **Capo** is physically present
+- Costs **1 action token** + money cost
+- Player enters placement mode (clicks build button → selects hex on map)
+- Map highlights valid hexes (green) during placement mode
+- Illegal businesses remain unrestricted (any owned empty hex)
+
+## Implementation
+- `pendingBusinessBuild` state in `EnhancedMafiaGameState`
+- `build_business` action enters placement mode (validates money, actions, Capo availability)
+- `place_business_on_hex` action validates Capo presence, deducts action token
+- `cancel_business_placement` action exits placement mode
+- Green hex highlighting in `EnhancedMafiaHexGrid` for valid placement targets
+- Capo requirement hint + available hex count in Economy section of `GameSidePanels`

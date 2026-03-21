@@ -411,6 +411,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-gradient-to-br from-noir-dark/50 to-background/50">
+      {/* Business placement banner */}
+      {isBusinessPlacementMode && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-6 py-2 rounded-full bg-green-600/90 backdrop-blur-sm border border-green-400/30 shadow-lg flex items-center gap-3">
+          <span className="text-sm font-bold text-white">📍 Select a hex with a Capo to place {pendingBuild?.businessType}</span>
+          <button
+            className="text-xs text-white/70 hover:text-white underline"
+            onClick={() => onAction?.({ type: 'cancel_business_placement' })}
+          >Cancel</button>
+        </div>
+      )}
       {/* Controls */}
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
         <div className="flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-3 border border-noir-light shadow-lg">
