@@ -1893,18 +1893,20 @@ export const useEnhancedMafiaGameState = (
         const aiSoldierUnits = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
         const aiHitmanIds = state.hitmen.filter(h => aiSoldierUnits.some(u => u.id === h.unitId)).map(h => h.unitId);
         
-        // Find the best eligible soldier (highest survivedConflicts)
+        // Find the best eligible soldier (highest victories)
         let bestCandidate: { unit: typeof aiSoldierUnits[0]; stats: SoldierStats } | null = null;
         for (const unit of aiSoldierUnits) {
           if (aiHitmanIds.includes(unit.id)) continue; // skip hitmen
           const stats = state.soldierStats[unit.id];
           if (!stats) continue;
           if (
-            stats.survivedConflicts >= CAPO_PROMOTION_REQUIREMENTS.minVictories &&
+            stats.victories >= CAPO_PROMOTION_REQUIREMENTS.minVictories &&
             stats.loyalty >= CAPO_PROMOTION_REQUIREMENTS.minLoyalty &&
-            stats.training >= CAPO_PROMOTION_REQUIREMENTS.minTraining
+            stats.training >= CAPO_PROMOTION_REQUIREMENTS.minTraining &&
+            stats.toughness >= CAPO_PROMOTION_REQUIREMENTS.minToughness &&
+            stats.racketeering >= CAPO_PROMOTION_REQUIREMENTS.minRacketeering
           ) {
-            if (!bestCandidate || stats.survivedConflicts > bestCandidate.stats.survivedConflicts) {
+            if (!bestCandidate || stats.victories > bestCandidate.stats.victories) {
               bestCandidate = { unit, stats };
             }
           }
