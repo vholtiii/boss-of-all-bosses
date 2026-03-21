@@ -1711,12 +1711,11 @@ export const useEnhancedMafiaGameState = (
       }
     });
     
-    // Soldier maintenance — $500/soldier base, hitmen cost 50% more
+    // Soldier maintenance — $500/soldier base
     const playerSoldiers = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier');
     let maintenance = 0;
     playerSoldiers.forEach(s => {
-      const isHitman = state.hitmen.some(h => h.unitId === s.id);
-      maintenance += isHitman ? Math.floor(SOLDIER_COST * HITMAN_MAINTENANCE_MULTIPLIER) : SOLDIER_COST;
+      maintenance += SOLDIER_COST;
     });
     maintenance += state.resources.soldiers * SOLDIER_COST; // undeployed pool
 
