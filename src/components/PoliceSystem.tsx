@@ -61,7 +61,7 @@ const AVAILABLE_OFFICIALS = [
   }
 ];
 
-export const PoliceSystem = ({ policeHeat, cleanMoney, dirtyMoney, currentTurn, loyalty, onAction }: PoliceSystemProps) => {
+export const PoliceSystem = ({ policeHeat, cleanMoney, dirtyMoney, currentTurn, loyalty, ricoTimer = 0, arrestedSoldiers = [], arrestedCapos = [], lawyerActiveUntil = 0, onAction }: PoliceSystemProps) => {
   const getHeatColor = (level: number) => {
     if (level < 30) return "text-green-400";
     if (level < 70) return "text-yellow-400";
