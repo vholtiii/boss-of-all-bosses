@@ -2039,6 +2039,21 @@ export const useEnhancedMafiaGameState = (
             newState.tacticalActionsRemaining -= 1;
             // Mercenary loyalty penalty
             newState.reputation.loyalty = Math.max(0, newState.reputation.loyalty - 3);
+            // Deploy mercenary at HQ
+            const hq = newState.headquarters[newState.playerFamily];
+            if (hq) {
+              const newId = `${newState.playerFamily}-soldier-merc-${Date.now()}`;
+              newState.deployedUnits = [...newState.deployedUnits, {
+                id: newId, type: 'soldier' as const, family: newState.playerFamily,
+                q: hq.q, r: hq.r, s: hq.s,
+                movesRemaining: 0, maxMoves: 2, level: 1,
+                recruited: false,
+              }];
+              newState.soldierStats[newId] = {
+                loyalty: Math.max(10, newState.reputation.loyalty), training: 5, equipment: 4,
+                hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+              };
+            }
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'info' as const,
               title: '💰 Mercenary Hired',
@@ -2090,28 +2105,7 @@ export const useEnhancedMafiaGameState = (
           }
           return newState;
         }
-        case 'recruit_capo': {
-          const respectDiscountCapo = (newState.reputation.respect / 100) * 0.3;
-          const cost = Math.floor(CAPO_COST * (1 - discount) * (1 - respectDiscountCapo));
-          if (newState.resources.money >= cost) {
-            newState.resources.money -= cost;
-            // Deploy capo at HQ
-            const hq = newState.headquarters[newState.playerFamily];
-            if (hq) {
-              const newId = `${newState.playerFamily}-capo-${Date.now()}`;
-              const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
-              const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
-              newState.deployedUnits = [...newState.deployedUnits, {
-                id: newId, type: 'capo' as const, family: newState.playerFamily,
-                q: hq.q, r: hq.r, s: hq.s,
-                movesRemaining: 0, maxMoves: 3, level: 1,
-                name: `Capo ${Math.floor(Math.random() * 100)}`,
-                personality: randomPersonality,
-              }];
-            }
-          }
-          return newState;
-        }
+        // recruit_capo case removed — capos are only obtainable via promote_capo
         case 'promote_capo': {
           const unitId = action.unitId as string;
           const unit = newState.deployedUnits.find(u => u.id === unitId);
