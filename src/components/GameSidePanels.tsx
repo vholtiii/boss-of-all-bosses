@@ -618,6 +618,7 @@ const CollapsibleSection: React.FC<{
 }> = ({ title, icon, isOpen, onToggle, children, disabled, phaseLocked }) => (
   <div>
     <button
+      data-no-sound
       onClick={onToggle}
       className="flex items-center gap-2 w-full text-left text-sm font-semibold text-foreground hover:text-primary transition-colors py-1"
     >
