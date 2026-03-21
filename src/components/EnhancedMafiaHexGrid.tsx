@@ -147,7 +147,26 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     'Staten Island': 'SI',
   };
 
+  // Business placement mode
+  const pendingBuild = gameState?.pendingBusinessBuild;
+  const isBusinessPlacementMode = !!pendingBuild;
+  const validPlacementHexes = useMemo(() => {
+    if (!pendingBuild) return [];
+    return hexMap.filter(t => 
+      t.controllingFamily === playerFamily && !t.business && !t.isHeadquarters &&
+      (pendingBuild.isLegal 
+        ? deployedUnits.some(u => u.type === 'capo' && u.family === playerFamily && u.q === t.q && u.r === t.r && u.s === t.s)
+        : true)
+    );
+  }, [pendingBuild, hexMap, deployedUnits, playerFamily]);
+
   const getHexColor = (tile: HexTile): string => {
+    // Business placement highlight
+    if (isBusinessPlacementMode) {
+      const isValid = validPlacementHexes.some(h => h.q === tile.q && h.r === tile.r && h.s === tile.s);
+      if (isValid) return '#22C55E'; // green for valid placement
+    }
+
     // HQ
     if (tile.isHeadquarters) {
       return tile.isHeadquarters === playerFamily ? '#D4AF37' : '#8B4513';
@@ -186,6 +205,15 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
   const handleHexClick = (tile: HexTile) => {
     const turnPhase = gameState?.turnPhase || 'waiting';
+
+    // Business placement mode — intercept clicks
+    if (isBusinessPlacementMode && onAction) {
+      const isValid = validPlacementHexes.some(h => h.q === tile.q && h.r === tile.r && h.s === tile.s);
+      if (isValid) {
+        onAction({ type: 'place_business_on_hex', targetQ: tile.q, targetR: tile.r, targetS: tile.s });
+      }
+      return; // Consume all clicks during placement mode
+    }
 
     // During move phase, try selecting units on HQ hex before opening the panel
     if (tile.isHeadquarters && turnPhase === 'move') {
@@ -383,6 +411,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-gradient-to-br from-noir-dark/50 to-background/50">
+      {/* Business placement banner */}
+      {isBusinessPlacementMode && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-6 py-2 rounded-full bg-green-600/90 backdrop-blur-sm border border-green-400/30 shadow-lg flex items-center gap-3">
+          <span className="text-sm font-bold text-white">📍 Select a hex with a Capo to place {pendingBuild?.businessType}</span>
+          <button
+            className="text-xs text-white/70 hover:text-white underline"
+            onClick={() => onAction?.({ type: 'cancel_business_placement' })}
+          >Cancel</button>
+        </div>
+      )}
       {/* Controls */}
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
         <div className="flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-3 border border-noir-light shadow-lg">
