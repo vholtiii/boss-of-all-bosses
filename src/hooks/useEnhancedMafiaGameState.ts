@@ -2619,6 +2619,25 @@ export const useEnhancedMafiaGameState = (
             newState.resources.money -= lawyerCost;
             newState.actionsRemaining -= 1;
             newState.lastLawyerTurn = newState.turn;
+            newState.lawyerActiveUntil = newState.turn + 3;
+            
+            // Reduce all active arrest sentences by 25%
+            newState.policeHeat.arrests = newState.policeHeat.arrests.map(a => {
+              if (newState.turn - a.turn < a.sentence) {
+                return { ...a, sentence: Math.max(1, Math.floor(a.sentence * 0.75)) };
+              }
+              return a;
+            });
+            // Also reduce arrested soldiers/capos return times by 25%
+            newState.arrestedSoldiers = (newState.arrestedSoldiers || []).map(a => ({
+              ...a,
+              returnTurn: Math.max(newState.turn + 1, newState.turn + Math.max(1, Math.floor((a.returnTurn - newState.turn) * 0.75))),
+            }));
+            newState.arrestedCapos = (newState.arrestedCapos || []).map(a => ({
+              ...a,
+              returnTurn: Math.max(newState.turn + 1, newState.turn + Math.max(1, Math.floor((a.returnTurn - newState.turn) * 0.75))),
+            }));
+            
             // Remove first active arrest if any, otherwise just reduce heat
             const activeArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn < a.sentence);
             if (activeArrests.length > 0) {
@@ -2627,13 +2646,13 @@ export const useEnhancedMafiaGameState = (
               newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 3);
               newState.pendingNotifications = [...newState.pendingNotifications, {
                 type: 'info' as const, title: '⚖️ Lawyer Hired',
-                message: `Cleared arrest of ${cleared.target} (${cleared.impactOnProfit}% profit penalty removed). Heat −3.`,
+                message: `Cleared arrest of ${cleared.target}. All sentences reduced 25% for 3 turns. Heat −3.`,
               }];
             } else {
               newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 3);
               newState.pendingNotifications = [...newState.pendingNotifications, {
-                type: 'info' as const, title: '⚖️ Lawyer Hired',
-                message: `No active arrests to clear. Heat −3.`,
+                type: 'info' as const, title: '⚖️ Lawyer Retained',
+                message: `No active arrests to clear. Sentences −25% for 3 turns. Heat −3.`,
               }];
             }
           }
