@@ -957,8 +957,19 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               {(() => {
                 const key = `${hoveredHex.q},${hoveredHex.r},${hoveredHex.s}`;
                 const units = unitsByHex.get(key) || [];
+                const hexRevealed = isHexRevealed(hoveredHex);
+                
+                // Fog of War: show mystery text for unrevealed rival hexes with units
+                if (!hexRevealed && hoveredHex.controllingFamily !== 'neutral' && hoveredHex.controllingFamily !== playerFamily) {
+                  return (
+                    <p className="text-muted-foreground italic">
+                      👁️‍🗨️ Intel unknown — scout or bribe to reveal
+                    </p>
+                  );
+                }
+                
                 if (units.length === 0) return null;
-                return units.map(u => (
+                return units.filter(u => u.family === playerFamily || hexRevealed).map(u => (
                   <p key={u.id} className={u.family === playerFamily ? 'text-green-400' : 'text-red-400'}>
                     {u.type === 'capo' ? `👔 ${u.name} (Lvl ${u.level})${u.personality ? ` ${u.personality === 'diplomat' ? '🕊️' : u.personality === 'enforcer' ? '💪' : '🧠'}` : ''}` : '👤 Soldier'} — {u.family.toUpperCase()}
                     {u.family === playerFamily && ` (${u.movesRemaining} moves${u.fortified ? ', 🛡️ Fortified' : ''})`}
