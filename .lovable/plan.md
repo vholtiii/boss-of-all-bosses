@@ -1,22 +1,20 @@
 
 
-# Prevent Soldiers from Claiming Hexes with Businesses
+# Add "End Turn Early" Button
 
 ## Problem
-Soldiers can currently claim any neutral hex, including those with businesses on them. They should only be able to claim empty neutral hexes (no business).
+The player must click through all three phases (Deploy → Tactical → Action → Waiting) before they can press "End Turn." There's no way to skip directly to end-of-turn processing.
+
+## Solution
+Allow the "END TURN" button to work from **any phase**, not just the `waiting` phase. This lets the player end their turn early whenever they want.
 
 ## Change
 
-### `src/components/EnhancedMafiaHexGrid.tsx` — Line 363
-Add a check that the tile has no business:
+### `src/pages/UltimateMafiaGame.tsx` — Line 467
+Remove the `gameState.turnPhase !== 'waiting'` condition from the END TURN button's `disabled` prop, so it's only disabled when jailed. Add a confirmation dialog when ending early (not in `waiting` phase) to prevent accidental clicks.
 
-```typescript
-// Before:
-const canClaim = isNeutral && isSoldier;
+The `endTurn()` handler in `useEnhancedMafiaGameState.ts` already resets `turnPhase` back to `'deploy'`, so no backend changes are needed — it will correctly process end-of-turn regardless of which phase the player is in.
 
-// After:
-const canClaim = isNeutral && isSoldier && !tile.business;
-```
-
-Single line change. No other files affected.
+### Same file — Mobile floating action button (~line 710)
+Apply the same change to the mobile END TURN button so it's also available from any phase.
 
