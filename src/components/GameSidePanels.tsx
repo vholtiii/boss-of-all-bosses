@@ -562,19 +562,24 @@ const ActionButton: React.FC<{
   label: string;
   sublabel: string;
   disabled?: boolean;
+  phaseLocked?: boolean;
   variant?: 'default' | 'destructive' | 'outline';
   onClick: () => void;
-}> = ({ icon, label, sublabel, disabled, variant = 'outline', onClick }) => (
+}> = ({ icon, label, sublabel, disabled, phaseLocked, variant = 'outline', onClick }) => (
   <Button
     variant={variant}
     size="sm"
-    disabled={disabled}
+    disabled={disabled || phaseLocked}
     onClick={onClick}
-    className="w-full justify-start text-xs h-9 gap-2"
+    className={cn("w-full justify-start text-xs h-9 gap-2", phaseLocked && "opacity-50")}
   >
-    {icon}
+    {phaseLocked ? <Shield className="h-3.5 w-3.5 text-muted-foreground" /> : icon}
     <span className="flex-1 text-left">{label}</span>
-    <span className="text-[10px] text-muted-foreground font-normal">{sublabel}</span>
+    {phaseLocked ? (
+      <span className="text-[10px] text-muted-foreground font-normal">🔒</span>
+    ) : (
+      <span className="text-[10px] text-muted-foreground font-normal">{sublabel}</span>
+    )}
   </Button>
 );
 
