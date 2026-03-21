@@ -2094,8 +2094,8 @@ export const useEnhancedMafiaGameState = (
                 recruited: true,
               }];
               newState.soldierStats[newId] = {
-                loyalty: 65, training: 2, equipment: 2,
-                hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+                loyalty: 65, training: 0,
+                hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
               };
             }
             newState.pendingNotifications = [...newState.pendingNotifications, {
