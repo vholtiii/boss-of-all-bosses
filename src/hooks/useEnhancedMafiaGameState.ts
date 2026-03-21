@@ -2828,7 +2828,7 @@ export const useEnhancedMafiaGameState = (
         state.lastCombatResult = {
           q: targetQ, r: targetR, s: targetS,
           success: true, type: 'hit',
-          title: 'TERRITORY CAPTURED!',
+          title: 'HIT SUCCESSFUL!',
           details: hitDetails,
           timestamp: Date.now(),
         };
