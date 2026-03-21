@@ -2779,12 +2779,13 @@ export const useEnhancedMafiaGameState = (
             isLegal: pending.isLegal,
             heatLevel: 0,
             launderingCapacity: 0,
-            turnsUntilComplete: 3,
+            constructionProgress: 0,
+            constructionGoal: 3,
           };
           newState.pendingBusinessBuild = null;
           newState.pendingNotifications = [...newState.pendingNotifications, {
             type: 'success' as const, title: '🚧 Construction Started',
-            message: `Building ${pending.businessType} for $${pending.cost.toLocaleString()}. Ready in 3 turns. (1 action used)`,
+            message: `Building ${pending.businessType} for $${pending.cost.toLocaleString()}. Keep a Capo on hex for faster construction! (1 action used)`,
           }];
           return newState;
         }
