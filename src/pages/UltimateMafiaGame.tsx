@@ -28,8 +28,10 @@ import {
   Swords,
   Eye,
   SkipForward,
-  LogOut
+  LogOut,
+  Settings
 } from 'lucide-react';
+import SoundSettingsDialog from '@/components/SoundSettingsDialog';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
 
