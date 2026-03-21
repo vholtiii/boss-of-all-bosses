@@ -711,6 +711,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           
           <MobileFloatingActionButton
             onClick={() => {
+              if (gameState.turnPhase !== 'waiting') {
+                if (!window.confirm('End your turn early? You still have actions remaining.')) return;
+              }
               playSound('notification');
               endTurn();
             }}
