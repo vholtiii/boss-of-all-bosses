@@ -319,7 +319,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                   .filter(u => u.family === gameState.playerFamily && u.type === 'soldier')
                   .map(u => u.id)
               }
-              hitmanIds={gameState.hitmen.map(h => h.unitId)}
+              hitmanIds={[]}
               money={resources.money}
               onPromote={(unitId) => onAction({ type: 'promote_capo', unitId })}
             />

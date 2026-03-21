@@ -1899,20 +1899,26 @@ export const useEnhancedMafiaGameState = (
             return tile && tile.controllingFamily !== fam && tile.controllingFamily !== 'neutral';
           });
 
-          // Check if this AI family has an active bounty on the player
-          const hasBounty = state.aiBounties.some(b => b.fromFamily === fam && b.targetFamily === state.playerFamily);
-          
           let targetPool = playerHexes.length > 0 ? playerHexes
             : enemyHexes.length > 0 ? enemyHexes
             : neutralHexes.length > 0 ? neutralHexes
             : validMoves;
           
-          // Bounty active: always prioritize player hexes, skip neutral expansion
-          if (hasBounty && playerHexes.length > 0) {
+          // Bounty or alert active: always prioritize player hexes
+          const hasBounty = state.aiBounties.some(b => b.fromFamily === fam && b.targetFamily === state.playerFamily);
+          if ((hasBounty || isAlerted) && playerHexes.length > 0) {
             targetPool = playerHexes;
-          } else if (!hasBounty && neutralHexes.length > 0 && Math.random() < 0.3) {
-            // 30% chance to just expand to neutral instead of attacking (variety) — only if no bounty
+          } else if (!hasBounty && !isAlerted && neutralHexes.length > 0 && Math.random() < 0.3) {
+            // 30% chance to just expand to neutral instead of attacking (variety)
             targetPool = neutralHexes;
+          }
+
+          // Alert: fortify 1-2 units per turn (random chance)
+          if (isAlerted && !unit.fortified && Math.random() < 0.3) {
+            unit.fortified = true;
+            unit.movesRemaining = 0;
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'fortify', detail: `Fortified a unit (alert mode)` });
+            continue;
           }
 
           const target = targetPool[Math.floor(Math.random() * targetPool.length)];
