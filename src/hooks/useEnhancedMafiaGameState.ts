@@ -3503,7 +3503,13 @@ export const useEnhancedMafiaGameState = (
         const shuffled = [...playerUnits].sort(() => Math.random() - 0.5);
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(shuffled[i]);
-          if (idx !== -1) state.deployedUnits.splice(idx, 1);
+          if (idx !== -1) {
+            state.deployedUnits.splice(idx, 1);
+            state.pendingNotifications = [...state.pendingNotifications, {
+              type: 'error' as const, title: '⚔️ Soldier Killed in Battle',
+              message: `Your ${shuffled[i].type === 'capo' ? 'capo' : 'soldier'} was killed in the failed attack on ${tile.district}.`,
+            }];
+          }
         }
         shuffled.slice(casualties).forEach(u => {
           if (state.soldierStats[u.id]) {
