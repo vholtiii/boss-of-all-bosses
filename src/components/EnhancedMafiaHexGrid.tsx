@@ -351,8 +351,15 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         const isSoldier = selectedUnit.type === 'soldier';
         const isCapo = selectedUnit.type === 'capo';
         
+        // Soldiers can only extort on their own hex; Capos can extort adjacent hexes
+        const unitOnTargetHex = selectedUnit.q === tile.q && selectedUnit.r === tile.r && selectedUnit.s === tile.s;
+        const hasIllegalBusiness = !!tile.business && !tile.business.isLegal;
+        
         const canHit = isEnemy && (isSoldier || isCapo);
-        const canExtort = (isNeutral || (isEnemy && !!tile.business)) && isSoldier;
+        const canExtort = hasIllegalBusiness && (
+          (isSoldier && unitOnTargetHex) || 
+          (isCapo && (unitOnTargetHex || true)) // Capo can extort from adjacent (already validated as valid target)
+        ) && (isNeutral || isEnemy);
         const canClaim = isNeutral && isSoldier;
         const canNegotiate = isEnemy && isCapo;
         const canSabotage = isEnemy && isSoldier && !!tile.business;

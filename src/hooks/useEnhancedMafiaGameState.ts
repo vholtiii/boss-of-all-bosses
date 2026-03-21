@@ -1553,6 +1553,10 @@ export const useEnhancedMafiaGameState = (
               const deserter = playerSoldiers[Math.floor(Math.random() * playerSoldiers.length)];
               newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== deserter.id);
               turnReport.events.push(`🚪 A soldier deserted due to dangerously low loyalty!`);
+              newState.pendingNotifications.push({
+                type: 'error' as const, title: '🚪 Soldier Deserted',
+                message: 'A soldier abandoned your crew due to dangerously low loyalty.',
+              });
             }
           }
           // Also has ratting risk at this level
@@ -1571,6 +1575,10 @@ export const useEnhancedMafiaGameState = (
               newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== mutineer.id);
               newState.reputation.respect = Math.max(0, newState.reputation.respect - 5);
               turnReport.events.push(`⚔️ MUTINY! A soldier turned against you! (-5 Respect)`);
+              newState.pendingNotifications.push({
+                type: 'error' as const, title: '⚔️ Mutiny!',
+                message: 'A soldier turned against you! -5 Respect.',
+              });
             }
           }
           // Also has ratting risk
@@ -1663,6 +1671,10 @@ export const useEnhancedMafiaGameState = (
                 impactOnProfit: 5,
               });
               turnReport.events.push(`🚔 Street arrest! A soldier was picked up. Jailed for ${sentence} turns.${lawyerActive ? ' (Lawyer reduced sentence)' : ''}`);
+              newState.pendingNotifications.push({
+                type: 'error' as const, title: '🚔 Soldier Arrested',
+                message: `A soldier was arrested. Jailed for ${sentence} turns.${lawyerActive ? ' (Lawyer reduced sentence)' : ''}`,
+              });
             }
           }
         }
@@ -3485,7 +3497,13 @@ export const useEnhancedMafiaGameState = (
         const shuffled = [...playerUnits].sort(() => Math.random() - 0.5);
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(shuffled[i]);
-          if (idx !== -1) state.deployedUnits.splice(idx, 1);
+          if (idx !== -1) {
+            state.deployedUnits.splice(idx, 1);
+            state.pendingNotifications = [...state.pendingNotifications, {
+              type: 'error' as const, title: '⚔️ Soldier Lost in Combat',
+              message: `Your ${shuffled[i].type === 'capo' ? 'capo' : 'soldier'} fell during the assault on ${tile.district}.`,
+            }];
+          }
         }
       } else {
         // ============ DEFEAT ============
@@ -3497,7 +3515,13 @@ export const useEnhancedMafiaGameState = (
         const shuffled = [...playerUnits].sort(() => Math.random() - 0.5);
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(shuffled[i]);
-          if (idx !== -1) state.deployedUnits.splice(idx, 1);
+          if (idx !== -1) {
+            state.deployedUnits.splice(idx, 1);
+            state.pendingNotifications = [...state.pendingNotifications, {
+              type: 'error' as const, title: '⚔️ Soldier Killed in Battle',
+              message: `Your ${shuffled[i].type === 'capo' ? 'capo' : 'soldier'} was killed in the failed attack on ${tile.district}.`,
+            }];
+          }
         }
         shuffled.slice(casualties).forEach(u => {
           if (state.soldierStats[u.id]) {
@@ -3543,24 +3567,24 @@ export const useEnhancedMafiaGameState = (
       const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== state.playerFamily;
       if (!isNeutral && !isEnemy) return state;
 
-      // Check for player units on OR adjacent to the target hex
+      // Soldiers: must be ON the hex. Capos: can be on or adjacent.
       const playerUnitsOnHex = state.deployedUnits.filter(u => 
         u.family === state.playerFamily && u.q === targetQ && u.r === targetR && u.s === targetS
       );
       const neighbors = getHexNeighbors(targetQ, targetR, targetS);
-      const playerUnitsAdjacent = state.deployedUnits.filter(u => 
-        u.family === state.playerFamily && 
+      const playerCaposAdjacent = state.deployedUnits.filter(u => 
+        u.family === state.playerFamily && u.type === 'capo' &&
         neighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s)
       );
-      const allPlayerUnits = [...playerUnitsOnHex, ...playerUnitsAdjacent];
-      if (allPlayerUnits.length === 0) return state;
-
-      // Capos cannot manually extort — their extortion is automatic on arrival only
-      const hasSoldier = allPlayerUnits.some(u => u.type === 'soldier');
-      if (!hasSoldier) {
+      
+      const soldiersOnHex = playerUnitsOnHex.filter(u => u.type === 'soldier');
+      const caposInRange = [...playerUnitsOnHex.filter(u => u.type === 'capo'), ...playerCaposAdjacent];
+      const allPlayerUnits = [...soldiersOnHex, ...caposInRange];
+      
+      if (allPlayerUnits.length === 0) {
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'info' as const, title: 'Cannot Extort',
-          message: 'Capos handle extortion automatically when they arrive at a territory. Send a soldier to extort manually.',
+          message: 'Soldiers must be on the hex to extort. Capos can extort from adjacent hexes.',
         }];
         return state;
       }
@@ -3602,13 +3626,7 @@ export const useEnhancedMafiaGameState = (
           }
         });
 
-        // Auto-move: find the first adjacent SOLDIER and move them to the target hex
-        const adjacentSoldier = playerUnitsAdjacent.find(u => u.type === 'soldier');
-        if (adjacentSoldier) {
-          adjacentSoldier.q = targetQ;
-          adjacentSoldier.r = targetR;
-          adjacentSoldier.s = targetS;
-        }
+        // No auto-move needed — soldiers must already be on the hex
         
         const extortDetails = isEnemy 
           ? `Stole $${moneyGain.toLocaleString()} from ${tile.controllingFamily} business, +${respectGain} respect`
