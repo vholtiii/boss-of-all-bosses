@@ -1715,8 +1715,8 @@ export const useEnhancedMafiaGameState = (
               movesRemaining: 2, maxMoves: 2, level: 1,
             });
             state.soldierStats[newId] = {
-              loyalty: 40 + Math.floor(Math.random() * 30), training: 2 + Math.floor(Math.random() * 3),
-              equipment: 2, hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+              loyalty: 40 + Math.floor(Math.random() * 30), training: 0,
+              hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
             };
             const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
             if (tile && (tile.controllingFamily === 'neutral' || tile.controllingFamily === fam) && !tile.isHeadquarters) {
