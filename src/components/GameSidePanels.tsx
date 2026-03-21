@@ -196,17 +196,17 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             <ActionButton
               icon={<Users className="h-4 w-4" />}
               label="Buy Soldier (Mercenary)"
-              sublabel={respectPct > 0 ? `$${discountedMercCost.toLocaleString()} · -3 loyalty (${respectPct}% respect)` : `$${SOLDIER_COST.toLocaleString()} · -3 loyalty`}
-              disabled={resources.money < discountedMercCost}
+              sublabel={respectPct > 0 ? `$${discountedMercCost.toLocaleString()} · -3 loyalty · 1 action (${respectPct}% respect)` : `$${SOLDIER_COST.toLocaleString()} · -3 loyalty · 1 action`}
+              disabled={resources.money < discountedMercCost || gameState.tacticalActionsRemaining <= 0}
               onClick={() => onAction({ type: 'recruit_soldiers', cost: SOLDIER_COST })}
             />
             <ActionButton
               icon={<Users className="h-4 w-4" />}
               label="Recruit Soldier (Loyal)"
               sublabel={canRecruit 
-                ? (respectPct > 0 ? `$${discountedRecruitCost} · +2 loyalty (${respectPct}% respect)` : `$${LOCAL_SOLDIER_COST} · +2 loyalty`)
+                ? (respectPct > 0 ? `$${discountedRecruitCost} · +2 loyalty · 1 action (${respectPct}% respect)` : `$${LOCAL_SOLDIER_COST} · +2 loyalty · 1 action`)
                 : `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (${playerTerritoryCount} owned)`}
-              disabled={!canRecruit || resources.money < discountedRecruitCost}
+              disabled={!canRecruit || resources.money < discountedRecruitCost || gameState.tacticalActionsRemaining <= 0}
               onClick={() => onAction({ type: 'recruit_local_soldier' })}
             />
             <ActionButton
