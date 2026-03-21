@@ -66,7 +66,7 @@ Clamped to range: 10% – 95%
 
 | Effect | Value |
 |---|---|
-| Territory captured | ✅ |
+| Territory captured | ❌ (set to neutral; must Claim next turn) |
 | Enemy units on hex | Removed |
 | Respect gained | +5 |
 | Fear gained | +5 |

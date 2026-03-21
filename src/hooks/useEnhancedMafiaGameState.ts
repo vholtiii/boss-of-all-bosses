@@ -2799,7 +2799,7 @@ export const useEnhancedMafiaGameState = (
           const idx = state.deployedUnits.indexOf(eu);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         });
-        tile.controllingFamily = state.playerFamily;
+        tile.controllingFamily = null; // Hit clears enemy control — player must Claim next turn
         
         // Fix 3: Replace money with fear/respect
         state.resources.respect += 5;
@@ -2828,13 +2828,13 @@ export const useEnhancedMafiaGameState = (
         state.lastCombatResult = {
           q: targetQ, r: targetR, s: targetS,
           success: true, type: 'hit',
-          title: 'TERRITORY CAPTURED!',
+          title: 'HIT SUCCESSFUL!',
           details: hitDetails,
           timestamp: Date.now(),
         };
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: 'Territory Captured!',
-          message: `Hit successful! ${hitDetails}.`,
+          type: 'success', title: 'Hit Successful!',
+          message: `Territory is now contested — claim it next turn. ${hitDetails}.`,
         }];
       } else {
         let casualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
