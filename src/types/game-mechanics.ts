@@ -276,3 +276,10 @@ export const INTERNAL_HIT_LOYALTY_THRESHOLD = 70;  // loyalty below this = elimi
 export const INTERNAL_HIT_HEAT_REDUCTION = 25;     // heat reduced when family cleans up
 export const INTERNAL_HIT_MORALE_RISK = 0.10;      // 10% chance each soldier loses loyalty
 export const INTERNAL_HIT_MORALE_PENALTY = 15;     // loyalty lost per affected soldier
+
+// ============ INDIVIDUAL SOLDIER LOYALTY ============
+export const LOYALTY_ACTION_BONUS = 2;         // +2 loyalty per successful action (hit, extortion, claim)
+export const LOYALTY_COMBAT_BONUS = 5;         // +5 loyalty per survived combat encounter
+export const LOYALTY_INCOME_HEX_BONUS = 3;     // +3 loyalty/turn if on hex with business >= threshold
+export const LOYALTY_INCOME_HEX_THRESHOLD = 4000; // minimum business income for hex loyalty bonus
+export const LOYALTY_UNPAID_PENALTY = 2;       // -2 loyalty/turn when family can't afford maintenance

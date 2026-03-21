@@ -55,13 +55,36 @@ Every soldier tracks individual statistics:
 
 | Stat | Range | Description |
 |---|---|---|
-| Loyalty | 1–100 | Affects promotion eligibility and overall effectiveness |
-| Training | 1–10 | Combat effectiveness and hitman eligibility |
-| Equipment | 1–10 | Gear quality |
+| Loyalty | 0–80 (soldiers) / 0–99 (capos) | Affects promotion eligibility, internal hit survival, and overall effectiveness |
+| Training | 0–3 | +1 per turn deployed away from HQ. Combat effectiveness and hitman eligibility |
 | Hits | Count | Number of hit operations completed |
 | Extortions | Count | Number of extortion operations completed |
-| Intimidations | Count | Number of intimidation actions |
-| Survived Conflicts | Count | Total battles survived (key for capo promotion) |
+| Victories | 0–5 | +1 per successful extortion or hit |
+| Toughness | 0–5 | +1 per survived combat encounter |
+| Racketeering | 0–5 | +1 per successful extortion |
+
+### 4.1 Loyalty Growth & Decay
+
+Loyalty changes dynamically each turn and during actions:
+
+**Per-Turn Growth:**
+| Source | Bonus | Condition |
+|---|---|---|
+| Stats baseline | `floor((training + toughness + racketeering + victories) / 4)` | Always (rewards well-rounded soldiers) |
+| High-income hex | +3/turn | Stationed on hex with business income ≥ $4,000 |
+
+**Action Bonuses (immediate):**
+| Trigger | Bonus |
+|---|---|
+| Successful hit, extortion, or claim | +2 loyalty |
+| Survived combat (win or loss) | +5 loyalty |
+
+**Decay:**
+| Trigger | Penalty |
+|---|---|
+| Unpaid maintenance (family can't afford upkeep) | -2 loyalty/turn |
+
+**Note:** Soldiers returning from hiding with loyalty < 70 are eliminated by the family (internal hit). See [COMBAT_SYSTEM_GUIDE.md](./COMBAT_SYSTEM_GUIDE.md) for details.
 
 Stats increase through successful operations and can be tracked per unit.
 

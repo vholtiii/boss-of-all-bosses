@@ -27,6 +27,7 @@ import {
   HiddenUnit, AIBounty,
   BLIND_HIT_PENALTY, BLIND_HIT_RESPECT, BLIND_HIT_FEAR, HIDING_DURATION, BOUNTY_DURATION, BLIND_HIT_INFLUENCE_LOSS,
   INTERNAL_HIT_LOYALTY_THRESHOLD, INTERNAL_HIT_HEAT_REDUCTION, INTERNAL_HIT_MORALE_RISK, INTERNAL_HIT_MORALE_PENALTY,
+  LOYALTY_ACTION_BONUS, LOYALTY_COMBAT_BONUS, LOYALTY_INCOME_HEX_BONUS, LOYALTY_INCOME_HEX_THRESHOLD, LOYALTY_UNPAID_PENALTY,
 } from '@/types/game-mechanics';
 
 // ============ UNIT TYPES ============
@@ -1378,7 +1379,18 @@ export const useEnhancedMafiaGameState = (
         ...u, movesRemaining: u.maxMoves, escortingSoldierIds: undefined,
       }));
 
-      // --- Training increment: +1 training per turn for soldiers deployed away from HQ ---
+      // --- Training increment & individual soldier loyalty (per-turn) ---
+      const maintenanceUnpaid = (() => {
+        const pSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+        let maint = 0;
+        pSoldiers.forEach(s => {
+          const isHitman = newState.hitmen.some(h => h.unitId === s.id);
+          maint += isHitman ? Math.floor(SOLDIER_COST * HITMAN_MAINTENANCE_MULTIPLIER) : SOLDIER_COST;
+        });
+        maint += newState.resources.soldiers * SOLDIER_COST;
+        return newState.resources.money < maint;
+      })();
+
       newState.deployedUnits.forEach(u => {
         const stats = newState.soldierStats[u.id];
         if (!stats) return;
@@ -1388,9 +1400,27 @@ export const useEnhancedMafiaGameState = (
           stats.training = Math.min(3, stats.training + 1);
           stats.turnsDeployed += 1;
         }
-        // Enforce loyalty caps
+
+        // === Individual soldier loyalty: stats-correlated baseline ===
+        const baseline = Math.floor((stats.training + stats.toughness + stats.racketeering + stats.victories) / 4);
+        stats.loyalty += baseline;
+
+        // === +3 if on high-income hex ===
+        if (u.family === newState.playerFamily) {
+          const hex = newState.hexMap.find(t => t.q === u.q && t.r === u.r && t.s === u.s);
+          if (hex?.business && hex.business.income >= LOYALTY_INCOME_HEX_THRESHOLD) {
+            stats.loyalty += LOYALTY_INCOME_HEX_BONUS;
+          }
+        }
+
+        // === -2 when unpaid ===
+        if (maintenanceUnpaid && u.family === newState.playerFamily) {
+          stats.loyalty -= LOYALTY_UNPAID_PENALTY;
+        }
+
+        // Enforce loyalty caps & floor
         const isCapo = u.type === 'capo';
-        stats.loyalty = Math.min(isCapo ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP, stats.loyalty);
+        stats.loyalty = Math.max(0, Math.min(isCapo ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP, stats.loyalty));
       });
 
       // Tick scouted hexes
@@ -2983,6 +3013,11 @@ export const useEnhancedMafiaGameState = (
               state.soldierStats[u.id].hits += 1;
               state.soldierStats[u.id].victories = Math.min(5, state.soldierStats[u.id].victories + 1);
               state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
+              // Loyalty: +2 action bonus + +5 combat bonus
+              state.soldierStats[u.id].loyalty = Math.min(
+                u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
+                state.soldierStats[u.id].loyalty + LOYALTY_ACTION_BONUS + LOYALTY_COMBAT_BONUS
+              );
             }
           });
           
@@ -3026,6 +3061,11 @@ export const useEnhancedMafiaGameState = (
         shuffled.slice(casualties).forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
+            // Loyalty: +5 combat survival bonus
+            state.soldierStats[u.id].loyalty = Math.min(
+              u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
+              state.soldierStats[u.id].loyalty + LOYALTY_COMBAT_BONUS
+            );
           }
         });
         const failDetails = `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} suffered`;
@@ -3109,6 +3149,11 @@ export const useEnhancedMafiaGameState = (
             state.soldierStats[u.id].extortions += 1;
             state.soldierStats[u.id].victories = Math.min(5, state.soldierStats[u.id].victories + 1);
             state.soldierStats[u.id].racketeering = Math.min(5, state.soldierStats[u.id].racketeering + 1);
+            // Loyalty: +2 action bonus
+            state.soldierStats[u.id].loyalty = Math.min(
+              u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
+              state.soldierStats[u.id].loyalty + LOYALTY_ACTION_BONUS
+            );
           }
         });
         
