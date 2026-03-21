@@ -225,9 +225,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Defense & Law"
           icon={<Gavel className="h-4 w-4" />}
-          isOpen={!actionsLocked && openSection === 'defense'}
-          onToggle={() => !actionsLocked && toggle('defense')}
-          disabled={actionsLocked}
+          isOpen={openSection === 'defense'}
+          onToggle={() => toggle('defense')}
+          phaseLocked={actionsLocked}
         >
           <div className="space-y-1.5">
             <ActionButton
@@ -235,6 +235,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Train Soldiers"
               sublabel={`$8,000`}
               disabled={resources.money < 8000}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'train_soldiers' })}
             />
             <ActionButton
@@ -242,6 +243,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Public Appearance"
               sublabel={`$3,000 · +Rep`}
               disabled={resources.money < 3000}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'public_appearance', cost: 3000 })}
             />
             <ActionButton
@@ -249,6 +251,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Charitable Donation"
               sublabel={`$5,000 · −Heat · +Rep`}
               disabled={resources.money < 5000}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'charitable_donation', amount: 5000 })}
             />
           </div>
