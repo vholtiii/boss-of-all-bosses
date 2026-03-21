@@ -1004,6 +1004,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               })()}
             </AnimatePresence>
           </g>
+            {/* District border outlines — rendered last so they appear on top */}
+            {districtBorderPaths.map((d, i) => (
+              <path key={`border-${i}`} d={d} stroke="rgba(220,220,220,0.7)" strokeWidth="3.5" fill="none" strokeLinejoin="round" className="pointer-events-none" />
+            ))}
         </svg>
       </div>
 
