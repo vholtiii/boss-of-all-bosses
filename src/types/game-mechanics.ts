@@ -224,13 +224,8 @@ export const CAPO_PROMOTION_REQUIREMENTS = {
   minRacketeering: 5,    // racketeering on SoldierStats (0-5)
 };
 
-// Hitman promotion requirements
-export const HITMAN_REQUIREMENTS = {
-  minStrength: 3,     // training (0-3 scale, must be maxed)
-  minReputation: 50,  // maps to loyalty
-  minHits: 3,
-  minToughness: 3,    // toughness (0-5)
-};
+// Hitman promotion requirements (legacy — kept for reference)
+// Hitmen are now external contract killers, not promoted soldiers
 
 // ============ MOVE PHASE TYPES ============
 export interface ScoutedHex {
