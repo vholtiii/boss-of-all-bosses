@@ -405,7 +405,8 @@ const createInitialGameState = (
     
     // New systems
     soldierStats,
-    hitmen: [],
+    hitmanContracts: [],
+    aiAlertState: {},
     activeBribes: [],
     alliances: [],
     ceasefires: [],
