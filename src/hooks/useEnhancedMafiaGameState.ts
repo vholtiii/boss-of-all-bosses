@@ -26,6 +26,7 @@ import {
   TACTICAL_ACTIONS_PER_TURN,
   HiddenUnit, AIBounty,
   BLIND_HIT_PENALTY, BLIND_HIT_RESPECT, BLIND_HIT_FEAR, HIDING_DURATION, BOUNTY_DURATION, BLIND_HIT_INFLUENCE_LOSS,
+  INTERNAL_HIT_LOYALTY_THRESHOLD, INTERNAL_HIT_HEAT_REDUCTION, INTERNAL_HIT_MORALE_RISK, INTERNAL_HIT_MORALE_PENALTY,
 } from '@/types/game-mechanics';
 
 // ============ UNIT TYPES ============
@@ -1289,37 +1290,75 @@ export const useEnhancedMafiaGameState = (
       newState.deployMode = null;
       newState.availableDeployHexes = [];
 
-      // ============ HIDDEN UNITS RETURN ============
+      // ============ HIDDEN UNITS RETURN / INTERNAL HIT CHECK ============
       const returningUnits = newState.hiddenUnits.filter(h => newState.turn >= h.returnsOnTurn);
       if (returningUnits.length > 0) {
         const hq = newState.headquarters[newState.playerFamily];
+        let returnedCount = 0;
+        let eliminatedCount = 0;
+
         returningUnits.forEach(h => {
-          // Re-deploy the unit at HQ
-          newState.deployedUnits.push({
-            id: h.unitId,
-            family: newState.playerFamily,
-            type: 'soldier',
-            q: hq.q, r: hq.r, s: hq.s,
-            movesRemaining: 0,
-            maxMoves: 2,
-            level: 1,
-            fortified: false,
-          });
-          // Restore soldier stats if missing
-          if (!newState.soldierStats[h.unitId]) {
-            newState.soldierStats[h.unitId] = {
-              loyalty: 50, training: 0, hits: 0, extortions: 0,
-              victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
-            };
+          const stats = newState.soldierStats[h.unitId];
+          const loyalty = stats?.loyalty ?? 50;
+
+          if (loyalty < INTERNAL_HIT_LOYALTY_THRESHOLD) {
+            // ===== INTERNAL FAMILY HIT: soldier eliminated =====
+            eliminatedCount++;
+            delete newState.soldierStats[h.unitId];
+
+            // Heat reduction — family cleaned up its mess
+            newState.policeHeat.level = Math.max(0, newState.policeHeat.level - INTERNAL_HIT_HEAT_REDUCTION);
+
+            // Morale risk: each remaining soldier may lose loyalty
+            Object.keys(newState.soldierStats).forEach(sid => {
+              if (Math.random() < INTERNAL_HIT_MORALE_RISK) {
+                newState.soldierStats[sid] = {
+                  ...newState.soldierStats[sid],
+                  loyalty: Math.max(0, newState.soldierStats[sid].loyalty - INTERNAL_HIT_MORALE_PENALTY),
+                };
+              }
+            });
+
+            newState.pendingNotifications.push({
+              type: 'error',
+              title: '🔪 Internal Family Hit',
+              message: `The family dealt with a disloyal soldier internally. The mess has been cleaned up. (-${INTERNAL_HIT_HEAT_REDUCTION} heat)`,
+            });
+          } else {
+            // ===== LOYAL SOLDIER: returns to HQ =====
+            returnedCount++;
+            newState.deployedUnits.push({
+              id: h.unitId,
+              family: newState.playerFamily,
+              type: 'soldier',
+              q: hq.q, r: hq.r, s: hq.s,
+              movesRemaining: 0,
+              maxMoves: 2,
+              level: 1,
+              fortified: false,
+            });
+            if (!newState.soldierStats[h.unitId]) {
+              newState.soldierStats[h.unitId] = {
+                loyalty: 50, training: 0, hits: 0, extortions: 0,
+                victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
+              };
+            }
           }
         });
+
         newState.hiddenUnits = newState.hiddenUnits.filter(h => newState.turn < h.returnsOnTurn);
-        newState.pendingNotifications.push({
-          type: 'info',
-          title: '🕵️ Soldier Returned from Hiding',
-          message: `${returningUnits.length} soldier(s) came out of hiding and returned to HQ.`,
-        });
-        if (turnReport) turnReport.events.push(`${returningUnits.length} soldier(s) returned from hiding.`);
+
+        if (returnedCount > 0) {
+          newState.pendingNotifications.push({
+            type: 'info',
+            title: '🕵️ Soldier Returned from Hiding',
+            message: `${returnedCount} soldier(s) came out of hiding and returned to HQ.`,
+          });
+        }
+        if (turnReport) {
+          if (returnedCount > 0) turnReport.events.push(`${returnedCount} soldier(s) returned from hiding.`);
+          if (eliminatedCount > 0) turnReport.events.push(`${eliminatedCount} soldier(s) eliminated internally by the family.`);
+        }
       }
 
       // ============ EXPIRE AI BOUNTIES ============

@@ -270,3 +270,9 @@ export const BLIND_HIT_FEAR = 15;           // fear gained on unscouted hit vict
 export const HIDING_DURATION = 3;           // turns a soldier hides after civilian hit
 export const BOUNTY_DURATION = 3;           // turns AI prioritizes revenge
 export const BLIND_HIT_INFLUENCE_LOSS = 10; // influence lost by targeted family
+
+// ============ INTERNAL FAMILY HIT ============
+export const INTERNAL_HIT_LOYALTY_THRESHOLD = 70;  // loyalty below this = eliminated after hiding
+export const INTERNAL_HIT_HEAT_REDUCTION = 25;     // heat reduced when family cleans up
+export const INTERNAL_HIT_MORALE_RISK = 0.10;      // 10% chance each soldier loses loyalty
+export const INTERNAL_HIT_MORALE_PENALTY = 15;     // loyalty lost per affected soldier
