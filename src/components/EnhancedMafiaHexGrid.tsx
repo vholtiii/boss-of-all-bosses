@@ -137,7 +137,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return points.join(' ');
   };
 
-  // Compute district border paths as connected polygons
+  // Compute district border paths as connected polygon outlines
   const districtBorderPaths = useMemo(() => {
     const tileMap = new Map<string, HexTile>();
     hexMap.forEach(t => tileMap.set(`${t.q},${t.r},${t.s}`, t));
