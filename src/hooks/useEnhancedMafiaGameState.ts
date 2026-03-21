@@ -1828,13 +1828,19 @@ export const useEnhancedMafiaGameState = (
             return tile && tile.controllingFamily !== fam && tile.controllingFamily !== 'neutral';
           });
 
+          // Check if this AI family has an active bounty on the player
+          const hasBounty = newState.aiBounties.some(b => b.fromFamily === fam && b.targetFamily === newState.playerFamily);
+          
           let targetPool = playerHexes.length > 0 ? playerHexes
             : enemyHexes.length > 0 ? enemyHexes
             : neutralHexes.length > 0 ? neutralHexes
             : validMoves;
           
-          // 30% chance to just expand to neutral instead of attacking (variety)
-          if (neutralHexes.length > 0 && Math.random() < 0.3) {
+          // Bounty active: always prioritize player hexes, skip neutral expansion
+          if (hasBounty && playerHexes.length > 0) {
+            targetPool = playerHexes;
+          } else if (!hasBounty && neutralHexes.length > 0 && Math.random() < 0.3) {
+            // 30% chance to just expand to neutral instead of attacking (variety) — only if no bounty
             targetPool = neutralHexes;
           }
 

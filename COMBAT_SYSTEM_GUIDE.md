@@ -35,7 +35,31 @@ Combat in Boss of All Bosses is resolved through three distinct actions availabl
 
 ## 2. Hit (Attack Enemy Territory)
 
-The primary offensive action. Attacks an enemy-controlled hex to capture it.
+The primary offensive action. Attacks an enemy-controlled hex to clear it (territory becomes neutral — must Claim next turn).
+
+**Scouted vs Unscouted (Blind) Hits** determine risk/reward:
+
+| | Scouted Hit | Blind Hit (Unscouted) |
+|---|---|---|
+| Civilian risk | None | Yes — if no enemies on hex |
+| Success penalty | None | −20% to hit chance |
+| Victory respect | +5 | +15 |
+| Victory fear | +5 | +15 |
+| Soldier stat boost | Normal (+1 each) | Maxed (toughness, loyalty, victories) |
+| Street cred event | No | Yes — all rivals gain fear |
+| Bounty placed | No | Yes — targeted family attacks you for 3 turns |
+| Target family penalty | None | −10 influence |
+
+### 2.0 Civilian Hit (Blind Hit Only)
+
+If you hit an **unscouted hex with no enemy units**, your soldier struck a civilian:
+
+| Penalty | Value |
+|---|---|
+| Police heat | Set to **100 (maximum)** |
+| Attacking soldier | Removed from board, enters **hiding for 3 turns** |
+| Soldier return | Reappears at HQ after hiding duration |
+| Respect/fear gained | None |
 
 ### 2.1 Who Participates
 
