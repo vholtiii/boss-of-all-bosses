@@ -89,7 +89,6 @@ When a soldier's hiding period ends, the family evaluates their loyalty:
 ```
 chance = 50% + (attackers - defenders) × 15%
        + family combat bonus (e.g., Gambino +25%)
-       + hitman bonus per hitman (+30% + 10% per level above 1)
        + family hit success bonus (e.g., Lucchese +25%)
        + scout bonus (+15% if hex scouted)
        + fortified attacker bonus (+12.5%)

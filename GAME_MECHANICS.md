@@ -491,14 +491,18 @@ Negotiations require a capo adjacent to enemy territory.
 | Min training | 3 |
 | Max capos | 3 |
 
-### 12.3 Hitman Promotion
+### 12.3 Hitman Contracts
 
-| Requirement | Value |
+Hitmen are hired externally — not promoted from soldiers.
+
+| Property | Value |
 |---|---|
-| Min strength (training × 10) | 80 |
-| Min reputation (loyalty) | 50 |
-| Min hits | 3 |
-| Max hitmen | 3 |
+| Cost | $15,000 per contract |
+| Max active | 3 |
+| Heat | None |
+| Bonuses | None |
+
+See [SOLDIER_RECRUITMENT_GUIDE.md](./SOLDIER_RECRUITMENT_GUIDE.md#6-hitman-contracts) for full contract details.
 
 ---
 

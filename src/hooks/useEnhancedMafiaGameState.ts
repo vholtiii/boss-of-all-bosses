@@ -2779,14 +2779,40 @@ export const useEnhancedMafiaGameState = (
     const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
     if (!tile || !tile.business || tile.controllingFamily === state.playerFamily || tile.isHeadquarters) return state;
 
-    // Reduce business income by 40-60%
-    const reduction = 0.4 + Math.random() * 0.2;
-    const oldIncome = tile.business.income;
-    tile.business.income = Math.max(100, Math.floor(oldIncome * (1 - reduction)));
-    tile.business.heatLevel = Math.min(100, tile.business.heatLevel + 20);
+    // Require $12,000
+    if (state.resources.money < 12000) {
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'warning', title: '💣 Sabotage Failed',
+        message: `Not enough money. Sabotage costs $12,000.`,
+      }];
+      return state;
+    }
 
-    // Increase police heat
-    state.policeHeat.level = Math.min(100, state.policeHeat.level + 10);
+    // Require a player soldier on or adjacent to the target hex
+    const adjacentCoords = getAdjacentHexes(targetQ, targetR, targetS);
+    const hasSoldierPresence = state.deployedUnits.some(u =>
+      u.family === state.playerFamily && u.type === 'soldier' &&
+      ((u.q === targetQ && u.r === targetR && u.s === targetS) ||
+       adjacentCoords.some(a => u.q === a.q && u.r === a.r && u.s === a.s))
+    );
+    if (!hasSoldierPresence) {
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'warning', title: '💣 Sabotage Failed',
+        message: `You need a soldier on or adjacent to the target hex.`,
+      }];
+      return state;
+    }
+
+    // Deduct cost
+    state.resources.money -= 12000;
+
+    // Permanently destroy the business
+    const destroyedType = tile.business.type;
+    const destroyedIncome = tile.business.income;
+    tile.business = null as any;
+
+    // Increase police heat (+15)
+    state.policeHeat.level = Math.min(100, state.policeHeat.level + 15);
 
     // Damage relationship with owning family
     if (state.reputation.familyRelationships[tile.controllingFamily] !== undefined) {
@@ -2795,7 +2821,7 @@ export const useEnhancedMafiaGameState = (
 
     state.pendingNotifications = [...state.pendingNotifications, {
       type: 'success', title: '💣 Sabotage Successful!',
-      message: `${tile.controllingFamily}'s ${tile.business.type} income reduced from $${oldIncome.toLocaleString()} to $${tile.business.income.toLocaleString()}/turn. +10 Heat.`,
+      message: `${tile.controllingFamily}'s ${destroyedType} ($${destroyedIncome.toLocaleString()}/turn) has been permanently destroyed! -$12,000. +15 Heat.`,
     }];
 
     syncLegacyUnits(state);
