@@ -1553,6 +1553,10 @@ export const useEnhancedMafiaGameState = (
               const deserter = playerSoldiers[Math.floor(Math.random() * playerSoldiers.length)];
               newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== deserter.id);
               turnReport.events.push(`🚪 A soldier deserted due to dangerously low loyalty!`);
+              newState.pendingNotifications.push({
+                type: 'error' as const, title: '🚪 Soldier Deserted',
+                message: 'A soldier abandoned your crew due to dangerously low loyalty.',
+              });
             }
           }
           // Also has ratting risk at this level
