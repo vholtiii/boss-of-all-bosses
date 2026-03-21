@@ -1350,6 +1350,7 @@ export const useEnhancedMafiaGameState = (
           if (loyalty < INTERNAL_HIT_LOYALTY_THRESHOLD) {
             // ===== INTERNAL FAMILY HIT: soldier eliminated =====
             eliminatedCount++;
+            if (turnReport) turnReport.resourceDeltas.soldiers--;
             delete newState.soldierStats[h.unitId];
 
             // Heat reduction — family cleaned up its mess
