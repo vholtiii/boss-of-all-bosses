@@ -159,9 +159,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Economy"
           icon={<TrendingUp className="h-4 w-4" />}
-          isOpen={!actionsLocked && openSection === 'economy'}
-          onToggle={() => !actionsLocked && toggle('economy')}
-          disabled={actionsLocked}
+          isOpen={openSection === 'economy'}
+          onToggle={() => toggle('economy')}
+          phaseLocked={actionsLocked}
         >
           <div className="space-y-1.5">
             <ActionButton
@@ -169,6 +169,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Build Business"
               sublabel={`$25,000`}
               disabled={resources.money < 25000 || legalStatus.jailTime > 0}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'build_business', cost: 25000, income: 5000, legal: true })}
             />
             <ActionButton
@@ -176,6 +177,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Launder Money"
               sublabel={`20% fee`}
               disabled={gameState.finances.dirtyMoney < 1000 || legalStatus.jailTime > 0}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'launder_money', amount: 10000 })}
             />
             <ActionButton
@@ -183,6 +185,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Invest $20K"
               sublabel={`~15% return · 5 turns`}
               disabled={resources.money < 20000}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'make_investment', investmentType: 'stocks', amount: 20000, expectedReturn: 1.15, duration: 5 })}
             />
           </div>
