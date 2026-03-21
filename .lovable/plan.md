@@ -1,33 +1,35 @@
 
 
-
-# Internal Hit After Hiding Period
+# Individual Soldier Loyalty System
 
 ## Summary
 
-When a blind hit results in a civilian hit, the soldier goes into hiding for 3 turns. Upon return, the family checks the soldier's loyalty — if below 70, the soldier is permanently eliminated (internal family hit). If 70+, the soldier returns to HQ normally.
+Individual soldier loyalty now grows and decays organically based on actions, combat, positioning, stats, and financial status.
 
 ## Mechanics
 
-### Civilian Hit → Hiding (unchanged)
-- Unscouted hex, no enemy units → soldier enters hiding for 3 turns
-- Heat set to 100
+### Per-Turn Loyalty Growth
+- **Stats-correlated baseline**: `floor((training + toughness + racketeering + victories) / 4)` loyalty per turn
+- **High-income hex bonus**: +3 loyalty/turn if stationed on hex with business income >= $4,000
+- **Unpaid penalty**: -2 loyalty/turn if family can't afford maintenance
 
-### Post-Hiding Loyalty Check (new)
-- When hiding period ends and `loyalty < 70`:
-  - Soldier **permanently removed** (deleted from deployedUnits and soldierStats)
-  - Police heat reduced by **25**
-  - Each remaining soldier has **10% chance** of losing **15 loyalty** (morale risk)
-  - Notification: "The family dealt with the soldier internally."
-- When `loyalty >= 70`: soldier returns to HQ hex as normal
+### Action Bonuses (immediate)
+- **Successful action** (hit, extortion, claim): +2 loyalty
+- **Survived combat** (hit win or loss with casualties): +5 loyalty
+
+### Caps
+- Soldiers: 80 (`SOLDIER_LOYALTY_CAP`)
+- Capos: 99 (`CAPO_LOYALTY_CAP`)
+- Minimum: 0
 
 ## Constants (`src/types/game-mechanics.ts`)
-- `INTERNAL_HIT_LOYALTY_THRESHOLD = 70`
-- `INTERNAL_HIT_HEAT_REDUCTION = 25`
-- `INTERNAL_HIT_MORALE_RISK = 0.10`
-- `INTERNAL_HIT_MORALE_PENALTY = 15`
+- `LOYALTY_ACTION_BONUS = 2`
+- `LOYALTY_COMBAT_BONUS = 5`
+- `LOYALTY_INCOME_HEX_BONUS = 3`
+- `LOYALTY_INCOME_HEX_THRESHOLD = 4000`
+- `LOYALTY_UNPAID_PENALTY = 2`
 
 ## Files Modified
-- `src/types/game-mechanics.ts` — 4 new constants
-- `src/hooks/useEnhancedMafiaGameState.ts` — loyalty check in hidden-unit-return logic
-- `COMBAT_SYSTEM_GUIDE.md` — Internal Family Hit subsection
+- `src/types/game-mechanics.ts` — 5 new constants
+- `src/hooks/useEnhancedMafiaGameState.ts` — per-turn loyalty processing, action/combat bonuses
+- `SOLDIER_RECRUITMENT_GUIDE.md` — documented loyalty mechanics
