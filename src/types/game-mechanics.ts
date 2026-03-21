@@ -1,13 +1,17 @@
 // ============ HITMAN SYSTEM ============
 export interface SoldierStats {
-  loyalty: number;       // 1-100
-  training: number;      // 1-10
-  equipment: number;     // 1-10
-  hits: number;
-  extortions: number;
-  intimidations: number;
-  survivedConflicts: number;
+  loyalty: number;       // 0-80 for soldiers, 0-99 for capos
+  training: number;      // 0-3 (+1 per turn deployed away from HQ)
+  hits: number;          // successful hit actions
+  extortions: number;    // successful extortion actions
+  victories: number;     // 0-5 (+1 per successful extortion or hit)
+  toughness: number;     // 0-5 (+1 per survived combat encounter)
+  racketeering: number;  // 0-5 (+1 per successful extortion)
+  turnsDeployed: number; // internal tracker for training calc
 }
+
+export const SOLDIER_LOYALTY_CAP = 80;
+export const CAPO_LOYALTY_CAP = 99;
 
 export interface Hitman {
   unitId: string;         // references DeployedUnit.id
