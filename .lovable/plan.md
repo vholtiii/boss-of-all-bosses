@@ -1,54 +1,38 @@
 
 
-# Fog of War: Hide Rival Intel Unless Scouted or Bribed
+# Fix Soldier Purchase & Capo Promotion Flow
 
-## Summary
+## Issues to Fix
 
-Currently all rival unit positions, counts, fortification status, and safehouses are visible on the map. This removes strategic depth. The plan adds a fog of war system where rival hexes only show **territory control color** — all other intel (units, fortifications, safehouses, unit counts) is hidden unless the hex is **scouted** or the player has an active **Police Captain bribe** targeting that rival family.
-
-## What Changes for the Player
-
-**Hidden by default on rival hexes:**
-- Soldier/Capo icons and counts
-- Fortification shield indicator
-- Enemy safehouse indicator
-- Unit details in hover tooltip
-
-**Always visible:**
-- Territory control (hex color + control dot)
-- Business icons and income (businesses are public-facing)
-- HQ locations (common knowledge)
-
-**How to reveal intel:**
-1. **Scout action** — reveals a specific hex for 3 turns (already exists)
-2. **Police Captain bribe** — reveals all hexes of the targeted rival family while active
+1. **Bought mercenaries don't appear at HQ** — `recruit_soldiers` increments a counter but never creates a `deployedUnit` at HQ coordinates
+2. **"Recruit Capo" button shouldn't exist** — Capos are only obtainable via promotion from the existing `CapoPromotionPanel`
+3. **Buy Soldier price display** — Ensure the button shows the correct $1,500 price
+4. **Capo promotion UX** — When clicking "Promote" in the Capo Promotion section, the player should select from their eligible soldiers (this already works via `CapoPromotionPanel` which lists soldiers with promote buttons — just need to remove the shortcut "Recruit Capo" button that bypasses it)
 
 ## Changes
 
-### 1. `src/components/EnhancedMafiaHexGrid.tsx` — Core fog of war logic
+### 1. `src/hooks/useEnhancedMafiaGameState.ts` — Fix mercenary purchase
 
-Add a helper function `isHexRevealed(tile, family)` that returns `true` if:
-- The hex belongs to the player
-- The hex is neutral
-- The hex is scouted (exists in `scoutedHexes`)
-- The player has an active `police_captain` bribe contract targeting the hex's controlling family
+**`recruit_soldiers` case**: Instead of just incrementing `resources.soldiers`, create an actual `deployedUnit` at the player's HQ coordinates:
+- Generate ID like `{family}-soldier-merc-{timestamp}`
+- Place at HQ with `movesRemaining: 0`, `type: 'soldier'`
+- Create `soldierStats` entry with `training: 5` (combat-ready merc), current loyalty
+- Apply -3 loyalty penalty
+- Decrement `tacticalActionsRemaining`
 
-**Unit rendering (~line 509-585):** Wrap rival unit rendering in `isHexRevealed` check — only show enemy SoldierIcon/CapoIcon if revealed.
+**Delete `recruit_capo` case** — no longer callable.
 
-**Fortification indicator (~line 483-494):** Currently only shows player's fortified units. Keep as-is (already correct — only shows `playerFamily`).
+### 2. `src/components/GameSidePanels.tsx` — UI cleanup
 
-**Safehouse indicator (~line 474-480):** This shows the player's own safehouse. Keep as-is. Add a separate block for *enemy* safehouses that only renders when revealed.
+- **Remove the "Recruit Capo" ActionButton** (lines 212-218) from the Recruitment section entirely
+- **Verify** the Buy Soldier button sublabel correctly shows `$1,500` (it references `SOLDIER_COST` which should already be 1500 from the earlier change — will confirm and fix if needed)
 
-**Hover tooltip (~line 900+):** Gate enemy unit counts and details behind `isHexRevealed`. Show "??? Unknown forces" for unrevealed rival hexes.
+### 3. `src/types/game-mechanics.ts` — Verify price constant
 
-### 2. `src/hooks/useEnhancedMafiaGameState.ts` — Expose bribe contracts
-
-Ensure `bribeContracts` (already in state) is passed through to the grid component so the fog of war check can query active captain bribes.
-
-### 3. Minor: update hover tooltip
-
-For unrevealed rival hexes, show a fog indicator like "👁️‍🗨️ Intel unknown — scout or bribe to reveal" instead of unit details.
+Confirm `SOLDIER_COST = 1500`. If it's still 500, update it.
 
 ## Files Modified
-- `src/components/EnhancedMafiaHexGrid.tsx`
+- `src/hooks/useEnhancedMafiaGameState.ts`
+- `src/components/GameSidePanels.tsx`
+- `src/types/game-mechanics.ts` (if needed)
 
