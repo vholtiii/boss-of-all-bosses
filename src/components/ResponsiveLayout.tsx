@@ -85,6 +85,25 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
     );
   }
 
+  const [leftWidth, setLeftWidth] = useState(340);
+  const [rightWidth, setRightWidth] = useState(320);
+  const [dragging, setDragging] = useState<'left' | 'right' | null>(null);
+
+  React.useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e: MouseEvent) => {
+      if (dragging === 'left') {
+        setLeftWidth(Math.max(260, Math.min(500, e.clientX)));
+      } else {
+        setRightWidth(Math.max(260, Math.min(500, window.innerWidth - e.clientX)));
+      }
+    };
+    const onUp = () => setDragging(null);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [dragging]);
+
   // Desktop Layout
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -94,10 +113,16 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
           initial={{ x: -320 }}
           animate={{ x: 0 }}
           transition={{ duration: 0.3 }}
-          className="w-80 p-4 bg-gradient-to-b from-noir-dark via-background to-noir-dark border-r border-noir-light overflow-y-auto"
+          style={{ width: leftWidth }}
+          className="flex-shrink-0 p-4 bg-gradient-to-b from-noir-dark via-background to-noir-dark border-r border-noir-light overflow-y-auto"
         >
           {leftSidebar}
         </motion.div>
+        {/* Left resize handle */}
+        <div
+          onMouseDown={() => setDragging('left')}
+          className="w-1 cursor-col-resize hover:bg-mafia-gold/40 active:bg-mafia-gold/60 transition-colors flex-shrink-0"
+        />
         
         {/* Main Game Area */}
         <div className="flex-1 flex flex-col">
