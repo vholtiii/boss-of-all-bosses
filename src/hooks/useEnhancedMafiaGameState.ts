@@ -1294,6 +1294,21 @@ export const useEnhancedMafiaGameState = (
         ...u, movesRemaining: u.maxMoves, escortingSoldierIds: undefined,
       }));
 
+      // --- Training increment: +1 training per turn for soldiers deployed away from HQ ---
+      newState.deployedUnits.forEach(u => {
+        const stats = newState.soldierStats[u.id];
+        if (!stats) return;
+        const hq = newState.headquarters[u.family];
+        const atHQ = hq && u.q === hq.q && u.r === hq.r && u.s === hq.s;
+        if (!atHQ && u.type === 'soldier') {
+          stats.training = Math.min(3, stats.training + 1);
+          stats.turnsDeployed += 1;
+        }
+        // Enforce loyalty caps
+        const isCapo = u.type === 'capo';
+        stats.loyalty = Math.min(isCapo ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP, stats.loyalty);
+      });
+
       // Tick scouted hexes
       newState.scoutedHexes = newState.scoutedHexes
         .map(s => ({ ...s, turnsRemaining: s.turnsRemaining - 1 }))
