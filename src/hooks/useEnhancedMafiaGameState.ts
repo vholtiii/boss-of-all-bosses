@@ -2064,6 +2064,7 @@ export const useEnhancedMafiaGameState = (
           if (newState.resources.money >= cost2) {
             newState.resources.money -= cost2;
             newState.resources.soldiers += 1;
+            newState.tacticalActionsRemaining -= 1;
             // Loyal recruit boosts loyalty
             newState.reputation.loyalty = Math.min(100, newState.reputation.loyalty + 2);
             // Deploy at HQ with recruited flag and lower training
