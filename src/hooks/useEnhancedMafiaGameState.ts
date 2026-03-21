@@ -2030,11 +2030,13 @@ export const useEnhancedMafiaGameState = (
           return processEstablishSafehouse(newState, action);
         case 'recruit_soldiers': {
           // Buy Mercenary — expensive, combat-ready, hurts loyalty
+          if (newState.tacticalActionsRemaining <= 0) return newState;
           const respectDiscount = (newState.reputation.respect / 100) * 0.3;
           const cost = Math.floor(SOLDIER_COST * (1 - discount) * (1 - respectDiscount));
           if (newState.resources.money >= cost) {
             newState.resources.money -= cost;
             newState.resources.soldiers += 1;
+            newState.tacticalActionsRemaining -= 1;
             // Mercenary loyalty penalty
             newState.reputation.loyalty = Math.max(0, newState.reputation.loyalty - 3);
             newState.pendingNotifications = [...newState.pendingNotifications, {
