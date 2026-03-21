@@ -1,69 +1,33 @@
 
 
-# Hit Territory Rework: Risk/Reward for Unscouted vs Scouted Hits
+
+# Internal Hit After Hiding Period
 
 ## Summary
 
-The regular "Hit Territory" action becomes a high-risk, high-reward gamble on unscouted hexes, and a calculated strike on scouted ones. This differentiates it from the safer "Plan Hit" action.
+When a blind hit results in a civilian hit, the soldier goes into hiding for 3 turns. Upon return, the family checks the soldier's loyalty — if below 70, the soldier is permanently eliminated (internal family hit). If 70+, the soldier returns to HQ normally.
 
 ## Mechanics
 
-### Unscouted Hit (Blind Hit)
-- **Civilian risk**: If the target hex has **no enemy units**, the soldier hit a civilian
-  - Heat set to **100 (max)**
-  - Attacking soldier enters **hiding for 3 turns** (removed from board, returns to HQ after 3 turns)
-  - No respect/fear gained
-- **Enemy found**: If the hex DOES have enemy soldiers/capos, normal hit combat resolves
-  - On **victory**: attacking soldier gets **max toughness (training=10), max loyalty (100), +5 survived conflicts**
-  - Family **respect +15** (triple normal), **fear +15**
-  - Family **loyalty unchanged**, **influence unchanged**
-  - **Street cred event**: notification fires, all rival families gain +15 fear of player
-  - **Bounty**: targeted family AI prioritizes attacking player territory for 3 turns
-  - **Targeted family loses -10 influence**
-- Base success rate on unscouted: **-20% penalty** (applied before clamp)
+### Civilian Hit → Hiding (unchanged)
+- Unscouted hex, no enemy units → soldier enters hiding for 3 turns
+- Heat set to 100
 
-### Scouted Hit
-- **No civilian risk** — intel is reliable, full bypass
-- Normal hit mechanics apply (existing combat formula)
-- Standard rewards (+5 respect, +5 fear)
+### Post-Hiding Loyalty Check (new)
+- When hiding period ends and `loyalty < 70`:
+  - Soldier **permanently removed** (deleted from deployedUnits and soldierStats)
+  - Police heat reduced by **25**
+  - Each remaining soldier has **10% chance** of losing **15 loyalty** (morale risk)
+  - Notification: "The family dealt with the soldier internally."
+- When `loyalty >= 70`: soldier returns to HQ hex as normal
 
-## State Changes
-
-### New state fields
-- `hiddenUnits: { unitId: string; returnsOnTurn: number }[]` — tracks soldiers in hiding
-- `aiBounties: { targetFamily: string; fromFamily: string; expiresOnTurn: number }[]` — tracks AI revenge priorities
-
-### `src/hooks/useEnhancedMafiaGameState.ts`
-
-**In `hit_territory` handler:**
-1. Check if hex is scouted
-2. If **not scouted** and **no enemy units on hex**:
-   - Set heat to 100
-   - Remove soldier from `deployedUnits`, add to `hiddenUnits` with `returnsOnTurn = currentTurn + 3`
-   - Add notification: "Your soldier hit a civilian! They've gone into hiding."
-   - Return early — no combat
-3. If **not scouted** and **enemy units present**:
-   - Apply -20% to success chance
-   - On victory: max out attacker stats, +15 respect, +15 fear, street cred event, add bounty, target family -10 influence
-4. If **scouted**: existing logic (no civilian risk, standard rewards)
-
-**Start-of-turn processing:**
-- Check `hiddenUnits` — if `currentTurn >= returnsOnTurn`, move unit back to HQ hex, remove from hidden list, show notification
-- Check `aiBounties` — feed into AI targeting logic (AI prioritizes player hexes for 3 turns)
-
-**AI attack logic:**
-- If family has active bounty on player, weight player territories higher in target selection
-
-### `src/types/game-mechanics.ts`
-- Add `HiddenUnit` and `AIBounty` interfaces
-- Add constants: `BLIND_HIT_PENALTY = 0.20`, `BLIND_HIT_RESPECT = 15`, `BLIND_HIT_FEAR = 15`, `HIDING_DURATION = 3`, `BOUNTY_DURATION = 3`
-
-### `COMBAT_SYSTEM_GUIDE.md`
-- Add section on Unscouted vs Scouted hit risk
-- Document civilian hit penalty, hiding mechanic, bounty system
+## Constants (`src/types/game-mechanics.ts`)
+- `INTERNAL_HIT_LOYALTY_THRESHOLD = 70`
+- `INTERNAL_HIT_HEAT_REDUCTION = 25`
+- `INTERNAL_HIT_MORALE_RISK = 0.10`
+- `INTERNAL_HIT_MORALE_PENALTY = 15`
 
 ## Files Modified
-- `src/types/game-mechanics.ts` — new interfaces and constants
-- `src/hooks/useEnhancedMafiaGameState.ts` — hit logic rework, hiding/bounty state, start-of-turn resolution, AI targeting
-- `COMBAT_SYSTEM_GUIDE.md` — documentation
-
+- `src/types/game-mechanics.ts` — 4 new constants
+- `src/hooks/useEnhancedMafiaGameState.ts` — loyalty check in hidden-unit-return logic
+- `COMBAT_SYSTEM_GUIDE.md` — Internal Family Hit subsection

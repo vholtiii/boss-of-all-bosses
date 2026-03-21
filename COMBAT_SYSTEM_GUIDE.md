@@ -58,8 +58,25 @@ If you hit an **unscouted hex with no enemy units**, your soldier struck a civil
 |---|---|
 | Police heat | Set to **100 (maximum)** |
 | Attacking soldier | Removed from board, enters **hiding for 3 turns** |
-| Soldier return | Reappears at HQ after hiding duration |
+| Soldier return | Loyalty check upon return (see Internal Family Hit) |
 | Respect/fear gained | None |
+
+### 2.0.1 Internal Family Hit (Post-Hiding)
+
+When a soldier's hiding period ends, the family evaluates their loyalty:
+
+| Loyalty | Outcome |
+|---|---|
+| **≥ 70** | Soldier returns to HQ normally |
+| **< 70** | Soldier is **permanently eliminated** by the family |
+
+**If eliminated:**
+
+| Effect | Value |
+|---|---|
+| Heat reduction | **−25** (family cleaned up its mess) |
+| Morale risk | Each remaining soldier has **10% chance** of losing **−15 loyalty** |
+| Notification | "The family dealt with the soldier internally." |
 
 ### 2.1 Who Participates
 
