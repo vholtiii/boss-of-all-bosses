@@ -164,6 +164,11 @@ export interface EnhancedMafiaGameState {
   legalStatus: LegalStatus;
   policeHeat: PoliceHeat;
   lastLawyerTurn: number;
+  lawyerActiveUntil: number;
+  ricoTimer: number;
+  arrestedSoldiers: Array<{ unitId: string; returnTurn: number }>;
+  arrestedCapos: Array<{ unitId: string; returnTurn: number }>;
+  gameOver?: { type: 'rico'; turn: number } | null;
   
   // Blind hit system
   hiddenUnits: HiddenUnit[];
