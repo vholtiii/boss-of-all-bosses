@@ -3331,7 +3331,7 @@ export const useEnhancedMafiaGameState = (
   // ============ PROCESS PACTS AT END OF TURN ============
   const processPacts = (state: EnhancedMafiaGameState) => {
     // Tick down ceasefires
-    state.ceasefires = state.ceasefires.map(c => {
+    state.ceasefires = (state.ceasefires || []).map(c => {
       if (!c.active) return c;
       const remaining = c.turnsRemaining - 1;
       if (remaining <= 0) {
