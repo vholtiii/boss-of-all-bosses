@@ -337,10 +337,8 @@ const createInitialGameState = (
         movesRemaining: 2, maxMoves: 2, level: 1,
       });
       soldierStats[id] = {
-        loyalty: 50 + Math.floor(Math.random() * 30),
-        training: 3 + Math.floor(Math.random() * 3),
-        equipment: 2 + Math.floor(Math.random() * 3),
-        hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+        loyalty: 50, training: 0,
+        hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
       };
     }
     const capoNames: Record<string, string> = {
