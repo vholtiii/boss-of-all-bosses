@@ -1379,7 +1379,18 @@ export const useEnhancedMafiaGameState = (
         ...u, movesRemaining: u.maxMoves, escortingSoldierIds: undefined,
       }));
 
-      // --- Training increment: +1 training per turn for soldiers deployed away from HQ ---
+      // --- Training increment & individual soldier loyalty (per-turn) ---
+      const maintenanceUnpaid = (() => {
+        const pSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+        let maint = 0;
+        pSoldiers.forEach(s => {
+          const isHitman = newState.hitmen.some(h => h.unitId === s.id);
+          maint += isHitman ? Math.floor(SOLDIER_COST * HITMAN_MAINTENANCE_MULTIPLIER) : SOLDIER_COST;
+        });
+        maint += newState.resources.soldiers * SOLDIER_COST;
+        return newState.resources.money < maint;
+      })();
+
       newState.deployedUnits.forEach(u => {
         const stats = newState.soldierStats[u.id];
         if (!stats) return;
@@ -1389,9 +1400,27 @@ export const useEnhancedMafiaGameState = (
           stats.training = Math.min(3, stats.training + 1);
           stats.turnsDeployed += 1;
         }
-        // Enforce loyalty caps
+
+        // === Individual soldier loyalty: stats-correlated baseline ===
+        const baseline = Math.floor((stats.training + stats.toughness + stats.racketeering + stats.victories) / 4);
+        stats.loyalty += baseline;
+
+        // === +3 if on high-income hex ===
+        if (u.family === newState.playerFamily) {
+          const hex = newState.hexMap.find(t => t.q === u.q && t.r === u.r && t.s === u.s);
+          if (hex?.business && hex.business.income >= LOYALTY_INCOME_HEX_THRESHOLD) {
+            stats.loyalty += LOYALTY_INCOME_HEX_BONUS;
+          }
+        }
+
+        // === -2 when unpaid ===
+        if (maintenanceUnpaid && u.family === newState.playerFamily) {
+          stats.loyalty -= LOYALTY_UNPAID_PENALTY;
+        }
+
+        // Enforce loyalty caps & floor
         const isCapo = u.type === 'capo';
-        stats.loyalty = Math.min(isCapo ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP, stats.loyalty);
+        stats.loyalty = Math.max(0, Math.min(isCapo ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP, stats.loyalty));
       });
 
       // Tick scouted hexes
