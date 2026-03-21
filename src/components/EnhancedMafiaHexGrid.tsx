@@ -708,6 +708,11 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })}
 
+            {/* District border outlines */}
+            {districtBorderEdges.map((edge, i) => (
+              <line key={`border-${i}`} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" className="pointer-events-none" />
+            ))}
+
             {/* District name labels */}
             {(() => {
               const districts = ['Little Italy', 'Bronx', 'Brooklyn', 'Queens', 'Manhattan', 'Staten Island'] as const;
