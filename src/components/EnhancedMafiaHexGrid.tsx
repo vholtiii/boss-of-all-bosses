@@ -489,14 +489,26 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
                   {/* Business/HQ icon */}
                   <text x={x} y={y + (tile.business && !tile.isHeadquarters ? 1 : 5)} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">
-                    {tile.isHeadquarters ? '🏛️' : tile.business ? (tile.business.turnsUntilComplete && tile.business.turnsUntilComplete > 0 ? '🚧' : (businessIcons[tile.business.type] || '🏢')) : ''}
+                    {tile.isHeadquarters ? '🏛️' : tile.business ? (tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal ? '🚧' : (businessIcons[tile.business.type] || '🏢')) : ''}
                   </text>
-                  {/* Construction turns remaining */}
-                  {tile.business && tile.business.turnsUntilComplete && tile.business.turnsUntilComplete > 0 && !tile.isHeadquarters && (
-                    <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#F59E0B" fontWeight="700" className="pointer-events-none select-none">
-                      {tile.business.turnsUntilComplete} turns
-                    </text>
-                  )}
+                  {/* Construction progress label */}
+                  {tile.business && tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal && !tile.isHeadquarters && (() => {
+                    const hexKey = `${tile.q},${tile.r},${tile.s}`;
+                    const hexUnits = unitsByHex.get(hexKey) || [];
+                    const hasCapoOnHex = hexUnits.some(u => u.family === playerFamily && u.type === 'capo');
+                    const hasSoldierOnHex = hexUnits.some(u => u.family === playerFamily && u.type === 'soldier');
+                    const remaining = tile.business!.constructionGoal! - (tile.business!.constructionProgress ?? 0);
+                    let rate = 0;
+                    let icon = '⏸️';
+                    if (hasCapoOnHex) { rate = 1.5; icon = '⚡'; }
+                    else if (hasSoldierOnHex) { rate = 0.75; icon = '🐢'; }
+                    const estTurns = rate > 0 ? Math.ceil(remaining / rate) : null;
+                    return (
+                      <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#F59E0B" fontWeight="700" className="pointer-events-none select-none">
+                        {icon} {estTurns !== null ? `${estTurns}t` : 'PAUSED'}
+                      </text>
+                    );
+                  })()}
 
                   {/* District abbreviation label */}
                   {!tile.isHeadquarters && !tile.business && (
