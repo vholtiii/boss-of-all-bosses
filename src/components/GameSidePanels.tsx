@@ -113,9 +113,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Strategic Actions"
           icon={<Swords className="h-4 w-4" />}
-          isOpen={!actionsLocked && openSection === 'actions'}
-          onToggle={() => !actionsLocked && toggle('actions')}
-          disabled={actionsLocked}
+          isOpen={openSection === 'actions'}
+          onToggle={() => toggle('actions')}
+          phaseLocked={actionsLocked}
         >
           <div className="space-y-1.5">
             <ActionButton
@@ -123,6 +123,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Attack Territory"
               sublabel={`$15,000 · 2 soldiers`}
               disabled={resources.money < 15000 || resources.soldiers < 2 || legalStatus.jailTime > 0}
+              phaseLocked={actionsLocked}
               variant="destructive"
               onClick={() => onAction({ type: 'attack_territory' })}
             />
@@ -131,6 +132,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Plan Hit"
               sublabel={`$8,000 · 1 soldier`}
               disabled={resources.money < 8000 || resources.soldiers < 1 || legalStatus.jailTime > 0}
+              phaseLocked={actionsLocked}
               variant="destructive"
               onClick={() => onAction({ type: 'violent_action', violenceType: 'hit', cost: 8000, risk: 70 })}
             />
@@ -139,6 +141,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Sabotage Rival"
               sublabel={`$12,000`}
               disabled={resources.money < 12000 || legalStatus.jailTime > 0}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'sabotage', cost: 12000 })}
             />
             <ActionButton
@@ -146,6 +149,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Extort Business"
               sublabel={`Free · +Heat`}
               disabled={legalStatus.jailTime > 0}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'extort_business', amount: 5000 })}
             />
           </div>
@@ -155,9 +159,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Economy"
           icon={<TrendingUp className="h-4 w-4" />}
-          isOpen={!actionsLocked && openSection === 'economy'}
-          onToggle={() => !actionsLocked && toggle('economy')}
-          disabled={actionsLocked}
+          isOpen={openSection === 'economy'}
+          onToggle={() => toggle('economy')}
+          phaseLocked={actionsLocked}
         >
           <div className="space-y-1.5">
             <ActionButton
@@ -165,6 +169,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Build Business"
               sublabel={`$25,000`}
               disabled={resources.money < 25000 || legalStatus.jailTime > 0}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'build_business', cost: 25000, income: 5000, legal: true })}
             />
             <ActionButton
@@ -172,6 +177,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Launder Money"
               sublabel={`20% fee`}
               disabled={gameState.finances.dirtyMoney < 1000 || legalStatus.jailTime > 0}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'launder_money', amount: 10000 })}
             />
             <ActionButton
@@ -179,6 +185,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Invest $20K"
               sublabel={`~15% return · 5 turns`}
               disabled={resources.money < 20000}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'make_investment', investmentType: 'stocks', amount: 20000, expectedReturn: 1.15, duration: 5 })}
             />
           </div>
@@ -188,9 +195,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Recruitment"
           icon={<Users className="h-4 w-4" />}
-          isOpen={isTacticalPhase && openSection === 'recruitment'}
-          onToggle={() => isTacticalPhase && toggle('recruitment')}
-          disabled={!isTacticalPhase}
+          isOpen={openSection === 'recruitment'}
+          onToggle={() => toggle('recruitment')}
+          phaseLocked={!isTacticalPhase}
         >
           <div className="space-y-1.5">
             <ActionButton
@@ -198,6 +205,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Buy Soldier (Mercenary)"
               sublabel={respectPct > 0 ? `$${discountedMercCost.toLocaleString()} · -3 loyalty · 1 action (${respectPct}% respect)` : `$${SOLDIER_COST.toLocaleString()} · -3 loyalty · 1 action`}
               disabled={resources.money < discountedMercCost || gameState.tacticalActionsRemaining <= 0}
+              phaseLocked={!isTacticalPhase}
               onClick={() => onAction({ type: 'recruit_soldiers', cost: SOLDIER_COST })}
             />
             <ActionButton
@@ -207,6 +215,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 ? (respectPct > 0 ? `$${discountedRecruitCost} · +2 loyalty · 1 action (${respectPct}% respect)` : `$${LOCAL_SOLDIER_COST} · +2 loyalty · 1 action`)
                 : `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (${playerTerritoryCount} owned)`}
               disabled={!canRecruit || resources.money < discountedRecruitCost || gameState.tacticalActionsRemaining <= 0}
+              phaseLocked={!isTacticalPhase}
               onClick={() => onAction({ type: 'recruit_local_soldier' })}
             />
           </div>
@@ -216,9 +225,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Defense & Law"
           icon={<Gavel className="h-4 w-4" />}
-          isOpen={!actionsLocked && openSection === 'defense'}
-          onToggle={() => !actionsLocked && toggle('defense')}
-          disabled={actionsLocked}
+          isOpen={openSection === 'defense'}
+          onToggle={() => toggle('defense')}
+          phaseLocked={actionsLocked}
         >
           <div className="space-y-1.5">
             <ActionButton
@@ -226,6 +235,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Train Soldiers"
               sublabel={`$8,000`}
               disabled={resources.money < 8000}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'train_soldiers' })}
             />
             <ActionButton
@@ -233,6 +243,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Public Appearance"
               sublabel={`$3,000 · +Rep`}
               disabled={resources.money < 3000}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'public_appearance', cost: 3000 })}
             />
             <ActionButton
@@ -240,6 +251,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Charitable Donation"
               sublabel={`$5,000 · −Heat · +Rep`}
               disabled={resources.money < 5000}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'charitable_donation', amount: 5000 })}
             />
           </div>
@@ -249,62 +261,74 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Corruption"
           icon={<Gavel className="h-4 w-4" />}
-          isOpen={!actionsLocked && openSection === 'corruption'}
-          onToggle={() => !actionsLocked && toggle('corruption')}
-          disabled={actionsLocked}
+          isOpen={openSection === 'corruption'}
+          onToggle={() => toggle('corruption')}
+          phaseLocked={actionsLocked}
         >
-          <CorruptionPanel
-            money={resources.money}
-            activeBribes={gameState.activeBribes}
-            rivalFamilies={gameState.aiOpponents.map(o => o.family)}
-            reputation={gameState.reputation.reputation}
-            heat={gameState.policeHeat.level}
-            onBribe={(tier, targetFamily) => onAction({ type: 'bribe_corruption', tier, targetFamily })}
-          />
+          {actionsLocked ? (
+            <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Action phase</p>
+          ) : (
+            <CorruptionPanel
+              money={resources.money}
+              activeBribes={gameState.activeBribes}
+              rivalFamilies={gameState.aiOpponents.map(o => o.family)}
+              reputation={gameState.reputation.reputation}
+              heat={gameState.policeHeat.level}
+              onBribe={(tier, targetFamily) => onAction({ type: 'bribe_corruption', tier, targetFamily })}
+            />
+          )}
         </CollapsibleSection>
 
         {/* ── HITMAN SYSTEM ── */}
         <CollapsibleSection
           title={`Hitmen (${gameState.hitmen.length}/3)`}
           icon={<Crosshair className="h-4 w-4" />}
-          isOpen={!actionsLocked && openSection === 'hitmen'}
-          onToggle={() => !actionsLocked && toggle('hitmen')}
-          disabled={actionsLocked}
+          isOpen={openSection === 'hitmen'}
+          onToggle={() => toggle('hitmen')}
+          phaseLocked={actionsLocked}
         >
-          <HitmanPanel
-            hitmen={gameState.hitmen}
-            soldierStats={gameState.soldierStats}
-            deployedSoldierIds={
-              gameState.deployedUnits
-                .filter(u => u.family === gameState.playerFamily && u.type === 'soldier')
-                .map(u => u.id)
-            }
-            playerFamily={gameState.playerFamily}
-            money={resources.money}
-            onPromote={(unitId) => onAction({ type: 'promote_hitman', unitId })}
-          />
+          {actionsLocked ? (
+            <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Action phase</p>
+          ) : (
+            <HitmanPanel
+              hitmen={gameState.hitmen}
+              soldierStats={gameState.soldierStats}
+              deployedSoldierIds={
+                gameState.deployedUnits
+                  .filter(u => u.family === gameState.playerFamily && u.type === 'soldier')
+                  .map(u => u.id)
+              }
+              playerFamily={gameState.playerFamily}
+              money={resources.money}
+              onPromote={(unitId) => onAction({ type: 'promote_hitman', unitId })}
+            />
+          )}
         </CollapsibleSection>
 
         {/* ── CAPO PROMOTION ── */}
         <CollapsibleSection
           title={`Capo Promotion (${gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'capo').length}/${3})`}
           icon={<Crown className="h-4 w-4" />}
-          isOpen={!actionsLocked && openSection === 'capo_promotion'}
-          onToggle={() => !actionsLocked && toggle('capo_promotion')}
-          disabled={actionsLocked}
+          isOpen={openSection === 'capo_promotion'}
+          onToggle={() => toggle('capo_promotion')}
+          phaseLocked={actionsLocked}
         >
-          <CapoPromotionPanel
-            capoCount={gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'capo').length}
-            soldierStats={gameState.soldierStats}
-            deployedSoldierIds={
-              gameState.deployedUnits
-                .filter(u => u.family === gameState.playerFamily && u.type === 'soldier')
-                .map(u => u.id)
-            }
-            hitmanIds={gameState.hitmen.map(h => h.unitId)}
-            money={resources.money}
-            onPromote={(unitId) => onAction({ type: 'promote_capo', unitId })}
-          />
+          {actionsLocked ? (
+            <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Action phase</p>
+          ) : (
+            <CapoPromotionPanel
+              capoCount={gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'capo').length}
+              soldierStats={gameState.soldierStats}
+              deployedSoldierIds={
+                gameState.deployedUnits
+                  .filter(u => u.family === gameState.playerFamily && u.type === 'soldier')
+                  .map(u => u.id)
+              }
+              hitmanIds={gameState.hitmen.map(h => h.unitId)}
+              money={resources.money}
+              onPromote={(unitId) => onAction({ type: 'promote_capo', unitId })}
+            />
+          )}
         </CollapsibleSection>
 
         {/* ── VICTORY TRACKER ── */}
@@ -562,19 +586,24 @@ const ActionButton: React.FC<{
   label: string;
   sublabel: string;
   disabled?: boolean;
+  phaseLocked?: boolean;
   variant?: 'default' | 'destructive' | 'outline';
   onClick: () => void;
-}> = ({ icon, label, sublabel, disabled, variant = 'outline', onClick }) => (
+}> = ({ icon, label, sublabel, disabled, phaseLocked, variant = 'outline', onClick }) => (
   <Button
     variant={variant}
     size="sm"
-    disabled={disabled}
+    disabled={disabled || phaseLocked}
     onClick={onClick}
-    className="w-full justify-start text-xs h-9 gap-2"
+    className={cn("w-full justify-start text-xs h-9 gap-2", phaseLocked && "opacity-50")}
   >
-    {icon}
+    {phaseLocked ? <Shield className="h-3.5 w-3.5 text-muted-foreground" /> : icon}
     <span className="flex-1 text-left">{label}</span>
-    <span className="text-[10px] text-muted-foreground font-normal">{sublabel}</span>
+    {phaseLocked ? (
+      <span className="text-[10px] text-muted-foreground font-normal">🔒</span>
+    ) : (
+      <span className="text-[10px] text-muted-foreground font-normal">{sublabel}</span>
+    )}
   </Button>
 );
 
@@ -585,18 +614,17 @@ const CollapsibleSection: React.FC<{
   onToggle: () => void;
   children: React.ReactNode;
   disabled?: boolean;
-}> = ({ title, icon, isOpen, onToggle, children, disabled }) => (
-  <div className={cn(disabled && 'opacity-40 pointer-events-none')}>
+  phaseLocked?: boolean;
+}> = ({ title, icon, isOpen, onToggle, children, disabled, phaseLocked }) => (
+  <div>
     <button
       onClick={onToggle}
-      disabled={disabled}
-      className="flex items-center gap-2 w-full text-left text-sm font-semibold text-foreground hover:text-primary transition-colors py-1 disabled:cursor-not-allowed"
+      className="flex items-center gap-2 w-full text-left text-sm font-semibold text-foreground hover:text-primary transition-colors py-1"
     >
       {icon}
       <span className="flex-1">{title}</span>
-      {disabled ? (
-        <span className="text-[9px] text-muted-foreground font-normal">🔒</span>
-      ) : isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+      {phaseLocked && <span className="text-[9px] text-muted-foreground font-normal">🔒</span>}
+      {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
     </button>
     <AnimatePresence>
       {isOpen && (
