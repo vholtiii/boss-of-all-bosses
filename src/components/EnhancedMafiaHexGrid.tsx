@@ -467,8 +467,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     </text>
                   )}
 
-                  {/* Always-visible income label */}
-                  {tile.business && !tile.isHeadquarters && (
+                  {/* Always-visible income label (hide during construction) */}
+                  {tile.business && !tile.isHeadquarters && !(tile.business.turnsUntilComplete && tile.business.turnsUntilComplete > 0) && (
                     <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#10B981" fontWeight="700" className="pointer-events-none select-none">
                       ${tile.business.income >= 1000 ? `${(tile.business.income / 1000).toFixed(1)}k` : tile.business.income}
                     </text>
