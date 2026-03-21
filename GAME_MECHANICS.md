@@ -179,15 +179,20 @@ Each family starts with:
 - Never deploys or moves
 - Represents family leadership
 
-### 4.5 Hitmen
+### 4.5 Hitman Contracts
+
+Hitmen are **external contract killers** — not members of your family. They perform surgical strikes against specific enemy units.
 
 | Property | Value |
 |---|---|
-| Max hitmen | 3 |
-| Levels | 1–3 |
-| Requirements | Training ≥ 8 (strength 80), Loyalty ≥ 50, 3+ hits |
-| Maintenance | 1.5x normal soldier cost |
-| Combat bonus | +30% hit success (level 1), +10% per additional level |
+| Cost | $15,000 per contract |
+| Max active contracts | 3 |
+| Duration | 3–5 turns (based on target location) |
+| Heat generated | None |
+| Combat bonus | None (external, not in battle) |
+| Bonuses gained | None (no respect, fear, or stat gains) |
+
+See [SOLDIER_RECRUITMENT_GUIDE.md](./SOLDIER_RECRUITMENT_GUIDE.md#6-hitman-contracts) for full details on targeting, success rates, and failed hit consequences.
 
 ### 4.6 Soldier Stats & Tracking
 
