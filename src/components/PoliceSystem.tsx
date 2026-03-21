@@ -11,6 +11,10 @@ interface PoliceSystemProps {
   dirtyMoney: number;
   currentTurn: number;
   loyalty: number;
+  ricoTimer?: number;
+  arrestedSoldiers?: Array<{ unitId: string; returnTurn: number }>;
+  arrestedCapos?: Array<{ unitId: string; returnTurn: number }>;
+  lawyerActiveUntil?: number;
   onAction: (action: BusinessAction) => void;
 }
 
