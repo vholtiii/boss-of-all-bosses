@@ -2279,7 +2279,7 @@ export const useEnhancedMafiaGameState = (
             } : u
           );
           
-          newState.hitmen = (newState.hitmen || []).filter(h => h.unitId !== unitId);
+          // Hitman contracts targeting this unit are handled at end-of-turn resolution
           
           newState.pendingNotifications = [...(newState.pendingNotifications || []), {
             type: 'success' as const,
