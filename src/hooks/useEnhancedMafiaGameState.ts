@@ -956,7 +956,7 @@ export const useEnhancedMafiaGameState = (
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
           if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters && unit.type === 'capo') {
-            const hasIllegalBusiness = tile.business && !tile.business.isLegal && !tile.business.underConstruction;
+            const hasIllegalBusiness = tile.business && !tile.business.isLegal && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
             if (hasIllegalBusiness) {
               // Capo auto-extorts illegal business on arrival
               const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
