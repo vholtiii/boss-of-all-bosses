@@ -360,7 +360,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           (isSoldier && unitOnTargetHex) || 
           (isCapo && (unitOnTargetHex || true)) // Capo can extort from adjacent (already validated as valid target)
         ) && (isNeutral || isEnemy);
-        const canClaim = isNeutral && isSoldier;
+        const canClaim = isNeutral && isSoldier && !tile.business;
         const canNegotiate = isEnemy && isCapo;
         const canSabotage = isEnemy && isSoldier && !!tile.business;
         const canSafehouse = isOwned && !tile.isHeadquarters;
