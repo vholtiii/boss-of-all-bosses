@@ -1,51 +1,35 @@
 
 
-# Build Legal Business System
+# Refine Defense & Law: Heat Reduction + Legal Defense
 
 ## Overview
-Add a functional "Build Business" action that lets the player construct legal businesses (Construction, Restaurant, Store) on their owned hexes. These take 3 turns to complete, show icons with a blue outline on the hex map, and generate legitimate income.
+Replace the two dead buttons with functional heat-reduction and legal-defense actions. Both cost 1 action-phase slot, creating a meaningful trade-off against combat/economy actions.
 
-## Business Types & Costs
+## Actions
 
-| Type | Icon | Cost | Income/Turn | Laundering Capacity |
+| Action | Icon | Cost | Effects | Cooldown |
 |---|---|---|---|---|
-| Restaurant | 🍝 | $20,000 | $3,000 | $2,000 |
-| Store | 🏪 | $12,000 | $1,800 | $1,500 |
-| Construction | 🏗️ | $35,000 | $5,000 | $4,000 |
+| **Public Appearance** | 👑 Crown | $3,000 | −5 heat, +2 Reputation | None |
+| **Charitable Donation** | 🤝 HandCoins | $5,000 | −10 heat, +3 Reputation | None |
+| **Hire Lawyer** | ⚖️ Scale | $8,000 | Clears 1 active arrest penalty (profit reduction), −3 heat | 3-turn cooldown |
+
+- **Public Appearance**: Cheap, small heat drop. Good for maintenance.
+- **Charitable Donation**: Medium cost, bigger heat drop. Useful when heat is climbing.
+- **Hire Lawyer**: Expensive but removes an active arrest penalty entirely (the -5%/-15%/-30% profit debuffs from the police system). If no active arrest, it still reduces heat by 3. Has a 3-turn cooldown to prevent spam.
 
 ## Changes
 
-### 1. `src/hooks/useEnhancedMafiaGameState.ts` — HexTile interface
-- Add `turnsUntilComplete?: number` to the `business` object on HexTile to track the 3-turn build timer
+### 1. `src/hooks/useEnhancedMafiaGameState.ts` — Add 3 action handlers
+- `public_appearance`: Deduct $3,000, reduce `policeHeat.level` by 5 (min 0), add +2 reputation, consume 1 action
+- `charitable_donation`: Deduct $5,000, reduce `policeHeat.level` by 10 (min 0), add +3 reputation, consume 1 action
+- `hire_lawyer`: Deduct $8,000, remove first active arrest from `policeHeat.activeArrests` array (or reduce heat by 3 if none active), consume 1 action. Track `lastLawyerTurn` in state for 3-turn cooldown
 
-### 2. `src/hooks/useEnhancedMafiaGameState.ts` — Add `build_business` handler
-- New action handler triggered from side panel or hex context menu
-- Requires: player-owned hex with no existing business selected, enough money, action phase
-- Flow: deducts cost, sets `tile.business = { type, income: 0, isLegal: true, heatLevel: 0, launderingCapacity, turnsUntilComplete: 3 }`
-- While `turnsUntilComplete > 0`, income is 0 (under construction)
+### 2. `src/components/GameSidePanels.tsx` — Update Defense & Law section
+- Keep Public Appearance and Charitable Donation buttons (already exist, just need handlers)
+- Add new "Hire Lawyer" button with Scale icon, $8,000 cost, disabled during cooldown
+- Show cooldown remaining on Hire Lawyer button when applicable (e.g., "2 turns")
+- All three phase-locked to action phase
 
-### 3. `src/hooks/useEnhancedMafiaGameState.ts` — Turn processing
-- In `processEconomy` or end-of-turn: decrement `turnsUntilComplete` for all businesses where it's > 0; when it hits 0, set full income
-
-### 4. `src/components/GameSidePanels.tsx` — Replace single button with 3 options
-- Replace the generic "Build Business $25,000" button with three buttons:
-  - 🍝 Restaurant ($20K)
-  - 🏪 Store ($12K)
-  - 🏗️ Construction ($35K)
-- Each dispatches `{ type: 'build_business', businessType: 'restaurant'|'store'|'construction' }` with the selected hex
-- Disabled if no owned hex is selected or hex already has a business
-
-### 5. `src/components/EnhancedMafiaHexGrid.tsx` — Blue outline for legal businesses
-- When rendering a hex with `tile.business?.isLegal === true`, add a blue stroke/outline to distinguish from illegal businesses
-- Show a construction icon or progress indicator while `turnsUntilComplete > 0` (e.g., 🚧 with "2 turns" label)
-- Add `restaurant: '🍝'`, `store: '🏪'`, `construction: '🏗️'` to `businessIcons` (restaurant and construction already exist)
-
-### 6. `src/components/EnhancedMafiaHexGrid.tsx` — Hex context menu
-- Add "Build Business" submenu option when right-clicking/interacting with an owned hex that has no business, offering the 3 types
-
-## Technical Details
-- The `turnsUntilComplete` field is optional — existing businesses (generated at map creation) won't have it
-- During construction, the hex shows 🚧 instead of the final business icon
-- Legal businesses generate 0 heat and provide laundering capacity for dirty money
-- The blue outline uses `stroke="#3B82F6"` (Tailwind blue-500) with `strokeWidth={2.5}` on the hex polygon
+### 3. `src/hooks/useEnhancedMafiaGameState.ts` — State addition
+- Add `lastLawyerTurn?: number` to game state for cooldown tracking
 
