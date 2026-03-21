@@ -69,9 +69,19 @@ export const PoliceSystem = ({ policeHeat, cleanMoney, dirtyMoney, currentTurn, 
   };
 
   const getHeatStatus = (level: number) => {
-    if (level < 30) return "Low";
+    if (level < 30) return "Safe";
+    if (level < 50) return "Low";
     if (level < 70) return "Medium";
-    return "High";
+    if (level < 90) return "High";
+    return "Critical";
+  };
+
+  const getHeatTierEffects = (level: number) => {
+    if (level >= 90) return "−25% illegal income · Soldier & capo arrests · Business shutdowns · RICO active";
+    if (level >= 70) return "−25% illegal income · Soldier arrests · 15% capo arrest chance";
+    if (level >= 50) return "−15% illegal income · 20% soldier arrest chance";
+    if (level >= 30) return "−15% illegal income";
+    return "No active penalties";
   };
 
   const totalMonthlyCosts = policeHeat.bribedOfficials.reduce((sum, official) => sum + official.monthlyBribe, 0);
