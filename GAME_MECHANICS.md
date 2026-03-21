@@ -179,15 +179,20 @@ Each family starts with:
 - Never deploys or moves
 - Represents family leadership
 
-### 4.5 Hitmen
+### 4.5 Hitman Contracts
+
+Hitmen are **external contract killers** — not members of your family. They perform surgical strikes against specific enemy units.
 
 | Property | Value |
 |---|---|
-| Max hitmen | 3 |
-| Levels | 1–3 |
-| Requirements | Training ≥ 8 (strength 80), Loyalty ≥ 50, 3+ hits |
-| Maintenance | 1.5x normal soldier cost |
-| Combat bonus | +30% hit success (level 1), +10% per additional level |
+| Cost | $15,000 per contract |
+| Max active contracts | 3 |
+| Duration | 3–5 turns (based on target location) |
+| Heat generated | None |
+| Combat bonus | None (external, not in battle) |
+| Bonuses gained | None (no respect, fear, or stat gains) |
+
+See [SOLDIER_RECRUITMENT_GUIDE.md](./SOLDIER_RECRUITMENT_GUIDE.md#6-hitman-contracts) for full details on targeting, success rates, and failed hit consequences.
 
 ### 4.6 Soldier Stats & Tracking
 
@@ -293,13 +298,12 @@ Standard movement following unit movement rules (soldiers: 1 hex, capos: up to 5
 
 ### 7.1 Hit (Attack Enemy Territory)
 
-**Participants**: Selected unit + player units already on the target hex.
+**Participants**: Selected unit + player units on the target hex + player units on adjacent hexes (adjacent units contribute at 90% effectiveness).
 
 **Success Chance Calculation:**
 ```
 Base chance = 50% + (attackers - defenders) × 15%
 + family combat bonus
-+ hitman bonus (+30% + 10% per level)
 + Lucchese hit bonus
 + scout bonus (+15% if hex is scouted)
 + fortified attacker bonus (+12.5%)
@@ -308,8 +312,8 @@ Clamped to 10%–95%
 ```
 
 **On Victory:**
+- Territory set to neutral (must Claim next turn)
 - Enemy units removed from hex
-- Territory captured
 - +5 respect, +5 fear
 - 20% attacker casualties (random selection, halved if fortified)
 
@@ -487,14 +491,18 @@ Negotiations require a capo adjacent to enemy territory.
 | Min training | 3 |
 | Max capos | 3 |
 
-### 12.3 Hitman Promotion
+### 12.3 Hitman Contracts
 
-| Requirement | Value |
+Hitmen are hired externally — not promoted from soldiers.
+
+| Property | Value |
 |---|---|
-| Min strength (training × 10) | 80 |
-| Min reputation (loyalty) | 50 |
-| Min hits | 3 |
-| Max hitmen | 3 |
+| Cost | $15,000 per contract |
+| Max active | 3 |
+| Heat | None |
+| Bonuses | None |
+
+See [SOLDIER_RECRUITMENT_GUIDE.md](./SOLDIER_RECRUITMENT_GUIDE.md#6-hitman-contracts) for full contract details.
 
 ---
 

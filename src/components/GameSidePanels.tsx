@@ -119,15 +119,6 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         >
           <div className="space-y-1.5">
             <ActionButton
-              icon={<Swords className="h-4 w-4" />}
-              label="Attack Territory"
-              sublabel={`$15,000 · 2 soldiers`}
-              disabled={resources.money < 15000 || resources.soldiers < 2 || legalStatus.jailTime > 0}
-              phaseLocked={actionsLocked}
-              variant="destructive"
-              onClick={() => onAction({ type: 'attack_territory' })}
-            />
-            <ActionButton
               icon={<Target className="h-4 w-4" />}
               label="Plan Hit"
               sublabel={`Free · 1 soldier`}
