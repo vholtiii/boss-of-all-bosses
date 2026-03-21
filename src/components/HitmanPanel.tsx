@@ -11,6 +11,7 @@ interface HitmanPanelProps {
   deployedUnits: DeployedUnit[];
   playerFamily: string;
   money: number;
+  currentTurn: number;
   onHire: (targetUnitId: string, targetFamily: string) => void;
 }
 
