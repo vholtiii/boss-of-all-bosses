@@ -1288,6 +1288,40 @@ export const useEnhancedMafiaGameState = (
       newState.availableMoveHexes = [];
       newState.deployMode = null;
       newState.availableDeployHexes = [];
+
+      // ============ HIDDEN UNITS RETURN ============
+      const returningUnits = newState.hiddenUnits.filter(h => newState.turn >= h.returnsOnTurn);
+      if (returningUnits.length > 0) {
+        const hq = newState.headquarters[newState.playerFamily];
+        returningUnits.forEach(h => {
+          // Re-deploy the unit at HQ
+          newState.deployedUnits.push({
+            id: h.unitId,
+            family: newState.playerFamily,
+            type: 'soldier',
+            q: hq.q, r: hq.r, s: hq.s,
+            movesRemaining: 0,
+            fortified: false,
+          });
+          // Restore soldier stats if missing
+          if (!newState.soldierStats[h.unitId]) {
+            newState.soldierStats[h.unitId] = {
+              loyalty: 50, training: 0, hits: 0, extortions: 0,
+              victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
+            };
+          }
+        });
+        newState.hiddenUnits = newState.hiddenUnits.filter(h => newState.turn < h.returnsOnTurn);
+        newState.pendingNotifications.push({
+          type: 'info',
+          title: '🕵️ Soldier Returned from Hiding',
+          message: `${returningUnits.length} soldier(s) came out of hiding and returned to HQ.`,
+        });
+        if (turnReport) turnReport.events.push(`${returningUnits.length} soldier(s) returned from hiding.`);
+      }
+
+      // ============ EXPIRE AI BOUNTIES ============
+      newState.aiBounties = newState.aiBounties.filter(b => newState.turn < b.expiresOnTurn);
       newState.selectedMoveAction = 'move' as MoveAction;
       
       // Reset action & tactical budgets for new turn
