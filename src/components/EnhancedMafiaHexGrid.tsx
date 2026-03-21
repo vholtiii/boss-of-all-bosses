@@ -78,6 +78,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   // Read hex data from gameState
   const hexMap: HexTile[] = gameState?.hexMap || [];
   const deployedUnits: DeployedUnit[] = gameState?.deployedUnits || [];
+  const scoutedHexes: ScoutedHex[] = gameState?.scoutedHexes || [];
+  const bribedOfficials = gameState?.policeHeat?.bribedOfficials || [];
+
+  // Fog of War: check if a rival hex's intel is revealed
+  const isHexRevealed = (tile: HexTile): boolean => {
+    // Player's own hexes and neutral hexes are always visible
+    if (tile.controllingFamily === playerFamily || tile.controllingFamily === 'neutral') return true;
+    // HQ locations are common knowledge
+    if (tile.isHeadquarters) return true;
+    // Scouted hexes are revealed
+    if (scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s)) return true;
+    // Captain Rodriguez bribe reveals all rival intel
+    if (bribedOfficials.some((o: any) => o.id === 'captain_rodriguez')) return true;
+    // Chief Sullivan (rival_intelligence) also reveals
+    if (bribedOfficials.some((o: any) => o.permissions?.includes('rival_intelligence'))) return true;
+    return false;
+  };
 
   // Group units by hex for rendering
   const unitsByHex = useMemo(() => {
@@ -530,8 +547,11 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     if (!isAtHQ) {
                       // Normal compact layout — skip HQ hexes (deployment menu handles those)
                       let offsetIdx = 0;
+                      const hexRevealed = isHexRevealed(tile);
 
                       caposByFamily.forEach((capos, fam) => {
+                        // Fog of War: hide rival units unless hex is revealed
+                        if (fam !== playerFamily && !hexRevealed) return;
                         const capo = capos[0];
                         const isSelected = selectedUnitId === capo.id;
                         const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action');
@@ -557,6 +577,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       });
 
                       soldiersByFamily.forEach((soldiers, fam) => {
+                        // Fog of War: hide rival units unless hex is revealed
+                        if (fam !== playerFamily && !hexRevealed) return;
                         const firstSoldier = soldiers[0];
                         const isSelected = soldiers.some(s => s.id === selectedUnitId);
                         const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action');
@@ -935,8 +957,19 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               {(() => {
                 const key = `${hoveredHex.q},${hoveredHex.r},${hoveredHex.s}`;
                 const units = unitsByHex.get(key) || [];
+                const hexRevealed = isHexRevealed(hoveredHex);
+                
+                // Fog of War: show mystery text for unrevealed rival hexes with units
+                if (!hexRevealed && hoveredHex.controllingFamily !== 'neutral' && hoveredHex.controllingFamily !== playerFamily) {
+                  return (
+                    <p className="text-muted-foreground italic">
+                      👁️‍🗨️ Intel unknown — scout or bribe to reveal
+                    </p>
+                  );
+                }
+                
                 if (units.length === 0) return null;
-                return units.map(u => (
+                return units.filter(u => u.family === playerFamily || hexRevealed).map(u => (
                   <p key={u.id} className={u.family === playerFamily ? 'text-green-400' : 'text-red-400'}>
                     {u.type === 'capo' ? `👔 ${u.name} (Lvl ${u.level})${u.personality ? ` ${u.personality === 'diplomat' ? '🕊️' : u.personality === 'enforcer' ? '💪' : '🧠'}` : ''}` : '👤 Soldier'} — {u.family.toUpperCase()}
                     {u.family === playerFamily && ` (${u.movesRemaining} moves${u.fortified ? ', 🛡️ Fortified' : ''})`}
