@@ -214,14 +214,6 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         >
           <div className="space-y-1.5">
             <ActionButton
-              icon={<Shield className="h-4 w-4" />}
-              label="Train Soldiers"
-              sublabel={`$8,000`}
-              disabled={resources.money < 8000}
-              phaseLocked={actionsLocked}
-              onClick={() => onAction({ type: 'train_soldiers' })}
-            />
-            <ActionButton
               icon={<Crown className="h-4 w-4" />}
               label="Public Appearance"
               sublabel={`$3,000 · +Rep`}
