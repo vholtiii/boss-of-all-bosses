@@ -24,6 +24,8 @@ import {
   FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, SCOUT_DURATION, SCOUT_INTEL_BONUS, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
   BASE_ACTIONS_PER_TURN, BONUS_ACTION_RESPECT_THRESHOLD, BONUS_ACTION_INFLUENCE_THRESHOLD,
   TACTICAL_ACTIONS_PER_TURN,
+  HiddenUnit, AIBounty,
+  BLIND_HIT_PENALTY, BLIND_HIT_RESPECT, BLIND_HIT_FEAR, HIDING_DURATION, BOUNTY_DURATION, BLIND_HIT_INFLUENCE_LOSS,
 } from '@/types/game-mechanics';
 
 // ============ UNIT TYPES ============
@@ -154,6 +156,10 @@ export interface EnhancedMafiaGameState {
   finances: BusinessFinances;
   legalStatus: LegalStatus;
   policeHeat: PoliceHeat;
+  
+  // Blind hit system
+  hiddenUnits: HiddenUnit[];
+  aiBounties: AIBounty[];
   
   turnReport: TurnReport | null;
   lastCombatResult?: {
@@ -484,6 +490,9 @@ const createInitialGameState = (
     finances: { totalIncome: 0, totalExpenses: 0, legalProfit: 0, illegalProfit: 0, totalProfit: 0, dirtyMoney: 0, cleanMoney: 0, legalCosts: 0 },
     legalStatus: { charges: [], lawyer: null, jailTime: 0, prosecutionRisk: 10, totalLegalCosts: 0 },
     policeHeat: { level: 15, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 },
+    
+    hiddenUnits: [],
+    aiBounties: [],
     
     selectedTerritory: null,
     activeEvent: null,
@@ -1279,6 +1288,42 @@ export const useEnhancedMafiaGameState = (
       newState.availableMoveHexes = [];
       newState.deployMode = null;
       newState.availableDeployHexes = [];
+
+      // ============ HIDDEN UNITS RETURN ============
+      const returningUnits = newState.hiddenUnits.filter(h => newState.turn >= h.returnsOnTurn);
+      if (returningUnits.length > 0) {
+        const hq = newState.headquarters[newState.playerFamily];
+        returningUnits.forEach(h => {
+          // Re-deploy the unit at HQ
+          newState.deployedUnits.push({
+            id: h.unitId,
+            family: newState.playerFamily,
+            type: 'soldier',
+            q: hq.q, r: hq.r, s: hq.s,
+            movesRemaining: 0,
+            maxMoves: 2,
+            level: 1,
+            fortified: false,
+          });
+          // Restore soldier stats if missing
+          if (!newState.soldierStats[h.unitId]) {
+            newState.soldierStats[h.unitId] = {
+              loyalty: 50, training: 0, hits: 0, extortions: 0,
+              victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
+            };
+          }
+        });
+        newState.hiddenUnits = newState.hiddenUnits.filter(h => newState.turn < h.returnsOnTurn);
+        newState.pendingNotifications.push({
+          type: 'info',
+          title: '🕵️ Soldier Returned from Hiding',
+          message: `${returningUnits.length} soldier(s) came out of hiding and returned to HQ.`,
+        });
+        if (turnReport) turnReport.events.push(`${returningUnits.length} soldier(s) returned from hiding.`);
+      }
+
+      // ============ EXPIRE AI BOUNTIES ============
+      newState.aiBounties = newState.aiBounties.filter(b => newState.turn < b.expiresOnTurn);
       newState.selectedMoveAction = 'move' as MoveAction;
       
       // Reset action & tactical budgets for new turn
@@ -1783,13 +1828,19 @@ export const useEnhancedMafiaGameState = (
             return tile && tile.controllingFamily !== fam && tile.controllingFamily !== 'neutral';
           });
 
+          // Check if this AI family has an active bounty on the player
+          const hasBounty = state.aiBounties.some(b => b.fromFamily === fam && b.targetFamily === state.playerFamily);
+          
           let targetPool = playerHexes.length > 0 ? playerHexes
             : enemyHexes.length > 0 ? enemyHexes
             : neutralHexes.length > 0 ? neutralHexes
             : validMoves;
           
-          // 30% chance to just expand to neutral instead of attacking (variety)
-          if (neutralHexes.length > 0 && Math.random() < 0.3) {
+          // Bounty active: always prioritize player hexes, skip neutral expansion
+          if (hasBounty && playerHexes.length > 0) {
+            targetPool = playerHexes;
+          } else if (!hasBounty && neutralHexes.length > 0 && Math.random() < 0.3) {
+            // 30% chance to just expand to neutral instead of attacking (variety) — only if no bounty
             targetPool = neutralHexes;
           }
 
@@ -2733,116 +2784,201 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // Fix 1: Only selected unit + player units already ON target hex participate
+      // Gather participants: selected unit + units on target hex
       const selectedUnitId = action.selectedUnitId;
       const playerUnitsOnHex = state.deployedUnits.filter(u => 
         u.family === state.playerFamily && u.q === targetQ && u.r === targetR && u.s === targetS
       );
       const selectedUnit = state.deployedUnits.find(u => u.id === selectedUnitId);
       const playerUnits: typeof playerUnitsOnHex = [];
-      // Add selected unit first (if not already on hex)
       if (selectedUnit && !playerUnitsOnHex.some(u => u.id === selectedUnit.id)) {
         playerUnits.push(selectedUnit);
       }
-      // Add units already on the target hex
       playerUnits.push(...playerUnitsOnHex);
       if (playerUnits.length === 0) return state;
+
+      // Check if hex is scouted
+      const isScouted = state.scoutedHexes.some(s => s.q === targetQ && s.r === targetR && s.s === targetS);
 
       const enemyUnits = state.deployedUnits.filter(u => 
         u.family === tile.controllingFamily && u.q === targetQ && u.r === targetR && u.s === targetS
       );
 
-      // Fix 2: Scaled success chance based on force ratio
+      // ============ BLIND HIT: CIVILIAN RISK ============
+      if (!isScouted && enemyUnits.length === 0) {
+        // No enemy units — soldier hit a civilian!
+        state.policeHeat.level = 100;
+        
+        // Remove soldier from board, add to hidden units
+        const hidingSoldier = playerUnits[0]; // The initiating soldier goes into hiding
+        const idx = state.deployedUnits.indexOf(hidingSoldier);
+        if (idx !== -1) state.deployedUnits.splice(idx, 1);
+        
+        state.hiddenUnits = [...state.hiddenUnits, {
+          unitId: hidingSoldier.id,
+          returnsOnTurn: state.turn + HIDING_DURATION,
+        }];
+        
+        state.lastCombatResult = {
+          q: targetQ, r: targetR, s: targetS,
+          success: false, type: 'hit',
+          title: '💀 CIVILIAN HIT!',
+          details: 'Your soldier hit an innocent civilian! Heat maxed, soldier in hiding for 3 turns.',
+          timestamp: Date.now(),
+        };
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'error', title: '💀 Civilian Casualty!',
+          message: `Your soldier hit an innocent civilian! Police heat maxed out. The soldier has gone into hiding for ${HIDING_DURATION} turns.`,
+        }];
+        
+        syncLegacyUnits(state);
+        return state;
+      }
+
+      // ============ COMBAT RESOLUTION ============
       const attackers = playerUnits.length;
       const defenders = enemyUnits.length;
       let chance = 0.5 + (attackers - defenders) * 0.15;
       
-      // Apply fortified defense bonus for defenders
+      // Unscouted penalty
+      if (!isScouted) {
+        chance -= BLIND_HIT_PENALTY;
+      }
+      
+      // Fortification modifiers
       const fortifiedDefenders = enemyUnits.filter(u => u.fortified);
       if (fortifiedDefenders.length > 0) {
         chance -= FORTIFY_DEFENSE_BONUS / 100;
       }
-      // Apply fortified bonus for player attackers
       const fortifiedAttackers = playerUnits.filter(u => u.fortified);
       if (fortifiedAttackers.length > 0) {
         chance += FORTIFY_DEFENSE_BONUS / 200;
       }
       
-      // Apply family combat bonus
+      // Family/hitman bonuses
       chance += state.familyBonuses.combatBonus / 100;
-      
-      // Apply hitman bonus
       const hitmenOnTile = playerUnits.filter(u => state.hitmen.some(h => h.unitId === u.id));
       hitmenOnTile.forEach(h => {
         const hitman = state.hitmen.find(hm => hm.unitId === h.id)!;
         chance += (0.3 + (hitman.hitmanLevel - 1) * 0.1);
       });
-      
-      // Apply Lucchese hit success bonus
       chance += state.familyBonuses.hitSuccess / 100;
 
-      // Apply scout intelligence bonus
-      const isScouted = state.scoutedHexes.some(s => s.q === targetQ && s.r === targetR && s.s === targetS);
+      // Scout intel bonus (only if scouted)
       if (isScouted) {
         chance += SCOUT_INTEL_BONUS / 100;
       }
       
       chance = Math.max(0.1, Math.min(0.95, chance));
 
-      // Fix 5: Scale heat with battle size
+      // Heat scales with battle size
       const totalUnitsInvolved = attackers + defenders;
       const heatGain = Math.min(25, 8 + totalUnitsInvolved * 2);
 
       if (Math.random() < chance) {
-        // Victory
+        // ============ VICTORY ============
+        const targetFamily = tile.controllingFamily;
+        
         enemyUnits.forEach(eu => {
           const idx = state.deployedUnits.indexOf(eu);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         });
         tile.controllingFamily = null; // Hit clears enemy control — player must Claim next turn
         
-        // Fix 3: Replace money with fear/respect
-        state.resources.respect += 5;
-        state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + 5);
-        
-        playerUnits.forEach(u => {
-          if (state.soldierStats[u.id]) {
-            state.soldierStats[u.id].hits += 1;
-            state.soldierStats[u.id].victories = Math.min(5, state.soldierStats[u.id].victories + 1);
-            state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
+        if (!isScouted) {
+          // ===== BLIND HIT VICTORY: Enhanced rewards =====
+          state.resources.respect += BLIND_HIT_RESPECT;
+          state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + BLIND_HIT_FEAR);
+          
+          // Max out the initiating soldier's stats
+          playerUnits.forEach(u => {
+            if (state.soldierStats[u.id]) {
+              state.soldierStats[u.id].toughness = 5;
+              state.soldierStats[u.id].loyalty = Math.min(SOLDIER_LOYALTY_CAP, 80);
+              state.soldierStats[u.id].victories = 5;
+              state.soldierStats[u.id].hits += 1;
+            }
+          });
+          
+          // Street cred event: +15 fear from all rival families
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'success', title: '🔥 STREET CRED! Bold Blind Hit!',
+            message: `Word spreads of your audacious unscouted attack! All rival families now fear you (+${BLIND_HIT_FEAR} fear). The ${targetFamily} family is out for revenge!`,
+          }];
+          
+          // Bounty: targeted family AI prioritizes player for BOUNTY_DURATION turns
+          if (targetFamily) {
+            state.aiBounties = [...state.aiBounties, {
+              targetFamily: state.playerFamily,
+              fromFamily: targetFamily,
+              expiresOnTurn: state.turn + BOUNTY_DURATION,
+            }];
+            
+            // Targeted family loses influence
+            const rivalOpponent = state.aiOpponents.find(o => o.family === targetFamily);
+            if (rivalOpponent) {
+              rivalOpponent.resources.influence = Math.max(0, rivalOpponent.resources.influence - BLIND_HIT_INFLUENCE_LOSS);
+            }
+            
+            state.pendingNotifications = [...state.pendingNotifications, {
+              type: 'warning', title: `🎯 Bounty Placed by ${targetFamily.charAt(0).toUpperCase() + targetFamily.slice(1)}!`,
+              message: `The ${targetFamily} family has placed a bounty on you! They will aggressively target your territory for ${BOUNTY_DURATION} turns.`,
+            }];
           }
-        });
+          
+          const hitDetails = `+${BLIND_HIT_RESPECT} respect, +${BLIND_HIT_FEAR} fear, soldier stats maxed!`;
+          state.lastCombatResult = {
+            q: targetQ, r: targetR, s: targetS,
+            success: true, type: 'hit',
+            title: '🔥 BLIND HIT SUCCESSFUL!',
+            details: hitDetails,
+            timestamp: Date.now(),
+          };
+        } else {
+          // ===== SCOUTED HIT VICTORY: Standard rewards =====
+          state.resources.respect += 5;
+          state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + 5);
+          
+          playerUnits.forEach(u => {
+            if (state.soldierStats[u.id]) {
+              state.soldierStats[u.id].hits += 1;
+              state.soldierStats[u.id].victories = Math.min(5, state.soldierStats[u.id].victories + 1);
+              state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
+            }
+          });
+          
+          const hitDetails = `+5 fear, +5 respect`;
+          state.lastCombatResult = {
+            q: targetQ, r: targetR, s: targetS,
+            success: true, type: 'hit',
+            title: 'HIT SUCCESSFUL!',
+            details: hitDetails,
+            timestamp: Date.now(),
+          };
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'success', title: 'Hit Successful!',
+            message: `Territory is now contested — claim it next turn. ${hitDetails}.`,
+          }];
+        }
         
+        // Casualties (same for both)
         let casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
         const attackersFortified = playerUnits.some(u => u.fortified);
         if (attackersFortified) {
           casualties = Math.max(0, Math.floor(casualties * (1 - FORTIFY_CASUALTY_REDUCTION / 100)));
         }
-        // Fix 4: Random casualty selection — shuffle before removing
         const shuffled = [...playerUnits].sort(() => Math.random() - 0.5);
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(shuffled[i]);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         }
-        const hitDetails = `+5 fear, +5 respect${casualties > 0 ? `, ${casualties} casualt${casualties > 1 ? 'ies' : 'y'}` : ''}`;
-        state.lastCombatResult = {
-          q: targetQ, r: targetR, s: targetS,
-          success: true, type: 'hit',
-          title: 'HIT SUCCESSFUL!',
-          details: hitDetails,
-          timestamp: Date.now(),
-        };
-        state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: 'Hit Successful!',
-          message: `Territory is now contested — claim it next turn. ${hitDetails}.`,
-        }];
       } else {
+        // ============ DEFEAT ============
         let casualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
         const defendersFortified = playerUnits.some(u => u.fortified);
         if (defendersFortified) {
           casualties = Math.max(1, Math.floor(casualties * (1 - FORTIFY_CASUALTY_REDUCTION / 100)));
         }
-        // Fix 4: Random casualty selection on failure too
         const shuffled = [...playerUnits].sort(() => Math.random() - 0.5);
         for (let i = 0; i < casualties; i++) {
           const idx = state.deployedUnits.indexOf(shuffled[i]);
@@ -2857,12 +2993,12 @@ export const useEnhancedMafiaGameState = (
         state.lastCombatResult = {
           q: targetQ, r: targetR, s: targetS,
           success: false, type: 'hit',
-          title: 'HIT FAILED!',
+          title: !isScouted ? '💀 BLIND HIT FAILED!' : 'HIT FAILED!',
           details: failDetails,
           timestamp: Date.now(),
         };
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'error', title: 'Hit Failed!',
+          type: 'error', title: !isScouted ? '💀 Blind Hit Failed!' : 'Hit Failed!',
           message: `The attack was repelled. ${failDetails}.`,
         }];
       }
