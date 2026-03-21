@@ -2789,7 +2789,7 @@ export const useEnhancedMafiaGameState = (
     }
 
     // Require a player soldier on or adjacent to the target hex
-    const adjacentCoords = getAdjacentHexes(targetQ, targetR, targetS);
+    const adjacentCoords = getHexNeighbors(targetQ, targetR, targetS);
     const hasSoldierPresence = state.deployedUnits.some(u =>
       u.family === state.playerFamily && u.type === 'soldier' &&
       ((u.q === targetQ && u.r === targetR && u.s === targetS) ||
