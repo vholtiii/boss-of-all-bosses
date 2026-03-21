@@ -2803,33 +2803,42 @@ export const useEnhancedMafiaGameState = (
     return state;
   };
 
-  // ============ CLAIM TERRITORY (soldiers only, action phase) ============
+  // ============ CLAIM TERRITORY (soldiers + capos, action phase) ============
   const processClaimTerritory = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
     const { targetQ, targetR, targetS } = action;
     const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
     if (!tile || tile.controllingFamily !== 'neutral' || tile.isHeadquarters) return state;
 
-    const playerSoldiersOnHex = state.deployedUnits.filter(u => 
-      u.family === state.playerFamily && u.type === 'soldier' &&
+    // Allow both soldiers and capos to claim
+    const playerUnitsOnHex = state.deployedUnits.filter(u => 
+      u.family === state.playerFamily &&
       u.q === targetQ && u.r === targetR && u.s === targetS
     );
     const claimNeighbors = getHexNeighbors(targetQ, targetR, targetS);
-    const playerSoldiersAdjacent = state.deployedUnits.filter(u => 
-      u.family === state.playerFamily && u.type === 'soldier' &&
+    const playerUnitsAdjacent = state.deployedUnits.filter(u => 
+      u.family === state.playerFamily &&
       claimNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s)
     );
-    const playerSoldiers = [...playerSoldiersOnHex, ...playerSoldiersAdjacent];
-    if (playerSoldiers.length === 0) return state;
+    const playerUnits = [...playerUnitsOnHex, ...playerUnitsAdjacent];
+    if (playerUnits.length === 0) return state;
 
     tile.controllingFamily = state.playerFamily;
+
+    // Auto-move: find the first adjacent SOLDIER (not on hex) and move them to the target
+    const adjacentSoldier = playerUnitsAdjacent.find(u => u.type === 'soldier');
+    if (adjacentSoldier) {
+      adjacentSoldier.q = targetQ;
+      adjacentSoldier.r = targetR;
+      adjacentSoldier.s = targetS;
+    }
+    // Capos do NOT move — they claim at range
 
     // Community expansion: +1 respect, +1 influence, no money
     let respectGain = 1;
     let influenceGain = 1;
-    // Recruited soldier bonus: +15% translates to extra respect/influence
-    const hasRecruitedSoldier = playerSoldiers.some(u => u.recruited);
+    const hasRecruitedSoldier = playerUnits.some(u => u.recruited);
     if (hasRecruitedSoldier) {
-      respectGain += 1; // bonus from local knowledge
+      respectGain += 1;
       influenceGain += 1;
     }
     state.reputation.respect = Math.min(100, state.reputation.respect + respectGain);
