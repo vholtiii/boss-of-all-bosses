@@ -987,7 +987,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           >
             <h3 className="font-semibold text-mafia-gold mb-2">{hoveredHex.district}</h3>
             <div className="space-y-1 text-sm">
-              <p><span className="text-muted-foreground">Control:</span> {hoveredHex.controllingFamily.toUpperCase()}</p>
+              <p><span className="text-muted-foreground">Control:</span> {(hoveredHex.controllingFamily || 'neutral').toUpperCase()}</p>
               <p><span className="text-muted-foreground">Terrain:</span> {hoveredHex.terrain}</p>
               {hoveredHex.business && (() => {
                 const isUnderConstruction = hoveredHex.business.constructionGoal && (hoveredHex.business.constructionProgress ?? 0) < hoveredHex.business.constructionGoal;
