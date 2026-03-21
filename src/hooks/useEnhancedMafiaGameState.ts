@@ -3144,6 +3144,11 @@ export const useEnhancedMafiaGameState = (
             state.soldierStats[u.id].extortions += 1;
             state.soldierStats[u.id].victories = Math.min(5, state.soldierStats[u.id].victories + 1);
             state.soldierStats[u.id].racketeering = Math.min(5, state.soldierStats[u.id].racketeering + 1);
+            // Loyalty: +2 action bonus
+            state.soldierStats[u.id].loyalty = Math.min(
+              u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
+              state.soldierStats[u.id].loyalty + LOYALTY_ACTION_BONUS
+            );
           }
         });
         
