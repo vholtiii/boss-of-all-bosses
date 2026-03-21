@@ -1,33 +1,25 @@
 
 
-# Fix: "Still in Hiding" Event Not Showing Every Turn
+# Add Negative Sound Effects for Unit Loss Events
 
 ## Problem
-The "🕵️ X unit(s) still in hiding" turn summary event is inside the `if (returningUnits.length > 0)` block. This means it only appears on turns when a hidden unit is scheduled to return — not on intermediate turns when soldiers are still hiding but none are returning yet.
+When a soldier or capo is killed in combat, arrested, or eliminated by an internal family hit, the player receives visual notifications but no audio feedback. Negative events should play a distinct warning/danger sound so the player immediately knows something bad happened.
+
+## Solution
+Add `playSound` calls in the existing pending notifications drain effect. Since all these bad events already use `type: 'error'` or `type: 'warning'` notification types, we can play appropriate sounds based on the notification type when draining the queue.
 
 ## Change
 
-### `src/hooks/useEnhancedMafiaGameState.ts` — Lines 1410-1415
-Move the "still in hiding" check **outside** the `if (returningUnits.length > 0)` block so it runs every turn:
+### `src/pages/UltimateMafiaGame.tsx` — Lines 69-81 (notification drain effect)
+Add sound effects when processing pending notifications:
+- `'error'` type notifications (arrests, internal hits, deaths, raids) → play `'danger'` sound
+- `'warning'` type notifications (enemy attacks, police warnings) → play `'error'` sound
+- `'success'` / `'info'` → play `'success'` / `'notification'` respectively
 
-```
-// Before (inside the if block, at lines 1410-1415):
-        const stillHiding = newState.hiddenUnits.length;
-        if (stillHiding > 0 && turnReport) {
-          const nextReturn = Math.min(...newState.hiddenUnits.map(h => h.returnsOnTurn));
-          turnReport.events.push(`🕵️ ${stillHiding} unit(s) still in hiding. Next return: Turn ${nextReturn}.`);
-        }
-      }   // <-- end of returningUnits block
+This covers all the events the user asked about:
+- **Killed by a hit** → `pendingNotifications` with `type: 'warning'` (enemy attack) → plays `'error'` sound
+- **Arrested** → `pendingNotifications` with `type: 'error'` (soldier/capo arrested) → plays `'danger'` sound
+- **Internal family hit** → `pendingNotifications` with `type: 'error'` (internal hit) → plays `'danger'` sound
 
-// After (moved outside):
-      }   // <-- end of returningUnits block
-
-      const stillHiding = newState.hiddenUnits.length;
-      if (stillHiding > 0 && turnReport) {
-        const nextReturn = Math.min(...newState.hiddenUnits.map(h => h.returnsOnTurn));
-        turnReport.events.push(`🕵️ ${stillHiding} unit(s) still in hiding. Next return: Turn ${nextReturn}.`);
-      }
-```
-
-Single block move, one file. Everything else from the previous implementation is correct.
+Single edit in one file. No new sound presets needed — `'danger'` and `'error'` already exist in the sound system.
 
