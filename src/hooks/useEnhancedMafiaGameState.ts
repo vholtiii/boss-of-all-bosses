@@ -491,6 +491,9 @@ const createInitialGameState = (
     legalStatus: { charges: [], lawyer: null, jailTime: 0, prosecutionRisk: 10, totalLegalCosts: 0 },
     policeHeat: { level: 15, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 },
     
+    hiddenUnits: [],
+    aiBounties: [],
+    
     selectedTerritory: null,
     activeEvent: null,
     turnReport: null,
