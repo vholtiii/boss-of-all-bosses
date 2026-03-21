@@ -1,39 +1,26 @@
 
 
-# Draw Cohesive District Border Outlines as Connected Paths
+# Make District Borders Bold and Continuous (Like Reference Image)
 
-## Problem
-The current implementation draws individual `<line>` segments for each hex edge on a district boundary. Even with round caps, these appear as disconnected fragments rather than continuous shapes around each borough.
+The reference image shows **thick, bold, clearly visible** continuous outlines tracing each district's full perimeter shape. The current implementation uses subtle gray at 0.4 opacity and 2px — far too faint. Additionally, the edge-chaining algorithm may have a bug where it marks vertices as "visited" globally, preventing proper closed-loop formation when multiple vertices are shared across loops.
 
-## Solution
-Replace the individual line segments with a single connected `<path>` per district that traces the full outer perimeter of each borough as a closed polygon.
+## Changes — `src/components/EnhancedMafiaHexGrid.tsx`
 
-## Technical Approach
+### 1. Fix edge-chaining algorithm (lines 198-227)
+The current algorithm marks visited vertices globally and uses a simple greedy walk, which can fail to form proper closed loops for complex district shapes. Replace with a proper edge-consumption approach:
+- Track **edges** as visited (not vertices), since vertices are shared between multiple edges
+- For each unconsumed edge, start a new loop and follow connected unconsumed edges until returning to the start vertex
+- This guarantees proper closed polygons even for districts with concave shapes or multiple boundary loops
 
-### `src/components/EnhancedMafiaHexGrid.tsx`
+### 2. Update border styling (line 768)
+Change from the current subtle appearance to match the reference:
+- `strokeWidth="3.5"` — bold and clearly visible
+- `stroke="rgba(220,220,220,0.7)"` — bright enough to stand out like the reference image
+- Keep `strokeLinejoin="round"` and `fill="none"`
 
-**1. Replace `districtBorderEdges` with `districtBorderPaths`**
-
-Instead of collecting individual line segments, the new `useMemo` will:
-
-- Group all hex tiles by `district`
-- For each district, collect all boundary edges (same logic: neighbor missing or different district)
-- **Chain the edges into ordered perimeter paths**: Starting from any edge, follow the next edge that shares an endpoint, building a continuous path. This handles districts with holes or disconnected regions by producing multiple sub-paths.
-- Convert each ordered path into an SVG `<path>` `d` attribute string (e.g., `M x1,y1 L x2,y2 L x3,y3 ... Z`)
-
-**2. Render as `<path>` elements instead of `<line>` elements**
-
-Each district gets one or more `<path>` elements with:
-- `stroke="rgba(200,200,200,0.4)"` — light gray, subtle
-- `strokeWidth="2"`
-- `fill="none"`
-- `strokeLinejoin="round"` for smooth corners
-- Closed paths (`Z` in the path data) for complete borough shapes
-
-**3. Edge-chaining algorithm**
-
-Build an adjacency map from edge endpoints (rounded to avoid float precision issues). Walk the chain: pick a starting vertex, follow connected vertices until returning to start. This produces a clean closed polygon per district boundary.
+### 3. Render borders above hex tiles
+Move the border rendering block to appear **after** hex tile rendering in the SVG (currently at line 766-769), so borders render on top of everything and aren't obscured by hex fills. Place them just before the closing `</svg>`.
 
 ## Files Changed
-- `src/components/EnhancedMafiaHexGrid.tsx` — Replace `districtBorderEdges` useMemo and its rendering block
+- `src/components/EnhancedMafiaHexGrid.tsx`
 
