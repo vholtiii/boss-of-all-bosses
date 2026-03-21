@@ -23,6 +23,9 @@ import {
   ChevronDown,
   ChevronRight,
   Crosshair,
+  UtensilsCrossed,
+  Store,
+  HardHat,
 } from 'lucide-react';
 import { EnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import HitmanPanel from '@/components/HitmanPanel';
