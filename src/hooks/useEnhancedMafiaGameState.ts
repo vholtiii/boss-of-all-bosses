@@ -1262,6 +1262,21 @@ export const useEnhancedMafiaGameState = (
   const endTurn = useCallback(() => {
     setGameState(prev => {
       const newState = { ...prev };
+      // Defensive guards for arrays that may be undefined (e.g. from older saved state)
+      newState.hiddenUnits = newState.hiddenUnits || [];
+      newState.aiBounties = newState.aiBounties || [];
+      newState.scoutedHexes = newState.scoutedHexes || [];
+      newState.activeBribes = newState.activeBribes || [];
+      newState.alliances = newState.alliances || [];
+      newState.ceasefires = newState.ceasefires || [];
+      newState.events = newState.events || [];
+      newState.hitmanContracts = newState.hitmanContracts || [];
+      newState.pendingNotifications = newState.pendingNotifications || [];
+      newState.deployedUnits = newState.deployedUnits || [];
+      newState.policeHeat = newState.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
+      newState.policeHeat.arrests = newState.policeHeat.arrests || [];
+      newState.policeHeat.bribedOfficials = newState.policeHeat.bribedOfficials || [];
+      newState.aiAlertState = newState.aiAlertState || {};
       newState.turn += 1;
       
       // Snapshot before-state for turn report
@@ -1751,7 +1766,7 @@ export const useEnhancedMafiaGameState = (
 
   // ============ PROCESS BRIBES ============
   const processBribes = (state: EnhancedMafiaGameState) => {
-    state.activeBribes = state.activeBribes.map(b => {
+    state.activeBribes = (state.activeBribes || []).map(b => {
       if (!b.active) return b;
       const remaining = b.turnsRemaining - 1;
       if (remaining <= 0) return { ...b, turnsRemaining: 0, active: false };
@@ -1782,6 +1797,10 @@ export const useEnhancedMafiaGameState = (
 
   // ============ AI TURN ============
   const processAITurn = (state: EnhancedMafiaGameState, turnReport?: TurnReport) => {
+    state.aiOpponents = state.aiOpponents || [];
+    state.deployedUnits = state.deployedUnits || [];
+    state.aiBounties = state.aiBounties || [];
+    state.aiAlertState = state.aiAlertState || {};
     state.aiOpponents.forEach(opponent => {
       const fam = opponent.family as any;
       const hq = state.headquarters[fam];
@@ -2134,6 +2153,18 @@ export const useEnhancedMafiaGameState = (
   const performAction = useCallback((action: any) => {
     setGameState(prev => {
       const newState = { ...prev };
+      // Defensive guards for arrays
+      newState.hitmanContracts = newState.hitmanContracts || [];
+      newState.activeBribes = newState.activeBribes || [];
+      newState.alliances = newState.alliances || [];
+      newState.ceasefires = newState.ceasefires || [];
+      newState.pendingNotifications = newState.pendingNotifications || [];
+      newState.deployedUnits = newState.deployedUnits || [];
+      newState.policeHeat = newState.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
+      newState.policeHeat.arrests = newState.policeHeat.arrests || [];
+      newState.policeHeat.bribedOfficials = newState.policeHeat.bribedOfficials || [];
+      newState.events = newState.events || [];
+      newState.businesses = newState.businesses || [];
       const bonuses = newState.familyBonuses;
       const discount = bonuses.recruitmentDiscount / 100;
       
@@ -3300,7 +3331,7 @@ export const useEnhancedMafiaGameState = (
   // ============ PROCESS PACTS AT END OF TURN ============
   const processPacts = (state: EnhancedMafiaGameState) => {
     // Tick down ceasefires
-    state.ceasefires = state.ceasefires.map(c => {
+    state.ceasefires = (state.ceasefires || []).map(c => {
       if (!c.active) return c;
       const remaining = c.turnsRemaining - 1;
       if (remaining <= 0) {
@@ -3314,7 +3345,7 @@ export const useEnhancedMafiaGameState = (
     }).filter(c => c.active);
 
     // Tick down alliances and check conditions
-    state.alliances = state.alliances.map(a => {
+    state.alliances = (state.alliances || []).map(a => {
       if (!a.active) return a;
       const remaining = a.turnsRemaining - 1;
 
