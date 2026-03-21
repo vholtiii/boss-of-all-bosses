@@ -2833,8 +2833,8 @@ export const useEnhancedMafiaGameState = (
           timestamp: Date.now(),
         };
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: 'Territory Captured!',
-          message: `Hit successful! ${hitDetails}.`,
+          type: 'success', title: 'Hit Successful!',
+          message: `Territory is now contested — claim it next turn. ${hitDetails}.`,
         }];
       } else {
         let casualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
