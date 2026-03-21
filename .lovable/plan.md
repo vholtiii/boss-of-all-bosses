@@ -1,20 +1,14 @@
 
 
-# Remove Investment System
+# Remove "Train Soldiers" Dead Button
 
-The "Invest $20K" button in the Economy menu and the `InvestmentPanel` component dispatch `make_investment` actions, but there is **no handler** in `useEnhancedMafiaGameState.ts`. It's non-functional dead code.
+## Problem
+The "Train Soldiers" button in the Defense & Law category dispatches `{ type: 'train_soldiers' }`, but there is no handler for this action in `useEnhancedMafiaGameState.ts`. It does nothing when clicked.
 
 ## Changes
 
-### 1. `src/components/GameSidePanels.tsx`
-- Remove the "Invest $20K" `ActionButton` (lines ~174-181) from the Economy category
+### `src/components/GameSidePanels.tsx` (lines 216-223)
+- Remove the "Train Soldiers" `ActionButton` from the Defense & Law category
 
-### 2. `src/components/EnhancedGameMechanics.tsx`
-- Remove the entire `InvestmentPanel` component (~lines 335-495) and its export
-
-### 3. `src/types/enhanced-mechanics.ts`
-- Remove the `Investment` interface and the `investments` field from `EconomySystem`
-
-### 4. `src/hooks/useEnhancedMafiaGameState.ts`
-- Remove `investments: []` from the economy initial state (line ~444)
+That's it — single surgical removal. No types or state to clean up since no handler ever existed.
 
