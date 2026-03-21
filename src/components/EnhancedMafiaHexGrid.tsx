@@ -137,15 +137,43 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return points.join(' ');
   };
 
-  // District abbreviations for hex labels
-  const districtAbbreviations: Record<string, string> = {
-    'Little Italy': 'LI',
-    'Bronx': 'BX',
-    'Brooklyn': 'BK',
-    'Queens': 'QN',
-    'Manhattan': 'MH',
-    'Staten Island': 'SI',
-  };
+  // Compute district border edges
+  const districtBorderEdges = useMemo(() => {
+    const edges: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    const tileMap = new Map<string, HexTile>();
+    hexMap.forEach(t => tileMap.set(`${t.q},${t.r},${t.s}`, t));
+
+    const neighborDirs = [
+      { dq: 1, dr: -1, ds: 0 },
+      { dq: 1, dr: 0, ds: -1 },
+      { dq: 0, dr: 1, ds: -1 },
+      { dq: -1, dr: 1, ds: 0 },
+      { dq: -1, dr: 0, ds: 1 },
+      { dq: 0, dr: -1, ds: 1 },
+    ];
+
+    hexMap.forEach(tile => {
+      const { x: cx, y: cy } = getHexPosition(tile.q, tile.r);
+      neighborDirs.forEach((dir, i) => {
+        const nq = tile.q + dir.dq;
+        const nr = tile.r + dir.dr;
+        const ns = tile.s + dir.ds;
+        const neighbor = tileMap.get(`${nq},${nr},${ns}`);
+        if (!neighbor || neighbor.district !== tile.district) {
+          // Draw edge between vertex i and vertex i+1
+          const angle1 = (Math.PI / 3) * i;
+          const angle2 = (Math.PI / 3) * ((i + 1) % 6);
+          edges.push({
+            x1: cx + baseHexRadius * Math.cos(angle1),
+            y1: cy + baseHexRadius * Math.sin(angle1),
+            x2: cx + baseHexRadius * Math.cos(angle2),
+            y2: cy + baseHexRadius * Math.sin(angle2),
+          });
+        }
+      });
+    });
+    return edges;
+  }, [hexMap, baseHexRadius]);
 
   // Business placement mode
   const pendingBuild = gameState?.pendingBusinessBuild;
@@ -517,12 +545,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     );
                   })()}
 
-                  {/* District abbreviation label */}
-                  {!tile.isHeadquarters && !tile.business && (
-                    <text x={x} y={y + 3} textAnchor="middle" fontSize="7" fill="#ffffff" fillOpacity="0.3" fontWeight="600" className="pointer-events-none select-none">
-                      {districtAbbreviations[tile.district] || ''}
-                    </text>
-                  )}
 
                   {/* Always-visible income label (hide during construction) */}
                   {tile.business && !tile.isHeadquarters && !(tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal) && (
@@ -685,6 +707,11 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 </g>
               );
             })}
+
+            {/* District border outlines */}
+            {districtBorderEdges.map((edge, i) => (
+              <line key={`border-${i}`} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" className="pointer-events-none" />
+            ))}
 
             {/* District name labels */}
             {(() => {
