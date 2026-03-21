@@ -309,22 +309,26 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title={`Capo Promotion (${gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'capo').length}/${3})`}
           icon={<Crown className="h-4 w-4" />}
-          isOpen={!actionsLocked && openSection === 'capo_promotion'}
-          onToggle={() => !actionsLocked && toggle('capo_promotion')}
-          disabled={actionsLocked}
+          isOpen={openSection === 'capo_promotion'}
+          onToggle={() => toggle('capo_promotion')}
+          phaseLocked={actionsLocked}
         >
-          <CapoPromotionPanel
-            capoCount={gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'capo').length}
-            soldierStats={gameState.soldierStats}
-            deployedSoldierIds={
-              gameState.deployedUnits
-                .filter(u => u.family === gameState.playerFamily && u.type === 'soldier')
-                .map(u => u.id)
-            }
-            hitmanIds={gameState.hitmen.map(h => h.unitId)}
-            money={resources.money}
-            onPromote={(unitId) => onAction({ type: 'promote_capo', unitId })}
-          />
+          {actionsLocked ? (
+            <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Action phase</p>
+          ) : (
+            <CapoPromotionPanel
+              capoCount={gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'capo').length}
+              soldierStats={gameState.soldierStats}
+              deployedSoldierIds={
+                gameState.deployedUnits
+                  .filter(u => u.family === gameState.playerFamily && u.type === 'soldier')
+                  .map(u => u.id)
+              }
+              hitmanIds={gameState.hitmen.map(h => h.unitId)}
+              money={resources.money}
+              onPromote={(unitId) => onAction({ type: 'promote_capo', unitId })}
+            />
+          )}
         </CollapsibleSection>
 
         {/* ── VICTORY TRACKER ── */}
