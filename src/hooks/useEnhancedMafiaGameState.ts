@@ -441,7 +441,7 @@ const createInitialGameState = (
       marketConditions: [
         { type: 'stable', sector: 'legal', modifier: 0, duration: 5, description: 'Legal businesses operating normally' },
       ],
-      supplyChains: [], investments: [], economicEvents: [],
+      supplyChains: [], economicEvents: [],
     },
     
     aiOpponents: allFamilies

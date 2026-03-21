@@ -171,14 +171,6 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'launder_money', amount: 10000 })}
             />
-            <ActionButton
-              icon={<TrendingUp className="h-4 w-4" />}
-              label="Invest $20K"
-              sublabel={`~15% return · 5 turns`}
-              disabled={resources.money < 20000}
-              phaseLocked={actionsLocked}
-              onClick={() => onAction({ type: 'make_investment', investmentType: 'stocks', amount: 20000, expectedReturn: 1.15, duration: 5 })}
-            />
           </div>
         </CollapsibleSection>
 

@@ -52,37 +52,7 @@ export interface CombatModifier {
 export interface EconomySystem {
   marketConditions: MarketCondition[];
   supplyChains: SupplyChain[];
-  investments: Investment[];
   economicEvents: EconomicEvent[];
-}
-
-export interface MarketCondition {
-  type: 'boom' | 'bust' | 'stable' | 'volatile';
-  sector: 'legal' | 'illegal' | 'construction' | 'gambling' | 'drugs';
-  modifier: number; // Percentage change in income
-  duration: number; // Turns remaining
-  description: string;
-}
-
-export interface SupplyChain {
-  id: string;
-  type: 'drugs' | 'weapons' | 'alcohol' | 'information';
-  source: string;
-  destination: string;
-  cost: number;
-  profit: number;
-  risk: number; // 0-100, chance of being intercepted
-  reliability: number; // 0-100, chance of successful delivery
-}
-
-export interface Investment {
-  id: string;
-  type: 'real_estate' | 'stocks' | 'business' | 'political';
-  amount: number;
-  expectedReturn: number;
-  risk: number;
-  duration: number; // Turns until maturity
-  currentValue: number;
 }
 
 export interface EconomicEvent {
