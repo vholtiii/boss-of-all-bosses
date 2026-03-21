@@ -590,18 +590,17 @@ const CollapsibleSection: React.FC<{
   onToggle: () => void;
   children: React.ReactNode;
   disabled?: boolean;
-}> = ({ title, icon, isOpen, onToggle, children, disabled }) => (
-  <div className={cn(disabled && 'opacity-40 pointer-events-none')}>
+  phaseLocked?: boolean;
+}> = ({ title, icon, isOpen, onToggle, children, disabled, phaseLocked }) => (
+  <div>
     <button
       onClick={onToggle}
-      disabled={disabled}
-      className="flex items-center gap-2 w-full text-left text-sm font-semibold text-foreground hover:text-primary transition-colors py-1 disabled:cursor-not-allowed"
+      className="flex items-center gap-2 w-full text-left text-sm font-semibold text-foreground hover:text-primary transition-colors py-1"
     >
       {icon}
       <span className="flex-1">{title}</span>
-      {disabled ? (
-        <span className="text-[9px] text-muted-foreground font-normal">🔒</span>
-      ) : isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+      {phaseLocked && <span className="text-[9px] text-muted-foreground font-normal">🔒</span>}
+      {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
     </button>
     <AnimatePresence>
       {isOpen && (
