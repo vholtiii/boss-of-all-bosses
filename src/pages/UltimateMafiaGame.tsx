@@ -459,12 +459,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         </Button>
         <Button
           onClick={() => {
+            if (gameState.turnPhase !== 'waiting') {
+              if (!window.confirm('End your turn early? You still have actions remaining.')) return;
+            }
             playSound('notification');
             endTurn();
           }}
           size="sm"
           className="bg-primary text-primary-foreground font-bold font-playfair hover:bg-primary/90"
-          disabled={gameState.legalStatus.jailTime > 0 || gameState.turnPhase !== 'waiting'}
+          disabled={gameState.legalStatus.jailTime > 0}
         >
           <SkipForward className="h-4 w-4 mr-2" />
           {gameState.legalStatus.jailTime > 0 ? `JAILED (${gameState.legalStatus.jailTime})` : 'END TURN'}
@@ -708,6 +711,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           
           <MobileFloatingActionButton
             onClick={() => {
+              if (gameState.turnPhase !== 'waiting') {
+                if (!window.confirm('End your turn early? You still have actions remaining.')) return;
+              }
               playSound('notification');
               endTurn();
             }}
