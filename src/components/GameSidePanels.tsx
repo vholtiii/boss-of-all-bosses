@@ -283,22 +283,26 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title={`Hitmen (${gameState.hitmen.length}/3)`}
           icon={<Crosshair className="h-4 w-4" />}
-          isOpen={!actionsLocked && openSection === 'hitmen'}
-          onToggle={() => !actionsLocked && toggle('hitmen')}
-          disabled={actionsLocked}
+          isOpen={openSection === 'hitmen'}
+          onToggle={() => toggle('hitmen')}
+          phaseLocked={actionsLocked}
         >
-          <HitmanPanel
-            hitmen={gameState.hitmen}
-            soldierStats={gameState.soldierStats}
-            deployedSoldierIds={
-              gameState.deployedUnits
-                .filter(u => u.family === gameState.playerFamily && u.type === 'soldier')
-                .map(u => u.id)
-            }
-            playerFamily={gameState.playerFamily}
-            money={resources.money}
-            onPromote={(unitId) => onAction({ type: 'promote_hitman', unitId })}
-          />
+          {actionsLocked ? (
+            <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Action phase</p>
+          ) : (
+            <HitmanPanel
+              hitmen={gameState.hitmen}
+              soldierStats={gameState.soldierStats}
+              deployedSoldierIds={
+                gameState.deployedUnits
+                  .filter(u => u.family === gameState.playerFamily && u.type === 'soldier')
+                  .map(u => u.id)
+              }
+              playerFamily={gameState.playerFamily}
+              money={resources.money}
+              onPromote={(unitId) => onAction({ type: 'promote_hitman', unitId })}
+            />
+          )}
         </CollapsibleSection>
 
         {/* ── CAPO PROMOTION ── */}
