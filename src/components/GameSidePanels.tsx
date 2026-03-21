@@ -159,12 +159,28 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         >
           <div className="space-y-1.5">
             <ActionButton
-              icon={<Building2 className="h-4 w-4" />}
-              label="Build Business"
-              sublabel={`$25,000`}
-              disabled={resources.money < 25000 || legalStatus.jailTime > 0}
+              icon={<UtensilsCrossed className="h-4 w-4" />}
+              label="🍝 Restaurant"
+              sublabel={`$20,000 · $3K/turn`}
+              disabled={resources.money < 20000 || legalStatus.jailTime > 0}
               phaseLocked={actionsLocked}
-              onClick={() => onAction({ type: 'build_business', cost: 25000, income: 5000, legal: true })}
+              onClick={() => onAction({ type: 'build_business', businessType: 'restaurant' })}
+            />
+            <ActionButton
+              icon={<Store className="h-4 w-4" />}
+              label="🏪 Store"
+              sublabel={`$12,000 · $1.8K/turn`}
+              disabled={resources.money < 12000 || legalStatus.jailTime > 0}
+              phaseLocked={actionsLocked}
+              onClick={() => onAction({ type: 'build_business', businessType: 'store' })}
+            />
+            <ActionButton
+              icon={<HardHat className="h-4 w-4" />}
+              label="🏗️ Construction"
+              sublabel={`$35,000 · $5K/turn`}
+              disabled={resources.money < 35000 || legalStatus.jailTime > 0}
+              phaseLocked={actionsLocked}
+              onClick={() => onAction({ type: 'build_business', businessType: 'construction' })}
             />
             <ActionButton
               icon={<DollarSign className="h-4 w-4" />}

@@ -1693,6 +1693,30 @@ export const useEnhancedMafiaGameState = (
     let income = 0;
     const units = state.deployedUnits || [];
     const bonuses = state.familyBonuses;
+
+    // Tick construction timers on ALL hexes (player-owned)
+    const LEGAL_BIZ_DEFS: Record<string, { income: number; launderingCapacity: number }> = {
+      restaurant: { income: 3000, launderingCapacity: 2000 },
+      store: { income: 1800, launderingCapacity: 1500 },
+      construction: { income: 5000, launderingCapacity: 4000 },
+    };
+    (state.hexMap || []).forEach(tile => {
+      if (tile.controllingFamily === state.playerFamily && tile.business && tile.business.turnsUntilComplete && tile.business.turnsUntilComplete > 0) {
+        tile.business.turnsUntilComplete -= 1;
+        if (tile.business.turnsUntilComplete <= 0) {
+          const def = LEGAL_BIZ_DEFS[tile.business.type];
+          if (def) {
+            tile.business.income = def.income;
+            tile.business.launderingCapacity = def.launderingCapacity;
+          }
+          tile.business.turnsUntilComplete = undefined;
+          state.pendingNotifications = [...(state.pendingNotifications || []), {
+            type: 'success' as const, title: '🏢 Business Complete!',
+            message: `Your ${tile.business.type} is now operational and generating $${tile.business.income.toLocaleString()}/turn.`,
+          }];
+        }
+      }
+    });
     
     (state.hexMap || []).forEach(tile => {
       if (tile.controllingFamily === state.playerFamily && tile.business) {

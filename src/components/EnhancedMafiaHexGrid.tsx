@@ -451,8 +451,14 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
                   {/* Business/HQ icon */}
                   <text x={x} y={y + (tile.business && !tile.isHeadquarters ? 1 : 5)} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">
-                    {tile.isHeadquarters ? '🏛️' : tile.business ? (businessIcons[tile.business.type] || '🏢') : ''}
+                    {tile.isHeadquarters ? '🏛️' : tile.business ? (tile.business.turnsUntilComplete && tile.business.turnsUntilComplete > 0 ? '🚧' : (businessIcons[tile.business.type] || '🏢')) : ''}
                   </text>
+                  {/* Construction turns remaining */}
+                  {tile.business && tile.business.turnsUntilComplete && tile.business.turnsUntilComplete > 0 && !tile.isHeadquarters && (
+                    <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#F59E0B" fontWeight="700" className="pointer-events-none select-none">
+                      {tile.business.turnsUntilComplete} turns
+                    </text>
+                  )}
 
                   {/* District abbreviation label */}
                   {!tile.isHeadquarters && !tile.business && (
