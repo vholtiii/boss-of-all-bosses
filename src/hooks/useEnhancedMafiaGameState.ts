@@ -2852,17 +2852,9 @@ export const useEnhancedMafiaGameState = (
       const newState = { ...prev };
       switch (action.type) {
         case 'charitable_donation':
-          if (newState.resources.money >= 5000) {
-            newState.resources.money -= 5000;
-            newState.reputation.reputation += 10;
-            newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 5);
-          }
-          return newState;
         case 'public_appearance':
-          if (newState.resources.money >= 3000) {
-            newState.resources.money -= 3000;
-            newState.reputation.reputation += 5;
-          }
+        case 'hire_lawyer':
+          // These are now handled by performAction, no-op here
           return newState;
         default:
           return newState;
