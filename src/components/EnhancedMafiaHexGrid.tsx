@@ -78,6 +78,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   // Read hex data from gameState
   const hexMap: HexTile[] = gameState?.hexMap || [];
   const deployedUnits: DeployedUnit[] = gameState?.deployedUnits || [];
+  const scoutedHexes: ScoutedHex[] = gameState?.scoutedHexes || [];
+  const bribedOfficials = gameState?.policeHeat?.bribedOfficials || [];
+
+  // Fog of War: check if a rival hex's intel is revealed
+  const isHexRevealed = (tile: HexTile): boolean => {
+    // Player's own hexes and neutral hexes are always visible
+    if (tile.controllingFamily === playerFamily || tile.controllingFamily === 'neutral') return true;
+    // HQ locations are common knowledge
+    if (tile.isHeadquarters) return true;
+    // Scouted hexes are revealed
+    if (scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s)) return true;
+    // Captain Rodriguez bribe reveals all rival intel
+    if (bribedOfficials.some((o: any) => o.id === 'captain_rodriguez')) return true;
+    // Chief Sullivan (rival_intelligence) also reveals
+    if (bribedOfficials.some((o: any) => o.permissions?.includes('rival_intelligence'))) return true;
+    return false;
+  };
 
   // Group units by hex for rendering
   const unitsByHex = useMemo(() => {
