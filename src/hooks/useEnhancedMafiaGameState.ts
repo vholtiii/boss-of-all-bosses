@@ -1115,6 +1115,24 @@ export const useEnhancedMafiaGameState = (
     });
   }, []);
 
+      // --- Training increment: +1 training per turn for soldiers deployed away from HQ ---
+      {
+        const allFams = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'] as const;
+        newState.deployedUnits.forEach(u => {
+          if (u.type !== 'soldier') return;
+          const stats = newState.soldierStats[u.id];
+          if (!stats) return;
+          const hq = newState.headquarters[u.family];
+          const atHQ = hq && u.q === hq.q && u.r === hq.r && u.s === hq.s;
+          if (!atHQ) {
+            stats.training = Math.min(3, stats.training + 1);
+            stats.turnsDeployed += 1;
+          }
+          // Enforce loyalty caps
+          const isCap = u.type === 'capo';
+          stats.loyalty = Math.min(isCap ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP, stats.loyalty);
+        });
+      }
 
   // ============ DEPLOY FROM HQ ============
   const selectHeadquarters = useCallback((family: string) => {}, []);

@@ -1,11 +1,8 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { cn } from '@/lib/utils';
-import { Crosshair, Star, Shield, Users, Skull } from 'lucide-react';
+import { Crosshair, Star, Skull } from 'lucide-react';
 import { Hitman, SoldierStats, HITMAN_REQUIREMENTS, MAX_HITMEN } from '@/types/game-mechanics';
 
 interface HitmanPanelProps {
@@ -25,9 +22,10 @@ const HitmanPanel: React.FC<HitmanPanelProps> = ({
     if (!stats) return false;
     if (hitmen.some(h => h.unitId === id)) return false;
     return (
-      stats.training * 10 >= HITMAN_REQUIREMENTS.minStrength &&
+      stats.training >= HITMAN_REQUIREMENTS.minStrength &&
       stats.loyalty >= HITMAN_REQUIREMENTS.minReputation &&
-      stats.hits >= HITMAN_REQUIREMENTS.minHits
+      stats.hits >= HITMAN_REQUIREMENTS.minHits &&
+      stats.toughness >= HITMAN_REQUIREMENTS.minToughness
     );
   });
 
@@ -35,7 +33,6 @@ const HitmanPanel: React.FC<HitmanPanelProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Active Hitmen */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -67,8 +64,8 @@ const HitmanPanel: React.FC<HitmanPanelProps> = ({
                   {stats && (
                     <div className="grid grid-cols-3 gap-1 text-[10px] text-muted-foreground mt-1">
                       <span>Hits: {stats.hits}</span>
-                      <span>Training: {stats.training}</span>
-                      <span>Loyalty: {stats.loyalty}</span>
+                      <span>Training: {stats.training}/3</span>
+                      <span>Toughness: {stats.toughness}/5</span>
                     </div>
                   )}
                 </div>
@@ -80,14 +77,13 @@ const HitmanPanel: React.FC<HitmanPanelProps> = ({
 
       <Separator />
 
-      {/* Eligible Soldiers */}
       <div>
         <h4 className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
           <Star className="h-4 w-4 text-primary" />
           Eligible for Promotion
         </h4>
         <p className="text-[10px] text-muted-foreground mb-2">
-          Requires: {HITMAN_REQUIREMENTS.minHits}+ hits, training ≥{HITMAN_REQUIREMENTS.minStrength / 10}, loyalty ≥{HITMAN_REQUIREMENTS.minReputation}
+          Requires: {HITMAN_REQUIREMENTS.minHits}+ hits, training ≥{HITMAN_REQUIREMENTS.minStrength}, loyalty ≥{HITMAN_REQUIREMENTS.minReputation}, toughness ≥{HITMAN_REQUIREMENTS.minToughness}
         </p>
         
         {eligibleSoldiers.length === 0 ? (
@@ -103,7 +99,7 @@ const HitmanPanel: React.FC<HitmanPanelProps> = ({
                   <div className="text-xs">
                     <span className="font-medium text-foreground">{id.split('-').slice(0, 2).join(' ')}</span>
                     <div className="text-[10px] text-muted-foreground">
-                      Hits: {stats.hits} · Train: {stats.training} · Loy: {stats.loyalty}
+                      Hits: {stats.hits} · Train: {stats.training}/3 · Tough: {stats.toughness}/5
                     </div>
                   </div>
                   <Button
