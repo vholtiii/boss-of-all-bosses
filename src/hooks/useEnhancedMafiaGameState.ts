@@ -2480,12 +2480,12 @@ export const useEnhancedMafiaGameState = (
         case 'hire_lawyer': {
           const lawyerCost = 8000;
           const lawyerCooldown = 3;
-          const lastLawyerTurn = (newState as any).lastLawyerTurn || 0;
+          const lastLawyerTurn = newState.lastLawyerTurn || 0;
           const turnsSinceLawyer = newState.turn - lastLawyerTurn;
           if (newState.resources.money >= lawyerCost && newState.actionsRemaining > 0 && turnsSinceLawyer >= lawyerCooldown) {
             newState.resources.money -= lawyerCost;
             newState.actionsRemaining -= 1;
-            (newState as any).lastLawyerTurn = newState.turn;
+            newState.lastLawyerTurn = newState.turn;
             // Remove first active arrest if any, otherwise just reduce heat
             const activeArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn < a.sentence);
             if (activeArrests.length > 0) {
