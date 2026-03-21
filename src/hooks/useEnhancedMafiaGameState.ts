@@ -1804,13 +1804,15 @@ export const useEnhancedMafiaGameState = (
       if (turnReport) turnReport.aiActions.push({ family: fam, action: 'income', detail: `Earned $${aiIncome.toLocaleString()} income` });
 
       // ── RECRUIT ── (always try to recruit up to a scaling cap)
-      const soldierCap = Math.min(8, 3 + Math.floor(state.turn / 2));
+      const isAlerted = (state.aiAlertState || {})[fam] > 0;
+      const alertBonus = isAlerted ? 1 : 0;
+      const soldierCap = Math.min(8 + alertBonus, 3 + Math.floor(state.turn / 2) + alertBonus);
       const currentDeployed = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier').length;
       const totalSoldiers = opponent.resources.soldiers + currentDeployed;
       const wantToRecruit = Math.max(0, soldierCap - totalSoldiers);
       if (wantToRecruit > 0) {
         const canAfford = Math.floor(opponent.resources.money / SOLDIER_COST);
-        const toRecruit = Math.min(wantToRecruit, canAfford, 3);
+        const toRecruit = Math.min(wantToRecruit, canAfford, 3 + alertBonus);
         opponent.resources.soldiers += toRecruit;
         opponent.resources.money -= toRecruit * SOLDIER_COST;
         if (toRecruit > 0 && turnReport) turnReport.aiActions.push({ family: fam, action: 'recruit', detail: `Recruited ${toRecruit} soldier(s)` });
