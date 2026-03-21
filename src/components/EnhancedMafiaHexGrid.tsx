@@ -547,8 +547,11 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     if (!isAtHQ) {
                       // Normal compact layout — skip HQ hexes (deployment menu handles those)
                       let offsetIdx = 0;
+                      const hexRevealed = isHexRevealed(tile);
 
                       caposByFamily.forEach((capos, fam) => {
+                        // Fog of War: hide rival units unless hex is revealed
+                        if (fam !== playerFamily && !hexRevealed) return;
                         const capo = capos[0];
                         const isSelected = selectedUnitId === capo.id;
                         const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action');
@@ -574,6 +577,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       });
 
                       soldiersByFamily.forEach((soldiers, fam) => {
+                        // Fog of War: hide rival units unless hex is revealed
+                        if (fam !== playerFamily && !hexRevealed) return;
                         const firstSoldier = soldiers[0];
                         const isSelected = soldiers.some(s => s.id === selectedUnitId);
                         const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action');
