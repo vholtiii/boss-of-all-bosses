@@ -2793,7 +2793,8 @@ export const useEnhancedMafiaGameState = (
         playerUnits.forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].hits += 1;
-            state.soldierStats[u.id].survivedConflicts += 1;
+            state.soldierStats[u.id].victories = Math.min(5, state.soldierStats[u.id].victories + 1);
+            state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
           }
         });
         
