@@ -25,6 +25,9 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [leftWidth, setLeftWidth] = useState(340);
+  const [rightWidth, setRightWidth] = useState(320);
+  const [dragging, setDragging] = useState<'left' | 'right' | null>(null);
 
   // Check if mobile on mount and resize
   React.useEffect(() => {
@@ -36,6 +39,21 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  React.useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e: MouseEvent) => {
+      if (dragging === 'left') {
+        setLeftWidth(Math.max(260, Math.min(500, e.clientX)));
+      } else {
+        setRightWidth(Math.max(260, Math.min(500, window.innerWidth - e.clientX)));
+      }
+    };
+    const onUp = () => setDragging(null);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [dragging]);
 
   if (isMobile) {
     return (
