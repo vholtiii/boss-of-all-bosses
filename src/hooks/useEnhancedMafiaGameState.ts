@@ -2911,7 +2911,7 @@ export const useEnhancedMafiaGameState = (
             // Targeted family loses influence
             const rivalOpponent = state.aiOpponents.find(o => o.family === targetFamily);
             if (rivalOpponent) {
-              rivalOpponent.influence = Math.max(0, (rivalOpponent.influence || 0) - BLIND_HIT_INFLUENCE_LOSS);
+              rivalOpponent.resources.influence = Math.max(0, rivalOpponent.resources.influence - BLIND_HIT_INFLUENCE_LOSS);
             }
             
             state.pendingNotifications = [...state.pendingNotifications, {
