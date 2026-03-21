@@ -2939,13 +2939,8 @@ export const useEnhancedMafiaGameState = (
         chance += FORTIFY_DEFENSE_BONUS / 200;
       }
       
-      // Family/hitman bonuses
+      // Family bonuses (hitmen no longer provide combat bonuses — they are external contractors)
       chance += state.familyBonuses.combatBonus / 100;
-      const hitmenOnTile = playerUnits.filter(u => state.hitmen.some(h => h.unitId === u.id));
-      hitmenOnTile.forEach(h => {
-        const hitman = state.hitmen.find(hm => hm.unitId === h.id)!;
-        chance += (0.3 + (hitman.hitmanLevel - 1) * 0.1);
-      });
       chance += state.familyBonuses.hitSuccess / 100;
 
       // Scout intel bonus (only if scouted)
