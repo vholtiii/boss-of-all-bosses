@@ -1829,7 +1829,7 @@ export const useEnhancedMafiaGameState = (
           });
 
           // Check if this AI family has an active bounty on the player
-          const hasBounty = newState.aiBounties.some(b => b.fromFamily === fam && b.targetFamily === newState.playerFamily);
+          const hasBounty = state.aiBounties.some(b => b.fromFamily === fam && b.targetFamily === state.playerFamily);
           
           let targetPool = playerHexes.length > 0 ? playerHexes
             : enemyHexes.length > 0 ? enemyHexes
