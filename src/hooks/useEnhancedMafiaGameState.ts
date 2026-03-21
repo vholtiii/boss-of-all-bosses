@@ -956,16 +956,25 @@ export const useEnhancedMafiaGameState = (
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
           if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters && unit.type === 'capo') {
-            // Capo auto-extorts on arrival — skip the extort action step
-            // Respect scales payout: 0 respect = 0.5x, 50 = 1.0x, 100 = 1.5x
-            const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
-            bonusMoney = Math.floor(3000 * respectPayoutMult);
-            bonusRespect = 5;
-            autoExtortNotification = {
-              type: 'success' as const,
-              title: '💰 Capo Auto-Extortion!',
-              message: `${unit.name || 'Your Capo'} took over and extorted the territory on arrival! +$${bonusMoney.toLocaleString()}, +5 respect.`,
-            };
+            const hasIllegalBusiness = tile.business && !tile.business.isLegal && !tile.business.underConstruction;
+            if (hasIllegalBusiness) {
+              // Capo auto-extorts illegal business on arrival
+              const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
+              bonusMoney = Math.floor(3000 * respectPayoutMult);
+              bonusRespect = 5;
+              autoExtortNotification = {
+                type: 'success' as const,
+                title: '💰 Capo Auto-Extortion!',
+                message: `${unit.name || 'Your Capo'} extorted the illegal business on arrival! +$${bonusMoney.toLocaleString()}, +5 respect.`,
+              };
+            } else {
+              // Capo auto-claims empty/legal territory — no money bonus
+              autoExtortNotification = {
+                type: 'info' as const,
+                title: '🏴 Territory Claimed',
+                message: `${unit.name || 'Your Capo'} claimed this territory on arrival.`,
+              };
+            }
             return { ...tile, controllingFamily: prev.playerFamily };
           }
         }
