@@ -2799,7 +2799,7 @@ export const useEnhancedMafiaGameState = (
           const idx = state.deployedUnits.indexOf(eu);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         });
-        tile.controllingFamily = state.playerFamily;
+        tile.controllingFamily = null; // Hit clears enemy control — player must Claim next turn
         
         // Fix 3: Replace money with fear/respect
         state.resources.respect += 5;
