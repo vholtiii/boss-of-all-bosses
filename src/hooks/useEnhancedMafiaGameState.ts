@@ -3345,7 +3345,7 @@ export const useEnhancedMafiaGameState = (
     }).filter(c => c.active);
 
     // Tick down alliances and check conditions
-    state.alliances = state.alliances.map(a => {
+    state.alliances = (state.alliances || []).map(a => {
       if (!a.active) return a;
       const remaining = a.turnsRemaining - 1;
 
