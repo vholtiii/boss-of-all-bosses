@@ -13,10 +13,13 @@ export interface SoldierStats {
 export const SOLDIER_LOYALTY_CAP = 80;
 export const CAPO_LOYALTY_CAP = 99;
 
-export interface Hitman {
-  unitId: string;         // references DeployedUnit.id
-  hitmanLevel: number;    // 1-3
-  promotedTurn: number;
+export interface HitmanContract {
+  id: string;
+  targetUnitId: string;
+  targetFamily: string;
+  turnsRemaining: number;
+  hiredOnTurn: number;
+  cost: number;
 }
 
 // ============ BRIBE / CORRUPTION SYSTEM ============
@@ -194,8 +197,21 @@ export const SOLDIER_COST = 1500;  // Mercenary (buy) cost
 export const LOCAL_SOLDIER_COST = 300;  // Recruited (loyal) cost
 export const RECRUIT_TERRITORY_REQUIREMENT = 10;  // Hexes needed to recruit locally
 export const CAPO_COST = 1500;
-export const HITMAN_MAINTENANCE_MULTIPLIER = 1.5;
 export const MAX_HITMEN = 3;
+
+// ============ HITMAN CONTRACT SYSTEM ============
+export const HITMAN_CONTRACT_COST = 15000;
+export const HITMAN_BASE_SUCCESS = 90;       // open field
+export const HITMAN_FORTIFIED_SUCCESS = 65;
+export const HITMAN_SAFEHOUSE_SUCCESS = 55;
+export const HITMAN_HQ_SUCCESS = 40;
+export const HITMAN_OPEN_TURNS = 3;
+export const HITMAN_FORTIFIED_TURNS = 4;
+export const HITMAN_SAFEHOUSE_TURNS = 4;
+export const HITMAN_HQ_TURNS = 5;
+export const HITMAN_MAX_LIFETIME = 5;
+export const HITMAN_REFUND_RATE = 0.5;
+export const HITMAN_ALERT_DURATION = 5;
 
 // ============ CAPO PROMOTION ============
 export const MAX_CAPOS = 3;
@@ -208,13 +224,8 @@ export const CAPO_PROMOTION_REQUIREMENTS = {
   minRacketeering: 5,    // racketeering on SoldierStats (0-5)
 };
 
-// Hitman promotion requirements
-export const HITMAN_REQUIREMENTS = {
-  minStrength: 3,     // training (0-3 scale, must be maxed)
-  minReputation: 50,  // maps to loyalty
-  minHits: 3,
-  minToughness: 3,    // toughness (0-5)
-};
+// Hitman promotion requirements (legacy — kept for reference)
+// Hitmen are now external contract killers, not promoted soldiers
 
 // ============ MOVE PHASE TYPES ============
 export interface ScoutedHex {

@@ -13,9 +13,12 @@ import {
 import { Business, BusinessFinances, LegalStatus, PoliceHeat } from '@/types/business';
 import { ViolentAction } from '@/types/reputation';
 import {
-  SoldierStats, Hitman, BribeContract, BribeTier, VictoryProgress, VictoryType,
+  SoldierStats, HitmanContract, BribeContract, BribeTier, VictoryProgress, VictoryType,
   FAMILY_BONUSES, BRIBE_TIERS, DOC_BUSINESS_TYPES,
-  SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, HITMAN_MAINTENANCE_MULTIPLIER, MAX_HITMEN, HITMAN_REQUIREMENTS,
+  SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, MAX_HITMEN,
+  HITMAN_CONTRACT_COST, HITMAN_BASE_SUCCESS, HITMAN_FORTIFIED_SUCCESS, HITMAN_SAFEHOUSE_SUCCESS, HITMAN_HQ_SUCCESS,
+  HITMAN_OPEN_TURNS, HITMAN_FORTIFIED_TURNS, HITMAN_SAFEHOUSE_TURNS, HITMAN_HQ_TURNS,
+  HITMAN_MAX_LIFETIME, HITMAN_REFUND_RATE, HITMAN_ALERT_DURATION,
   MAX_CAPOS, CAPO_PROMOTION_COST, CAPO_PROMOTION_REQUIREMENTS,
   SOLDIER_LOYALTY_CAP, CAPO_LOYALTY_CAP,
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType,
@@ -120,7 +123,8 @@ export interface EnhancedMafiaGameState {
   
   // === NEW SYSTEMS ===
   soldierStats: Record<string, SoldierStats>;
-  hitmen: Hitman[];
+  hitmanContracts: HitmanContract[];
+  aiAlertState: Record<string, number>; // family → alert turns remaining
   activeBribes: BribeContract[];
   alliances: AlliancePact[];
   ceasefires: CeasefirePact[];
@@ -401,7 +405,8 @@ const createInitialGameState = (
     
     // New systems
     soldierStats,
-    hitmen: [],
+    hitmanContracts: [],
+    aiAlertState: {},
     activeBribes: [],
     alliances: [],
     ceasefires: [],
@@ -1382,11 +1387,7 @@ export const useEnhancedMafiaGameState = (
       // --- Training increment & individual soldier loyalty (per-turn) ---
       const maintenanceUnpaid = (() => {
         const pSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
-        let maint = 0;
-        pSoldiers.forEach(s => {
-          const isHitman = newState.hitmen.some(h => h.unitId === s.id);
-          maint += isHitman ? Math.floor(SOLDIER_COST * HITMAN_MAINTENANCE_MULTIPLIER) : SOLDIER_COST;
-        });
+        let maint = pSoldiers.length * SOLDIER_COST;
         maint += newState.resources.soldiers * SOLDIER_COST;
         return newState.resources.money < maint;
       })();
@@ -1706,12 +1707,11 @@ export const useEnhancedMafiaGameState = (
       }
     });
     
-    // Soldier maintenance — $500/soldier base, hitmen cost 50% more
+    // Soldier maintenance — $500/soldier base
     const playerSoldiers = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier');
     let maintenance = 0;
     playerSoldiers.forEach(s => {
-      const isHitman = state.hitmen.some(h => h.unitId === s.id);
-      maintenance += isHitman ? Math.floor(SOLDIER_COST * HITMAN_MAINTENANCE_MULTIPLIER) : SOLDIER_COST;
+      maintenance += SOLDIER_COST;
     });
     maintenance += state.resources.soldiers * SOLDIER_COST; // undeployed pool
 
@@ -1804,13 +1804,15 @@ export const useEnhancedMafiaGameState = (
       if (turnReport) turnReport.aiActions.push({ family: fam, action: 'income', detail: `Earned $${aiIncome.toLocaleString()} income` });
 
       // ── RECRUIT ── (always try to recruit up to a scaling cap)
-      const soldierCap = Math.min(8, 3 + Math.floor(state.turn / 2));
+      const isAlerted = (state.aiAlertState || {})[fam] > 0;
+      const alertBonus = isAlerted ? 1 : 0;
+      const soldierCap = Math.min(8 + alertBonus, 3 + Math.floor(state.turn / 2) + alertBonus);
       const currentDeployed = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier').length;
       const totalSoldiers = opponent.resources.soldiers + currentDeployed;
       const wantToRecruit = Math.max(0, soldierCap - totalSoldiers);
       if (wantToRecruit > 0) {
         const canAfford = Math.floor(opponent.resources.money / SOLDIER_COST);
-        const toRecruit = Math.min(wantToRecruit, canAfford, 3);
+        const toRecruit = Math.min(wantToRecruit, canAfford, 3 + alertBonus);
         opponent.resources.soldiers += toRecruit;
         opponent.resources.money -= toRecruit * SOLDIER_COST;
         if (toRecruit > 0 && turnReport) turnReport.aiActions.push({ family: fam, action: 'recruit', detail: `Recruited ${toRecruit} soldier(s)` });
@@ -1863,8 +1865,8 @@ export const useEnhancedMafiaGameState = (
       // ── MOVE ALL UNITS ── (each unit tries to move)
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
       for (const unit of aiUnits) {
-        // Each unit gets up to 2 move attempts
-        let movesLeft = Math.min(unit.movesRemaining, unit.type === 'soldier' ? 2 : 3);
+        // Each unit gets up to 2 move attempts (alert: +1 range)
+        let movesLeft = Math.min(unit.movesRemaining, unit.type === 'soldier' ? (2 + alertBonus) : 3);
         while (movesLeft > 0) {
           const neighbors = unit.type === 'soldier'
             ? getHexNeighbors(unit.q, unit.r, unit.s)
@@ -1897,20 +1899,26 @@ export const useEnhancedMafiaGameState = (
             return tile && tile.controllingFamily !== fam && tile.controllingFamily !== 'neutral';
           });
 
-          // Check if this AI family has an active bounty on the player
-          const hasBounty = state.aiBounties.some(b => b.fromFamily === fam && b.targetFamily === state.playerFamily);
-          
           let targetPool = playerHexes.length > 0 ? playerHexes
             : enemyHexes.length > 0 ? enemyHexes
             : neutralHexes.length > 0 ? neutralHexes
             : validMoves;
           
-          // Bounty active: always prioritize player hexes, skip neutral expansion
-          if (hasBounty && playerHexes.length > 0) {
+          // Bounty or alert active: always prioritize player hexes
+          const hasBounty = state.aiBounties.some(b => b.fromFamily === fam && b.targetFamily === state.playerFamily);
+          if ((hasBounty || isAlerted) && playerHexes.length > 0) {
             targetPool = playerHexes;
-          } else if (!hasBounty && neutralHexes.length > 0 && Math.random() < 0.3) {
-            // 30% chance to just expand to neutral instead of attacking (variety) — only if no bounty
+          } else if (!hasBounty && !isAlerted && neutralHexes.length > 0 && Math.random() < 0.3) {
+            // 30% chance to just expand to neutral instead of attacking (variety)
             targetPool = neutralHexes;
+          }
+
+          // Alert: fortify 1-2 units per turn (random chance)
+          if (isAlerted && !unit.fortified && Math.random() < 0.3) {
+            unit.fortified = true;
+            unit.movesRemaining = 0;
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'fortify', detail: `Fortified a unit (alert mode)` });
+            continue;
           }
 
           const target = targetPool[Math.floor(Math.random() * targetPool.length)];
@@ -2026,12 +2034,10 @@ export const useEnhancedMafiaGameState = (
       const aiCapoCount = state.deployedUnits.filter(u => u.family === fam && u.type === 'capo').length;
       if (aiCapoCount < MAX_CAPOS && opponent.resources.money >= CAPO_PROMOTION_COST) {
         const aiSoldierUnits = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
-        const aiHitmanIds = state.hitmen.filter(h => aiSoldierUnits.some(u => u.id === h.unitId)).map(h => h.unitId);
         
         // Find the best eligible soldier (highest victories)
         let bestCandidate: { unit: typeof aiSoldierUnits[0]; stats: SoldierStats } | null = null;
         for (const unit of aiSoldierUnits) {
-          if (aiHitmanIds.includes(unit.id)) continue; // skip hitmen
           const stats = state.soldierStats[unit.id];
           if (!stats) continue;
           if (
@@ -2281,7 +2287,7 @@ export const useEnhancedMafiaGameState = (
             } : u
           );
           
-          newState.hitmen = (newState.hitmen || []).filter(h => h.unitId !== unitId);
+          // Hitman contracts targeting this unit are handled at end-of-turn resolution
           
           newState.pendingNotifications = [...(newState.pendingNotifications || []), {
             type: 'success' as const,
@@ -2351,22 +2357,39 @@ export const useEnhancedMafiaGameState = (
           }
           return newState;
         }
-        case 'promote_hitman': {
-          const unitId = action.unitId as string;
-          if (newState.hitmen.length >= MAX_HITMEN) return newState;
-          const stats = newState.soldierStats[unitId];
-          if (!stats) return newState;
-          if (stats.training * 10 < HITMAN_REQUIREMENTS.minStrength) return newState;
-          if (stats.loyalty < HITMAN_REQUIREMENTS.minReputation) return newState;
-          if (stats.hits < HITMAN_REQUIREMENTS.minHits) return newState;
-          if (newState.hitmen.some(h => h.unitId === unitId)) return newState;
+        case 'hire_hitman': {
+          const targetUnitId = action.targetUnitId as string;
+          const targetFamily = action.targetFamily as string;
+          if ((newState.hitmanContracts || []).length >= MAX_HITMEN) return newState;
+          if (newState.resources.money < HITMAN_CONTRACT_COST) return newState;
           
-          newState.hitmen = [...newState.hitmen, {
-            unitId, hitmanLevel: 1, promotedTurn: newState.turn,
+          // Check target exists
+          const targetUnit = newState.deployedUnits.find(u => u.id === targetUnitId && u.family === targetFamily);
+          if (!targetUnit) return newState;
+          
+          // Determine duration based on target's current location
+          const targetHex = newState.hexMap.find(t => t.q === targetUnit.q && t.r === targetUnit.r && t.s === targetUnit.s);
+          const isAtHQ = targetHex?.isHeadquarters === targetUnit.family;
+          const isAtSafehouse = newState.safehouse && targetUnit.q === newState.safehouse.q && targetUnit.r === newState.safehouse.r && targetUnit.s === newState.safehouse.s;
+          const isFortified = targetUnit.fortified;
+          
+          let duration = HITMAN_OPEN_TURNS;
+          if (isAtHQ) duration = HITMAN_HQ_TURNS;
+          else if (isAtSafehouse) duration = HITMAN_SAFEHOUSE_TURNS;
+          else if (isFortified) duration = HITMAN_FORTIFIED_TURNS;
+          
+          newState.resources.money -= HITMAN_CONTRACT_COST;
+          newState.hitmanContracts = [...(newState.hitmanContracts || []), {
+            id: `hitman-${Date.now()}-${Math.random().toString(36).substr(2,4)}`,
+            targetUnitId,
+            targetFamily,
+            turnsRemaining: duration,
+            hiredOnTurn: newState.turn,
+            cost: HITMAN_CONTRACT_COST,
           }];
           newState.pendingNotifications = [...newState.pendingNotifications, {
-            type: 'success', title: 'Hitman Promoted!',
-            message: `A soldier has been elevated to Hitman. +30% hit success, 50% higher maintenance.`,
+            type: 'info' as const, title: '🎯 Hitman Contracted',
+            message: `A contract killer has been hired for $${HITMAN_CONTRACT_COST.toLocaleString()}. ETA: ${duration} turns.`,
           }];
           return newState;
         }
@@ -2924,13 +2947,8 @@ export const useEnhancedMafiaGameState = (
         chance += FORTIFY_DEFENSE_BONUS / 200;
       }
       
-      // Family/hitman bonuses
+      // Family bonuses (hitmen no longer provide combat bonuses — they are external contractors)
       chance += state.familyBonuses.combatBonus / 100;
-      const hitmenOnTile = playerUnits.filter(u => state.hitmen.some(h => h.unitId === u.id));
-      hitmenOnTile.forEach(h => {
-        const hitman = state.hitmen.find(hm => hm.unitId === h.id)!;
-        chance += (0.3 + (hitman.hitmanLevel - 1) * 0.1);
-      });
       chance += state.familyBonuses.hitSuccess / 100;
 
       // Scout intel bonus (only if scouted)

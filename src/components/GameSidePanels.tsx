@@ -279,9 +279,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           )}
         </CollapsibleSection>
 
-        {/* ── HITMAN SYSTEM ── */}
+        {/* ── HITMAN CONTRACT SYSTEM ── */}
         <CollapsibleSection
-          title={`Hitmen (${gameState.hitmen.length}/3)`}
+          title={`Hitmen (${gameState.hitmanContracts?.length || 0}/3)`}
           icon={<Crosshair className="h-4 w-4" />}
           isOpen={openSection === 'hitmen'}
           onToggle={() => toggle('hitmen')}
@@ -291,16 +291,11 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Action phase</p>
           ) : (
             <HitmanPanel
-              hitmen={gameState.hitmen}
-              soldierStats={gameState.soldierStats}
-              deployedSoldierIds={
-                gameState.deployedUnits
-                  .filter(u => u.family === gameState.playerFamily && u.type === 'soldier')
-                  .map(u => u.id)
-              }
+              hitmanContracts={gameState.hitmanContracts || []}
+              deployedUnits={gameState.deployedUnits}
               playerFamily={gameState.playerFamily}
               money={resources.money}
-              onPromote={(unitId) => onAction({ type: 'promote_hitman', unitId })}
+              onHire={(targetUnitId, targetFamily) => onAction({ type: 'hire_hitman', targetUnitId, targetFamily })}
             />
           )}
         </CollapsibleSection>
@@ -324,7 +319,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                   .filter(u => u.family === gameState.playerFamily && u.type === 'soldier')
                   .map(u => u.id)
               }
-              hitmanIds={gameState.hitmen.map(h => h.unitId)}
+              hitmanIds={[]}
               money={resources.money}
               onPromote={(unitId) => onAction({ type: 'promote_capo', unitId })}
             />
