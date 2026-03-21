@@ -74,6 +74,7 @@ const HitmanPanel: React.FC<HitmanPanelProps> = ({
                   <Clock className="h-3 w-3" />
                   Active: {currentTurn - c.hiredOnTurn} turn{currentTurn - c.hiredOnTurn !== 1 ? 's' : ''}
                 </p>
+              </div>
             ))}
           </div>
         )}
