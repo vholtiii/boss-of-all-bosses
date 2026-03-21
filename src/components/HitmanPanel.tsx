@@ -70,7 +70,10 @@ const HitmanPanel: React.FC<HitmanPanelProps> = ({
                 <p className="text-[10px] text-muted-foreground">
                   Target: {c.targetUnitId.includes('capo') ? 'Capo' : 'Soldier'}
                 </p>
-              </div>
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Active: {currentTurn - c.hiredOnTurn} turn{currentTurn - c.hiredOnTurn !== 1 ? 's' : ''}
+                </p>
             ))}
           </div>
         )}
