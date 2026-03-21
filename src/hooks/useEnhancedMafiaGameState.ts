@@ -1671,6 +1671,10 @@ export const useEnhancedMafiaGameState = (
                 impactOnProfit: 5,
               });
               turnReport.events.push(`🚔 Street arrest! A soldier was picked up. Jailed for ${sentence} turns.${lawyerActive ? ' (Lawyer reduced sentence)' : ''}`);
+              newState.pendingNotifications.push({
+                type: 'error' as const, title: '🚔 Soldier Arrested',
+                message: `A soldier was arrested. Jailed for ${sentence} turns.${lawyerActive ? ' (Lawyer reduced sentence)' : ''}`,
+              });
             }
           }
         }
