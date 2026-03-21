@@ -159,7 +159,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         const nr = tile.r + dir.dr;
         const ns = tile.s + dir.ds;
         const neighbor = tileMap.get(`${nq},${nr},${ns}`);
-        if (!neighbor || neighbor.districtId !== tile.districtId) {
+        if (!neighbor || neighbor.district !== tile.district) {
           // Draw edge between vertex i and vertex i+1
           const angle1 = (Math.PI / 3) * i;
           const angle2 = (Math.PI / 3) * ((i + 1) % 6);
