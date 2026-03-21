@@ -1797,6 +1797,10 @@ export const useEnhancedMafiaGameState = (
 
   // ============ AI TURN ============
   const processAITurn = (state: EnhancedMafiaGameState, turnReport?: TurnReport) => {
+    state.aiOpponents = state.aiOpponents || [];
+    state.deployedUnits = state.deployedUnits || [];
+    state.aiBounties = state.aiBounties || [];
+    state.aiAlertState = state.aiAlertState || {};
     state.aiOpponents.forEach(opponent => {
       const fam = opponent.family as any;
       const hq = state.headquarters[fam];
