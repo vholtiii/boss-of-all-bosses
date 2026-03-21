@@ -2049,6 +2049,7 @@ export const useEnhancedMafiaGameState = (
         }
         case 'recruit_local_soldier': {
           // Recruit Loyal — cheap, territory-gated, boosts loyalty, lower combat stats
+          if (newState.tacticalActionsRemaining <= 0) return newState;
           const playerTerritoryCount = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).length;
           if (playerTerritoryCount < RECRUIT_TERRITORY_REQUIREMENT) {
             newState.pendingNotifications = [...newState.pendingNotifications, {
