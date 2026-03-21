@@ -70,10 +70,10 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     if (gameState.pendingNotifications.length > 0) {
       gameState.pendingNotifications.forEach(n => {
         switch (n.type) {
-          case 'success': notifySuccess(n.title, n.message); break;
-          case 'error': notifyError(n.title, n.message); break;
-          case 'warning': notifyWarning(n.title, n.message); break;
-          case 'info': notifyInfo(n.title, n.message); break;
+          case 'success': notifySuccess(n.title, n.message); playSound('success'); break;
+          case 'error': notifyError(n.title, n.message); playSound('danger'); break;
+          case 'warning': notifyWarning(n.title, n.message); playSound('error'); break;
+          case 'info': notifyInfo(n.title, n.message); playSound('notification'); break;
         }
       });
       clearNotifications();
