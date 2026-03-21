@@ -1827,7 +1827,7 @@ export const useEnhancedMafiaGameState = (
                   u.family !== fam && u.q === target.q && u.r === target.r && u.s === target.s
                 );
                 if (remainingEnemies.length === 0) {
-                  tile.controllingFamily = fam;
+                  tile.controllingFamily = null; // AI hit sets to neutral — AI must claim next turn
                   // Destroy player safehouse if on this hex
                   if (state.safehouse && state.safehouse.q === target.q && state.safehouse.r === target.r && state.safehouse.s === target.s) {
                     state.safehouse = null;
