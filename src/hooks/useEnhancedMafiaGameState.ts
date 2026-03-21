@@ -2149,6 +2149,18 @@ export const useEnhancedMafiaGameState = (
   const performAction = useCallback((action: any) => {
     setGameState(prev => {
       const newState = { ...prev };
+      // Defensive guards for arrays
+      newState.hitmanContracts = newState.hitmanContracts || [];
+      newState.activeBribes = newState.activeBribes || [];
+      newState.alliances = newState.alliances || [];
+      newState.ceasefires = newState.ceasefires || [];
+      newState.pendingNotifications = newState.pendingNotifications || [];
+      newState.deployedUnits = newState.deployedUnits || [];
+      newState.policeHeat = newState.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
+      newState.policeHeat.arrests = newState.policeHeat.arrests || [];
+      newState.policeHeat.bribedOfficials = newState.policeHeat.bribedOfficials || [];
+      newState.events = newState.events || [];
+      newState.businesses = newState.businesses || [];
       const bonuses = newState.familyBonuses;
       const discount = bonuses.recruitmentDiscount / 100;
       
