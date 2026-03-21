@@ -13,10 +13,13 @@ export interface SoldierStats {
 export const SOLDIER_LOYALTY_CAP = 80;
 export const CAPO_LOYALTY_CAP = 99;
 
-export interface Hitman {
-  unitId: string;         // references DeployedUnit.id
-  hitmanLevel: number;    // 1-3
-  promotedTurn: number;
+export interface HitmanContract {
+  id: string;
+  targetUnitId: string;
+  targetFamily: string;
+  turnsRemaining: number;
+  hiredOnTurn: number;
+  cost: number;
 }
 
 // ============ BRIBE / CORRUPTION SYSTEM ============
