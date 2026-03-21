@@ -1,29 +1,34 @@
 
-# ✅ COMPLETED: Refine Police Heat — Escalating Thresholds + Lawyer Sentence Reduction
 
-## Implemented
+# Restrict Legal Business Construction to Capos
 
-### 4-Tier Heat System
-| Tier | Heat | Effects |
-|---|---|---|
-| Low | 30-49 | −15% illegal income |
-| Medium | 50-69 | −15% illegal income + 20% soldier arrest (3 turns) |
-| High | 70-89 | −25% illegal income + soldier arrests + 15% capo arrest (5 turns) |
-| Critical | 90-100 | All above + business shutdowns + RICO timer (5 turns = game over) |
+## Overview
+Legal businesses can only be built when a Capo is physically on the target hex. The build costs 1 action token. Illegal businesses remain unrestricted (any unit can build them).
 
-### Lawyer Sentence Reduction (25%)
-- Hire Lawyer sets `lawyerActiveUntil = turn + 3`
-- Immediately reduces all existing sentences by 25%
-- New arrests during window also get 25% shorter sentences
+## Rule Summary
+- **Legal business**: Requires a Capo on the hex + 1 action token + money cost
+- **Illegal business**: No Capo requirement (existing behavior)
+- The hex must still be player-owned and have no existing business
 
-### RICO Game Over
-- 5 consecutive turns at 90+ heat = federal indictment
-- Dropping below 90 resets the timer
-- Full game-over screen with RICO theme
+## Changes
 
-### UI Updates
-- Heat tier indicator in Defense & Law panel
-- RICO warning badge in top bar (flashing)
-- Lawyer active badge with turns remaining
-- Arrested units summary with return turns
-- PoliceSystem shows tier effects, RICO timer, jailed units
+### 1. `src/hooks/useEnhancedMafiaGameState.ts` — Validation
+- In the `place_business_on_hex` handler (or equivalent build logic), when the business type is legal:
+  - Check that a Capo unit exists on the target hex
+  - Check that the player has ≥1 remaining action token
+  - Deduct 1 action token on successful placement
+- If no Capo is present, show a toast: "A Capo must be on this hex to build a legal business"
+- If no actions remaining, show: "No action tokens remaining"
+
+### 2. `src/components/BusinessManagement.tsx` — UI hints
+- For legal business build buttons, show helper text: "Requires Capo on hex • 1 action"
+- Disable legal build buttons if player has 0 action tokens remaining
+- Available hex count for legal businesses should only count hexes that have a Capo on them
+
+### 3. `src/components/EnhancedMafiaHexGrid.tsx` — Placement highlighting
+- When placing a legal business, only highlight hexes that are player-owned, empty, AND have a Capo on them
+- Illegal business placement highlights all player-owned empty hexes (unchanged)
+
+### 4. `.lovable/plan.md` — Update plan
+- Document the Capo requirement for legal business construction
+
