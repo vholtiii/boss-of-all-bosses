@@ -338,7 +338,7 @@ const EconomyPanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (act
   onAction 
 }) => {
   const { economy, resources } = gameState;
-  const [selectedInvestment, setSelectedInvestment] = useState<string | null>(null);
+  
   const { playSound } = useSoundSystem();
 
   const investmentOptions = useMemo(() => [
