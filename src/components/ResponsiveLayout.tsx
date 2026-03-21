@@ -157,12 +157,18 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
           </motion.div>
         </div>
         
+        {/* Right resize handle */}
+        <div
+          onMouseDown={() => setDragging('right')}
+          className="w-1 cursor-col-resize hover:bg-mafia-gold/40 active:bg-mafia-gold/60 transition-colors flex-shrink-0"
+        />
         {/* Right Sidebar - Desktop */}
         <motion.div
           initial={{ x: 320 }}
           animate={{ x: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
-          className="w-80 p-4 bg-gradient-to-b from-noir-dark via-background to-noir-dark border-l border-noir-light overflow-y-auto"
+          style={{ width: rightWidth }}
+          className="flex-shrink-0 p-4 bg-gradient-to-b from-noir-dark via-background to-noir-dark border-l border-noir-light overflow-y-auto"
         >
           {rightSidebar}
         </motion.div>
