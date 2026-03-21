@@ -55,6 +55,25 @@ export interface EconomySystem {
   economicEvents: EconomicEvent[];
 }
 
+export interface MarketCondition {
+  type: 'boom' | 'bust' | 'stable' | 'volatile';
+  sector: 'legal' | 'illegal' | 'construction' | 'gambling' | 'drugs';
+  modifier: number;
+  duration: number;
+  description: string;
+}
+
+export interface SupplyChain {
+  id: string;
+  type: 'drugs' | 'weapons' | 'alcohol' | 'information';
+  source: string;
+  destination: string;
+  cost: number;
+  profit: number;
+  risk: number;
+  reliability: number;
+}
+
 export interface EconomicEvent {
   id: string;
   type: 'market_crash' | 'boom' | 'regulation' | 'scandal' | 'opportunity';
