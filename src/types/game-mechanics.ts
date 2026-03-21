@@ -210,9 +210,10 @@ export const CAPO_PROMOTION_REQUIREMENTS = {
 
 // Hitman promotion requirements
 export const HITMAN_REQUIREMENTS = {
-  minStrength: 80,    // maps to training * 10
+  minStrength: 3,     // training (0-3 scale, must be maxed)
   minReputation: 50,  // maps to loyalty
   minHits: 3,
+  minToughness: 3,    // toughness (0-5)
 };
 
 // ============ MOVE PHASE TYPES ============
