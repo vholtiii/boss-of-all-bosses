@@ -1,58 +1,18 @@
 
-# ✅ COMPLETED: Refine Police Heat — Escalating Thresholds + Lawyer Sentence Reduction
 
-## Implemented
+# Fix: Distinguish Capo Auto-Extort vs Auto-Claim Notifications
 
-### 4-Tier Heat System
-| Tier | Heat | Effects |
-|---|---|---|
-| Low | 30-49 | −15% illegal income |
-| Medium | 50-69 | −15% illegal income + 20% soldier arrest (3 turns) |
-| High | 70-89 | −25% illegal income + soldier arrests + 15% capo arrest (5 turns) |
-| Critical | 90-100 | All above + business shutdowns + RICO timer (5 turns = game over) |
+## Problem
+When a Capo moves to any neutral hex, the notification always says "Auto-Extortion" with a money bonus — even on empty hexes with no business. Extortion should only happen on neutral hexes with an illegal business. Empty neutral hexes should just be auto-claimed with a different notification.
 
-### Lawyer Sentence Reduction (25%)
-- Hire Lawyer sets `lawyerActiveUntil = turn + 3`
-- Immediately reduces all existing sentences by 25%
-- New arrests during window also get 25% shorter sentences
+## Changes
 
-### RICO Game Over
-- 5 consecutive turns at 90+ heat = federal indictment
-- Dropping below 90 resets the timer
-- Full game-over screen with RICO theme
+### `src/hooks/useEnhancedMafiaGameState.ts` (~lines 958-970)
 
-### UI Updates
-- Heat tier indicator in Defense & Law panel
-- RICO warning badge in top bar (flashing)
-- Lawyer active badge with turns remaining
-- Arrested units summary with return turns
-- PoliceSystem shows tier effects, RICO timer, jailed units
+Split the existing logic into two paths:
 
----
+1. **Neutral hex WITH an illegal business** → Auto-extort: claim hex + money bonus + respect + notification "💰 Capo Auto-Extortion!"
+2. **Neutral hex WITHOUT a business (or with a legal business)** → Auto-claim only: claim hex, no money, notification "🏴 Territory Claimed" with message like "Your Capo claimed this territory on arrival."
 
-# ✅ COMPLETED: Legal Business Construction — Capo Requirement + Dynamic Construction Speed
+No other files need changes — the notification content is generated entirely in this block.
 
-## Rules
-- **Legal businesses** can only be built on a player-owned hex where a **Capo** is physically present
-- Costs **1 action token** + money cost
-- Player enters placement mode (clicks build button → selects hex on map)
-- Map highlights valid hexes (green) during placement mode
-- Illegal businesses remain unrestricted (any owned empty hex)
-
-## Dynamic Construction Speed
-| Hex Occupant | Speed |
-|---|---|
-| Capo present | 1.5 progress/turn (50% faster) |
-| Soldier only | 0.75 progress/turn (25% slower) |
-| Unoccupied | Paused (0 progress) |
-
-- Base construction goal = 3.0 progress points
-- Progress accumulates each turn based on occupant
-- Hex shows estimated turns remaining or ⏸️ if paused
-- Hover tooltip shows progress bar, speed modifier, and ETA
-
-## Implementation
-- `constructionProgress` and `constructionGoal` on tile business object
-- Turn processing checks unit presence and applies speed modifier
-- Green hex highlighting in `EnhancedMafiaHexGrid` for valid placement targets
-- Capo requirement hint + available hex count in Economy section of `GameSidePanels`
