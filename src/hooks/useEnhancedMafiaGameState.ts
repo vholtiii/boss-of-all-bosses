@@ -65,6 +65,7 @@ export interface HexTile {
     isLegal: boolean;
     heatLevel: number;
     launderingCapacity?: number;
+    turnsUntilComplete?: number;
   };
   isHeadquarters?: string;
 }
