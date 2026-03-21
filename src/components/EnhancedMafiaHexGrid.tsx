@@ -489,14 +489,26 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
                   {/* Business/HQ icon */}
                   <text x={x} y={y + (tile.business && !tile.isHeadquarters ? 1 : 5)} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">
-                    {tile.isHeadquarters ? '🏛️' : tile.business ? (tile.business.turnsUntilComplete && tile.business.turnsUntilComplete > 0 ? '🚧' : (businessIcons[tile.business.type] || '🏢')) : ''}
+                    {tile.isHeadquarters ? '🏛️' : tile.business ? (tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal ? '🚧' : (businessIcons[tile.business.type] || '🏢')) : ''}
                   </text>
-                  {/* Construction turns remaining */}
-                  {tile.business && tile.business.turnsUntilComplete && tile.business.turnsUntilComplete > 0 && !tile.isHeadquarters && (
-                    <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#F59E0B" fontWeight="700" className="pointer-events-none select-none">
-                      {tile.business.turnsUntilComplete} turns
-                    </text>
-                  )}
+                  {/* Construction progress label */}
+                  {tile.business && tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal && !tile.isHeadquarters && (() => {
+                    const hexKey = `${tile.q},${tile.r},${tile.s}`;
+                    const hexUnits = unitsByHex.get(hexKey) || [];
+                    const hasCapoOnHex = hexUnits.some(u => u.family === playerFamily && u.type === 'capo');
+                    const hasSoldierOnHex = hexUnits.some(u => u.family === playerFamily && u.type === 'soldier');
+                    const remaining = tile.business!.constructionGoal! - (tile.business!.constructionProgress ?? 0);
+                    let rate = 0;
+                    let icon = '⏸️';
+                    if (hasCapoOnHex) { rate = 1.5; icon = '⚡'; }
+                    else if (hasSoldierOnHex) { rate = 0.75; icon = '🐢'; }
+                    const estTurns = rate > 0 ? Math.ceil(remaining / rate) : null;
+                    return (
+                      <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#F59E0B" fontWeight="700" className="pointer-events-none select-none">
+                        {icon} {estTurns !== null ? `${estTurns}t` : 'PAUSED'}
+                      </text>
+                    );
+                  })()}
 
                   {/* District abbreviation label */}
                   {!tile.isHeadquarters && !tile.business && (
@@ -506,7 +518,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   )}
 
                   {/* Always-visible income label (hide during construction) */}
-                  {tile.business && !tile.isHeadquarters && !(tile.business.turnsUntilComplete && tile.business.turnsUntilComplete > 0) && (
+                  {tile.business && !tile.isHeadquarters && !(tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal) && (
                     <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#10B981" fontWeight="700" className="pointer-events-none select-none">
                       ${tile.business.income >= 1000 ? `${(tile.business.income / 1000).toFixed(1)}k` : tile.business.income}
                     </text>
@@ -977,13 +989,33 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             <div className="space-y-1 text-sm">
               <p><span className="text-muted-foreground">Control:</span> {hoveredHex.controllingFamily.toUpperCase()}</p>
               <p><span className="text-muted-foreground">Terrain:</span> {hoveredHex.terrain}</p>
-              {hoveredHex.business && (
-                <>
-                  <p><span className="text-muted-foreground">Business:</span> {hoveredHex.business.type.replace('_', ' ').toUpperCase()}</p>
-                  <p><span className="text-muted-foreground">Income:</span> ${hoveredHex.business.income.toLocaleString()}/turn</p>
-                  <p><span className="text-muted-foreground">Type:</span> {hoveredHex.business.isLegal ? 'Legal' : 'Illegal'}</p>
-                </>
-              )}
+              {hoveredHex.business && (() => {
+                const isUnderConstruction = hoveredHex.business.constructionGoal && (hoveredHex.business.constructionProgress ?? 0) < hoveredHex.business.constructionGoal;
+                const hexKey = `${hoveredHex.q},${hoveredHex.r},${hoveredHex.s}`;
+                const hexUnits = unitsByHex.get(hexKey) || [];
+                const hasCapoH = hexUnits.some(u => u.family === playerFamily && u.type === 'capo');
+                const hasSoldierH = hexUnits.some(u => u.family === playerFamily && u.type === 'soldier');
+                return (
+                  <>
+                    <p><span className="text-muted-foreground">Business:</span> {hoveredHex.business.type.replace('_', ' ').toUpperCase()}</p>
+                    <p><span className="text-muted-foreground">Type:</span> {hoveredHex.business.isLegal ? 'Legal' : 'Illegal'}</p>
+                    {isUnderConstruction ? (
+                      <div className="mt-1 p-1.5 rounded bg-yellow-900/40 border border-yellow-500/30">
+                        <p className="text-yellow-300 font-bold text-xs">🚧 UNDER CONSTRUCTION</p>
+                        <p><span className="text-muted-foreground">Progress:</span> {(hoveredHex.business.constructionProgress ?? 0).toFixed(1)} / {hoveredHex.business.constructionGoal!.toFixed(1)}</p>
+                        <p><span className="text-muted-foreground">Speed:</span> {hasCapoH ? '⚡ Capo: 50% faster' : hasSoldierH ? '🐢 Soldier: 25% slower' : '⏸️ Paused — no unit'}</p>
+                        {(hasCapoH || hasSoldierH) && (() => {
+                          const rate = hasCapoH ? 1.5 : 0.75;
+                          const rem = hoveredHex.business.constructionGoal! - (hoveredHex.business.constructionProgress ?? 0);
+                          return <p><span className="text-muted-foreground">Est. turns:</span> {Math.ceil(rem / rate)}</p>;
+                        })()}
+                      </div>
+                    ) : (
+                      <p><span className="text-muted-foreground">Income:</span> ${hoveredHex.business.income.toLocaleString()}/turn</p>
+                    )}
+                  </>
+                );
+              })()}
               {hoveredHex.isHeadquarters && (
                 <p className="text-mafia-gold font-bold">🏛️ {hoveredHex.isHeadquarters.toUpperCase()} HQ</p>
               )}

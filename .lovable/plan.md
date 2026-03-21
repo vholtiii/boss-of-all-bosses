@@ -1,43 +1,58 @@
 
+# ✅ COMPLETED: Refine Police Heat — Escalating Thresholds + Lawyer Sentence Reduction
 
-# Dynamic Construction Speed Based on Unit Presence
+## Implemented
 
-## Overview
-Legal businesses under construction progress differently depending on which unit occupies the hex. A Capo speeds it up by 50%, a lone soldier slows it down by 25%, and an empty hex pauses construction entirely.
+### 4-Tier Heat System
+| Tier | Heat | Effects |
+|---|---|---|
+| Low | 30-49 | −15% illegal income |
+| Medium | 50-69 | −15% illegal income + 20% soldier arrest (3 turns) |
+| High | 70-89 | −25% illegal income + soldier arrests + 15% capo arrest (5 turns) |
+| Critical | 90-100 | All above + business shutdowns + RICO timer (5 turns = game over) |
+
+### Lawyer Sentence Reduction (25%)
+- Hire Lawyer sets `lawyerActiveUntil = turn + 3`
+- Immediately reduces all existing sentences by 25%
+- New arrests during window also get 25% shorter sentences
+
+### RICO Game Over
+- 5 consecutive turns at 90+ heat = federal indictment
+- Dropping below 90 resets the timer
+- Full game-over screen with RICO theme
+
+### UI Updates
+- Heat tier indicator in Defense & Law panel
+- RICO warning badge in top bar (flashing)
+- Lawyer active badge with turns remaining
+- Arrested units summary with return turns
+- PoliceSystem shows tier effects, RICO timer, jailed units
+
+---
+
+# ✅ COMPLETED: Legal Business Construction — Capo Requirement + Dynamic Construction Speed
 
 ## Rules
+- **Legal businesses** can only be built on a player-owned hex where a **Capo** is physically present
+- Costs **1 action token** + money cost
+- Player enters placement mode (clicks build button → selects hex on map)
+- Map highlights valid hexes (green) during placement mode
+- Illegal businesses remain unrestricted (any owned empty hex)
 
-| Hex Occupant | Construction Speed |
+## Dynamic Construction Speed
+| Hex Occupant | Speed |
 |---|---|
-| Capo present | 50% faster (2 progress per turn instead of 1) |
-| Soldier only (no Capo) | 25% slower (0.75 progress per turn) |
+| Capo present | 1.5 progress/turn (50% faster) |
+| Soldier only | 0.75 progress/turn (25% slower) |
 | Unoccupied | Paused (0 progress) |
 
-Base construction = 3 turns worth of progress (i.e. progress goal = 3.0). Each turn, progress increments based on the occupant modifier. Business completes when accumulated progress reaches the goal.
+- Base construction goal = 3.0 progress points
+- Progress accumulates each turn based on occupant
+- Hex shows estimated turns remaining or ⏸️ if paused
+- Hover tooltip shows progress bar, speed modifier, and ETA
 
-## Changes
-
-### 1. `src/hooks/useEnhancedMafiaGameState.ts` — Switch from countdown to progress accumulation
-
-Replace `turnsUntilComplete: number` countdown with a progress-based system on the tile business object:
-- Add `constructionProgress: number` (starts at 0) and `constructionGoal: number` (3.0 for all legal businesses)
-- Keep `turnsUntilComplete` as a computed display value (derived from remaining progress and current rate)
-- In the turn-processing construction tick (~line 1798):
-  - Check units on the hex via the units array
-  - If no player unit on hex → skip (paused)
-  - If a Capo is present → add 1.5 progress
-  - If only soldiers → add 0.75 progress
-  - When `constructionProgress >= constructionGoal` → complete the business
-- Update `place_business_on_hex` handler (~line 2757) to set `constructionProgress: 0, constructionGoal: 3`
-
-### 2. `src/components/EnhancedMafiaHexGrid.tsx` — Hover tooltip shows construction info
-
-In the hover info panel (~line 980), when the business is under construction:
-- Show progress bar or fraction (e.g. "Progress: 1.5 / 3.0")
-- Show current speed modifier ("⚡ Capo: 50% faster" or "🐢 Soldier only: 25% slower" or "⏸️ Paused — no unit on hex")
-- Show estimated turns remaining based on current rate
-
-### 3. `src/components/EnhancedMafiaHexGrid.tsx` — On-hex label update
-
-The existing construction turns label (~line 496) should show estimated turns remaining (computed from remaining progress / current rate), or "⏸️" if paused.
-
+## Implementation
+- `constructionProgress` and `constructionGoal` on tile business object
+- Turn processing checks unit presence and applies speed modifier
+- Green hex highlighting in `EnhancedMafiaHexGrid` for valid placement targets
+- Capo requirement hint + available hex count in Economy section of `GameSidePanels`

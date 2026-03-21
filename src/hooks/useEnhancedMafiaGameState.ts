@@ -66,6 +66,8 @@ export interface HexTile {
     heatLevel: number;
     launderingCapacity?: number;
     turnsUntilComplete?: number;
+    constructionProgress?: number;
+    constructionGoal?: number;
   };
   isHeadquarters?: string;
 }
@@ -1796,14 +1798,37 @@ export const useEnhancedMafiaGameState = (
       construction: { income: 5000, launderingCapacity: 4000 },
     };
     (state.hexMap || []).forEach(tile => {
-      if (tile.controllingFamily === state.playerFamily && tile.business && tile.business.turnsUntilComplete && tile.business.turnsUntilComplete > 0) {
-        tile.business.turnsUntilComplete -= 1;
-        if (tile.business.turnsUntilComplete <= 0) {
+      if (tile.controllingFamily === state.playerFamily && tile.business && tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal) {
+        // Check unit presence on this hex
+        const hasCapo = units.some(u => 
+          u.family === state.playerFamily && u.type === 'capo' &&
+          u.q === tile.q && u.r === tile.r && u.s === tile.s
+        );
+        const hasSoldier = units.some(u => 
+          u.family === state.playerFamily && u.type === 'soldier' &&
+          u.q === tile.q && u.r === tile.r && u.s === tile.s
+        );
+
+        let progressIncrement = 0;
+        if (hasCapo) {
+          progressIncrement = 1.5; // 50% faster
+        } else if (hasSoldier) {
+          progressIncrement = 0.75; // 25% slower
+        }
+        // If no unit → paused (0 progress)
+
+        if (progressIncrement > 0) {
+          tile.business.constructionProgress = (tile.business.constructionProgress ?? 0) + progressIncrement;
+        }
+
+        if ((tile.business.constructionProgress ?? 0) >= tile.business.constructionGoal) {
           const def = LEGAL_BIZ_DEFS[tile.business.type];
           if (def) {
             tile.business.income = def.income;
             tile.business.launderingCapacity = def.launderingCapacity;
           }
+          tile.business.constructionGoal = undefined;
+          tile.business.constructionProgress = undefined;
           tile.business.turnsUntilComplete = undefined;
           state.pendingNotifications = [...(state.pendingNotifications || []), {
             type: 'success' as const, title: '🏢 Business Complete!',
@@ -2756,12 +2781,13 @@ export const useEnhancedMafiaGameState = (
             isLegal: pending.isLegal,
             heatLevel: 0,
             launderingCapacity: 0,
-            turnsUntilComplete: 3,
+            constructionProgress: 0,
+            constructionGoal: 3,
           };
           newState.pendingBusinessBuild = null;
           newState.pendingNotifications = [...newState.pendingNotifications, {
             type: 'success' as const, title: '🚧 Construction Started',
-            message: `Building ${pending.businessType} for $${pending.cost.toLocaleString()}. Ready in 3 turns. (1 action used)`,
+            message: `Building ${pending.businessType} for $${pending.cost.toLocaleString()}. Keep a Capo on hex for faster construction! (1 action used)`,
           }];
           return newState;
         }
