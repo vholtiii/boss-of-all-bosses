@@ -169,6 +169,7 @@ export interface EnhancedMafiaGameState {
   arrestedSoldiers: Array<{ unitId: string; returnTurn: number }>;
   arrestedCapos: Array<{ unitId: string; returnTurn: number }>;
   gameOver?: { type: 'rico'; turn: number } | null;
+  pendingBusinessBuild?: { businessType: string; cost: number; isLegal: boolean } | null;
   
   // Blind hit system
   hiddenUnits: HiddenUnit[];
