@@ -304,7 +304,6 @@ Standard movement following unit movement rules (soldiers: 1 hex, capos: up to 5
 ```
 Base chance = 50% + (attackers - defenders) × 15%
 + family combat bonus
-+ hitman bonus (+30% + 10% per level)
 + Lucchese hit bonus
 + scout bonus (+15% if hex is scouted)
 + fortified attacker bonus (+12.5%)
