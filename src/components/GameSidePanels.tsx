@@ -209,13 +209,6 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               disabled={!canRecruit || resources.money < discountedRecruitCost || gameState.tacticalActionsRemaining <= 0}
               onClick={() => onAction({ type: 'recruit_local_soldier' })}
             />
-            <ActionButton
-              icon={<Crown className="h-4 w-4" />}
-              label="Recruit Capo"
-              sublabel={respectPct > 0 ? `$${discountedCapoCost.toLocaleString()} (${respectPct}% respect)` : `$${CAPO_COST.toLocaleString()}`}
-              disabled={resources.money < discountedCapoCost}
-              onClick={() => onAction({ type: 'recruit_capo', cost: CAPO_COST })}
-            />
           </div>
         </CollapsibleSection>
 

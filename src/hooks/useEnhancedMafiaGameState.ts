@@ -2105,28 +2105,7 @@ export const useEnhancedMafiaGameState = (
           }
           return newState;
         }
-        case 'recruit_capo': {
-          const respectDiscountCapo = (newState.reputation.respect / 100) * 0.3;
-          const cost = Math.floor(CAPO_COST * (1 - discount) * (1 - respectDiscountCapo));
-          if (newState.resources.money >= cost) {
-            newState.resources.money -= cost;
-            // Deploy capo at HQ
-            const hq = newState.headquarters[newState.playerFamily];
-            if (hq) {
-              const newId = `${newState.playerFamily}-capo-${Date.now()}`;
-              const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
-              const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
-              newState.deployedUnits = [...newState.deployedUnits, {
-                id: newId, type: 'capo' as const, family: newState.playerFamily,
-                q: hq.q, r: hq.r, s: hq.s,
-                movesRemaining: 0, maxMoves: 3, level: 1,
-                name: `Capo ${Math.floor(Math.random() * 100)}`,
-                personality: randomPersonality,
-              }];
-            }
-          }
-          return newState;
-        }
+        // recruit_capo case removed — capos are only obtainable via promote_capo
         case 'promote_capo': {
           const unitId = action.unitId as string;
           const unit = newState.deployedUnits.find(u => u.id === unitId);
