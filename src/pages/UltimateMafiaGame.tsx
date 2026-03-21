@@ -65,7 +65,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   } = useEnhancedMafiaGameState(config.family, config.resources);
 
   const { notifySuccess, notifyError, notifyWarning, notifyInfo, notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
-  const { playSound, playSoundSequence } = useSoundSystem();
+  const { playSound, playSoundSequence, updateSoundConfig, soundConfig } = useSoundSystem();
+  const [showSoundSettings, setShowSoundSettings] = useState(false);
 
   // Drain pending notifications from game state into the notification system
   useEffect(() => {
