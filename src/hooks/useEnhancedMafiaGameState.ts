@@ -2349,22 +2349,39 @@ export const useEnhancedMafiaGameState = (
           }
           return newState;
         }
-        case 'promote_hitman': {
-          const unitId = action.unitId as string;
-          if (newState.hitmen.length >= MAX_HITMEN) return newState;
-          const stats = newState.soldierStats[unitId];
-          if (!stats) return newState;
-          if (stats.training * 10 < HITMAN_REQUIREMENTS.minStrength) return newState;
-          if (stats.loyalty < HITMAN_REQUIREMENTS.minReputation) return newState;
-          if (stats.hits < HITMAN_REQUIREMENTS.minHits) return newState;
-          if (newState.hitmen.some(h => h.unitId === unitId)) return newState;
+        case 'hire_hitman': {
+          const targetUnitId = action.targetUnitId as string;
+          const targetFamily = action.targetFamily as string;
+          if ((newState.hitmanContracts || []).length >= MAX_HITMEN) return newState;
+          if (newState.resources.money < HITMAN_CONTRACT_COST) return newState;
           
-          newState.hitmen = [...newState.hitmen, {
-            unitId, hitmanLevel: 1, promotedTurn: newState.turn,
+          // Check target exists
+          const targetUnit = newState.deployedUnits.find(u => u.id === targetUnitId && u.family === targetFamily);
+          if (!targetUnit) return newState;
+          
+          // Determine duration based on target's current location
+          const targetHex = newState.hexMap.find(t => t.q === targetUnit.q && t.r === targetUnit.r && t.s === targetUnit.s);
+          const isAtHQ = targetHex?.isHeadquarters === targetUnit.family;
+          const isAtSafehouse = newState.safehouse && targetUnit.q === newState.safehouse.q && targetUnit.r === newState.safehouse.r && targetUnit.s === newState.safehouse.s;
+          const isFortified = targetUnit.fortified;
+          
+          let duration = HITMAN_OPEN_TURNS;
+          if (isAtHQ) duration = HITMAN_HQ_TURNS;
+          else if (isAtSafehouse) duration = HITMAN_SAFEHOUSE_TURNS;
+          else if (isFortified) duration = HITMAN_FORTIFIED_TURNS;
+          
+          newState.resources.money -= HITMAN_CONTRACT_COST;
+          newState.hitmanContracts = [...(newState.hitmanContracts || []), {
+            id: `hitman-${Date.now()}-${Math.random().toString(36).substr(2,4)}`,
+            targetUnitId,
+            targetFamily,
+            turnsRemaining: duration,
+            hiredOnTurn: newState.turn,
+            cost: HITMAN_CONTRACT_COST,
           }];
           newState.pendingNotifications = [...newState.pendingNotifications, {
-            type: 'success', title: 'Hitman Promoted!',
-            message: `A soldier has been elevated to Hitman. +30% hit success, 50% higher maintenance.`,
+            type: 'info' as const, title: '🎯 Hitman Contracted',
+            message: `A contract killer has been hired for $${HITMAN_CONTRACT_COST.toLocaleString()}. ETA: ${duration} turns.`,
           }];
           return newState;
         }
