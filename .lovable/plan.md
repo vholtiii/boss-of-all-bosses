@@ -1,38 +1,45 @@
 
 
-# Fix Soldier Purchase & Capo Promotion Flow
+# Refine Soldier Attributes & Capo Promotion Requirements
 
-## Issues to Fix
+## New Attribute System
 
-1. **Bought mercenaries don't appear at HQ** — `recruit_soldiers` increments a counter but never creates a `deployedUnit` at HQ coordinates
-2. **"Recruit Capo" button shouldn't exist** — Capos are only obtainable via promotion from the existing `CapoPromotionPanel`
-3. **Buy Soldier price display** — Ensure the button shows the correct $1,500 price
-4. **Capo promotion UX** — When clicking "Promote" in the Capo Promotion section, the player should select from their eligible soldiers (this already works via `CapoPromotionPanel` which lists soldiers with promote buttons — just need to remove the shortcut "Recruit Capo" button that bypasses it)
+| Attribute | Max (Soldier) | Max (Capo) | How it increases |
+|---|---|---|---|
+| **Victories** | **5** | — | +1 per successful extortion or hit action |
+| **Loyalty** | **80** | **99** | Starts at 50 for bought soldiers |
+| **Training** | **3** | — | +1 per turn deployed on map (not at HQ); starts at 0 |
+| **Toughness** | **5** | — | +1 per survived combat encounter |
+| **Racketeering** | **5** | — | +1 per successful extortion action |
+
+**Capo promotion requires ALL maxed**: Victories = 5, Loyalty = 80, Training = 3, Toughness = 5, Racketeering = 5, plus $10,000.
 
 ## Changes
 
-### 1. `src/hooks/useEnhancedMafiaGameState.ts` — Fix mercenary purchase
+### 1. `src/types/game-mechanics.ts`
+- Update `SoldierStats`: rename `survivedConflicts` → `victories`, add `toughness` (0-5), `racketeering` (0-5), `turnsDeployed` (internal). Remove `equipment`, `intimidations`.
+- Training scale: 0-3 (was 1-10)
+- Update `CAPO_PROMOTION_REQUIREMENTS`: `minVictories: 5, minLoyalty: 80, minTraining: 3, minToughness: 5, minRacketeering: 5`
 
-**`recruit_soldiers` case**: Instead of just incrementing `resources.soldiers`, create an actual `deployedUnit` at the player's HQ coordinates:
-- Generate ID like `{family}-soldier-merc-{timestamp}`
-- Place at HQ with `movesRemaining: 0`, `type: 'soldier'`
-- Create `soldierStats` entry with `training: 5` (combat-ready merc), current loyalty
-- Apply -3 loyalty penalty
-- Decrement `tacticalActionsRemaining`
+### 2. `src/hooks/useEnhancedMafiaGameState.ts`
+- Bought soldiers: loyalty 50, training 0
+- Recruited soldiers: loyalty 65, training 0
+- End-of-turn: +1 training (cap 3) for soldiers deployed away from HQ
+- Victories: +1 (cap 5) on successful extortion or hit
+- Toughness: +1 (cap 5) on surviving combat
+- Racketeering: +1 (cap 5) on successful extortion
+- Loyalty cap: 80 soldiers, 99 capos
+- Replace all `survivedConflicts` references with `victories`
 
-**Delete `recruit_capo` case** — no longer callable.
+### 3. `src/components/CapoPromotionPanel.tsx`
+- Show all 5 requirements in checklist (Victories 5, Loyalty 80, Training 3, Toughness 5, Racketeering 5)
 
-### 2. `src/components/GameSidePanels.tsx` — UI cleanup
-
-- **Remove the "Recruit Capo" ActionButton** (lines 212-218) from the Recruitment section entirely
-- **Verify** the Buy Soldier button sublabel correctly shows `$1,500` (it references `SOLDIER_COST` which should already be 1500 from the earlier change — will confirm and fix if needed)
-
-### 3. `src/types/game-mechanics.ts` — Verify price constant
-
-Confirm `SOLDIER_COST = 1500`. If it's still 500, update it.
+### 4. `src/components/HitmanPanel.tsx`
+- Update references for new training scale (0-3) and stats
 
 ## Files Modified
+- `src/types/game-mechanics.ts`
 - `src/hooks/useEnhancedMafiaGameState.ts`
-- `src/components/GameSidePanels.tsx`
-- `src/types/game-mechanics.ts` (if needed)
+- `src/components/CapoPromotionPanel.tsx`
+- `src/components/HitmanPanel.tsx`
 
