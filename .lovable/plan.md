@@ -1,18 +1,37 @@
 
 
-# Fix: Distinguish Capo Auto-Extort vs Auto-Claim Notifications
+# Fix Extortion Rules + Add Soldier Loss Notifications
 
-## Problem
-When a Capo moves to any neutral hex, the notification always says "Auto-Extortion" with a money bonus — even on empty hexes with no business. Extortion should only happen on neutral hexes with an illegal business. Empty neutral hexes should just be auto-claimed with a different notification.
+## Problem 1: Extortion Range
+Soldiers can currently extort from adjacent hexes, but the auto-move to the target hex doesn't work reliably. The fix: soldiers can only extort businesses on hexes they **currently occupy**. Capos can extort adjacent hexes (they already auto-extort on arrival, but this covers manual extortion too).
+
+## Problem 2: Missing Soldier Loss Notifications
+When soldiers are removed (combat casualties, arrests, desertion, mutiny, hiding), some paths lack real-time toast notifications — the info only appears in the turn summary. Every soldier loss should produce an immediate notification explaining why.
 
 ## Changes
 
-### `src/hooks/useEnhancedMafiaGameState.ts` (~lines 958-970)
+### 1. `src/components/EnhancedMafiaHexGrid.tsx` — Extortion eligibility logic (~line 355)
+- **Soldier**: `canExtort` only if the soldier is **on the target hex** (not adjacent) and hex has an illegal business
+- **Capo**: `canExtort` if the Capo is **on or adjacent to** the target hex and hex has an illegal business
+- Remove auto-move logic from the extortion handler since soldiers must already be on the hex
 
-Split the existing logic into two paths:
+### 2. `src/hooks/useEnhancedMafiaGameState.ts` — `processTerritoryExtortion` (~line 3533)
+- For soldiers: only check for player soldiers **on** the hex (remove adjacent check)
+- For capos: allow if capo is on or adjacent (re-enable capo manual extortion for adjacent hexes)
+- Remove the auto-move block (~lines 3605-3611) for soldiers since they're already on the hex
+- Update the "Capos cannot manually extort" guard to instead allow capo extortion from adjacent
 
-1. **Neutral hex WITH an illegal business** → Auto-extort: claim hex + money bonus + respect + notification "💰 Capo Auto-Extortion!"
-2. **Neutral hex WITHOUT a business (or with a legal business)** → Auto-claim only: claim hex, no money, notification "🏴 Territory Claimed" with message like "Your Capo claimed this territory on arrival."
+### 3. `src/hooks/useEnhancedMafiaGameState.ts` — Add notifications for every soldier loss
 
-No other files need changes — the notification content is generated entirely in this block.
+Add `pendingNotifications` entries at each removal point:
+
+| Location | Cause | Notification |
+|---|---|---|
+| ~line 3486-3488 | Combat victory casualties | "⚔️ Soldier Lost in Combat" — "Your soldier fell during the assault" |
+| ~line 3498-3500 | Combat defeat casualties | "⚔️ Soldier Killed in Battle" — "Your soldier was killed in the failed attack" |
+| ~line 3329-3330 | Civilian hit (hiding) | Already has notification — no change needed |
+| ~line 1554 | Desertion (low loyalty) | "🚪 Soldier Deserted" — already in turn report, add `pendingNotifications` |
+| ~line 1571 | Mutiny | "⚔️ Mutiny!" — already in turn report, add `pendingNotifications` |
+| ~line 1653 | Police arrest | "🚔 Soldier Arrested" — already in turn report, add `pendingNotifications` |
+| ~line 1676 | Capo arrest | "🚔 Capo Arrested" — already in turn report, add `pendingNotifications` |
 
