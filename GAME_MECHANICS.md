@@ -312,7 +312,7 @@ Clamped to 10%–95%
 ```
 
 **On Victory:**
-- Enemy units removed from hex
+- Territory set to neutral (must Claim next turn)
 - Territory captured
 - +5 respect, +5 fear
 - 20% attacker casualties (random selection, halved if fortified)
