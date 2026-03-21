@@ -1404,7 +1404,13 @@ export const useEnhancedMafiaGameState = (
         }
         if (turnReport) {
           if (returnedCount > 0) turnReport.events.push(`${returnedCount} soldier(s) returned from hiding.`);
-          if (eliminatedCount > 0) turnReport.events.push(`${eliminatedCount} soldier(s) eliminated internally by the family.`);
+          if (eliminatedCount > 0) turnReport.events.push(`🔪 Internal hit: ${eliminatedCount} disloyal soldier(s) eliminated by the family (loyalty below ${INTERNAL_HIT_LOYALTY_THRESHOLD}). -${INTERNAL_HIT_HEAT_REDUCTION} heat each. Morale risk applied.`);
+        }
+
+        const stillHiding = newState.hiddenUnits.length;
+        if (stillHiding > 0 && turnReport) {
+          const nextReturn = Math.min(...newState.hiddenUnits.map(h => h.returnsOnTurn));
+          turnReport.events.push(`🕵️ ${stillHiding} unit(s) still in hiding. Next return: Turn ${nextReturn}.`);
         }
       }
 
