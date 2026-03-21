@@ -1203,8 +1203,8 @@ export const useEnhancedMafiaGameState = (
             movesRemaining: 0, maxMoves: 2, level: 1,
           });
           newSoldierStats[newId] = {
-            loyalty: 50, training: 3, equipment: 2,
-            hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+            loyalty: 50, training: 0,
+            hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
           };
           newResources.soldiers -= 1;
         } else {
