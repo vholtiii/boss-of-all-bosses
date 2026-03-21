@@ -2119,9 +2119,11 @@ export const useEnhancedMafiaGameState = (
           const stats = newState.soldierStats?.[unitId];
           if (stats) {
             if (
-              stats.survivedConflicts < CAPO_PROMOTION_REQUIREMENTS.minVictories ||
+              stats.victories < CAPO_PROMOTION_REQUIREMENTS.minVictories ||
               stats.loyalty < CAPO_PROMOTION_REQUIREMENTS.minLoyalty ||
-              stats.training < CAPO_PROMOTION_REQUIREMENTS.minTraining
+              stats.training < CAPO_PROMOTION_REQUIREMENTS.minTraining ||
+              stats.toughness < CAPO_PROMOTION_REQUIREMENTS.minToughness ||
+              stats.racketeering < CAPO_PROMOTION_REQUIREMENTS.minRacketeering
             ) return newState;
           }
           
