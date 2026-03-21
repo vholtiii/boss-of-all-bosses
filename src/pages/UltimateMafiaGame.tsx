@@ -232,6 +232,66 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     },
   ];
 
+  // RICO Game Over
+  if (gameState.gameOver?.type === 'rico') {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8 }}
+          className="text-center p-8 max-w-lg"
+        >
+          <motion.div
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="text-6xl mb-4"
+          >
+            🚨
+          </motion.div>
+          <motion.h1
+            initial={{ y: -30, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="text-4xl font-bold text-destructive mb-4 font-playfair"
+          >
+            RICO INDICTMENT
+          </motion.h1>
+          <motion.p
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.7 }}
+            className="text-lg text-muted-foreground mb-6"
+          >
+            The federal government has dismantled your criminal empire after 5 consecutive turns at critical heat.
+            Your entire organization has been indicted under the RICO Act.
+          </motion.p>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+          >
+            <Badge variant="destructive" className="text-xl px-6 py-3 font-playfair">
+              GAME OVER — Turn {gameState.gameOver.turn}
+            </Badge>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.5 }}
+            className="mt-8"
+          >
+            <Button size="lg" onClick={onExitToMenu} className="font-playfair text-lg px-8 py-3">
+              <LogOut className="h-5 w-5 mr-2" />
+              Return to Main Menu
+            </Button>
+          </motion.div>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (isWinner) {
     return (
       <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
@@ -325,6 +385,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           <div className="text-lg font-bold text-mafia-gold">Turn {gameState.turn}</div>
           <div className="text-xs text-muted-foreground capitalize">{gameState.season}</div>
         </div>
+        {(gameState.ricoTimer || 0) > 0 && (
+          <motion.div
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 0.8, repeat: Infinity }}
+            className="text-center px-3 py-1 rounded-lg bg-destructive/20 border border-destructive/40"
+          >
+            <div className="text-sm font-bold text-destructive">🚨 RICO {gameState.ricoTimer}/5</div>
+          </motion.div>
+        )}
         <div className="text-center">
           <div className="text-sm font-medium text-green-400">Commission Active</div>
           <motion.div

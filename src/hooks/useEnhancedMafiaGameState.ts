@@ -164,6 +164,11 @@ export interface EnhancedMafiaGameState {
   legalStatus: LegalStatus;
   policeHeat: PoliceHeat;
   lastLawyerTurn: number;
+  lawyerActiveUntil: number;
+  ricoTimer: number;
+  arrestedSoldiers: Array<{ unitId: string; returnTurn: number }>;
+  arrestedCapos: Array<{ unitId: string; returnTurn: number }>;
+  gameOver?: { type: 'rico'; turn: number } | null;
   
   // Blind hit system
   hiddenUnits: HiddenUnit[];
@@ -500,6 +505,11 @@ const createInitialGameState = (
     legalStatus: { charges: [], lawyer: null, jailTime: 0, prosecutionRisk: 10, totalLegalCosts: 0 },
     policeHeat: { level: 15, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 },
     lastLawyerTurn: 0,
+    lawyerActiveUntil: 0,
+    ricoTimer: 0,
+    arrestedSoldiers: [],
+    arrestedCapos: [],
+    gameOver: null,
     
     hiddenUnits: [],
     aiBounties: [],
@@ -1575,56 +1585,138 @@ export const useEnhancedMafiaGameState = (
         }
       }
       
-      // --- Arrest System (after loyalty effects, before heat decay) ---
+      // --- Release arrested soldiers & capos ---
+      {
+        const releasedSoldiers = (newState.arrestedSoldiers || []).filter(a => a.returnTurn <= newState.turn);
+        if (releasedSoldiers.length > 0) {
+          releasedSoldiers.forEach(a => {
+            // Re-deploy at HQ
+            const hq = newState.headquarters[newState.playerFamily];
+            if (hq) {
+              newState.deployedUnits.push({
+                id: a.unitId, type: 'soldier', family: newState.playerFamily,
+                q: hq.q, r: hq.r, s: hq.s,
+                movesRemaining: 2, maxMoves: 2, level: 1,
+              });
+              turnReport.events.push(`🔓 Soldier released from jail and returned to HQ.`);
+            }
+          });
+          newState.arrestedSoldiers = newState.arrestedSoldiers.filter(a => a.returnTurn > newState.turn);
+        }
+        const releasedCapos = (newState.arrestedCapos || []).filter(a => a.returnTurn <= newState.turn);
+        if (releasedCapos.length > 0) {
+          releasedCapos.forEach(a => {
+            const hq = newState.headquarters[newState.playerFamily];
+            const capoUnit = newState.deployedUnits.find(u => u.id === a.unitId);
+            // Only re-deploy if not already on the map (should have been removed)
+            if (hq && !capoUnit) {
+              const stats = newState.soldierStats[a.unitId];
+              newState.deployedUnits.push({
+                id: a.unitId, type: 'capo', family: newState.playerFamily,
+                q: hq.q, r: hq.r, s: hq.s,
+                movesRemaining: 3, maxMoves: 3, level: 1,
+                name: stats ? `Capo` : `Capo`,
+              });
+              turnReport.events.push(`🔓 Capo released from jail and returned to HQ.`);
+            }
+          });
+          newState.arrestedCapos = newState.arrestedCapos.filter(a => a.returnTurn > newState.turn);
+        }
+      }
+
+      // --- Escalating Police Heat System (4 tiers) ---
       {
         const heat = newState.policeHeat.level;
-        
-        // Heat 90-100: Player arrest risk (10%)
-        if (heat >= 90 && Math.random() < 0.10) {
-          const sentence = 3 + Math.floor(Math.random() * 3); // 3-5 turns
-          newState.policeHeat.arrests.push({
-            id: `arrest-player-${newState.turn}`,
-            type: 'player',
-            target: 'You',
-            turn: newState.turn,
-            sentence,
-            impactOnProfit: 30,
-          });
-          turnReport.events.push(`🚨 FEDERAL ARREST! You've been indicted! -30% profits for ${sentence} turns.`);
-          newState.pendingNotifications.push({
-            type: 'error' as const, title: '🚨 You\'ve Been Arrested!',
-            message: `Federal agents raided your operations. -30% profits for ${sentence} turns.`,
-          });
-        }
-        // Heat 70-89: Management arrest (25%)
-        else if (heat >= 70 && Math.random() < 0.25) {
-          newState.policeHeat.arrests.push({
-            id: `arrest-mgmt-${newState.turn}`,
-            type: 'management',
-            target: 'Lieutenant',
-            turn: newState.turn,
-            sentence: 5,
-            impactOnProfit: 15,
-          });
-          newState.resources.influence = Math.max(0, newState.resources.influence - 2);
-          turnReport.events.push('👔 Management arrest! A lieutenant was taken in. -2 Influence, -15% profits for 5 turns.');
-        }
-        // Heat 40-69: Street arrest (15%)
-        else if (heat >= 40 && Math.random() < 0.15) {
-          const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
-          if (playerSoldiers.length > 0) {
-            const arrested = playerSoldiers[Math.floor(Math.random() * playerSoldiers.length)];
-            newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== arrested.id);
+        const lawyerActive = (newState.lawyerActiveUntil || 0) >= newState.turn;
+
+        // Tier 1: 30+ → income penalty applied in processEconomy
+        // (handled via state flag, not here)
+
+        // Tier 2: 50+ → 20% chance soldier arrest (3 turns, 2 with lawyer)
+        if (heat >= 50) {
+          if (Math.random() < 0.20) {
+            const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+            if (playerSoldiers.length > 0) {
+              const arrested = playerSoldiers[Math.floor(Math.random() * playerSoldiers.length)];
+              newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== arrested.id);
+              const baseSentence = 3;
+              const sentence = lawyerActive ? Math.max(1, Math.floor(baseSentence * 0.75)) : baseSentence;
+              newState.arrestedSoldiers = [...(newState.arrestedSoldiers || []), { unitId: arrested.id, returnTurn: newState.turn + sentence }];
+              newState.policeHeat.arrests.push({
+                id: `arrest-street-${newState.turn}`,
+                type: 'street',
+                target: 'Soldier',
+                turn: newState.turn,
+                sentence,
+                impactOnProfit: 5,
+              });
+              turnReport.events.push(`🚔 Street arrest! A soldier was picked up. Jailed for ${sentence} turns.${lawyerActive ? ' (Lawyer reduced sentence)' : ''}`);
+            }
           }
-          newState.policeHeat.arrests.push({
-            id: `arrest-street-${newState.turn}`,
-            type: 'street',
-            target: 'Soldier',
-            turn: newState.turn,
-            sentence: 3,
-            impactOnProfit: 5,
-          });
-          turnReport.events.push('🚔 Street arrest! A soldier was picked up by police. -5% profits for 3 turns.');
+        }
+
+        // Tier 3: 70+ → 15% chance capo arrest (5 turns, 4 with lawyer)
+        if (heat >= 70) {
+          if (Math.random() < 0.15) {
+            const playerCapos = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'capo');
+            if (playerCapos.length > 0) {
+              const arrested = playerCapos[Math.floor(Math.random() * playerCapos.length)];
+              newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== arrested.id);
+              const baseSentence = 5;
+              const sentence = lawyerActive ? Math.max(1, Math.floor(baseSentence * 0.75)) : baseSentence;
+              newState.arrestedCapos = [...(newState.arrestedCapos || []), { unitId: arrested.id, returnTurn: newState.turn + sentence }];
+              newState.policeHeat.arrests.push({
+                id: `arrest-capo-${newState.turn}`,
+                type: 'management',
+                target: arrested.name || 'Capo',
+                turn: newState.turn,
+                sentence,
+                impactOnProfit: 15,
+              });
+              newState.resources.influence = Math.max(0, newState.resources.influence - 2);
+              turnReport.events.push(`👔 Capo arrested! ${arrested.name || 'A capo'} jailed for ${sentence} turns. -2 Influence.${lawyerActive ? ' (Lawyer reduced sentence)' : ''}`);
+              newState.pendingNotifications.push({
+                type: 'error' as const, title: '👔 Capo Arrested!',
+                message: `${arrested.name || 'A capo'} was arrested. Returns in ${sentence} turns.`,
+              });
+            }
+          }
+        }
+
+        // Tier 4: 90+ → Shut down 1 illegal business + RICO timer
+        if (heat >= 90) {
+          // Shut down a random illegal business
+          const illegalBizHexes = newState.hexMap.filter(t =>
+            t.controllingFamily === newState.playerFamily && t.business && !t.business.isLegal
+          );
+          if (illegalBizHexes.length > 0) {
+            const target = illegalBizHexes[Math.floor(Math.random() * illegalBizHexes.length)];
+            const bizType = target.business!.type;
+            target.business = undefined;
+            turnReport.events.push(`🏚️ Federal raid! Your ${bizType} was shut down permanently!`);
+            newState.pendingNotifications.push({
+              type: 'error' as const, title: '🏚️ Business Shut Down!',
+              message: `The feds raided and permanently closed your ${bizType}.`,
+            });
+          }
+
+          // RICO timer
+          newState.ricoTimer = (newState.ricoTimer || 0) + 1;
+          turnReport.events.push(`⚠️ RICO INVESTIGATION: ${newState.ricoTimer}/5 turns at critical heat!`);
+          if (newState.ricoTimer >= 5) {
+            newState.gameOver = { type: 'rico', turn: newState.turn };
+            turnReport.events.push(`🚨 RICO INDICTMENT! The federal government has brought down your empire!`);
+            newState.pendingNotifications.push({
+              type: 'error' as const, title: '🚨 GAME OVER — RICO Indictment',
+              message: `5 consecutive turns at critical heat. Your entire organization has been dismantled by the feds.`,
+            });
+          }
+        } else {
+          // Reset RICO timer if heat drops below 90
+          if ((newState.ricoTimer || 0) > 0) {
+            newState.ricoTimer = 0;
+            turnReport.events.push(`✅ RICO investigation suspended — heat dropped below critical.`);
+          }
         }
       }
       
@@ -1769,6 +1861,47 @@ export const useEnhancedMafiaGameState = (
     const totalProfitPenalty = activeArrests.reduce((sum, a) => sum + a.impactOnProfit, 0);
     if (totalProfitPenalty > 0) {
       income = Math.floor(income * Math.max(0.1, (100 - totalProfitPenalty) / 100));
+    }
+
+    // Apply heat-based illegal income penalty (Tier 1: 30+ = -15%, Tier 3: 70+ = -25%)
+    {
+      const heat = state.policeHeat.level;
+      if (heat >= 70) {
+        // -25% illegal income at high heat
+        let illegalIncome = 0;
+        let legalIncome = 0;
+        (state.hexMap || []).forEach(tile => {
+          if (tile.controllingFamily === state.playerFamily && tile.business) {
+            const hasCapo = (state.deployedUnits || []).some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+            const hasSoldier = (state.deployedUnits || []).some(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+            let tileInc = 0;
+            if (hasCapo) tileInc = tile.business.income;
+            else if (hasSoldier) tileInc = Math.floor(tile.business.income * 0.3);
+            else tileInc = Math.floor(tile.business.income * 0.1);
+            if (!tile.business.isLegal) illegalIncome += tileInc;
+            else legalIncome += tileInc;
+          }
+        });
+        // Reduce illegal portion by 25%
+        const penalty = Math.floor(illegalIncome * 0.25);
+        income = Math.max(0, income - penalty);
+      } else if (heat >= 30) {
+        // -15% illegal income at low heat
+        let illegalIncome = 0;
+        (state.hexMap || []).forEach(tile => {
+          if (tile.controllingFamily === state.playerFamily && tile.business && !tile.business.isLegal) {
+            const hasCapo = (state.deployedUnits || []).some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+            const hasSoldier = (state.deployedUnits || []).some(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+            let tileInc = 0;
+            if (hasCapo) tileInc = tile.business.income;
+            else if (hasSoldier) tileInc = Math.floor(tile.business.income * 0.3);
+            else tileInc = Math.floor(tile.business.income * 0.1);
+            illegalIncome += tileInc;
+          }
+        });
+        const penalty = Math.floor(illegalIncome * 0.15);
+        income = Math.max(0, income - penalty);
+      }
     }
     
     state.lastTurnIncome = income;
@@ -2486,6 +2619,25 @@ export const useEnhancedMafiaGameState = (
             newState.resources.money -= lawyerCost;
             newState.actionsRemaining -= 1;
             newState.lastLawyerTurn = newState.turn;
+            newState.lawyerActiveUntil = newState.turn + 3;
+            
+            // Reduce all active arrest sentences by 25%
+            newState.policeHeat.arrests = newState.policeHeat.arrests.map(a => {
+              if (newState.turn - a.turn < a.sentence) {
+                return { ...a, sentence: Math.max(1, Math.floor(a.sentence * 0.75)) };
+              }
+              return a;
+            });
+            // Also reduce arrested soldiers/capos return times by 25%
+            newState.arrestedSoldiers = (newState.arrestedSoldiers || []).map(a => ({
+              ...a,
+              returnTurn: Math.max(newState.turn + 1, newState.turn + Math.max(1, Math.floor((a.returnTurn - newState.turn) * 0.75))),
+            }));
+            newState.arrestedCapos = (newState.arrestedCapos || []).map(a => ({
+              ...a,
+              returnTurn: Math.max(newState.turn + 1, newState.turn + Math.max(1, Math.floor((a.returnTurn - newState.turn) * 0.75))),
+            }));
+            
             // Remove first active arrest if any, otherwise just reduce heat
             const activeArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn < a.sentence);
             if (activeArrests.length > 0) {
@@ -2494,13 +2646,13 @@ export const useEnhancedMafiaGameState = (
               newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 3);
               newState.pendingNotifications = [...newState.pendingNotifications, {
                 type: 'info' as const, title: '⚖️ Lawyer Hired',
-                message: `Cleared arrest of ${cleared.target} (${cleared.impactOnProfit}% profit penalty removed). Heat −3.`,
+                message: `Cleared arrest of ${cleared.target}. All sentences reduced 25% for 3 turns. Heat −3.`,
               }];
             } else {
               newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 3);
               newState.pendingNotifications = [...newState.pendingNotifications, {
-                type: 'info' as const, title: '⚖️ Lawyer Hired',
-                message: `No active arrests to clear. Heat −3.`,
+                type: 'info' as const, title: '⚖️ Lawyer Retained',
+                message: `No active arrests to clear. Sentences −25% for 3 turns. Heat −3.`,
               }];
             }
           }
