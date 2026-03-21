@@ -2803,33 +2803,42 @@ export const useEnhancedMafiaGameState = (
     return state;
   };
 
-  // ============ CLAIM TERRITORY (soldiers only, action phase) ============
+  // ============ CLAIM TERRITORY (soldiers + capos, action phase) ============
   const processClaimTerritory = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
     const { targetQ, targetR, targetS } = action;
     const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
     if (!tile || tile.controllingFamily !== 'neutral' || tile.isHeadquarters) return state;
 
-    const playerSoldiersOnHex = state.deployedUnits.filter(u => 
-      u.family === state.playerFamily && u.type === 'soldier' &&
+    // Allow both soldiers and capos to claim
+    const playerUnitsOnHex = state.deployedUnits.filter(u => 
+      u.family === state.playerFamily &&
       u.q === targetQ && u.r === targetR && u.s === targetS
     );
     const claimNeighbors = getHexNeighbors(targetQ, targetR, targetS);
-    const playerSoldiersAdjacent = state.deployedUnits.filter(u => 
-      u.family === state.playerFamily && u.type === 'soldier' &&
+    const playerUnitsAdjacent = state.deployedUnits.filter(u => 
+      u.family === state.playerFamily &&
       claimNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s)
     );
-    const playerSoldiers = [...playerSoldiersOnHex, ...playerSoldiersAdjacent];
-    if (playerSoldiers.length === 0) return state;
+    const playerUnits = [...playerUnitsOnHex, ...playerUnitsAdjacent];
+    if (playerUnits.length === 0) return state;
 
     tile.controllingFamily = state.playerFamily;
+
+    // Auto-move: find the first adjacent SOLDIER (not on hex) and move them to the target
+    const adjacentSoldier = playerUnitsAdjacent.find(u => u.type === 'soldier');
+    if (adjacentSoldier) {
+      adjacentSoldier.q = targetQ;
+      adjacentSoldier.r = targetR;
+      adjacentSoldier.s = targetS;
+    }
+    // Capos do NOT move — they claim at range
 
     // Community expansion: +1 respect, +1 influence, no money
     let respectGain = 1;
     let influenceGain = 1;
-    // Recruited soldier bonus: +15% translates to extra respect/influence
-    const hasRecruitedSoldier = playerSoldiers.some(u => u.recruited);
+    const hasRecruitedSoldier = playerUnits.some(u => u.recruited);
     if (hasRecruitedSoldier) {
-      respectGain += 1; // bonus from local knowledge
+      respectGain += 1;
       influenceGain += 1;
     }
     state.reputation.respect = Math.min(100, state.reputation.respect + respectGain);
@@ -3137,7 +3146,7 @@ export const useEnhancedMafiaGameState = (
     return state;
   };
 
-  // ============ 3-STEP TAKEOVER: EXTORT (neutral only) ============
+  // ============ 3-STEP TAKEOVER: EXTORT (soldiers only — capos auto-extort on arrival) ============
   const processTerritoryExtortion = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
     const targetQ = action.targetQ;
     const targetR = action.targetR;
@@ -3163,18 +3172,24 @@ export const useEnhancedMafiaGameState = (
       const allPlayerUnits = [...playerUnitsOnHex, ...playerUnitsAdjacent];
       if (allPlayerUnits.length === 0) return state;
 
+      // Capos cannot manually extort — their extortion is automatic on arrival only
+      const hasSoldier = allPlayerUnits.some(u => u.type === 'soldier');
+      if (!hasSoldier) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'info' as const, title: 'Cannot Extort',
+          message: 'Capos handle extortion automatically when they arrive at a territory. Send a soldier to extort manually.',
+        }];
+        return state;
+      }
+
       // Neutral: 90% success, claims territory. Enemy: 50% success, steals income only.
       let chance = isNeutral ? 0.9 : 0.5;
       chance += state.familyBonuses.extortion / 100;
-      // Heat penalty: up to -10% at max heat
       chance -= state.policeHeat.level / 1000;
-      // Influence bonus: up to +15% at 100 influence
       chance += (state.resources.influence / 100) * 0.15;
-      // Manhattan has heavy police presence — extortion is 20% harder
       if (tile.district === 'Manhattan') {
         chance *= 0.8;
       }
-      // Recruited soldier bonus: +10% extortion success
       const hasRecruitedUnit = allPlayerUnits.some(u => u.recruited);
       if (hasRecruitedUnit) {
         chance += 0.10;
@@ -3186,7 +3201,6 @@ export const useEnhancedMafiaGameState = (
           tile.controllingFamily = state.playerFamily;
         }
         const baseMoneyGain = isEnemy ? (tile.business?.income || 2000) : 3000;
-        // Respect scales payout: 0 respect = 0.5x, 50 = 1.0x, 100 = 1.5x
         const respectPayoutMultiplier = 0.5 + (state.reputation.respect / 100);
         const moneyGain = Math.floor(baseMoneyGain * respectPayoutMultiplier);
         const respectGain = isEnemy ? 3 : 5;
@@ -3198,13 +3212,20 @@ export const useEnhancedMafiaGameState = (
             state.soldierStats[u.id].extortions += 1;
             state.soldierStats[u.id].victories = Math.min(5, state.soldierStats[u.id].victories + 1);
             state.soldierStats[u.id].racketeering = Math.min(5, state.soldierStats[u.id].racketeering + 1);
-            // Loyalty: +2 action bonus
             state.soldierStats[u.id].loyalty = Math.min(
               u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
               state.soldierStats[u.id].loyalty + LOYALTY_ACTION_BONUS
             );
           }
         });
+
+        // Auto-move: find the first adjacent SOLDIER and move them to the target hex
+        const adjacentSoldier = playerUnitsAdjacent.find(u => u.type === 'soldier');
+        if (adjacentSoldier) {
+          adjacentSoldier.q = targetQ;
+          adjacentSoldier.r = targetR;
+          adjacentSoldier.s = targetS;
+        }
         
         const extortDetails = isEnemy 
           ? `Stole $${moneyGain.toLocaleString()} from ${tile.controllingFamily} business, +${respectGain} respect`
@@ -3221,7 +3242,6 @@ export const useEnhancedMafiaGameState = (
           message: isEnemy ? `Stole income from ${tile.controllingFamily} territory! ${extortDetails}.` : `Territory claimed! ${extortDetails}.`,
         }];
       } else {
-        // Failed extortion: no casualties, but reputation and heat consequences
         const respectPenalty = 3;
         const fearPenalty = 2;
         const extraHeat = 5;
