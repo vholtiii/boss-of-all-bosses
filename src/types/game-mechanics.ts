@@ -251,3 +251,22 @@ export const BASE_ACTIONS_PER_TURN = 2;
 export const BONUS_ACTION_RESPECT_THRESHOLD = 50;
 export const BONUS_ACTION_INFLUENCE_THRESHOLD = 50;
 export const TACTICAL_ACTIONS_PER_TURN = 3;
+
+// ============ BLIND HIT SYSTEM ============
+export interface HiddenUnit {
+  unitId: string;
+  returnsOnTurn: number;
+}
+
+export interface AIBounty {
+  targetFamily: string;
+  fromFamily: string;
+  expiresOnTurn: number;
+}
+
+export const BLIND_HIT_PENALTY = 0.20;     // -20% success on unscouted hits
+export const BLIND_HIT_RESPECT = 15;        // respect gained on unscouted hit victory
+export const BLIND_HIT_FEAR = 15;           // fear gained on unscouted hit victory
+export const HIDING_DURATION = 3;           // turns a soldier hides after civilian hit
+export const BOUNTY_DURATION = 3;           // turns AI prioritizes revenge
+export const BLIND_HIT_INFLUENCE_LOSS = 10; // influence lost by targeted family
