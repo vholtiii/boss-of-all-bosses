@@ -1865,8 +1865,8 @@ export const useEnhancedMafiaGameState = (
       // ── MOVE ALL UNITS ── (each unit tries to move)
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
       for (const unit of aiUnits) {
-        // Each unit gets up to 2 move attempts
-        let movesLeft = Math.min(unit.movesRemaining, unit.type === 'soldier' ? 2 : 3);
+        // Each unit gets up to 2 move attempts (alert: +1 range)
+        let movesLeft = Math.min(unit.movesRemaining, unit.type === 'soldier' ? (2 + alertBonus) : 3);
         while (movesLeft > 0) {
           const neighbors = unit.type === 'soldier'
             ? getHexNeighbors(unit.q, unit.r, unit.s)
