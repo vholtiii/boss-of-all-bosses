@@ -236,19 +236,35 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             <ActionButton
               icon={<Crown className="h-4 w-4" />}
               label="Public Appearance"
-              sublabel={`$3,000 · +Rep`}
-              disabled={resources.money < 3000}
+              sublabel="$3,000 · −5 Heat · +2 Rep · 1 action"
+              disabled={resources.money < 3000 || gameState.actionsRemaining <= 0}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'public_appearance', cost: 3000 })}
             />
             <ActionButton
               icon={<HandCoins className="h-4 w-4" />}
               label="Charitable Donation"
-              sublabel={`$5,000 · −Heat · +Rep`}
-              disabled={resources.money < 5000}
+              sublabel="$5,000 · −10 Heat · +3 Rep · 1 action"
+              disabled={resources.money < 5000 || gameState.actionsRemaining <= 0}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'charitable_donation', amount: 5000 })}
             />
+            {(() => {
+              const lawyerCooldown = 3;
+              const lastLawyerTurn = (gameState as any).lastLawyerTurn || 0;
+              const turnsLeft = Math.max(0, lawyerCooldown - (gameState.turn - lastLawyerTurn));
+              const onCooldown = turnsLeft > 0;
+              return (
+                <ActionButton
+                  icon={<Scale className="h-4 w-4" />}
+                  label="Hire Lawyer"
+                  sublabel={onCooldown ? `Cooldown: ${turnsLeft} turn${turnsLeft > 1 ? 's' : ''}` : '$8,000 · Clears arrest / −3 Heat · 1 action'}
+                  disabled={resources.money < 8000 || gameState.actionsRemaining <= 0 || onCooldown}
+                  phaseLocked={actionsLocked}
+                  onClick={() => onAction({ type: 'hire_lawyer' })}
+                />
+              );
+            })()}
           </div>
         </CollapsibleSection>
 
