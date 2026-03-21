@@ -123,7 +123,8 @@ export interface EnhancedMafiaGameState {
   
   // === NEW SYSTEMS ===
   soldierStats: Record<string, SoldierStats>;
-  hitmen: Hitman[];
+  hitmanContracts: HitmanContract[];
+  aiAlertState: Record<string, number>; // family → alert turns remaining
   activeBribes: BribeContract[];
   alliances: AlliancePact[];
   ceasefires: CeasefirePact[];
