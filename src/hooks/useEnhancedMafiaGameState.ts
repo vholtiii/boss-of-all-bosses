@@ -2039,6 +2039,21 @@ export const useEnhancedMafiaGameState = (
             newState.tacticalActionsRemaining -= 1;
             // Mercenary loyalty penalty
             newState.reputation.loyalty = Math.max(0, newState.reputation.loyalty - 3);
+            // Deploy mercenary at HQ
+            const hq = newState.headquarters[newState.playerFamily];
+            if (hq) {
+              const newId = `${newState.playerFamily}-soldier-merc-${Date.now()}`;
+              newState.deployedUnits = [...newState.deployedUnits, {
+                id: newId, type: 'soldier' as const, family: newState.playerFamily,
+                q: hq.q, r: hq.r, s: hq.s,
+                movesRemaining: 0, maxMoves: 2, level: 1,
+                recruited: false,
+              }];
+              newState.soldierStats[newId] = {
+                loyalty: Math.max(10, newState.reputation.loyalty), training: 5, equipment: 4,
+                hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+              };
+            }
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'info' as const,
               title: '💰 Mercenary Hired',
