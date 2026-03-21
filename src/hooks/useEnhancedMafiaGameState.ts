@@ -1369,7 +1369,7 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications.push({
               type: 'error',
               title: '🔪 Internal Family Hit',
-              message: `The family dealt with a disloyal soldier internally. The mess has been cleaned up. (-${INTERNAL_HIT_HEAT_REDUCTION} heat)`,
+              message: `A disloyal soldier (loyalty: ${loyalty}/${INTERNAL_HIT_LOYALTY_THRESHOLD}) was eliminated by the family. -${INTERNAL_HIT_HEAT_REDUCTION} heat. Warning: remaining crew morale may suffer.`,
             });
           } else {
             // ===== LOYAL SOLDIER: returns to HQ =====
