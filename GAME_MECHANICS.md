@@ -298,7 +298,7 @@ Standard movement following unit movement rules (soldiers: 1 hex, capos: up to 5
 
 ### 7.1 Hit (Attack Enemy Territory)
 
-**Participants**: Selected unit + player units already on the target hex.
+**Participants**: Selected unit + player units on the target hex + player units on adjacent hexes (adjacent units contribute at 90% effectiveness).
 
 **Success Chance Calculation:**
 ```
