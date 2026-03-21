@@ -163,6 +163,7 @@ export interface EnhancedMafiaGameState {
   finances: BusinessFinances;
   legalStatus: LegalStatus;
   policeHeat: PoliceHeat;
+  lastLawyerTurn: number;
   
   // Blind hit system
   hiddenUnits: HiddenUnit[];
