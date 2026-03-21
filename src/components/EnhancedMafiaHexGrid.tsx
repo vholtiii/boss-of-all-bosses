@@ -206,6 +206,15 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const handleHexClick = (tile: HexTile) => {
     const turnPhase = gameState?.turnPhase || 'waiting';
 
+    // Business placement mode — intercept clicks
+    if (isBusinessPlacementMode && onAction) {
+      const isValid = validPlacementHexes.some(h => h.q === tile.q && h.r === tile.r && h.s === tile.s);
+      if (isValid) {
+        onAction({ type: 'place_business_on_hex', targetQ: tile.q, targetR: tile.r, targetS: tile.s });
+      }
+      return; // Consume all clicks during placement mode
+    }
+
     // During move phase, try selecting units on HQ hex before opening the panel
     if (tile.isHeadquarters && turnPhase === 'move') {
       const key = `${tile.q},${tile.r},${tile.s}`;

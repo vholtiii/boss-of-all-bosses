@@ -2660,7 +2660,7 @@ export const useEnhancedMafiaGameState = (
           return newState;
         }
         case 'build_business': {
-          // Build a legal business on a player-owned hex
+          // Enter placement mode — player must click a valid hex on the map
           const businessDefs: Record<string, { cost: number; income: number; launderingCapacity: number; icon: string }> = {
             restaurant: { cost: 20000, income: 3000, launderingCapacity: 2000, icon: '🍝' },
             store: { cost: 12000, income: 1800, launderingCapacity: 1500, icon: '🏪' },
@@ -2675,18 +2675,45 @@ export const useEnhancedMafiaGameState = (
             }];
             return newState;
           }
-          // Find the hex — use action coords or selected unit's hex
-          let targetTile: HexTile | undefined;
-          if (action.targetQ !== undefined) {
-            targetTile = newState.hexMap.find(t => t.q === action.targetQ && t.r === action.targetR && t.s === action.targetS);
-          } else if (newState.selectedUnitId) {
-            const unit = newState.deployedUnits.find(u => u.id === newState.selectedUnitId);
-            if (unit) targetTile = newState.hexMap.find(t => t.q === unit.q && t.r === unit.r && t.s === unit.s);
+          // Check action tokens for legal businesses
+          if (newState.actionsRemaining <= 0) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚠️ No Actions Remaining',
+              message: 'You need at least 1 action token to build a business.',
+            }];
+            return newState;
           }
+          // Check that at least one valid hex exists (with Capo for legal)
+          const validHexes = newState.hexMap.filter((t: HexTile) => 
+            t.controllingFamily === newState.playerFamily && !t.business && !t.isHeadquarters
+          );
+          const hexesWithCapo = validHexes.filter((t: HexTile) => 
+            newState.deployedUnits.some((u: DeployedUnit) => u.type === 'capo' && u.family === newState.playerFamily && u.q === t.q && u.r === t.r && u.s === t.s)
+          );
+          if (hexesWithCapo.length === 0) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '👔 No Capo Available',
+              message: 'A Capo must be on an empty owned hex to build a legal business.',
+            }];
+            return newState;
+          }
+          // Set pending build — player must click a hex
+          newState.pendingBusinessBuild = { businessType: action.businessType, cost: def.cost, isLegal: true };
+          newState.pendingNotifications = [...newState.pendingNotifications, {
+            type: 'info' as const, title: '📍 Select Hex',
+            message: `Click a hex with a Capo to build ${action.businessType}. Costs 1 action.`,
+          }];
+          return newState;
+        }
+        case 'place_business_on_hex': {
+          // Place a pending business on the selected hex
+          const pending = newState.pendingBusinessBuild;
+          if (!pending) return newState;
+          const targetTile = newState.hexMap.find((t: HexTile) => t.q === action.targetQ && t.r === action.targetR && t.s === action.targetS);
           if (!targetTile || targetTile.controllingFamily !== newState.playerFamily) {
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'warning' as const, title: '🚫 Invalid Location',
-              message: 'Select one of your territories without an existing business.',
+              message: 'Select one of your territories.',
             }];
             return newState;
           }
@@ -2697,19 +2724,49 @@ export const useEnhancedMafiaGameState = (
             }];
             return newState;
           }
-          newState.resources.money -= def.cost;
+          // Legal business: require Capo on hex + 1 action token
+          if (pending.isLegal) {
+            const hasCapo = newState.deployedUnits.some((u: DeployedUnit) => u.type === 'capo' && u.family === newState.playerFamily && u.q === targetTile.q && u.r === targetTile.r && u.s === targetTile.s);
+            if (!hasCapo) {
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'warning' as const, title: '👔 Capo Required',
+                message: 'A Capo must be on this hex to build a legal business.',
+              }];
+              return newState;
+            }
+            if (newState.actionsRemaining <= 0) {
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'warning' as const, title: '⚠️ No Actions Remaining',
+                message: 'You need at least 1 action token to build a legal business.',
+              }];
+              return newState;
+            }
+            newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
+          }
+          const allDefs: Record<string, { income: number; launderingCapacity: number }> = {
+            restaurant: { income: 3000, launderingCapacity: 2000 },
+            store: { income: 1800, launderingCapacity: 1500 },
+            construction: { income: 5000, launderingCapacity: 4000 },
+          };
+          const bDef = allDefs[pending.businessType] || { income: 2000, launderingCapacity: 1000 };
+          newState.resources.money -= pending.cost;
           targetTile.business = {
-            type: action.businessType,
-            income: 0, // No income until construction completes
-            isLegal: true,
+            type: pending.businessType,
+            income: 0,
+            isLegal: pending.isLegal,
             heatLevel: 0,
             launderingCapacity: 0,
             turnsUntilComplete: 3,
           };
+          newState.pendingBusinessBuild = null;
           newState.pendingNotifications = [...newState.pendingNotifications, {
             type: 'success' as const, title: '🚧 Construction Started',
-            message: `Building ${action.businessType} for $${def.cost.toLocaleString()}. Ready in 3 turns.`,
+            message: `Building ${pending.businessType} for $${pending.cost.toLocaleString()}. Ready in 3 turns. (1 action used)`,
           }];
+          return newState;
+        }
+        case 'cancel_business_placement': {
+          newState.pendingBusinessBuild = null;
           return newState;
         }
         case 'negotiate': {

@@ -159,27 +159,50 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           phaseLocked={actionsLocked}
         >
           <div className="space-y-1.5">
+            {/* Capo requirement hint */}
+            <div className="text-[10px] text-muted-foreground px-1 pb-1 border-b border-border/30">
+              👔 Legal businesses require a Capo on the hex · 1 action token
+              {(() => {
+                const validHexes = (gameState.hexMap || []).filter((t: any) => 
+                  t.controllingFamily === gameState.playerFamily && !t.business && !t.isHeadquarters
+                );
+                const hexesWithCapo = validHexes.filter((t: any) =>
+                  (gameState.deployedUnits || []).some((u: any) => u.type === 'capo' && u.family === gameState.playerFamily && u.q === t.q && u.r === t.r && u.s === t.s)
+                );
+                return <span className="ml-1">({hexesWithCapo.length} hex{hexesWithCapo.length !== 1 ? 'es' : ''} with Capo)</span>;
+              })()}
+            </div>
+            {/* Pending placement indicator */}
+            {(gameState as any).pendingBusinessBuild && (
+              <div className="rounded-md border border-primary/50 bg-primary/10 px-3 py-1.5 text-xs text-primary font-medium flex items-center justify-between">
+                <span>📍 Click a hex with a Capo to place {(gameState as any).pendingBusinessBuild.businessType}</span>
+                <button
+                  className="text-destructive hover:text-destructive/80 text-xs underline ml-2"
+                  onClick={() => onAction({ type: 'cancel_business_placement' })}
+                >Cancel</button>
+              </div>
+            )}
             <ActionButton
               icon={<UtensilsCrossed className="h-4 w-4" />}
               label="🍝 Restaurant"
-              sublabel={`$20,000 · $3K/turn`}
-              disabled={resources.money < 20000 || legalStatus.jailTime > 0}
+              sublabel={`$20,000 · $3K/turn · 1 action`}
+              disabled={resources.money < 20000 || legalStatus.jailTime > 0 || gameState.actionsRemaining <= 0}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'build_business', businessType: 'restaurant' })}
             />
             <ActionButton
               icon={<Store className="h-4 w-4" />}
               label="🏪 Store"
-              sublabel={`$12,000 · $1.8K/turn`}
-              disabled={resources.money < 12000 || legalStatus.jailTime > 0}
+              sublabel={`$12,000 · $1.8K/turn · 1 action`}
+              disabled={resources.money < 12000 || legalStatus.jailTime > 0 || gameState.actionsRemaining <= 0}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'build_business', businessType: 'store' })}
             />
             <ActionButton
               icon={<HardHat className="h-4 w-4" />}
               label="🏗️ Construction"
-              sublabel={`$35,000 · $5K/turn`}
-              disabled={resources.money < 35000 || legalStatus.jailTime > 0}
+              sublabel={`$35,000 · $5K/turn · 1 action`}
+              disabled={resources.money < 35000 || legalStatus.jailTime > 0 || gameState.actionsRemaining <= 0}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'build_business', businessType: 'construction' })}
             />
