@@ -195,32 +195,44 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         addAdj(e.x2, e.y2, e.x1, e.y1);
       });
 
-      const visited = new Set<string>();
+      // Track consumed edges (not vertices) to handle shared vertices correctly
+      const consumedEdges = new Set<string>();
+      const edgeKey = (ax: number, ay: number, bx: number, by: number) => {
+        const ka = ptKey(ax, ay);
+        const kb = ptKey(bx, by);
+        return ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+      };
 
-      // Walk chains to form closed loops
+      // Walk chains to form closed loops using edge consumption
       adj.forEach((_, startKey) => {
-        if (visited.has(startKey)) return;
+        // Try to start a loop from this vertex if it has unconsumed edges
+        const startNeighbors = adj.get(startKey);
+        if (!startNeighbors) return;
+        
+        const unusedStart = startNeighbors.find(n => !consumedEdges.has(edgeKey(...startKey.split(',').map(Number) as [number, number], n.x, n.y)));
+        if (!unusedStart) return;
+
         const [sx, sy] = startKey.split(',').map(Number);
         const path: { x: number; y: number }[] = [{ x: sx, y: sy }];
-        visited.add(startKey);
         let current = startKey;
 
         while (true) {
           const neighbors = adj.get(current);
           if (!neighbors) break;
-          const next = neighbors.find(n => !visited.has(ptKey(n.x, n.y)));
-          if (!next) {
-            // Check if we can close back to start
-            const canClose = neighbors.some(n => ptKey(n.x, n.y) === startKey);
-            if (canClose && path.length > 2) {
-              // Close the path
-              const d = `M ${path.map(p => `${p.x},${p.y}`).join(' L ')} Z`;
-              allPaths.push(d);
-            }
+          const [cx, cy] = current.split(',').map(Number);
+          const next = neighbors.find(n => !consumedEdges.has(edgeKey(cx, cy, n.x, n.y)));
+          if (!next) break;
+          
+          consumedEdges.add(edgeKey(cx, cy, next.x, next.y));
+          const nextKey = ptKey(next.x, next.y);
+          
+          if (nextKey === startKey && path.length > 2) {
+            // Closed the loop
+            const d = `M ${path.map(p => `${p.x},${p.y}`).join(' L ')} Z`;
+            allPaths.push(d);
             break;
           }
-          const nextKey = ptKey(next.x, next.y);
-          visited.add(nextKey);
+          
           path.push(next);
           current = nextKey;
         }
@@ -763,10 +775,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })}
 
-            {/* District border outlines */}
-            {districtBorderPaths.map((d, i) => (
-              <path key={`border-${i}`} d={d} stroke="rgba(200,200,200,0.4)" strokeWidth="2" fill="none" strokeLinejoin="round" className="pointer-events-none" />
-            ))}
+            {/* District borders moved to render after tiles — see below */}
 
             {/* District name labels */}
             {(() => {
@@ -995,6 +1004,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               })()}
             </AnimatePresence>
           </g>
+            {/* District border outlines — rendered last so they appear on top */}
+            {districtBorderPaths.map((d, i) => (
+              <path key={`border-${i}`} d={d} stroke="rgba(220,220,220,0.7)" strokeWidth="3.5" fill="none" strokeLinejoin="round" className="pointer-events-none" />
+            ))}
         </svg>
       </div>
 
