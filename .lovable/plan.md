@@ -1,29 +1,34 @@
 
 
-# Hitman Contract System
+# Soldier Auto-Move on Claim/Extort + Capo Extort Restrictions
 
-## Summary
+## Problem
+1. **Soldiers** claim territory or extort from adjacent hexes but don't move to that hex afterward.
+2. **Capos** should NOT be able to extort at range via the action menu. Their extortion is **automatic on arrival** at a neutral hex with a business (already implemented in move/deploy). Capos CAN still claim at range without moving.
 
-Hitmen reworked from promoted soldiers into external contract killers. Player pays $15,000 to target any enemy soldier or capo (blind selection — no location/stats shown). The hit resolves in 3-5 turns with no heat and no bonuses. Failed hits refund 50% and trigger AI alert mode.
+## Changes
 
-## Payment Model
-- On hire: full $15,000 deducted
-- Success: no refund
-- Failure/expired/target dead: 50% refunded ($7,500)
+### `src/hooks/useEnhancedMafiaGameState.ts`
 
-## Duration & Success
-- Duration set at hire: Open 3, Fortified/Safehouse 4, HQ 5 turns
-- Success at resolution: Open 90%, Fortified 65%, Safehouse 55%, HQ 40%
-- Auto-fail after 5 turns
+**1. `processClaimTerritory` (~line 2812-2846)**
+- Keep allowing both soldiers and capos to claim from adjacent hexes
+- After successful claim: find the first **soldier** from `playerSoldiersAdjacent` (not already on hex) and update their `q, r, s` to the target coordinates
+- Capos do NOT move — they claim at range
 
-## AI Alert State
-- Failed contracts trigger 5-turn alert on target AI family
-- Alert: +1 recruit cap, +1 move range, fortify units, prioritize player hexes
+**2. `processTerritoryExtortion` (~line 3141-3249)**
+- Add a guard at the top: if ALL units in `allPlayerUnits` are capos (no soldiers present on or adjacent), return early — capos cannot manually extort, their extortion is automatic on arrival only
+- After successful extortion: find the first **soldier** from `playerUnitsAdjacent` and move them to the target hex
+- This means only soldiers (on hex or adjacent) can trigger the extort action
 
-## Files Modified
-- `src/types/game-mechanics.ts` — HitmanContract interface, new constants
-- `src/hooks/useEnhancedMafiaGameState.ts` — hire_hitman action, contract resolution, AI alert
-- `src/components/HitmanPanel.tsx` — Complete rewrite with contract UI
-- `src/components/GameSidePanels.tsx` — Updated props
-- `SOLDIER_RECRUITMENT_GUIDE.md` — Documented contract system
-- `COMBAT_SYSTEM_GUIDE.md` — Updated hitman section
+**3. Capo auto-extort on move (~line 935-957)** — already correctly implemented, no changes needed. Capos auto-claim and auto-extort neutral hexes when they move onto them.
+
+**4. Capo auto-claim on deploy (~line 1241-1249)** — already correct, no changes needed.
+
+## Summary of Behavior After Changes
+
+| Action | Soldier | Capo |
+|---|---|---|
+| Claim (action menu) | Yes, auto-moves to hex | Yes, stays at range |
+| Extort (action menu) | Yes, auto-moves to hex | No — extort is auto on arrival only |
+| Extort on arrival | N/A | Automatic (existing) |
+
