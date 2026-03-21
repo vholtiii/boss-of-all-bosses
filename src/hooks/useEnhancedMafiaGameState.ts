@@ -3602,13 +3602,7 @@ export const useEnhancedMafiaGameState = (
           }
         });
 
-        // Auto-move: find the first adjacent SOLDIER and move them to the target hex
-        const adjacentSoldier = playerUnitsAdjacent.find(u => u.type === 'soldier');
-        if (adjacentSoldier) {
-          adjacentSoldier.q = targetQ;
-          adjacentSoldier.r = targetR;
-          adjacentSoldier.s = targetS;
-        }
+        // No auto-move needed — soldiers must already be on the hex
         
         const extortDetails = isEnemy 
           ? `Stole $${moneyGain.toLocaleString()} from ${tile.controllingFamily} business, +${respectGain} respect`
