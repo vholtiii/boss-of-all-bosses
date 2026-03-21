@@ -26,6 +26,7 @@ import {
   UtensilsCrossed,
   Store,
   HardHat,
+  Scale,
 } from 'lucide-react';
 import { EnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import HitmanPanel from '@/components/HitmanPanel';
