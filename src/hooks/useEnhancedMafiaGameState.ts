@@ -1575,6 +1575,10 @@ export const useEnhancedMafiaGameState = (
               newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== mutineer.id);
               newState.reputation.respect = Math.max(0, newState.reputation.respect - 5);
               turnReport.events.push(`⚔️ MUTINY! A soldier turned against you! (-5 Respect)`);
+              newState.pendingNotifications.push({
+                type: 'error' as const, title: '⚔️ Mutiny!',
+                message: 'A soldier turned against you! -5 Respect.',
+              });
             }
           }
           // Also has ratting risk
