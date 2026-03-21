@@ -38,6 +38,7 @@ const businessIcons: Record<string, string> = {
   speakeasy: '🥃', headquarters: '🏛️',
   // Doc business types
   brothel: '💋', gambling_den: '🎲', loan_sharking: '💰', store_front: '🏪',
+  store: '🏪',
 };
 
 const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({ 
@@ -432,8 +433,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   <polygon
                     points={getHexPoints(x, y, baseHexRadius)}
                     fill={getHexColor(tile)}
-                    stroke={tile.isHeadquarters ? '#D4AF37' : isPlayerTerritory ? '#D4AF3780' : '#333333'}
-                    strokeWidth={tile.isHeadquarters ? 3 : isPlayerTerritory ? 2 : 1}
+                    stroke={tile.isHeadquarters ? '#D4AF37' : (tile.business?.isLegal && isPlayerTerritory) ? '#3B82F6' : isPlayerTerritory ? '#D4AF3780' : '#333333'}
+                    strokeWidth={tile.isHeadquarters ? 3 : (tile.business?.isLegal && isPlayerTerritory) ? 2.5 : isPlayerTerritory ? 2 : 1}
                     opacity={getHexOpacity(tile)}
                     className="cursor-pointer transition-all duration-150"
                     onClick={() => handleHexClick(tile)}
@@ -450,8 +451,14 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
                   {/* Business/HQ icon */}
                   <text x={x} y={y + (tile.business && !tile.isHeadquarters ? 1 : 5)} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">
-                    {tile.isHeadquarters ? '🏛️' : tile.business ? (businessIcons[tile.business.type] || '🏢') : ''}
+                    {tile.isHeadquarters ? '🏛️' : tile.business ? (tile.business.turnsUntilComplete && tile.business.turnsUntilComplete > 0 ? '🚧' : (businessIcons[tile.business.type] || '🏢')) : ''}
                   </text>
+                  {/* Construction turns remaining */}
+                  {tile.business && tile.business.turnsUntilComplete && tile.business.turnsUntilComplete > 0 && !tile.isHeadquarters && (
+                    <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#F59E0B" fontWeight="700" className="pointer-events-none select-none">
+                      {tile.business.turnsUntilComplete} turns
+                    </text>
+                  )}
 
                   {/* District abbreviation label */}
                   {!tile.isHeadquarters && !tile.business && (
@@ -460,8 +467,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     </text>
                   )}
 
-                  {/* Always-visible income label */}
-                  {tile.business && !tile.isHeadquarters && (
+                  {/* Always-visible income label (hide during construction) */}
+                  {tile.business && !tile.isHeadquarters && !(tile.business.turnsUntilComplete && tile.business.turnsUntilComplete > 0) && (
                     <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#10B981" fontWeight="700" className="pointer-events-none select-none">
                       ${tile.business.income >= 1000 ? `${(tile.business.income / 1000).toFixed(1)}k` : tile.business.income}
                     </text>

@@ -65,6 +65,7 @@ export interface HexTile {
     isLegal: boolean;
     heatLevel: number;
     launderingCapacity?: number;
+    turnsUntilComplete?: number;
   };
   isHeadquarters?: string;
 }
@@ -1692,6 +1693,30 @@ export const useEnhancedMafiaGameState = (
     let income = 0;
     const units = state.deployedUnits || [];
     const bonuses = state.familyBonuses;
+
+    // Tick construction timers on ALL hexes (player-owned)
+    const LEGAL_BIZ_DEFS: Record<string, { income: number; launderingCapacity: number }> = {
+      restaurant: { income: 3000, launderingCapacity: 2000 },
+      store: { income: 1800, launderingCapacity: 1500 },
+      construction: { income: 5000, launderingCapacity: 4000 },
+    };
+    (state.hexMap || []).forEach(tile => {
+      if (tile.controllingFamily === state.playerFamily && tile.business && tile.business.turnsUntilComplete && tile.business.turnsUntilComplete > 0) {
+        tile.business.turnsUntilComplete -= 1;
+        if (tile.business.turnsUntilComplete <= 0) {
+          const def = LEGAL_BIZ_DEFS[tile.business.type];
+          if (def) {
+            tile.business.income = def.income;
+            tile.business.launderingCapacity = def.launderingCapacity;
+          }
+          tile.business.turnsUntilComplete = undefined;
+          state.pendingNotifications = [...(state.pendingNotifications || []), {
+            type: 'success' as const, title: '🏢 Business Complete!',
+            message: `Your ${tile.business.type} is now operational and generating $${tile.business.income.toLocaleString()}/turn.`,
+          }];
+        }
+      }
+    });
     
     (state.hexMap || []).forEach(tile => {
       if (tile.controllingFamily === state.playerFamily && tile.business) {
@@ -2439,6 +2464,59 @@ export const useEnhancedMafiaGameState = (
             newState.reputation.reputation += repGain;
           }
           return newState;
+        case 'build_business': {
+          // Build a legal business on a player-owned hex
+          const businessDefs: Record<string, { cost: number; income: number; launderingCapacity: number; icon: string }> = {
+            restaurant: { cost: 20000, income: 3000, launderingCapacity: 2000, icon: '🍝' },
+            store: { cost: 12000, income: 1800, launderingCapacity: 1500, icon: '🏪' },
+            construction: { cost: 35000, income: 5000, launderingCapacity: 4000, icon: '🏗️' },
+          };
+          const def = businessDefs[action.businessType];
+          if (!def) return newState;
+          if (newState.resources.money < def.cost) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '💰 Not Enough Money',
+              message: `You need $${def.cost.toLocaleString()} to build a ${action.businessType}.`,
+            }];
+            return newState;
+          }
+          // Find the hex — use action coords or selected unit's hex
+          let targetTile: HexTile | undefined;
+          if (action.targetQ !== undefined) {
+            targetTile = newState.hexMap.find(t => t.q === action.targetQ && t.r === action.targetR && t.s === action.targetS);
+          } else if (newState.selectedUnitId) {
+            const unit = newState.deployedUnits.find(u => u.id === newState.selectedUnitId);
+            if (unit) targetTile = newState.hexMap.find(t => t.q === unit.q && t.r === unit.r && t.s === unit.s);
+          }
+          if (!targetTile || targetTile.controllingFamily !== newState.playerFamily) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '🚫 Invalid Location',
+              message: 'Select one of your territories without an existing business.',
+            }];
+            return newState;
+          }
+          if (targetTile.business || targetTile.isHeadquarters) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '🚫 Hex Occupied',
+              message: 'This territory already has a business or headquarters.',
+            }];
+            return newState;
+          }
+          newState.resources.money -= def.cost;
+          targetTile.business = {
+            type: action.businessType,
+            income: 0, // No income until construction completes
+            isLegal: true,
+            heatLevel: 0,
+            launderingCapacity: 0,
+            turnsUntilComplete: 3,
+          };
+          newState.pendingNotifications = [...newState.pendingNotifications, {
+            type: 'success' as const, title: '🚧 Construction Started',
+            message: `Building ${action.businessType} for $${def.cost.toLocaleString()}. Ready in 3 turns.`,
+          }];
+          return newState;
+        }
         case 'negotiate': {
           const result = processNegotiation(newState, action);
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
