@@ -9,9 +9,10 @@
 - [5. Capo Promotion](#5-capo-promotion)
   - [5.1 Requirements](#51-requirements)
   - [5.2 Capo Personalities](#52-capo-personalities)
-- [6. Hitman Promotion](#6-hitman-promotion)
-  - [6.1 Requirements](#61-requirements)
-  - [6.2 Hitman Levels](#62-hitman-levels)
+- [6. Hitman Contracts](#6-hitman-contracts)
+  - [6.1 How It Works](#61-how-it-works)
+  - [6.2 Duration & Success](#62-duration--success)
+  - [6.3 Failed Hits & AI Alert](#63-failed-hits--ai-alert)
 - [7. Unit Costs & Maintenance](#7-unit-costs--maintenance)
 - [8. Strategic Tips](#8-strategic-tips)
 
@@ -19,7 +20,7 @@
 
 ## 1. Overview
 
-The personnel system governs recruitment of new soldiers and promotion of experienced soldiers into specialized roles (capos and hitmen). All units start at headquarters and must be deployed to the field.
+The personnel system governs recruitment of new soldiers and promotion of experienced soldiers into specialized roles (capos). Hitmen are external contract killers hired for surgical strikes.
 
 ---
 
@@ -122,31 +123,54 @@ Capo properties:
 
 ---
 
-## 6. Hitman Promotion
+## 6. Hitman Contracts
 
-Promote an elite soldier into a hitman — a specialist unit with massive combat bonuses.
+Hitmen are **external contract killers** — not members of your family. They are expensive but perform surgical strikes with no heat and no bonuses.
 
-### 6.1 Requirements
+### 6.1 How It Works
 
-| Requirement | Value |
+| Property | Value |
 |---|---|
-| Min strength (training × 10) | 80 (i.e., training ≥ 8) |
-| Min reputation (loyalty) | 50 |
-| Min hits completed | 3 |
-| Max hitmen | 3 total |
-| Maintenance cost | 1.5× normal soldier cost |
+| Cost | $15,000 per contract |
+| Max active contracts | 3 |
+| Heat generated | None |
+| Bonuses gained | None (no respect, fear, or stat gains) |
+| Target selection | Blind — you see family + unit type only, no location or stats |
 
-### 6.2 Hitman Levels
+When you hire a hitman, you pick an enemy **soldier or capo** from a list showing only their family and unit type. The hitman finds and eliminates them wherever they are when the contract resolves.
 
-Hitmen have levels 1–3 that increase their combat bonus:
+### 6.2 Duration & Success
 
-| Level | Hit Success Bonus |
+**Duration** (set at hire based on target's current location):
+
+| Target location at hire | Duration |
 |---|---|
-| 1 | +30% |
-| 2 | +40% |
-| 3 | +50% |
+| Open field | 3 turns |
+| Fortified / Safehouse | 4 turns |
+| HQ | 5 turns |
 
-Multiple hitmen in the same battle stack their bonuses.
+**Success rate** (checked at resolution based on target's location at that moment):
+
+| Target location at resolution | Success rate |
+|---|---|
+| Open field | 90% |
+| Fortified | 65% |
+| Safehouse | 55% |
+| HQ | 40% |
+
+Auto-fails if contract exceeds 5 turns total.
+
+### 6.3 Failed Hits & AI Alert
+
+**Payment on failure:** 50% refunded ($7,500 back).
+
+**AI Alert State:** When a contract fails against an AI-controlled family, that family enters **alert mode** for 5 turns:
+- Recruits +1 extra soldier per turn
+- Prioritizes fortifying hexes
+- Gets +1 additional move per unit
+- Actively targets player hexes
+
+If the target was already eliminated before the contract resolves, the contract is cancelled with a 50% refund.
 
 ---
 
@@ -156,7 +180,7 @@ Multiple hitmen in the same battle stack their bonuses.
 |---|---|---|
 | Soldier | $500 | Base rate |
 | Capo | $10,000 (promotion) | — |
-| Hitman | — (promotion) | 1.5× soldier maintenance |
+| Hitman contract | $15,000 | — (one-time cost) |
 
 ---
 
@@ -171,10 +195,11 @@ Multiple hitmen in the same battle stack their bonuses.
 - Deploy capos to high-income hexes for maximum revenue (100% vs 30%)
 - Use capo personalities strategically — diplomats for peace, enforcers for expansion
 
-### Hitman Promotion
-- Train soldiers to level 8+ training before promoting
-- Hitmen dramatically increase hit success rates
-- Stack hitmen on difficult targets for near-guaranteed captures
+### Hitman Contracts
+- Use hitmen to eliminate key enemy capos on high-value hexes
+- Target units at open field hexes for highest success rate
+- Be prepared: failed contracts alert the enemy and make them more aggressive
+- Never rely solely on hitmen — they provide no strategic bonuses
 
 ### General
 - Don't over-extend — each soldier lost is an action budget lost

@@ -232,15 +232,15 @@ The peaceful way to expand. **Neutral hexes only.**
 | Duration | 3 turns after scouting |
 | Intel revealed | Enemy count, family, business details |
 
-### 5.3 Hitmen
+### 5.3 Hitman Contracts
 
-| Level | Hit Bonus |
+Hitmen are **external contract killers** — they do NOT participate in regular combat. Instead, they perform surgical strikes against specific enemy units over 3-5 turns. See [SOLDIER_RECRUITMENT_GUIDE.md](./SOLDIER_RECRUITMENT_GUIDE.md#6-hitman-contracts) for full details.
+
+| Property | Value |
 |---|---|
-| Level 1 | +30% |
-| Level 2 | +40% |
-| Level 3 | +50% |
-
-Multiple hitmen stack their bonuses.
+| Combat bonus | None (external, not in battle) |
+| Success rate | 40-90% depending on target location |
+| Heat generated | None |
 
 ### 5.4 Family Bonuses
 

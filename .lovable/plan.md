@@ -1,35 +1,29 @@
 
 
-# Individual Soldier Loyalty System
+# Hitman Contract System
 
 ## Summary
 
-Individual soldier loyalty now grows and decays organically based on actions, combat, positioning, stats, and financial status.
+Hitmen reworked from promoted soldiers into external contract killers. Player pays $15,000 to target any enemy soldier or capo (blind selection — no location/stats shown). The hit resolves in 3-5 turns with no heat and no bonuses. Failed hits refund 50% and trigger AI alert mode.
 
-## Mechanics
+## Payment Model
+- On hire: full $15,000 deducted
+- Success: no refund
+- Failure/expired/target dead: 50% refunded ($7,500)
 
-### Per-Turn Loyalty Growth
-- **Stats-correlated baseline**: `floor((training + toughness + racketeering + victories) / 4)` loyalty per turn
-- **High-income hex bonus**: +3 loyalty/turn if stationed on hex with business income >= $4,000
-- **Unpaid penalty**: -2 loyalty/turn if family can't afford maintenance
+## Duration & Success
+- Duration set at hire: Open 3, Fortified/Safehouse 4, HQ 5 turns
+- Success at resolution: Open 90%, Fortified 65%, Safehouse 55%, HQ 40%
+- Auto-fail after 5 turns
 
-### Action Bonuses (immediate)
-- **Successful action** (hit, extortion, claim): +2 loyalty
-- **Survived combat** (hit win or loss with casualties): +5 loyalty
-
-### Caps
-- Soldiers: 80 (`SOLDIER_LOYALTY_CAP`)
-- Capos: 99 (`CAPO_LOYALTY_CAP`)
-- Minimum: 0
-
-## Constants (`src/types/game-mechanics.ts`)
-- `LOYALTY_ACTION_BONUS = 2`
-- `LOYALTY_COMBAT_BONUS = 5`
-- `LOYALTY_INCOME_HEX_BONUS = 3`
-- `LOYALTY_INCOME_HEX_THRESHOLD = 4000`
-- `LOYALTY_UNPAID_PENALTY = 2`
+## AI Alert State
+- Failed contracts trigger 5-turn alert on target AI family
+- Alert: +1 recruit cap, +1 move range, fortify units, prioritize player hexes
 
 ## Files Modified
-- `src/types/game-mechanics.ts` — 5 new constants
-- `src/hooks/useEnhancedMafiaGameState.ts` — per-turn loyalty processing, action/combat bonuses
-- `SOLDIER_RECRUITMENT_GUIDE.md` — documented loyalty mechanics
+- `src/types/game-mechanics.ts` — HitmanContract interface, new constants
+- `src/hooks/useEnhancedMafiaGameState.ts` — hire_hitman action, contract resolution, AI alert
+- `src/components/HitmanPanel.tsx` — Complete rewrite with contract UI
+- `src/components/GameSidePanels.tsx` — Updated props
+- `SOLDIER_RECRUITMENT_GUIDE.md` — Documented contract system
+- `COMBAT_SYSTEM_GUIDE.md` — Updated hitman section
