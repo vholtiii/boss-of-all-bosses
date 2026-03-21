@@ -147,7 +147,26 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     'Staten Island': 'SI',
   };
 
+  // Business placement mode
+  const pendingBuild = gameState?.pendingBusinessBuild;
+  const isBusinessPlacementMode = !!pendingBuild;
+  const validPlacementHexes = useMemo(() => {
+    if (!pendingBuild) return [];
+    return hexMap.filter(t => 
+      t.controllingFamily === playerFamily && !t.business && !t.isHeadquarters &&
+      (pendingBuild.isLegal 
+        ? deployedUnits.some(u => u.type === 'capo' && u.family === playerFamily && u.q === t.q && u.r === t.r && u.s === t.s)
+        : true)
+    );
+  }, [pendingBuild, hexMap, deployedUnits, playerFamily]);
+
   const getHexColor = (tile: HexTile): string => {
+    // Business placement highlight
+    if (isBusinessPlacementMode) {
+      const isValid = validPlacementHexes.some(h => h.q === tile.q && h.r === tile.r && h.s === tile.s);
+      if (isValid) return '#22C55E'; // green for valid placement
+    }
+
     // HQ
     if (tile.isHeadquarters) {
       return tile.isHeadquarters === playerFamily ? '#D4AF37' : '#8B4513';
