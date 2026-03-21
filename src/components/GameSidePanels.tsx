@@ -261,18 +261,22 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Corruption"
           icon={<Gavel className="h-4 w-4" />}
-          isOpen={!actionsLocked && openSection === 'corruption'}
-          onToggle={() => !actionsLocked && toggle('corruption')}
-          disabled={actionsLocked}
+          isOpen={openSection === 'corruption'}
+          onToggle={() => toggle('corruption')}
+          phaseLocked={actionsLocked}
         >
-          <CorruptionPanel
-            money={resources.money}
-            activeBribes={gameState.activeBribes}
-            rivalFamilies={gameState.aiOpponents.map(o => o.family)}
-            reputation={gameState.reputation.reputation}
-            heat={gameState.policeHeat.level}
-            onBribe={(tier, targetFamily) => onAction({ type: 'bribe_corruption', tier, targetFamily })}
-          />
+          {actionsLocked ? (
+            <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Action phase</p>
+          ) : (
+            <CorruptionPanel
+              money={resources.money}
+              activeBribes={gameState.activeBribes}
+              rivalFamilies={gameState.aiOpponents.map(o => o.family)}
+              reputation={gameState.reputation.reputation}
+              heat={gameState.policeHeat.level}
+              onBribe={(tier, targetFamily) => onAction({ type: 'bribe_corruption', tier, targetFamily })}
+            />
+          )}
         </CollapsibleSection>
 
         {/* ── HITMAN SYSTEM ── */}
