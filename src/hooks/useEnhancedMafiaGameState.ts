@@ -2026,12 +2026,10 @@ export const useEnhancedMafiaGameState = (
       const aiCapoCount = state.deployedUnits.filter(u => u.family === fam && u.type === 'capo').length;
       if (aiCapoCount < MAX_CAPOS && opponent.resources.money >= CAPO_PROMOTION_COST) {
         const aiSoldierUnits = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
-        const aiHitmanIds = state.hitmen.filter(h => aiSoldierUnits.some(u => u.id === h.unitId)).map(h => h.unitId);
         
         // Find the best eligible soldier (highest victories)
         let bestCandidate: { unit: typeof aiSoldierUnits[0]; stats: SoldierStats } | null = null;
         for (const unit of aiSoldierUnits) {
-          if (aiHitmanIds.includes(unit.id)) continue; // skip hitmen
           const stats = state.soldierStats[unit.id];
           if (!stats) continue;
           if (
