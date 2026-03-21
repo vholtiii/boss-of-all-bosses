@@ -486,10 +486,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       <div className="absolute inset-0 flex items-center justify-center">
         <svg width="100%" height="100%" viewBox={viewBox} className="overflow-visible">
           <g transform={`scale(${zoom})`}>
-            {/* District border outlines */}
-            {districtBorderEdges.map((edge, i) => (
-              <line key={`border-${i}`} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" className="pointer-events-none" />
-            ))}
             {hexMap.map(tile => {
               const { x, y } = getHexPosition(tile.q, tile.r);
               const key = `${tile.q},${tile.r},${tile.s}`;
