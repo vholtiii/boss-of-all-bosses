@@ -1,35 +1,64 @@
 
 
-# Refine Defense & Law: Heat Reduction + Legal Defense
+# Refine Police Heat: Escalating Thresholds + Lawyer Sentence Reduction
 
 ## Overview
-Replace the two dead buttons with functional heat-reduction and legal-defense actions. Both cost 1 action-phase slot, creating a meaningful trade-off against combat/economy actions.
+Overhaul the police heat system with 4 escalating consequence tiers, a RICO game-over mechanic, and a lawyer system that reduces arrest sentences by 25%.
 
-## Actions
+## Threshold System
 
-| Action | Icon | Cost | Effects | Cooldown |
-|---|---|---|---|---|
-| **Public Appearance** | 👑 Crown | $3,000 | −5 heat, +2 Reputation | None |
-| **Charitable Donation** | 🤝 HandCoins | $5,000 | −10 heat, +3 Reputation | None |
-| **Hire Lawyer** | ⚖️ Scale | $8,000 | Clears 1 active arrest penalty (profit reduction), −3 heat | 3-turn cooldown |
+| Tier | Heat Range | Effects |
+|---|---|---|
+| **Low** | 30-49 | −15% illegal income |
+| **Medium** | 50-69 | −15% illegal income + 20% chance/turn to arrest 1 soldier (jailed 3 turns, auto-released) |
+| **High** | 70-89 | −25% illegal income + soldier arrests continue + 15% chance/turn to arrest a capo (jailed 5 turns, auto-released) |
+| **Critical** | 90-100 | All above + 1 random illegal business shut down/turn + **RICO timer starts** (5 consecutive turns at 90+ = game over) |
 
-- **Public Appearance**: Cheap, small heat drop. Good for maintenance.
-- **Charitable Donation**: Medium cost, bigger heat drop. Useful when heat is climbing.
-- **Hire Lawyer**: Expensive but removes an active arrest penalty entirely (the -5%/-15%/-30% profit debuffs from the police system). If no active arrest, it still reduces heat by 3. Has a 3-turn cooldown to prevent spam.
+## Arrest Durations
+
+| Unit Type | Base Sentence | With Lawyer (−25%) |
+|---|---|---|
+| Soldier | 3 turns | 2 turns |
+| Capo | 5 turns | 4 turns |
+
+## RICO Timer
+- State field: `ricoTimer: number` (0-5)
+- Each turn at heat ≥90, increment by 1. Below 90 → reset to 0
+- At 5 → federal indictment, game over
+- Flashing red warning in HUD when active
+
+## Lawyer Sentence Reduction (25%)
+- "Hire Lawyer" sets `lawyerActiveUntil = currentTurn + 3`
+- Immediately reduces all existing active sentences by 25% (min 1 turn)
+- New arrests during lawyer window also get 25% shorter sentences
+- Green badge in Defense & Law: "⚖️ Lawyer Active — Sentences −25%"
 
 ## Changes
 
-### 1. `src/hooks/useEnhancedMafiaGameState.ts` — Add 3 action handlers
-- `public_appearance`: Deduct $3,000, reduce `policeHeat.level` by 5 (min 0), add +2 reputation, consume 1 action
-- `charitable_donation`: Deduct $5,000, reduce `policeHeat.level` by 10 (min 0), add +3 reputation, consume 1 action
-- `hire_lawyer`: Deduct $8,000, remove first active arrest from `policeHeat.activeArrests` array (or reduce heat by 3 if none active), consume 1 action. Track `lastLawyerTurn` in state for 3-turn cooldown
+### 1. `src/hooks/useEnhancedMafiaGameState.ts` — State additions
+- Add `ricoTimer: number` (init 0), `arrestedCapos: Array<{unitId, returnTurn}>` (init []), `arrestedSoldiers: Array<{returnTurn}>` (init []), `lawyerActiveUntil: number` (init 0)
 
-### 2. `src/components/GameSidePanels.tsx` — Update Defense & Law section
-- Keep Public Appearance and Charitable Donation buttons (already exist, just need handlers)
-- Add new "Hire Lawyer" button with Scale icon, $8,000 cost, disabled during cooldown
-- Show cooldown remaining on Hire Lawyer button when applicable (e.g., "2 turns")
-- All three phase-locked to action phase
+### 2. `src/hooks/useEnhancedMafiaGameState.ts` — Rewrite arrest/heat logic (~lines 1578-1628)
+Replace existing 3-tier system with new 4-tier logic:
+- 30+: ×0.85 illegal income multiplier
+- 50+: 20% soldier arrest roll → 3-turn sentence (2 with lawyer)
+- 70+: ×0.75 illegal income, 15% capo arrest roll → 5-turn sentence (4 with lawyer)
+- 90+: Shut down 1 random illegal business, increment ricoTimer. Game over at 5
 
-### 3. `src/hooks/useEnhancedMafiaGameState.ts` — State addition
-- Add `lastLawyerTurn?: number` to game state for cooldown tracking
+### 3. `src/hooks/useEnhancedMafiaGameState.ts` — Turn processing
+- Release arrested soldiers/capos where `returnTurn <= currentTurn`
+- Apply income penalty multiplier in economy processing
+
+### 4. `src/hooks/useEnhancedMafiaGameState.ts` — Hire Lawyer handler update
+- Set `lawyerActiveUntil = turn + 3`
+- Reduce all active arrest sentences by 25% (min 1)
+
+### 5. `src/components/GameSidePanels.tsx` — Lawyer status
+- Green badge "⚖️ Lawyer Active — Sentences −25%" when active
+
+### 6. `src/components/PoliceSystem.tsx` — UI updates
+- Display current tier, active effects, arrested units with countdowns, RICO timer
+
+### 7. `src/components/MafiaHud.tsx` — RICO warning
+- Flashing red: "RICO INVESTIGATION: X turns until indictment"
 
