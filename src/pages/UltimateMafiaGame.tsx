@@ -28,8 +28,10 @@ import {
   Swords,
   Eye,
   SkipForward,
-  LogOut
+  LogOut,
+  Settings
 } from 'lucide-react';
+import SoundSettingsDialog from '@/components/SoundSettingsDialog';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
 
@@ -63,7 +65,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   } = useEnhancedMafiaGameState(config.family, config.resources);
 
   const { notifySuccess, notifyError, notifyWarning, notifyInfo, notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
-  const { playSound, playSoundSequence } = useSoundSystem();
+  const { playSound, playSoundSequence, updateSoundConfig, soundConfig } = useSoundSystem();
+  const [showSoundSettings, setShowSoundSettings] = useState(false);
 
   // Drain pending notifications from game state into the notification system
   useEffect(() => {
@@ -441,6 +444,14 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         <Button
           variant="outline"
           size="sm"
+          data-no-sound
+          onClick={() => setShowSoundSettings(true)}
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => setShowTutorial(true)}
         >
           <Info className="h-4 w-4" />
@@ -771,6 +782,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           />
         );
       })()}
+
+      {/* Sound Settings */}
+      <SoundSettingsDialog
+        open={showSoundSettings}
+        onOpenChange={setShowSoundSettings}
+        soundConfig={soundConfig}
+        onUpdateConfig={updateSoundConfig}
+        onTestSound={playSound}
+      />
 
       {/* Tutorial System */}
       <TutorialSystem
