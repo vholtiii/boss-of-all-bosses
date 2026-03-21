@@ -233,6 +233,30 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           phaseLocked={actionsLocked}
         >
           <div className="space-y-1.5">
+            {/* Lawyer Active Badge */}
+            {(gameState as any).lawyerActiveUntil >= gameState.turn && (
+              <div className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 font-medium flex items-center gap-1.5">
+                ⚖️ Lawyer Active — Sentences −25%
+                <span className="ml-auto text-muted-foreground">
+                  {(gameState as any).lawyerActiveUntil - gameState.turn + 1} turn{(gameState as any).lawyerActiveUntil - gameState.turn + 1 !== 1 ? 's' : ''} left
+                </span>
+              </div>
+            )}
+            {/* RICO Warning */}
+            {(gameState as any).ricoTimer > 0 && (
+              <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-1.5 text-xs text-destructive font-bold flex items-center gap-1.5 animate-pulse">
+                🚨 RICO: {(gameState as any).ricoTimer}/5 turns
+              </div>
+            )}
+            {/* Heat Tier Indicator */}
+            {(() => {
+              const heat = policeHeat.level;
+              if (heat >= 90) return <div className="text-xs text-destructive font-semibold px-1">🔴 CRITICAL — Businesses shutting down, RICO active</div>;
+              if (heat >= 70) return <div className="text-xs text-orange-400 font-semibold px-1">🟠 HIGH — Capo arrests possible, −25% illegal income</div>;
+              if (heat >= 50) return <div className="text-xs text-yellow-400 font-semibold px-1">🟡 MEDIUM — Soldier arrests possible, −15% illegal income</div>;
+              if (heat >= 30) return <div className="text-xs text-blue-400 font-semibold px-1">🔵 LOW — −15% illegal income</div>;
+              return null;
+            })()}
             <ActionButton
               icon={<Crown className="h-4 w-4" />}
               label="Public Appearance"
@@ -258,13 +282,24 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 <ActionButton
                   icon={<Scale className="h-4 w-4" />}
                   label="Hire Lawyer"
-                  sublabel={onCooldown ? `Cooldown: ${turnsLeft} turn${turnsLeft > 1 ? 's' : ''}` : '$8,000 · Clears arrest / −3 Heat · 1 action'}
+                  sublabel={onCooldown ? `Cooldown: ${turnsLeft} turn${turnsLeft > 1 ? 's' : ''}` : '$8,000 · Clears arrest, −25% sentences · 1 action'}
                   disabled={resources.money < 8000 || gameState.actionsRemaining <= 0 || onCooldown}
                   phaseLocked={actionsLocked}
                   onClick={() => onAction({ type: 'hire_lawyer' })}
                 />
               );
             })()}
+            {/* Arrested Units Summary */}
+            {(((gameState as any).arrestedSoldiers?.length || 0) > 0 || ((gameState as any).arrestedCapos?.length || 0) > 0) && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs space-y-0.5">
+                {((gameState as any).arrestedSoldiers || []).map((a: any, i: number) => (
+                  <div key={i} className="text-muted-foreground">🔒 Soldier jailed — returns turn {a.returnTurn}</div>
+                ))}
+                {((gameState as any).arrestedCapos || []).map((a: any, i: number) => (
+                  <div key={i} className="text-orange-400">🔒 Capo jailed — returns turn {a.returnTurn}</div>
+                ))}
+              </div>
+            )}
           </div>
         </CollapsibleSection>
 
