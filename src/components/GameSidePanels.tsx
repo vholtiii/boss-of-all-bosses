@@ -113,9 +113,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Strategic Actions"
           icon={<Swords className="h-4 w-4" />}
-          isOpen={!actionsLocked && openSection === 'actions'}
-          onToggle={() => !actionsLocked && toggle('actions')}
-          disabled={actionsLocked}
+          isOpen={openSection === 'actions'}
+          onToggle={() => toggle('actions')}
+          phaseLocked={actionsLocked}
         >
           <div className="space-y-1.5">
             <ActionButton
@@ -123,6 +123,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Attack Territory"
               sublabel={`$15,000 · 2 soldiers`}
               disabled={resources.money < 15000 || resources.soldiers < 2 || legalStatus.jailTime > 0}
+              phaseLocked={actionsLocked}
               variant="destructive"
               onClick={() => onAction({ type: 'attack_territory' })}
             />
@@ -131,6 +132,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Plan Hit"
               sublabel={`$8,000 · 1 soldier`}
               disabled={resources.money < 8000 || resources.soldiers < 1 || legalStatus.jailTime > 0}
+              phaseLocked={actionsLocked}
               variant="destructive"
               onClick={() => onAction({ type: 'violent_action', violenceType: 'hit', cost: 8000, risk: 70 })}
             />
@@ -139,6 +141,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Sabotage Rival"
               sublabel={`$12,000`}
               disabled={resources.money < 12000 || legalStatus.jailTime > 0}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'sabotage', cost: 12000 })}
             />
             <ActionButton
@@ -146,6 +149,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Extort Business"
               sublabel={`Free · +Heat`}
               disabled={legalStatus.jailTime > 0}
+              phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'extort_business', amount: 5000 })}
             />
           </div>
