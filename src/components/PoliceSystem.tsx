@@ -181,6 +181,51 @@ export const PoliceSystem = ({ policeHeat, cleanMoney, dirtyMoney, currentTurn, 
               </span>
             </div>
           )}
+
+          {/* Current Tier Effects */}
+          <div className="p-3 bg-card border rounded-lg">
+            <div className="text-xs font-medium text-muted-foreground mb-1">Active Effects</div>
+            <div className="text-sm">{getHeatTierEffects(policeHeat.level)}</div>
+          </div>
+
+          {/* RICO Timer */}
+          {ricoTimer > 0 && (
+            <div className="flex items-center gap-2 p-3 bg-red-500/20 border border-red-500/40 rounded-lg animate-pulse">
+              <AlertTriangle className="h-5 w-5 text-red-400" />
+              <div>
+                <div className="text-sm font-bold text-red-400">🚨 RICO INVESTIGATION</div>
+                <div className="text-xs text-red-300">{ricoTimer}/5 turns — Drop below 90 heat to reset!</div>
+              </div>
+            </div>
+          )}
+
+          {/* Lawyer Status */}
+          {lawyerActiveUntil >= currentTurn && (
+            <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+              <span className="text-sm">⚖️</span>
+              <span className="text-sm text-green-400 font-medium">Lawyer Active — Sentences −25%</span>
+              <span className="text-xs text-muted-foreground ml-auto">{lawyerActiveUntil - currentTurn + 1} turns left</span>
+            </div>
+          )}
+
+          {/* Arrested Units */}
+          {(arrestedSoldiers.length > 0 || arrestedCapos.length > 0) && (
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Jailed Units</div>
+              {arrestedSoldiers.map((a, i) => (
+                <div key={`s-${i}`} className="flex items-center justify-between p-2 bg-card border rounded text-xs">
+                  <span>🔒 Soldier</span>
+                  <span className="text-muted-foreground">Returns turn {a.returnTurn}</span>
+                </div>
+              ))}
+              {arrestedCapos.map((a, i) => (
+                <div key={`c-${i}`} className="flex items-center justify-between p-2 bg-orange-500/10 border border-orange-500/20 rounded text-xs">
+                  <span className="text-orange-400">🔒 Capo</span>
+                  <span className="text-muted-foreground">Returns turn {a.returnTurn}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
