@@ -2450,20 +2450,60 @@ export const useEnhancedMafiaGameState = (
           return newState;
         }
         case 'charitable_donation':
-          if (newState.resources.money >= 5000) {
+          if (newState.resources.money >= 5000 && newState.actionsRemaining > 0) {
             newState.resources.money -= 5000;
-            const repGain = 10 * (1 + bonuses.reputationGain / 100);
-            newState.reputation.reputation += repGain;
-            newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 5);
+            const repGainCD = 3 * (1 + bonuses.reputationGain / 100);
+            newState.reputation.reputation += repGainCD;
+            newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 10);
+            newState.actionsRemaining -= 1;
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'info' as const, title: '🤝 Charitable Donation',
+              message: `Donated $5,000. Heat −10, Reputation +${repGainCD.toFixed(0)}.`,
+            }];
           }
           return newState;
         case 'public_appearance':
-          if (newState.resources.money >= 3000) {
+          if (newState.resources.money >= 3000 && newState.actionsRemaining > 0) {
             newState.resources.money -= 3000;
-            const repGain = 5 * (1 + bonuses.reputationGain / 100);
-            newState.reputation.reputation += repGain;
+            const repGainPA = 2 * (1 + bonuses.reputationGain / 100);
+            newState.reputation.reputation += repGainPA;
+            newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 5);
+            newState.actionsRemaining -= 1;
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'info' as const, title: '👑 Public Appearance',
+              message: `Spent $3,000. Heat −5, Reputation +${repGainPA.toFixed(0)}.`,
+            }];
           }
           return newState;
+        case 'hire_lawyer': {
+          const lawyerCost = 8000;
+          const lawyerCooldown = 3;
+          const lastLawyerTurn = (newState as any).lastLawyerTurn || 0;
+          const turnsSinceLawyer = newState.turn - lastLawyerTurn;
+          if (newState.resources.money >= lawyerCost && newState.actionsRemaining > 0 && turnsSinceLawyer >= lawyerCooldown) {
+            newState.resources.money -= lawyerCost;
+            newState.actionsRemaining -= 1;
+            (newState as any).lastLawyerTurn = newState.turn;
+            // Remove first active arrest if any, otherwise just reduce heat
+            const activeArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn < a.sentence);
+            if (activeArrests.length > 0) {
+              const cleared = activeArrests[0];
+              newState.policeHeat.arrests = newState.policeHeat.arrests.filter(a => a.id !== cleared.id);
+              newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 3);
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'info' as const, title: '⚖️ Lawyer Hired',
+                message: `Cleared arrest of ${cleared.target} (${cleared.impactOnProfit}% profit penalty removed). Heat −3.`,
+              }];
+            } else {
+              newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 3);
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'info' as const, title: '⚖️ Lawyer Hired',
+                message: `No active arrests to clear. Heat −3.`,
+              }];
+            }
+          }
+          return newState;
+        }
         case 'build_business': {
           // Build a legal business on a player-owned hex
           const businessDefs: Record<string, { cost: number; income: number; launderingCapacity: number; icon: string }> = {
