@@ -3543,24 +3543,24 @@ export const useEnhancedMafiaGameState = (
       const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== state.playerFamily;
       if (!isNeutral && !isEnemy) return state;
 
-      // Check for player units on OR adjacent to the target hex
+      // Soldiers: must be ON the hex. Capos: can be on or adjacent.
       const playerUnitsOnHex = state.deployedUnits.filter(u => 
         u.family === state.playerFamily && u.q === targetQ && u.r === targetR && u.s === targetS
       );
       const neighbors = getHexNeighbors(targetQ, targetR, targetS);
-      const playerUnitsAdjacent = state.deployedUnits.filter(u => 
-        u.family === state.playerFamily && 
+      const playerCaposAdjacent = state.deployedUnits.filter(u => 
+        u.family === state.playerFamily && u.type === 'capo' &&
         neighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s)
       );
-      const allPlayerUnits = [...playerUnitsOnHex, ...playerUnitsAdjacent];
-      if (allPlayerUnits.length === 0) return state;
-
-      // Capos cannot manually extort — their extortion is automatic on arrival only
-      const hasSoldier = allPlayerUnits.some(u => u.type === 'soldier');
-      if (!hasSoldier) {
+      
+      const soldiersOnHex = playerUnitsOnHex.filter(u => u.type === 'soldier');
+      const caposInRange = [...playerUnitsOnHex.filter(u => u.type === 'capo'), ...playerCaposAdjacent];
+      const allPlayerUnits = [...soldiersOnHex, ...caposInRange];
+      
+      if (allPlayerUnits.length === 0) {
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'info' as const, title: 'Cannot Extort',
-          message: 'Capos handle extortion automatically when they arrive at a territory. Send a soldier to extort manually.',
+          message: 'Soldiers must be on the hex to extort. Capos can extort from adjacent hexes.',
         }];
         return state;
       }
