@@ -16,7 +16,7 @@ interface HitmanPanelProps {
 }
 
 const HitmanPanel: React.FC<HitmanPanelProps> = ({
-  hitmanContracts, deployedUnits, playerFamily, money, onHire
+  hitmanContracts, deployedUnits, playerFamily, money, currentTurn, onHire
 }) => {
   const [selecting, setSelecting] = useState(false);
 
