@@ -2835,7 +2835,7 @@ export const useEnhancedMafiaGameState = (
         }
         shuffled.slice(casualties).forEach(u => {
           if (state.soldierStats[u.id]) {
-            state.soldierStats[u.id].survivedConflicts += 1;
+            state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
           }
         });
         const failDetails = `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} suffered`;
