@@ -157,6 +157,10 @@ export interface EnhancedMafiaGameState {
   legalStatus: LegalStatus;
   policeHeat: PoliceHeat;
   
+  // Blind hit system
+  hiddenUnits: HiddenUnit[];
+  aiBounties: AIBounty[];
+  
   turnReport: TurnReport | null;
   lastCombatResult?: {
     q: number; r: number; s: number;
