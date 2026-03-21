@@ -385,6 +385,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           <div className="text-lg font-bold text-mafia-gold">Turn {gameState.turn}</div>
           <div className="text-xs text-muted-foreground capitalize">{gameState.season}</div>
         </div>
+        {(gameState.ricoTimer || 0) > 0 && (
+          <motion.div
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 0.8, repeat: Infinity }}
+            className="text-center px-3 py-1 rounded-lg bg-destructive/20 border border-destructive/40"
+          >
+            <div className="text-sm font-bold text-destructive">🚨 RICO {gameState.ricoTimer}/5</div>
+          </motion.div>
+        )}
         <div className="text-center">
           <div className="text-sm font-medium text-green-400">Commission Active</div>
           <motion.div
