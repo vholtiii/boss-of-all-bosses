@@ -775,10 +775,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })}
 
-            {/* District border outlines */}
-            {districtBorderPaths.map((d, i) => (
-              <path key={`border-${i}`} d={d} stroke="rgba(200,200,200,0.4)" strokeWidth="2" fill="none" strokeLinejoin="round" className="pointer-events-none" />
-            ))}
+            {/* District borders moved to render after tiles — see below */}
 
             {/* District name labels */}
             {(() => {
