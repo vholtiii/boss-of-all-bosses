@@ -1,13 +1,17 @@
 // ============ HITMAN SYSTEM ============
 export interface SoldierStats {
-  loyalty: number;       // 1-100
-  training: number;      // 1-10
-  equipment: number;     // 1-10
-  hits: number;
-  extortions: number;
-  intimidations: number;
-  survivedConflicts: number;
+  loyalty: number;       // 0-80 for soldiers, 0-99 for capos
+  training: number;      // 0-3 (+1 per turn deployed away from HQ)
+  hits: number;          // successful hit actions
+  extortions: number;    // successful extortion actions
+  victories: number;     // 0-5 (+1 per successful extortion or hit)
+  toughness: number;     // 0-5 (+1 per survived combat encounter)
+  racketeering: number;  // 0-5 (+1 per successful extortion)
+  turnsDeployed: number; // internal tracker for training calc
 }
+
+export const SOLDIER_LOYALTY_CAP = 80;
+export const CAPO_LOYALTY_CAP = 99;
 
 export interface Hitman {
   unitId: string;         // references DeployedUnit.id
@@ -197,16 +201,19 @@ export const MAX_HITMEN = 3;
 export const MAX_CAPOS = 3;
 export const CAPO_PROMOTION_COST = 10000;
 export const CAPO_PROMOTION_REQUIREMENTS = {
-  minVictories: 5,       // survivedConflicts on SoldierStats
-  minLoyalty: 60,         // loyalty on SoldierStats
-  minTraining: 3,        // training on SoldierStats (1-10 scale)
+  minVictories: 5,       // victories on SoldierStats (max 5)
+  minLoyalty: 80,         // loyalty on SoldierStats (soldier cap)
+  minTraining: 3,        // training on SoldierStats (0-3 scale)
+  minToughness: 5,       // toughness on SoldierStats (0-5)
+  minRacketeering: 5,    // racketeering on SoldierStats (0-5)
 };
 
 // Hitman promotion requirements
 export const HITMAN_REQUIREMENTS = {
-  minStrength: 80,    // maps to training * 10
+  minStrength: 3,     // training (0-3 scale, must be maxed)
   minReputation: 50,  // maps to loyalty
   minHits: 3,
+  minToughness: 3,    // toughness (0-5)
 };
 
 // ============ MOVE PHASE TYPES ============

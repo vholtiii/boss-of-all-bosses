@@ -17,6 +17,7 @@ import {
   FAMILY_BONUSES, BRIBE_TIERS, DOC_BUSINESS_TYPES,
   SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, HITMAN_MAINTENANCE_MULTIPLIER, MAX_HITMEN, HITMAN_REQUIREMENTS,
   MAX_CAPOS, CAPO_PROMOTION_COST, CAPO_PROMOTION_REQUIREMENTS,
+  SOLDIER_LOYALTY_CAP, CAPO_LOYALTY_CAP,
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType,
   NEGOTIATION_TYPES,
   ScoutedHex, Safehouse, MoveAction,
@@ -336,10 +337,8 @@ const createInitialGameState = (
         movesRemaining: 2, maxMoves: 2, level: 1,
       });
       soldierStats[id] = {
-        loyalty: 50 + Math.floor(Math.random() * 30),
-        training: 3 + Math.floor(Math.random() * 3),
-        equipment: 2 + Math.floor(Math.random() * 3),
-        hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+        loyalty: 50, training: 0,
+        hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
       };
     }
     const capoNames: Record<string, string> = {
@@ -1204,8 +1203,8 @@ export const useEnhancedMafiaGameState = (
             movesRemaining: 0, maxMoves: 2, level: 1,
           });
           newSoldierStats[newId] = {
-            loyalty: 50, training: 3, equipment: 2,
-            hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+            loyalty: 50, training: 0,
+            hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
           };
           newResources.soldiers -= 1;
         } else {
@@ -1294,6 +1293,21 @@ export const useEnhancedMafiaGameState = (
       newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
         ...u, movesRemaining: u.maxMoves, escortingSoldierIds: undefined,
       }));
+
+      // --- Training increment: +1 training per turn for soldiers deployed away from HQ ---
+      newState.deployedUnits.forEach(u => {
+        const stats = newState.soldierStats[u.id];
+        if (!stats) return;
+        const hq = newState.headquarters[u.family];
+        const atHQ = hq && u.q === hq.q && u.r === hq.r && u.s === hq.s;
+        if (!atHQ && u.type === 'soldier') {
+          stats.training = Math.min(3, stats.training + 1);
+          stats.turnsDeployed += 1;
+        }
+        // Enforce loyalty caps
+        const isCapo = u.type === 'capo';
+        stats.loyalty = Math.min(isCapo ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP, stats.loyalty);
+      });
 
       // Tick scouted hexes
       newState.scoutedHexes = newState.scoutedHexes
@@ -1716,8 +1730,8 @@ export const useEnhancedMafiaGameState = (
               movesRemaining: 2, maxMoves: 2, level: 1,
             });
             state.soldierStats[newId] = {
-              loyalty: 40 + Math.floor(Math.random() * 30), training: 2 + Math.floor(Math.random() * 3),
-              equipment: 2, hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+              loyalty: 40 + Math.floor(Math.random() * 30), training: 0,
+              hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
             };
             const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
             if (tile && (tile.controllingFamily === 'neutral' || tile.controllingFamily === fam) && !tile.isHeadquarters) {
@@ -1894,18 +1908,20 @@ export const useEnhancedMafiaGameState = (
         const aiSoldierUnits = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
         const aiHitmanIds = state.hitmen.filter(h => aiSoldierUnits.some(u => u.id === h.unitId)).map(h => h.unitId);
         
-        // Find the best eligible soldier (highest survivedConflicts)
+        // Find the best eligible soldier (highest victories)
         let bestCandidate: { unit: typeof aiSoldierUnits[0]; stats: SoldierStats } | null = null;
         for (const unit of aiSoldierUnits) {
           if (aiHitmanIds.includes(unit.id)) continue; // skip hitmen
           const stats = state.soldierStats[unit.id];
           if (!stats) continue;
           if (
-            stats.survivedConflicts >= CAPO_PROMOTION_REQUIREMENTS.minVictories &&
+            stats.victories >= CAPO_PROMOTION_REQUIREMENTS.minVictories &&
             stats.loyalty >= CAPO_PROMOTION_REQUIREMENTS.minLoyalty &&
-            stats.training >= CAPO_PROMOTION_REQUIREMENTS.minTraining
+            stats.training >= CAPO_PROMOTION_REQUIREMENTS.minTraining &&
+            stats.toughness >= CAPO_PROMOTION_REQUIREMENTS.minToughness &&
+            stats.racketeering >= CAPO_PROMOTION_REQUIREMENTS.minRacketeering
           ) {
-            if (!bestCandidate || stats.survivedConflicts > bestCandidate.stats.survivedConflicts) {
+            if (!bestCandidate || stats.victories > bestCandidate.stats.victories) {
               bestCandidate = { unit, stats };
             }
           }
@@ -2050,8 +2066,8 @@ export const useEnhancedMafiaGameState = (
                 recruited: false,
               }];
               newState.soldierStats[newId] = {
-                loyalty: Math.max(10, newState.reputation.loyalty), training: 5, equipment: 4,
-                hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+                loyalty: 50, training: 0,
+                hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
               };
             }
             newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -2093,8 +2109,8 @@ export const useEnhancedMafiaGameState = (
                 recruited: true,
               }];
               newState.soldierStats[newId] = {
-                loyalty: 65, training: 2, equipment: 2,
-                hits: 0, extortions: 0, intimidations: 0, survivedConflicts: 0,
+                loyalty: 65, training: 0,
+                hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
               };
             }
             newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -2118,9 +2134,11 @@ export const useEnhancedMafiaGameState = (
           const stats = newState.soldierStats?.[unitId];
           if (stats) {
             if (
-              stats.survivedConflicts < CAPO_PROMOTION_REQUIREMENTS.minVictories ||
+              stats.victories < CAPO_PROMOTION_REQUIREMENTS.minVictories ||
               stats.loyalty < CAPO_PROMOTION_REQUIREMENTS.minLoyalty ||
-              stats.training < CAPO_PROMOTION_REQUIREMENTS.minTraining
+              stats.training < CAPO_PROMOTION_REQUIREMENTS.minTraining ||
+              stats.toughness < CAPO_PROMOTION_REQUIREMENTS.minToughness ||
+              stats.racketeering < CAPO_PROMOTION_REQUIREMENTS.minRacketeering
             ) return newState;
           }
           
@@ -2790,7 +2808,8 @@ export const useEnhancedMafiaGameState = (
         playerUnits.forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].hits += 1;
-            state.soldierStats[u.id].survivedConflicts += 1;
+            state.soldierStats[u.id].victories = Math.min(5, state.soldierStats[u.id].victories + 1);
+            state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
           }
         });
         
@@ -2831,7 +2850,7 @@ export const useEnhancedMafiaGameState = (
         }
         shuffled.slice(casualties).forEach(u => {
           if (state.soldierStats[u.id]) {
-            state.soldierStats[u.id].survivedConflicts += 1;
+            state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
           }
         });
         const failDetails = `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} suffered`;
@@ -2913,6 +2932,8 @@ export const useEnhancedMafiaGameState = (
         allPlayerUnits.forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].extortions += 1;
+            state.soldierStats[u.id].victories = Math.min(5, state.soldierStats[u.id].victories + 1);
+            state.soldierStats[u.id].racketeering = Math.min(5, state.soldierStats[u.id].racketeering + 1);
           }
         });
         
