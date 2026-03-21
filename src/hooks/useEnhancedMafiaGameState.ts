@@ -1862,6 +1862,47 @@ export const useEnhancedMafiaGameState = (
     if (totalProfitPenalty > 0) {
       income = Math.floor(income * Math.max(0.1, (100 - totalProfitPenalty) / 100));
     }
+
+    // Apply heat-based illegal income penalty (Tier 1: 30+ = -15%, Tier 3: 70+ = -25%)
+    {
+      const heat = state.policeHeat.level;
+      if (heat >= 70) {
+        // -25% illegal income at high heat
+        let illegalIncome = 0;
+        let legalIncome = 0;
+        (state.hexMap || []).forEach(tile => {
+          if (tile.controllingFamily === state.playerFamily && tile.business) {
+            const hasCapo = (state.deployedUnits || []).some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+            const hasSoldier = (state.deployedUnits || []).some(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+            let tileInc = 0;
+            if (hasCapo) tileInc = tile.business.income;
+            else if (hasSoldier) tileInc = Math.floor(tile.business.income * 0.3);
+            else tileInc = Math.floor(tile.business.income * 0.1);
+            if (!tile.business.isLegal) illegalIncome += tileInc;
+            else legalIncome += tileInc;
+          }
+        });
+        // Reduce illegal portion by 25%
+        const penalty = Math.floor(illegalIncome * 0.25);
+        income = Math.max(0, income - penalty);
+      } else if (heat >= 30) {
+        // -15% illegal income at low heat
+        let illegalIncome = 0;
+        (state.hexMap || []).forEach(tile => {
+          if (tile.controllingFamily === state.playerFamily && tile.business && !tile.business.isLegal) {
+            const hasCapo = (state.deployedUnits || []).some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+            const hasSoldier = (state.deployedUnits || []).some(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+            let tileInc = 0;
+            if (hasCapo) tileInc = tile.business.income;
+            else if (hasSoldier) tileInc = Math.floor(tile.business.income * 0.3);
+            else tileInc = Math.floor(tile.business.income * 0.1);
+            illegalIncome += tileInc;
+          }
+        });
+        const penalty = Math.floor(illegalIncome * 0.15);
+        income = Math.max(0, income - penalty);
+      }
+    }
     
     state.lastTurnIncome = income;
     state.resources.money += income - maintenance;
