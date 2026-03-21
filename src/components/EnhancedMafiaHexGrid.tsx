@@ -545,12 +545,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     );
                   })()}
 
-                  {/* District abbreviation label */}
-                  {!tile.isHeadquarters && !tile.business && (
-                    <text x={x} y={y + 3} textAnchor="middle" fontSize="7" fill="#ffffff" fillOpacity="0.3" fontWeight="600" className="pointer-events-none select-none">
-                      {districtAbbreviations[tile.district] || ''}
-                    </text>
-                  )}
 
                   {/* Always-visible income label (hide during construction) */}
                   {tile.business && !tile.isHeadquarters && !(tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal) && (
