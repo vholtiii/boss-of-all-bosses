@@ -30,7 +30,7 @@
 
 ---
 
-# ✅ COMPLETED: Legal Business Construction — Capo Requirement
+# ✅ COMPLETED: Legal Business Construction — Capo Requirement + Dynamic Construction Speed
 
 ## Rules
 - **Legal businesses** can only be built on a player-owned hex where a **Capo** is physically present
@@ -39,10 +39,20 @@
 - Map highlights valid hexes (green) during placement mode
 - Illegal businesses remain unrestricted (any owned empty hex)
 
+## Dynamic Construction Speed
+| Hex Occupant | Speed |
+|---|---|
+| Capo present | 1.5 progress/turn (50% faster) |
+| Soldier only | 0.75 progress/turn (25% slower) |
+| Unoccupied | Paused (0 progress) |
+
+- Base construction goal = 3.0 progress points
+- Progress accumulates each turn based on occupant
+- Hex shows estimated turns remaining or ⏸️ if paused
+- Hover tooltip shows progress bar, speed modifier, and ETA
+
 ## Implementation
-- `pendingBusinessBuild` state in `EnhancedMafiaGameState`
-- `build_business` action enters placement mode (validates money, actions, Capo availability)
-- `place_business_on_hex` action validates Capo presence, deducts action token
-- `cancel_business_placement` action exits placement mode
+- `constructionProgress` and `constructionGoal` on tile business object
+- Turn processing checks unit presence and applies speed modifier
 - Green hex highlighting in `EnhancedMafiaHexGrid` for valid placement targets
 - Capo requirement hint + available hex count in Economy section of `GameSidePanels`

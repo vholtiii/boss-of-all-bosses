@@ -66,6 +66,8 @@ export interface HexTile {
     heatLevel: number;
     launderingCapacity?: number;
     turnsUntilComplete?: number;
+    constructionProgress?: number;
+    constructionGoal?: number;
   };
   isHeadquarters?: string;
 }
