@@ -783,6 +783,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         );
       })()}
 
+      {/* Sound Settings */}
+      <SoundSettingsDialog
+        open={showSoundSettings}
+        onOpenChange={setShowSoundSettings}
+        soundConfig={soundConfig}
+        onUpdateConfig={updateSoundConfig}
+        onTestSound={playSound}
+      />
+
       {/* Tutorial System */}
       <TutorialSystem
         isOpen={showTutorial}
