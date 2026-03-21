@@ -1766,7 +1766,7 @@ export const useEnhancedMafiaGameState = (
 
   // ============ PROCESS BRIBES ============
   const processBribes = (state: EnhancedMafiaGameState) => {
-    state.activeBribes = state.activeBribes.map(b => {
+    state.activeBribes = (state.activeBribes || []).map(b => {
       if (!b.active) return b;
       const remaining = b.turnsRemaining - 1;
       if (remaining <= 0) return { ...b, turnsRemaining: 0, active: false };
