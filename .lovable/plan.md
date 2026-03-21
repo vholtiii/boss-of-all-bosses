@@ -1,26 +1,20 @@
 
 
-# Make District Borders Bold and Continuous (Like Reference Image)
+# Add "End Turn Early" Button
 
-The reference image shows **thick, bold, clearly visible** continuous outlines tracing each district's full perimeter shape. The current implementation uses subtle gray at 0.4 opacity and 2px — far too faint. Additionally, the edge-chaining algorithm may have a bug where it marks vertices as "visited" globally, preventing proper closed-loop formation when multiple vertices are shared across loops.
+## Problem
+The player must click through all three phases (Deploy → Tactical → Action → Waiting) before they can press "End Turn." There's no way to skip directly to end-of-turn processing.
 
-## Changes — `src/components/EnhancedMafiaHexGrid.tsx`
+## Solution
+Allow the "END TURN" button to work from **any phase**, not just the `waiting` phase. This lets the player end their turn early whenever they want.
 
-### 1. Fix edge-chaining algorithm (lines 198-227)
-The current algorithm marks visited vertices globally and uses a simple greedy walk, which can fail to form proper closed loops for complex district shapes. Replace with a proper edge-consumption approach:
-- Track **edges** as visited (not vertices), since vertices are shared between multiple edges
-- For each unconsumed edge, start a new loop and follow connected unconsumed edges until returning to the start vertex
-- This guarantees proper closed polygons even for districts with concave shapes or multiple boundary loops
+## Change
 
-### 2. Update border styling (line 768)
-Change from the current subtle appearance to match the reference:
-- `strokeWidth="3.5"` — bold and clearly visible
-- `stroke="rgba(220,220,220,0.7)"` — bright enough to stand out like the reference image
-- Keep `strokeLinejoin="round"` and `fill="none"`
+### `src/pages/UltimateMafiaGame.tsx` — Line 467
+Remove the `gameState.turnPhase !== 'waiting'` condition from the END TURN button's `disabled` prop, so it's only disabled when jailed. Add a confirmation dialog when ending early (not in `waiting` phase) to prevent accidental clicks.
 
-### 3. Render borders above hex tiles
-Move the border rendering block to appear **after** hex tile rendering in the SVG (currently at line 766-769), so borders render on top of everything and aren't obscured by hex fills. Place them just before the closing `</svg>`.
+The `endTurn()` handler in `useEnhancedMafiaGameState.ts` already resets `turnPhase` back to `'deploy'`, so no backend changes are needed — it will correctly process end-of-turn regardless of which phase the player is in.
 
-## Files Changed
-- `src/components/EnhancedMafiaHexGrid.tsx`
+### Same file — Mobile floating action button (~line 710)
+Apply the same change to the mobile END TURN button so it's also available from any phase.
 

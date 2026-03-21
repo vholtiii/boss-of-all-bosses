@@ -137,110 +137,15 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return points.join(' ');
   };
 
-  // Compute district border paths as connected polygon outlines
-  const districtBorderPaths = useMemo(() => {
-    const tileMap = new Map<string, HexTile>();
-    hexMap.forEach(t => tileMap.set(`${t.q},${t.r},${t.s}`, t));
-
-    const neighborDirs = [
-      { dq: 1, dr: -1, ds: 0 },
-      { dq: 1, dr: 0, ds: -1 },
-      { dq: 0, dr: 1, ds: -1 },
-      { dq: -1, dr: 1, ds: 0 },
-      { dq: -1, dr: 0, ds: 1 },
-      { dq: 0, dr: -1, ds: 1 },
-    ];
-
-    // Round to avoid float precision issues
-    const rk = (n: number) => Math.round(n * 100) / 100;
-    const ptKey = (x: number, y: number) => `${rk(x)},${rk(y)}`;
-
-    // Group boundary edges by district
-    const districtEdges = new Map<string, { x1: number; y1: number; x2: number; y2: number }[]>();
-
-    hexMap.forEach(tile => {
-      const { x: cx, y: cy } = getHexPosition(tile.q, tile.r);
-      neighborDirs.forEach((dir, i) => {
-        const nq = tile.q + dir.dq;
-        const nr = tile.r + dir.dr;
-        const ns = tile.s + dir.ds;
-        const neighbor = tileMap.get(`${nq},${nr},${ns}`);
-        if (!neighbor || neighbor.district !== tile.district) {
-          const angle1 = (Math.PI / 3) * i;
-          const angle2 = (Math.PI / 3) * ((i + 1) % 6);
-          if (!districtEdges.has(tile.district)) districtEdges.set(tile.district, []);
-          districtEdges.get(tile.district)!.push({
-            x1: cx + baseHexRadius * Math.cos(angle1),
-            y1: cy + baseHexRadius * Math.sin(angle1),
-            x2: cx + baseHexRadius * Math.cos(angle2),
-            y2: cy + baseHexRadius * Math.sin(angle2),
-          });
-        }
-      });
-    });
-
-    // Chain edges into continuous paths per district
-    const allPaths: string[] = [];
-
-    districtEdges.forEach((edges) => {
-      // Build adjacency: point -> list of connected points
-      const adj = new Map<string, { x: number; y: number }[]>();
-      const addAdj = (ax: number, ay: number, bx: number, by: number) => {
-        const ka = ptKey(ax, ay);
-        if (!adj.has(ka)) adj.set(ka, []);
-        adj.get(ka)!.push({ x: rk(bx), y: rk(by) });
-      };
-      edges.forEach(e => {
-        addAdj(e.x1, e.y1, e.x2, e.y2);
-        addAdj(e.x2, e.y2, e.x1, e.y1);
-      });
-
-      // Track consumed edges (not vertices) to handle shared vertices correctly
-      const consumedEdges = new Set<string>();
-      const edgeKey = (ax: number, ay: number, bx: number, by: number) => {
-        const ka = ptKey(ax, ay);
-        const kb = ptKey(bx, by);
-        return ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
-      };
-
-      // Walk chains to form closed loops using edge consumption
-      adj.forEach((_, startKey) => {
-        // Try to start a loop from this vertex if it has unconsumed edges
-        const startNeighbors = adj.get(startKey);
-        if (!startNeighbors) return;
-        
-        const unusedStart = startNeighbors.find(n => !consumedEdges.has(edgeKey(...startKey.split(',').map(Number) as [number, number], n.x, n.y)));
-        if (!unusedStart) return;
-
-        const [sx, sy] = startKey.split(',').map(Number);
-        const path: { x: number; y: number }[] = [{ x: sx, y: sy }];
-        let current = startKey;
-
-        while (true) {
-          const neighbors = adj.get(current);
-          if (!neighbors) break;
-          const [cx, cy] = current.split(',').map(Number);
-          const next = neighbors.find(n => !consumedEdges.has(edgeKey(cx, cy, n.x, n.y)));
-          if (!next) break;
-          
-          consumedEdges.add(edgeKey(cx, cy, next.x, next.y));
-          const nextKey = ptKey(next.x, next.y);
-          
-          if (nextKey === startKey && path.length > 2) {
-            // Closed the loop
-            const d = `M ${path.map(p => `${p.x},${p.y}`).join(' L ')} Z`;
-            allPaths.push(d);
-            break;
-          }
-          
-          path.push(next);
-          current = nextKey;
-        }
-      });
-    });
-
-    return allPaths;
-  }, [hexMap, baseHexRadius]);
+  // District abbreviations for hex labels
+  const districtAbbreviations: Record<string, string> = {
+    'Little Italy': 'LI',
+    'Bronx': 'BX',
+    'Brooklyn': 'BK',
+    'Queens': 'QN',
+    'Manhattan': 'MH',
+    'Staten Island': 'SI',
+  };
 
   // Business placement mode
   const pendingBuild = gameState?.pendingBusinessBuild;
@@ -612,6 +517,12 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     );
                   })()}
 
+                  {/* District abbreviation label */}
+                  {!tile.isHeadquarters && !tile.business && (
+                    <text x={x} y={y + 3} textAnchor="middle" fontSize="7" fill="#ffffff" fillOpacity="0.3" fontWeight="600" className="pointer-events-none select-none">
+                      {districtAbbreviations[tile.district] || ''}
+                    </text>
+                  )}
 
                   {/* Always-visible income label (hide during construction) */}
                   {tile.business && !tile.isHeadquarters && !(tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal) && (
@@ -774,8 +685,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 </g>
               );
             })}
-
-            {/* District borders moved to render after tiles — see below */}
 
             {/* District name labels */}
             {(() => {
@@ -1004,10 +913,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               })()}
             </AnimatePresence>
           </g>
-            {/* District border outlines — rendered last so they appear on top */}
-            {districtBorderPaths.map((d, i) => (
-              <path key={`border-${i}`} d={d} stroke="rgba(220,220,220,0.7)" strokeWidth="3.5" fill="none" strokeLinejoin="round" className="pointer-events-none" />
-            ))}
         </svg>
       </div>
 
