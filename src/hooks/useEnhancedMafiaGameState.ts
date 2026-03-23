@@ -2780,9 +2780,29 @@ export const useEnhancedMafiaGameState = (
             }];
             return newState;
           }
-          const phQ = action.targetQ;
-          const phR = action.targetR;
-          const phS = action.targetS;
+          // Validate planner soldier
+          const plannerUnitId = action.plannerUnitId;
+          const plannerUnit = newState.deployedUnits.find(u => u.id === plannerUnitId && u.family === newState.playerFamily);
+          if (!plannerUnit) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚠️ No Planner Selected',
+              message: 'Select one of your soldiers to plan the hit.',
+            }];
+            return newState;
+          }
+          // Validate target unit
+          const targetUnitId = action.targetUnitId;
+          const targetUnit = newState.deployedUnits.find(u => u.id === targetUnitId);
+          if (!targetUnit || targetUnit.family === newState.playerFamily) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚠️ Invalid Target Unit',
+              message: 'Select an enemy unit on a scouted hex.',
+            }];
+            return newState;
+          }
+          const phQ = targetUnit.q;
+          const phR = targetUnit.r;
+          const phS = targetUnit.s;
           const phTile = newState.hexMap.find(t => t.q === phQ && t.r === phR && t.s === phS);
           if (!phTile || phTile.controllingFamily === newState.playerFamily || phTile.controllingFamily === 'neutral') {
             newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -2803,15 +2823,19 @@ export const useEnhancedMafiaGameState = (
           newState.plannedHit = {
             q: phQ, r: phR, s: phS,
             targetFamily: phTile.controllingFamily,
+            targetUnitId,
+            plannerUnitId,
             plannedOnTurn: newState.turn,
             expiresOnTurn: newState.turn + PLAN_HIT_DURATION,
           };
           newState.tacticalActionsRemaining -= 1;
           newState.selectedUnitId = null;
           newState.availableMoveHexes = [];
+          const targetName = targetUnit.name || targetUnit.id.split('-').slice(-2).join(' ');
+          const plannerName = plannerUnit.name || plannerUnit.id.split('-').slice(-2).join(' ');
           newState.pendingNotifications = [...newState.pendingNotifications, {
             type: 'success' as const, title: '🎯 Hit Planned',
-            message: `Target marked for +${PLAN_HIT_BONUS}% hit bonus. Execute during Action phase within ${PLAN_HIT_DURATION} turns.`,
+            message: `${plannerName} is planning a hit on ${targetName}. +${PLAN_HIT_BONUS}% bonus if target stays put. Execute within ${PLAN_HIT_DURATION} turns.`,
           }];
           return newState;
         }
