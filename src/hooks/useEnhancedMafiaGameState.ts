@@ -2346,7 +2346,15 @@ export const useEnhancedMafiaGameState = (
           let targetPool: typeof validMoves;
           const hasBounty = state.aiBounties.some(b => b.fromFamily === fam && b.targetFamily === state.playerFamily);
 
-          if ((hasBounty || isAlerted) && playerHexes.length > 0) {
+          // Prioritize enemy safehouse hexes for bounty + intel
+          const safehouseHexes = validMoves.filter(n => 
+            state.safehouses.some(s => s.q === n.q && s.r === n.r && s.s === n.s) &&
+            !state.hexMap.some(t => t.q === n.q && t.r === n.r && t.s === n.s && t.controllingFamily === fam)
+          );
+
+          if (safehouseHexes.length > 0 && Math.random() < 0.7) {
+            targetPool = safehouseHexes;
+          } else if ((hasBounty || isAlerted) && playerHexes.length > 0) {
             targetPool = playerHexes;
           } else {
             switch (personality) {
