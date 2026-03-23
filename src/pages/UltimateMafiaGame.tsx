@@ -84,6 +84,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
   }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications]);
 
+  // Clear planHitMode when phase changes
+  useEffect(() => { setPlanHitMode(false); }, [gameState.turnPhase]);
+
   // Global button click sound
   useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
