@@ -1,20 +1,52 @@
 
 
-# Fix: Plan Hit Visibility During Tactical Phase
+# Add Hover Tooltip for Disabled ActionButtons
 
 ## Problem
-The "Plan Hit" button lives inside the "Strategic Actions" section, which displays a 🔒 icon on its header during the tactical phase. Even though the Plan Hit button itself is correctly unlocked (`phaseLocked={!isTacticalPhase}`), the section-level lock icon misleads the player into thinking the entire section is inaccessible.
-
-The `disabledReason` text (e.g., "Scout an enemy hex first", "No tactical actions") already renders correctly on the button — but the player never opens the section because the header shows 🔒.
+When an ActionButton is greyed out (disabled), the `disabledReason` text shows inline but can be hard to notice. The user wants a tooltip on hover explaining why the button is disabled.
 
 ## Fix — `src/components/GameSidePanels.tsx`
 
-**Move "Plan Hit" (and its active-hit status card) out of the "Strategic Actions" section** and into the "Recruitment & Tactical" section (which is already unlocked during the tactical phase). This places it alongside other tactical-phase actions like "Hire Mercenary" and "Recruit Local Soldier", where it logically belongs since it costs a tactical action.
+Wrap the `ActionButton`'s `<Button>` in a `<Tooltip>` from the existing UI tooltip components when the button is disabled and has a `disabledReason` (or is `phaseLocked`).
 
-This is a simple cut-and-paste of ~50 lines (the `ActionButton` for Plan Hit + the `plannedHit` status card) from the Strategic Actions section to the Recruitment & Tactical section.
+Since disabled buttons don't fire pointer events by default, wrap in a `<span>` to capture hover.
 
-No logic changes needed — the button's own `disabled`, `disabledReason`, and `phaseLocked` props already handle all edge cases correctly. The player will now see it in an unlocked section with clear feedback text when conditions aren't met.
+### Changes to `ActionButton` component (lines 729-747):
+
+```tsx
+const ActionButton: React.FC<{...}> = ({ icon, label, sublabel, disabled, phaseLocked, disabledReason, variant = 'outline', onClick }) => {
+  const isDisabled = disabled || phaseLocked;
+  const tooltipText = phaseLocked ? 'Available in a different phase' : disabledReason;
+
+  const button = (
+    <Button ...existing props...>
+      ...existing content...
+    </Button>
+  );
+
+  if (isDisabled && tooltipText) {
+    return (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="w-full block">
+              {button}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <p>{tooltipText}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return button;
+};
+```
+
+Add imports for `Tooltip, TooltipTrigger, TooltipContent, TooltipProvider` from `@/components/ui/tooltip`.
 
 ## Files Modified
-- `src/components/GameSidePanels.tsx` — relocate Plan Hit button + status card to tactical section
+- `src/components/GameSidePanels.tsx` — add tooltip wrapper to ActionButton component
 
