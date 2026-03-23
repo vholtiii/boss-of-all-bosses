@@ -234,6 +234,7 @@ export interface ScoutedHex {
   s: number;
   scoutedTurn: number;
   turnsRemaining: number;
+  freshUntilTurn: number; // scoutedTurn + 1 — live data on this turn, stale after
   enemySoldierCount: number;
   enemyFamily: string;
   businessType?: string;
