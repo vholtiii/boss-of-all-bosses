@@ -1144,6 +1144,7 @@ export const useEnhancedMafiaGameState = (
       q: targetLocation.q, r: targetLocation.r, s: targetLocation.s,
       scoutedTurn: prev.turn,
       turnsRemaining: SCOUT_DURATION,
+      freshUntilTurn: prev.turn + 1, // live data on scout turn, stale after
       enemySoldierCount: enemyUnitsOnHex.length,
       enemyFamily: tile.controllingFamily,
       businessType: tile.business?.type,
@@ -1154,17 +1155,35 @@ export const useEnhancedMafiaGameState = (
     newScoutedHexes.push(scoutInfo);
 
     const newUnits = [...prev.deployedUnits];
+    const notifications = [...prev.pendingNotifications, {
+      type: 'info' as const, title: '👁️ Hex Scouted',
+      message: tile.controllingFamily === 'neutral'
+        ? `Neutral territory${tile.business ? `: ${tile.business.type} generating $${tile.business.income}/turn` : ': no businesses'}.`
+        : `${tile.controllingFamily.toUpperCase()} territory: ${enemyUnitsOnHex.length} units${tile.business ? `, ${tile.business.type} ($${tile.business.income}/turn)` : ''}.`,
+    }];
+
+    // Detection chance on enemy-controlled hexes (no heat, but AI gets reinforcement flag)
+    let reinforceTargets = [...(prev.reinforceTargets || [])];
+    if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) {
+      if (Math.random() < SCOUT_DETECTION_CHANCE) {
+        reinforceTargets.push({
+          q: targetLocation.q, r: targetLocation.r, s: targetLocation.s,
+          family: tile.controllingFamily,
+          expiresOnTurn: prev.turn + 3,
+        });
+        notifications.push({
+          type: 'warning' as const, title: '⚠️ Scout Detected!',
+          message: `The ${tile.controllingFamily} family may reinforce this position.`,
+        });
+      }
+    }
 
     return {
       ...prev, deployedUnits: newUnits, scoutedHexes: newScoutedHexes,
+      reinforceTargets,
       selectedUnitId: null, availableMoveHexes: [],
       selectedMoveAction: 'move' as MoveAction,
-      pendingNotifications: [...prev.pendingNotifications, {
-        type: 'info' as const, title: '👁️ Hex Scouted',
-        message: tile.controllingFamily === 'neutral'
-          ? `Neutral territory${tile.business ? `: ${tile.business.type} generating $${tile.business.income}/turn` : ': no businesses'}.`
-          : `${tile.controllingFamily.toUpperCase()} territory: ${enemyUnitsOnHex.length} units${tile.business ? `, ${tile.business.type} ($${tile.business.income}/turn)` : ''}.`,
-      }],
+      pendingNotifications: notifications,
     };
   };
 
