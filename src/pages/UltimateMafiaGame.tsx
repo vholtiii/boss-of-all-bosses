@@ -534,7 +534,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               {([
                 { action: 'scout' as const, label: '👁️ Scout', tip: 'Select a soldier, click adjacent enemy hex to reveal unit count & business info for 3 turns.' },
                 { action: 'fortify' as const, label: '🛡️ Fortify', tip: 'Click a unit to fortify it (+25% defense, persists until it moves).' },
-                { action: 'escort' as const, label: '🚗 Escort', tip: 'Select a soldier, then click a capo (or their hex) to call the soldier there.' },
+                { action: 'escort' as const, label: '🚗 Escort', tip: 'Call a soldier to your capo\'s location. Select a soldier, then click a capo.' },
                 { action: 'safehouse' as const, label: '🏠 Safehouse', tip: 'Select a capo on your territory to set up a secondary deploy point (5 turns).' },
               ] as const).map(({ action, label, tip }) => {
                 const noTactical = gameState.tacticalActionsRemaining <= 0;
