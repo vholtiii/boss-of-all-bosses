@@ -129,6 +129,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     capoId: string;
   } | null>(null);
 
+  // Plan Hit mode
+  const [planHitMode, setPlanHitMode] = useState(false);
+
   // Handle action wrapper function
   const handleAction = useCallback((action: any) => {
     if (action.type === 'open_negotiate') {
@@ -139,6 +142,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         targetS: action.targetS,
         capoId: action.capoId,
       });
+      return;
+    }
+    if (action.type === 'enter_plan_hit_mode') {
+      setPlanHitMode(true);
+      return;
+    }
+    if (action.type === 'plan_hit') {
+      performAction(action);
+      setPlanHitMode(false);
       return;
     }
     performAction(action);
