@@ -841,6 +841,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-destructive/90 hover:bg-destructive text-destructive-foreground text-xs font-bold transition-colors"
                       >
                         ⚔️ Hit Territory
+                        {gameState?.plannedHit && gameState.plannedHit.q === actionMenu.tile.q && gameState.plannedHit.r === actionMenu.tile.r && gameState.plannedHit.s === actionMenu.tile.s && (
+                          <span className="ml-1 text-[9px] bg-background/30 px-1 rounded">+20% 🎯</span>
+                        )}
                       </button>
                     ) : reasons.hit ? (
                       <DisabledAction icon="⚔️" label="Hit Territory" reason={reasons.hit} />
