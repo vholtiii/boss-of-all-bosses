@@ -3835,6 +3835,16 @@ export const useEnhancedMafiaGameState = (
           chance += SCOUT_STALE_BONUS / 100;
         }
       }
+
+      // Plan Hit bonus — +20% if this hex was planned
+      if (state.plannedHit && state.plannedHit.q === targetQ && state.plannedHit.r === targetR && state.plannedHit.s === targetS) {
+        chance += PLAN_HIT_BONUS / 100;
+        state.plannedHit = null; // Consume the plan
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'info', title: '🎯 Plan Hit Executed!',
+          message: `+${PLAN_HIT_BONUS}% bonus applied from tactical planning.`,
+        }];
+      }
       
       chance = Math.max(0.1, Math.min(0.95, chance));
 
