@@ -2750,6 +2750,48 @@ export const useEnhancedMafiaGameState = (
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
         }
+        case 'execute_planned_hit': {
+          // Execute a planned hit — follows the target to their current location
+          if (!newState.plannedHit) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚠️ No Plan Active',
+              message: 'There is no planned hit to execute.',
+            }];
+            return newState;
+          }
+          const planTarget = newState.deployedUnits.find(u => u.id === newState.plannedHit!.targetUnitId);
+          if (!planTarget) {
+            // Target is gone (dead/removed) — apply failure penalties
+            if (newState.resources.respect >= newState.reputation.fear) {
+              newState.resources.respect = Math.max(0, newState.resources.respect - PLAN_HIT_FAIL_REPUTATION);
+            } else {
+              newState.reputation.fear = Math.max(0, newState.reputation.fear - PLAN_HIT_FAIL_REPUTATION);
+            }
+            const goneStats = newState.soldierStats[newState.plannedHit.plannerUnitId];
+            if (goneStats) {
+              goneStats.loyalty = Math.max(0, goneStats.loyalty - PLAN_HIT_FAIL_LOYALTY);
+            }
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'error' as const, title: '🎯 Target Eliminated',
+              message: `The target is no longer on the map — plan wasted. -${PLAN_HIT_FAIL_REPUTATION} reputation, planner morale shaken.`,
+            }];
+            newState.plannedHit = null;
+            newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
+            return newState;
+          }
+          // Target exists — redirect hit to their current hex
+          const redirectAction = {
+            ...action,
+            type: 'hit_territory',
+            targetQ: planTarget.q,
+            targetR: planTarget.r,
+            targetS: planTarget.s,
+            _executingPlan: true, // flag so processTerritoryHit knows
+          };
+          const result = processTerritoryHit(newState, redirectAction);
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
         case 'extort_territory': {
           const result = processTerritoryExtortion(newState, action);
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
