@@ -26,6 +26,7 @@ import {
   ScoutedHex, Safehouse, MoveAction, PlannedHit,
   FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
   PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_FAIL_REPUTATION, PLAN_HIT_FAIL_LOYALTY,
+  PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN,
   BASE_ACTIONS_PER_TURN, BONUS_ACTION_RESPECT_THRESHOLD, BONUS_ACTION_INFLUENCE_THRESHOLD,
   TACTICAL_ACTIONS_PER_TURN,
   HiddenUnit, AIBounty,
@@ -82,6 +83,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   scoutedHexes: [...(state.scoutedHexes || [])],
   activeBribes: (state.activeBribes || []).map(b => ({ ...b })),
   plannedHit: state.plannedHit ? { ...state.plannedHit } : null,
+  planHitCooldownUntil: state.planHitCooldownUntil || 0,
   alliances: (state.alliances || []).map(a => ({ ...a, conditions: a.conditions.map(c => ({ ...c })) })),
   ceasefires: (state.ceasefires || []).map(c => ({ ...c })),
   events: [...(state.events || [])],
@@ -216,6 +218,7 @@ export interface EnhancedMafiaGameState {
   scoutedHexes: ScoutedHex[];
   safehouse: Safehouse | null;
   plannedHit: PlannedHit | null;
+  planHitCooldownUntil: number;
   selectedMoveAction: MoveAction;
   
   // Action & tactical budgets
@@ -518,6 +521,7 @@ const createInitialGameState = (
     scoutedHexes: [],
     safehouse: null,
     plannedHit: null,
+    planHitCooldownUntil: 0,
     selectedMoveAction: 'move' as MoveAction,
     actionsRemaining: BASE_ACTIONS_PER_TURN,
     maxActions: BASE_ACTIONS_PER_TURN,
@@ -2747,6 +2751,48 @@ export const useEnhancedMafiaGameState = (
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
         }
+        case 'execute_planned_hit': {
+          // Execute a planned hit — follows the target to their current location
+          if (!newState.plannedHit) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚠️ No Plan Active',
+              message: 'There is no planned hit to execute.',
+            }];
+            return newState;
+          }
+          const planTarget = newState.deployedUnits.find(u => u.id === newState.plannedHit!.targetUnitId);
+          if (!planTarget) {
+            // Target is gone (dead/removed) — apply failure penalties
+            if (newState.resources.respect >= newState.reputation.fear) {
+              newState.resources.respect = Math.max(0, newState.resources.respect - PLAN_HIT_FAIL_REPUTATION);
+            } else {
+              newState.reputation.fear = Math.max(0, newState.reputation.fear - PLAN_HIT_FAIL_REPUTATION);
+            }
+            const goneStats = newState.soldierStats[newState.plannedHit.plannerUnitId];
+            if (goneStats) {
+              goneStats.loyalty = Math.max(0, goneStats.loyalty - PLAN_HIT_FAIL_LOYALTY);
+            }
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'error' as const, title: '🎯 Target Eliminated',
+              message: `The target is no longer on the map — plan wasted. -${PLAN_HIT_FAIL_REPUTATION} reputation, planner morale shaken.`,
+            }];
+            newState.plannedHit = null;
+            newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
+            return newState;
+          }
+          // Target exists — redirect hit to their current hex
+          const redirectAction = {
+            ...action,
+            type: 'hit_territory',
+            targetQ: planTarget.q,
+            targetR: planTarget.r,
+            targetS: planTarget.s,
+            _executingPlan: true, // flag so processTerritoryHit knows
+          };
+          const result = processTerritoryHit(newState, redirectAction);
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
         case 'extort_territory': {
           const result = processTerritoryExtortion(newState, action);
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
@@ -2777,6 +2823,15 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'warning' as const, title: '⚠️ No Tactical Actions',
               message: 'You have no tactical actions remaining.',
+            }];
+            return newState;
+          }
+          // Check cooldown
+          if (newState.turn < (newState.planHitCooldownUntil || 0)) {
+            const turnsLeft = (newState.planHitCooldownUntil || 0) - newState.turn;
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⏳ Plan Hit Cooldown',
+              message: `Your crew needs to regroup. Plan Hit available in ${turnsLeft} turn${turnsLeft !== 1 ? 's' : ''}.`,
             }];
             return newState;
           }
@@ -3920,27 +3975,38 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // Plan Hit bonus — +20% if this hex was planned AND target unit is still here
-      if (state.plannedHit && state.plannedHit.q === targetQ && state.plannedHit.r === targetR && state.plannedHit.s === targetS) {
-        const targetStillHere = state.deployedUnits.some(u => 
+      // Plan Hit bonus — target tracking system
+      if (state.plannedHit && (action._executingPlan || (state.plannedHit.q === targetQ && state.plannedHit.r === targetR && state.plannedHit.s === targetS))) {
+        const targetOnOriginalHex = state.deployedUnits.some(u => 
+          u.id === state.plannedHit!.targetUnitId && u.q === state.plannedHit!.q && u.r === state.plannedHit!.r && u.s === state.plannedHit!.s
+        );
+        const targetOnCurrentHex = state.deployedUnits.some(u =>
           u.id === state.plannedHit!.targetUnitId && u.q === targetQ && u.r === targetR && u.s === targetS
         );
-        if (targetStillHere) {
-          // Success — target is still on the planned hex
+
+        if (targetOnOriginalHex) {
+          // Best case — target stayed on planned hex → full +20% bonus
           chance += PLAN_HIT_BONUS / 100;
           state.pendingNotifications = [...state.pendingNotifications, {
             type: 'info', title: '🎯 Plan Hit Executed!',
             message: `+${PLAN_HIT_BONUS}% bonus applied — target was right where expected.`,
           }];
+        } else if (targetOnCurrentHex) {
+          // Target relocated but we followed them → reduced +10% bonus + penalties
+          chance += PLAN_HIT_RELOCATED_BONUS / 100;
+          state.policeHeat.level = Math.min(100, state.policeHeat.level + PLAN_HIT_RELOCATED_HEAT);
+          state.planHitCooldownUntil = state.turn + PLAN_HIT_COOLDOWN;
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'warning', title: '🎯 Target Relocated',
+            message: `Target moved — strike redirected. +${PLAN_HIT_RELOCATED_BONUS}% bonus (reduced), +${PLAN_HIT_RELOCATED_HEAT} heat. Plan Hit on cooldown for ${PLAN_HIT_COOLDOWN} turns.`,
+          }];
         } else {
-          // Failure — target moved away, apply penalties
-          // -5 respect or fear (whichever is higher)
+          // Target gone from this hex entirely (shouldn't happen via execute_planned_hit, but safety net)
           if (state.resources.respect >= state.reputation.fear) {
             state.resources.respect = Math.max(0, state.resources.respect - PLAN_HIT_FAIL_REPUTATION);
           } else {
             state.reputation.fear = Math.max(0, state.reputation.fear - PLAN_HIT_FAIL_REPUTATION);
           }
-          // -10 loyalty on the planner soldier
           const plannerStats = state.soldierStats[state.plannedHit.plannerUnitId];
           if (plannerStats) {
             plannerStats.loyalty = Math.max(0, plannerStats.loyalty - PLAN_HIT_FAIL_LOYALTY);

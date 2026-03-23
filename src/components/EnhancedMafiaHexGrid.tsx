@@ -646,13 +646,34 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     </g>
                   )}
 
-                  {/* Planned Hit crosshair indicator */}
-                  {gameState?.plannedHit && gameState.plannedHit.q === tile.q && gameState.plannedHit.r === tile.r && gameState.plannedHit.s === tile.s && (
-                    <g className="pointer-events-none">
-                      <circle cx={x + baseHexRadius * 0.55} cy={y + baseHexRadius * 0.55} r="8" fill="#DC2626" stroke="#ffffff" strokeWidth="1" />
-                      <text x={x + baseHexRadius * 0.55} y={y + baseHexRadius * 0.55 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🎯</text>
-                    </g>
-                  )}
+                  {/* Planned Hit crosshair indicator — original hex */}
+                  {gameState?.plannedHit && gameState.plannedHit.q === tile.q && gameState.plannedHit.r === tile.r && gameState.plannedHit.s === tile.s && (() => {
+                    const target = (gameState.deployedUnits || []).find((u: DeployedUnit) => u.id === gameState.plannedHit?.targetUnitId);
+                    const targetStillHere = target && target.q === tile.q && target.r === tile.r && target.s === tile.s;
+                    const opacity = targetStillHere ? 1 : 0.35; // Faded if target moved
+                    return (
+                      <g className="pointer-events-none" opacity={opacity}>
+                        <circle cx={x + baseHexRadius * 0.55} cy={y + baseHexRadius * 0.55} r="8" fill="#DC2626" stroke="#ffffff" strokeWidth="1" />
+                        <text x={x + baseHexRadius * 0.55} y={y + baseHexRadius * 0.55 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🎯</text>
+                      </g>
+                    );
+                  })()}
+
+                  {/* Planned Hit crosshair — target's current hex (if relocated) */}
+                  {gameState?.plannedHit && (() => {
+                    const target = (gameState.deployedUnits || []).find((u: DeployedUnit) => u.id === gameState.plannedHit?.targetUnitId);
+                    if (!target) return null;
+                    const onOriginal = target.q === gameState.plannedHit.q && target.r === gameState.plannedHit.r && target.s === gameState.plannedHit.s;
+                    if (onOriginal) return null; // Already shown above
+                    const isThisHex = target.q === tile.q && target.r === tile.r && target.s === tile.s;
+                    if (!isThisHex) return null;
+                    return (
+                      <g className="pointer-events-none">
+                        <circle cx={x + baseHexRadius * 0.55} cy={y + baseHexRadius * 0.55} r="9" fill="#F97316" stroke="#ffffff" strokeWidth="1.5" />
+                        <text x={x + baseHexRadius * 0.55} y={y + baseHexRadius * 0.55 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🎯</text>
+                      </g>
+                    );
+                  })()}
 
                   {/* Plan Hit mode — step 1: highlight hexes with player soldiers */}
                   {planHitMode && planHitStep === 'selectSoldier' && (() => {

@@ -33,7 +33,7 @@ import HitmanPanel from '@/components/HitmanPanel';
 import CapoPromotionPanel from '@/components/CapoPromotionPanel';
 import CorruptionPanel from '@/components/CorruptionPanel';
 import VictoryTracker from '@/components/VictoryTracker';
-import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION } from '@/types/game-mechanics';
+import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN } from '@/types/game-mechanics';
 
 interface GameSidePanelProps {
   gameState: EnhancedMafiaGameState;
@@ -125,12 +125,24 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             <ActionButton
               icon={<Target className="h-4 w-4" />}
               label="Plan Hit"
-              sublabel={`🎯 +${PLAN_HIT_BONUS}% bonus · 1 tactical · ${PLAN_HIT_DURATION}t`}
-              disabled={gameState.tacticalActionsRemaining <= 0 || !(gameState.scoutedHexes || []).some((s: any) => {
-                const tile = (gameState.hexMap || []).find((t: any) => t.q === s.q && t.r === s.r && t.s === s.s);
-                return tile && tile.controllingFamily !== gameState.playerFamily && tile.controllingFamily !== 'neutral';
-              })}
-              disabledReason={gameState.tacticalActionsRemaining <= 0 ? 'No tactical actions' : 'Scout an enemy hex first'}
+              sublabel={
+                gameState.turn < (gameState.planHitCooldownUntil || 0)
+                  ? `⏳ Cooldown: ${(gameState.planHitCooldownUntil || 0) - gameState.turn} turn(s)`
+                  : `🎯 +${PLAN_HIT_BONUS}% bonus · 1 tactical · ${PLAN_HIT_DURATION}t`
+              }
+              disabled={
+                gameState.turn < (gameState.planHitCooldownUntil || 0) ||
+                gameState.tacticalActionsRemaining <= 0 || 
+                !(gameState.scoutedHexes || []).some((s: any) => {
+                  const tile = (gameState.hexMap || []).find((t: any) => t.q === s.q && t.r === s.r && t.s === s.s);
+                  return tile && tile.controllingFamily !== gameState.playerFamily && tile.controllingFamily !== 'neutral';
+                })
+              }
+              disabledReason={
+                gameState.turn < (gameState.planHitCooldownUntil || 0)
+                  ? `Cooldown: ${(gameState.planHitCooldownUntil || 0) - gameState.turn} turn(s) remaining`
+                  : gameState.tacticalActionsRemaining <= 0 ? 'No tactical actions' : 'Scout an enemy hex first'
+              }
               phaseLocked={!isTacticalPhase}
               variant="destructive"
               onClick={() => onAction({ type: 'enter_plan_hit_mode' })}
@@ -140,21 +152,41 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               const target = (gameState.deployedUnits || []).find((u: any) => u.id === gameState.plannedHit.targetUnitId);
               const plannerName = planner?.name || gameState.plannedHit.plannerUnitId?.split('-').slice(-2).join(' ') || '?';
               const targetName = target?.name || gameState.plannedHit.targetUnitId?.split('-').slice(-2).join(' ') || '?';
-              const targetStillThere = target && target.q === gameState.plannedHit.q && target.r === gameState.plannedHit.r && target.s === gameState.plannedHit.s;
+              const targetOnOriginalHex = target && target.q === gameState.plannedHit.q && target.r === gameState.plannedHit.r && target.s === gameState.plannedHit.s;
+              const targetExists = !!target;
+              const targetRelocated = targetExists && !targetOnOriginalHex;
+              const isActionPhase = phase === 'action';
               return (
                 <div className={cn(
                   "rounded-md border px-3 py-1.5 text-xs font-medium flex flex-col gap-0.5",
-                  targetStillThere 
-                    ? "border-destructive/30 bg-destructive/10 text-destructive" 
-                    : "border-orange-500/30 bg-orange-500/10 text-orange-400"
+                  !targetExists
+                    ? "border-destructive/50 bg-destructive/10 text-destructive"
+                    : targetOnOriginalHex 
+                      ? "border-destructive/30 bg-destructive/10 text-destructive" 
+                      : "border-orange-500/30 bg-orange-500/10 text-orange-400"
                 )}>
                   <div className="flex items-center gap-1.5">
-                    🎯 Hit planned — +{PLAN_HIT_BONUS}% bonus · Expires turn {gameState.plannedHit.expiresOnTurn}
+                    🎯 Hit planned — {targetOnOriginalHex ? `+${PLAN_HIT_BONUS}%` : targetRelocated ? `+${PLAN_HIT_RELOCATED_BONUS}% (relocated)` : 'TARGET GONE'} · Expires turn {gameState.plannedHit.expiresOnTurn}
                   </div>
                   <div className="text-[10px] opacity-80">
                     Planner: {plannerName} → Target: {targetName}
-                    {!targetStillThere && target && <span className="ml-1 text-orange-400 font-bold">⚠️ TARGET MOVED</span>}
+                    {targetRelocated && <span className="ml-1 text-orange-400 font-bold">⚠️ MOVED — +{PLAN_HIT_RELOCATED_HEAT} heat, {PLAN_HIT_COOLDOWN}t cooldown</span>}
+                    {!targetExists && <span className="ml-1 text-destructive font-bold">💀 ELIMINATED</span>}
                   </div>
+                  {isActionPhase && gameState.actionsRemaining > 0 && (
+                    <button
+                      onClick={() => onAction({ type: 'execute_planned_hit', selectedUnitId: gameState.plannedHit?.plannerUnitId })}
+                      className={cn(
+                        "mt-1 px-2 py-1 rounded text-xs font-bold transition-colors",
+                        targetExists
+                          ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          : "bg-muted text-muted-foreground cursor-not-allowed"
+                      )}
+                      disabled={!targetExists}
+                    >
+                      {targetOnOriginalHex ? '⚔️ Execute Plan' : targetRelocated ? '⚔️ Execute (Redirected)' : '❌ Target Lost'}
+                    </button>
+                  )}
                 </div>
               );
             })()}
