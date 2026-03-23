@@ -580,24 +580,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 const isSoldier = selectedUnit?.type === 'soldier';
                 const isCapo = selectedUnit?.type === 'capo';
 
-                let reason = '';
-                if (noTactical) {
-                  reason = 'No tactical actions left';
-                } else if (action === 'scout') {
-                  if (!selectedUnit) reason = 'Select a soldier first';
-                  else if (!isSoldier) reason = 'Need a soldier selected';
-                } else if (action === 'fortify') {
-                  if (!selectedUnit) reason = 'Select a unit first';
-                  else if ((selectedUnit as any).isFortified) reason = 'Already fortified';
-                } else if (action === 'escort') {
-                  if (!selectedUnit) reason = 'Select a soldier first';
-                  else if (!isSoldier) reason = 'Need a soldier selected';
-                } else if (action === 'safehouse') {
-                  if (!selectedUnit) reason = 'Select a capo first';
-                  else if (!isCapo) reason = 'Need a capo selected';
-                }
-
-                const isDisabled = noTactical || (!!reason && !noTactical);
+                const reason = noTactical ? 'No tactical actions left' : '';
+                const isDisabled = noTactical;
 
                 return (
                   <div key={action} className="relative group">
