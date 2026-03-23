@@ -132,8 +132,10 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     capoId: string;
   } | null>(null);
 
-  // Plan Hit mode
+  // Plan Hit mode — 2-step: select soldier, then select target hex+unit
   const [planHitMode, setPlanHitMode] = useState(false);
+  const [planHitStep, setPlanHitStep] = useState<'selectSoldier' | 'selectTarget'>('selectSoldier');
+  const [planHitPlannerId, setPlanHitPlannerId] = useState<string | null>(null);
 
   // Handle action wrapper function
   const handleAction = useCallback((action: any) => {
@@ -149,11 +151,26 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
     if (action.type === 'enter_plan_hit_mode') {
       setPlanHitMode(true);
+      setPlanHitStep('selectSoldier');
+      setPlanHitPlannerId(null);
+      return;
+    }
+    if (action.type === 'cancel_plan_hit_mode') {
+      setPlanHitMode(false);
+      setPlanHitStep('selectSoldier');
+      setPlanHitPlannerId(null);
+      return;
+    }
+    if (action.type === 'plan_hit_select_soldier') {
+      setPlanHitPlannerId(action.unitId);
+      setPlanHitStep('selectTarget');
       return;
     }
     if (action.type === 'plan_hit') {
       performAction(action);
       setPlanHitMode(false);
+      setPlanHitStep('selectSoldier');
+      setPlanHitPlannerId(null);
       return;
     }
     performAction(action);
