@@ -2532,113 +2532,77 @@ export const useEnhancedMafiaGameState = (
         });
       }
 
-      // 6. Internal Betrayal (3+ soldiers)
-      if (state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier').length > 2) {
+      // 6. Internal Betrayal — loyalty-gated
+      {
+        const playerSoldiers = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier');
+        const lowLoyaltySoldier = playerSoldiers.find(u => {
+          const stats = state.soldierStats[u.id];
+          return stats && stats.loyalty < 40;
+        });
+        if (lowLoyaltySoldier) {
+          const soldierName = lowLoyaltySoldier.id.slice(-6);
+          eligibleEvents.push({
+            id: `event-${Date.now()}-betrayal`, type: 'random' as const,
+            title: 'Internal Betrayal',
+            description: `Soldier ${soldierName} (loyalty: ${state.soldierStats[lowLoyaltySoldier.id]?.loyalty ?? '?'}) is showing signs of disloyalty. Word on the street says he's talking to the other side.`,
+            choices: [
+              { id: 'confront', text: 'Confront & dismiss the soldier', consequences: [{ type: 'soldiers' as const, value: -1, description: 'Soldier removed' }] },
+              { id: 'promote', text: `Offer a promotion ($${Math.floor(5000 * costMult).toLocaleString()})`, cost: Math.floor(5000 * costMult), consequences: [{ type: 'money' as const, value: -Math.floor(5000 * costMult), description: 'Promotion cost' }] },
+              { id: 'ignore', text: 'Ignore it', consequences: [{ type: 'reputation' as const, value: -3, description: 'Potential defection risk' }] },
+            ],
+            consequences: [], turn: state.turn, expires: state.turn + 1,
+            // Store the target soldier ID in the event for resolution
+            requirements: { money: 0, soldiers: 0, reputation: 0, territory: [lowLoyaltySoldier.id] },
+          });
+        }
+      }
+
+      // 7. Rat in the Ranks / Federal Investigation — escalating event
+      if (heat > 30 && !state.ratIgnored) {
+        // Stage 1: Rat in the Ranks
         eligibleEvents.push({
-          id: `event-${Date.now()}-betrayal`, type: 'random' as const,
-          title: 'Internal Betrayal',
-          description: 'Rumors say one of your soldiers is planning to flip.',
+          id: `event-${Date.now()}-rat`, type: 'random' as const,
+          title: 'Rat in the Ranks',
+          description: 'Someone in your crew is feeding info to the cops. Deal with it now or face consequences later.',
           choices: [
-            { id: 'investigate', text: `Investigate ($${Math.floor(5000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(5000 * costMult), description: 'Investigation' }] },
-            { id: 'ignore', text: 'Ignore the rumor', consequences: [{ type: 'reputation' as const, value: -5, description: 'Loyalty erosion' }] },
+            { id: 'find', text: `Find the rat ($${Math.floor(3000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(3000 * costMult), description: 'Investigation' },{ type: 'heat' as const, value: -10, description: 'Leak plugged' }] },
+            { id: 'ignore', text: 'Ignore it', consequences: [{ type: 'heat' as const, value: 15, description: 'Info leaked to feds' }] },
           ],
           consequences: [], turn: state.turn, expires: state.turn + 1,
         });
       }
-
-      // 7. Federal Investigation (heat > 60)
-      if (heat > 60) {
+      if (heat > 60 && state.ratIgnored) {
+        // Stage 2: Federal Investigation (escalated from ignored rat)
         eligibleEvents.push({
           id: `event-${Date.now()}-federal`, type: 'random' as const,
           title: 'Federal Investigation',
-          description: 'The FBI has opened an investigation. Pay to derail it or risk losing a business.',
+          description: 'The rat you ignored led the FBI straight to your operations. A federal case has been opened.',
           choices: [
-            { id: 'pay', text: `Pay off ($${Math.floor(15000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(15000 * costMult), description: 'Payoff' },{ type: 'heat' as const, value: -25, description: 'Investigation stalled' }] },
+            { id: 'pay', text: `Pay off ($${Math.floor(15000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(15000 * costMult), description: 'Federal payoff' },{ type: 'heat' as const, value: -25, description: 'Investigation derailed' }] },
             { id: 'risk', text: 'Take the risk', consequences: [{ type: 'heat' as const, value: 15, description: 'Investigation intensifies' }] },
           ],
           consequences: [], turn: state.turn, expires: state.turn + 1,
         });
-      }
-
-      // 8. Market Opportunity (money > 10k)
-      if (money > 10000) {
-        eligibleEvents.push({
-          id: `event-${Date.now()}-market`, type: 'random' as const,
-          title: 'Market Opportunity',
-          description: 'A lucrative but risky investment opportunity.',
-          choices: [
-            { id: 'invest', text: `Invest ($${Math.floor(10000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: Math.random() < 0.7 ? Math.floor(10000 * costMult) : -Math.floor(10000 * costMult), description: 'Investment' }] },
-            { id: 'pass', text: 'Pass', consequences: [] },
-          ],
-          consequences: [], turn: state.turn, expires: state.turn + 1,
-        });
-      }
-
-      // 9. Rival Turf War (2+ AI families)
-      if (state.aiOpponents.length >= 2) {
-        const f1 = state.aiOpponents[Math.floor(Math.random() * state.aiOpponents.length)];
-        const others = state.aiOpponents.filter(o => o.family !== f1.family);
-        const f2 = others[Math.floor(Math.random() * others.length)];
-        if (f1 && f2) {
+      } else if (heat > 60 && !state.ratIgnored) {
+        // Independent Federal Investigation (lower weight — only added if no rat escalation)
+        if (Math.random() < 0.3) {
           eligibleEvents.push({
-            id: `event-${Date.now()}-turfwar`, type: 'random' as const,
-            title: 'Rival Turf War',
-            description: `The ${f1.family} and ${f2.family} families are at war. Pick a side?`,
+            id: `event-${Date.now()}-federal`, type: 'random' as const,
+            title: 'Federal Investigation',
+            description: 'The FBI has opened an investigation into your operations.',
             choices: [
-              { id: 'support1', text: `Support ${f1.family}`, consequences: [{ type: 'reputation' as const, value: 5, description: `${f1.family} favor` },{ type: 'relationship' as const, value: -15, description: `${f2.family} hostility` }] },
-              { id: 'neutral', text: 'Stay out of it', consequences: [{ type: 'reputation' as const, value: 2, description: 'Neutral stance' }] },
+              { id: 'pay', text: `Pay off ($${Math.floor(15000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(15000 * costMult), description: 'Payoff' },{ type: 'heat' as const, value: -25, description: 'Investigation stalled' }] },
+              { id: 'risk', text: 'Take the risk', consequences: [{ type: 'heat' as const, value: 15, description: 'Investigation intensifies' }] },
             ],
             consequences: [], turn: state.turn, expires: state.turn + 1,
           });
         }
       }
 
-      // 10. Celebrity Endorsement (respect > 50)
-      if (respect > 50) {
-        eligibleEvents.push({
-          id: `event-${Date.now()}-celebrity`, type: 'random' as const,
-          title: 'Celebrity Endorsement',
-          description: 'A famous entertainer wants to associate with your family.',
-          choices: [
-            { id: 'accept', text: `Accept ($${Math.floor(8000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(8000 * costMult), description: 'Endorsement' },{ type: 'reputation' as const, value: 15, description: 'Image boost' },{ type: 'heat' as const, value: -10, description: 'Positive press' }] },
-            { id: 'decline', text: 'Decline', consequences: [] },
-          ],
-          consequences: [], turn: state.turn, expires: state.turn + 1,
-        });
-      }
-
-      // 11. Rat in the Ranks (heat > 30)
-      if (heat > 30) {
-        eligibleEvents.push({
-          id: `event-${Date.now()}-rat`, type: 'random' as const,
-          title: 'Rat in the Ranks',
-          description: 'Someone in your crew is feeding info to the cops.',
-          choices: [
-            { id: 'find', text: `Find the rat ($${Math.floor(3000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(3000 * costMult), description: 'Investigation' },{ type: 'heat' as const, value: -10, description: 'Leak plugged' }] },
-            { id: 'ignore', text: 'Ignore it', consequences: [{ type: 'heat' as const, value: 15, description: 'Info leaked' }] },
-          ],
-          consequences: [], turn: state.turn, expires: state.turn + 1,
-        });
-      }
-
-      // 12. Dock Workers Strike (Brooklyn territory)
-      if (state.hexMap.some(t => t.controllingFamily === state.playerFamily && t.district === 'Brooklyn')) {
-        eligibleEvents.push({
-          id: `event-${Date.now()}-strike`, type: 'random' as const,
-          title: 'Dock Workers Strike',
-          description: 'Brooklyn dock workers are threatening to strike.',
-          choices: [
-            { id: 'pay', text: `Pay off ($${Math.floor(6000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(6000 * costMult), description: 'Worker payoff' },{ type: 'reputation' as const, value: 3, description: 'Worker respect' }] },
-            { id: 'threaten', text: 'Intimidate them', consequences: [{ type: 'reputation' as const, value: 5, description: 'Fear gained' },{ type: 'heat' as const, value: 10, description: 'Public attention' }] },
-          ],
-          consequences: [], turn: state.turn, expires: state.turn + 1,
-        });
-      }
-
       // Pick one random event
       if (eligibleEvents.length > 0) {
         const chosen = eligibleEvents[Math.floor(Math.random() * eligibleEvents.length)];
-        state.events.push(chosen);
+        state.events = [...state.events, chosen];
       }
     }
     state.events = state.events.filter(e => !e.expires || e.expires > state.turn);
