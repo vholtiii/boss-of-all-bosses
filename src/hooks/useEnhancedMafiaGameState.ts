@@ -2450,8 +2450,13 @@ export const useEnhancedMafiaGameState = (
               }
 
               if (aiStrength >= enemyUnitsHere.length || Math.random() < combatWillingness) {
+                // Safehouse defense bonus: defenders on safehouse hex are harder to kill
+                const isTargetSafehouse = state.safehouses.some(s => s.q === target.q && s.r === target.r && s.s === target.s);
+                const baseKillChance = isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) : 0.7;
                 enemyUnitsHere.forEach(eu => {
-                  if (Math.random() < 0.7) {
+                  // Fortified defenders also get protection
+                  const killChance = eu.fortified ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
+                  if (Math.random() < killChance) {
                     const idx = state.deployedUnits.indexOf(eu);
                     if (idx !== -1) state.deployedUnits.splice(idx, 1);
                   }
