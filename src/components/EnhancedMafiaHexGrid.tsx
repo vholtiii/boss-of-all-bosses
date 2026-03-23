@@ -758,23 +758,34 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             {/* Action context menu on hex */}
             {actionMenu && (() => {
               const { x, y } = getHexPosition(actionMenu.tile.q, actionMenu.tile.r);
-              const menuWidth = 140;
-              const buttonCount = [actionMenu.canHit, actionMenu.canExtort, actionMenu.canClaim, actionMenu.canNegotiate, actionMenu.canSabotage, actionMenu.canSafehouse].filter(Boolean).length;
-              const menuHeight = buttonCount * 32 + 30;
+              const menuWidth = 150;
+              const activeCount = [actionMenu.canHit, actionMenu.canExtort, actionMenu.canClaim, actionMenu.canNegotiate, actionMenu.canSabotage, actionMenu.canSafehouse].filter(Boolean).length;
+              const disabledCount = Object.keys(actionMenu.reasons || {}).length;
+              const totalItems = activeCount + disabledCount;
+              const menuHeight = totalItems * 38 + 30;
               const noActions = gameState?.actionsRemaining === 0;
+              const reasons = actionMenu.reasons || {};
+
+              const DisabledAction = ({ icon, label, reason }: { icon: string; label: string; reason: string }) => (
+                <div className="flex flex-col px-2.5 py-1 rounded-md opacity-40 cursor-not-allowed">
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">{icon} {label}</span>
+                  <span className="text-[8px] text-destructive/80 ml-5">{reason}</span>
+                </div>
+              );
+
               return (
                 <foreignObject
                   x={x - menuWidth / 2}
                   y={y - baseHexRadius - menuHeight - 8}
                   width={menuWidth}
-                  height={menuHeight}
+                  height={menuHeight + 20}
                   className="overflow-visible"
                 >
                   <div className="text-[9px] font-bold text-center mb-0.5 text-muted-foreground">
                     ⚔️ {gameState?.actionsRemaining ?? '?'}/{gameState?.maxActions ?? '?'} Actions
                   </div>
-                  <div className={cn("flex flex-col gap-1 bg-background/95 backdrop-blur-sm border border-primary/40 rounded-lg p-1.5 shadow-xl", noActions && "opacity-50 pointer-events-none")}>
-                    {actionMenu.canHit && (
+                  <div className={cn("flex flex-col gap-0.5 bg-background/95 backdrop-blur-sm border border-primary/40 rounded-lg p-1.5 shadow-xl", noActions && !disabledCount && "opacity-50 pointer-events-none")}>
+                    {actionMenu.canHit ? (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -791,8 +802,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       >
                         ⚔️ Hit Territory
                       </button>
-                    )}
-                    {actionMenu.canSabotage && (
+                    ) : reasons.hit ? (
+                      <DisabledAction icon="⚔️" label="Hit Territory" reason={reasons.hit} />
+                    ) : null}
+                    {actionMenu.canSabotage ? (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -808,8 +821,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       >
                         💣 Sabotage
                       </button>
-                    )}
-                    {actionMenu.canExtort && (
+                    ) : reasons.sabotage ? (
+                      <DisabledAction icon="💣" label="Sabotage" reason={reasons.sabotage} />
+                    ) : null}
+                    {actionMenu.canExtort ? (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -825,8 +840,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       >
                         💰 Extort
                       </button>
-                    )}
-                    {actionMenu.canClaim && (
+                    ) : reasons.extort ? (
+                      <DisabledAction icon="💰" label="Extort" reason={reasons.extort} />
+                    ) : null}
+                    {actionMenu.canClaim ? (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -842,8 +859,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       >
                         🏴 Claim Territory
                       </button>
-                    )}
-                    {actionMenu.canNegotiate && (
+                    ) : reasons.claim ? (
+                      <DisabledAction icon="🏴" label="Claim Territory" reason={reasons.claim} />
+                    ) : null}
+                    {actionMenu.canNegotiate ? (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -860,8 +879,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       >
                         🤝 Negotiate
                       </button>
-                    )}
-                    {actionMenu.canSafehouse && (
+                    ) : reasons.negotiate ? (
+                      <DisabledAction icon="🤝" label="Negotiate" reason={reasons.negotiate} />
+                    ) : null}
+                    {actionMenu.canSafehouse ? (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -877,7 +898,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       >
                         🏠 Safehouse
                       </button>
-                    )}
+                    ) : reasons.safehouse ? (
+                      <DisabledAction icon="🏠" label="Safehouse" reason={reasons.safehouse} />
+                    ) : null}
                   </div>
                 </foreignObject>
               );
