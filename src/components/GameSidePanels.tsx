@@ -127,6 +127,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Plan Hit"
               sublabel={`Free · 1 soldier`}
               disabled={resources.soldiers < 1 || legalStatus.jailTime > 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : resources.soldiers < 1 ? 'Need 1 soldier' : undefined}
               phaseLocked={actionsLocked}
               variant="destructive"
               onClick={() => onAction({ type: 'violent_action', violenceType: 'hit', cost: 0, risk: 70 })}
@@ -136,6 +137,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Sabotage Rival"
               sublabel={`$12,000`}
               disabled={resources.money < 12000 || legalStatus.jailTime > 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : resources.money < 12000 ? `Need $12,000` : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'sabotage', cost: 12000 })}
             />
@@ -144,6 +146,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Extort Business"
               sublabel={`Free · +Heat`}
               disabled={legalStatus.jailTime > 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'extort_business', amount: 5000 })}
             />
@@ -187,6 +190,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="🍝 Restaurant"
               sublabel={`$20,000 · $3K/turn · 1 action`}
               disabled={resources.money < 20000 || legalStatus.jailTime > 0 || gameState.actionsRemaining <= 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 20000 ? 'Need $20,000' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'build_business', businessType: 'restaurant' })}
             />
@@ -195,6 +199,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="🏪 Store"
               sublabel={`$12,000 · $1.8K/turn · 1 action`}
               disabled={resources.money < 12000 || legalStatus.jailTime > 0 || gameState.actionsRemaining <= 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 12000 ? 'Need $12,000' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'build_business', businessType: 'store' })}
             />
@@ -203,6 +208,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="🏗️ Construction"
               sublabel={`$35,000 · $5K/turn · 1 action`}
               disabled={resources.money < 35000 || legalStatus.jailTime > 0 || gameState.actionsRemaining <= 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 35000 ? 'Need $35,000' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'build_business', businessType: 'construction' })}
             />
@@ -211,6 +217,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Launder Money"
               sublabel={`20% fee`}
               disabled={gameState.finances.dirtyMoney < 1000 || legalStatus.jailTime > 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : gameState.finances.dirtyMoney < 1000 ? 'No dirty money' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'launder_money', amount: 10000 })}
             />
@@ -231,6 +238,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Buy Soldier (Mercenary)"
               sublabel={respectPct > 0 ? `$${discountedMercCost.toLocaleString()} · -3 loyalty · 1 action (${respectPct}% respect)` : `$${SOLDIER_COST.toLocaleString()} · -3 loyalty · 1 action`}
               disabled={resources.money < discountedMercCost || gameState.tacticalActionsRemaining <= 0}
+              disabledReason={gameState.tacticalActionsRemaining <= 0 ? 'No tactical actions' : resources.money < discountedMercCost ? `Need $${discountedMercCost.toLocaleString()}` : undefined}
               phaseLocked={!isTacticalPhase}
               onClick={() => onAction({ type: 'recruit_soldiers', cost: SOLDIER_COST })}
             />
@@ -241,6 +249,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 ? (respectPct > 0 ? `$${discountedRecruitCost} · +2 loyalty · 1 action (${respectPct}% respect)` : `$${LOCAL_SOLDIER_COST} · +2 loyalty · 1 action`)
                 : `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (${playerTerritoryCount} owned)`}
               disabled={!canRecruit || resources.money < discountedRecruitCost || gameState.tacticalActionsRemaining <= 0}
+              disabledReason={gameState.tacticalActionsRemaining <= 0 ? 'No tactical actions' : !canRecruit ? `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (have ${playerTerritoryCount})` : resources.money < discountedRecruitCost ? `Need $${discountedRecruitCost.toLocaleString()}` : undefined}
               phaseLocked={!isTacticalPhase}
               onClick={() => onAction({ type: 'recruit_local_soldier' })}
             />
@@ -285,6 +294,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Public Appearance"
               sublabel="$3,000 · −5 Heat · +2 Rep · 1 action"
               disabled={resources.money < 3000 || gameState.actionsRemaining <= 0}
+              disabledReason={gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 3000 ? 'Need $3,000' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'public_appearance', cost: 3000 })}
             />
@@ -293,6 +303,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Charitable Donation"
               sublabel="$5,000 · −10 Heat · +3 Rep · 1 action"
               disabled={resources.money < 5000 || gameState.actionsRemaining <= 0}
+              disabledReason={gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 5000 ? 'Need $5,000' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'charitable_donation', amount: 5000 })}
             />
@@ -307,6 +318,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                   label="Hire Lawyer"
                   sublabel={onCooldown ? `Cooldown: ${turnsLeft} turn${turnsLeft > 1 ? 's' : ''}` : '$8,000 · Clears arrest, −25% sentences · 1 action'}
                   disabled={resources.money < 8000 || gameState.actionsRemaining <= 0 || onCooldown}
+                  disabledReason={onCooldown ? `Cooldown: ${turnsLeft}t` : gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 8000 ? 'Need $8,000' : undefined}
                   phaseLocked={actionsLocked}
                   onClick={() => onAction({ type: 'hire_lawyer' })}
                 />
@@ -652,9 +664,10 @@ const ActionButton: React.FC<{
   sublabel: string;
   disabled?: boolean;
   phaseLocked?: boolean;
+  disabledReason?: string;
   variant?: 'default' | 'destructive' | 'outline';
   onClick: () => void;
-}> = ({ icon, label, sublabel, disabled, phaseLocked, variant = 'outline', onClick }) => (
+}> = ({ icon, label, sublabel, disabled, phaseLocked, disabledReason, variant = 'outline', onClick }) => (
   <Button
     variant={variant}
     size="sm"
@@ -666,6 +679,8 @@ const ActionButton: React.FC<{
     <span className="flex-1 text-left">{label}</span>
     {phaseLocked ? (
       <span className="text-[10px] text-muted-foreground font-normal">🔒</span>
+    ) : disabled && disabledReason ? (
+      <span className="text-[10px] text-destructive/80 font-normal">{disabledReason}</span>
     ) : (
       <span className="text-[10px] text-muted-foreground font-normal">{sublabel}</span>
     )}

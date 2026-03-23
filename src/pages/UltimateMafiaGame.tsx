@@ -528,7 +528,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
 
         {/* Tactical action toolbar — only during tactical (move) phase */}
         {gameState.turnPhase === 'move' && (
-          <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1">
             <div className="flex items-center gap-1 bg-background/80 rounded-lg px-2 py-1 border border-noir-light">
               <span className="text-[10px] text-muted-foreground mr-1">📋 {gameState.tacticalActionsRemaining}/{gameState.maxTacticalActions}</span>
               {([
@@ -536,25 +536,57 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 { action: 'fortify' as const, label: '🛡️ Fortify', tip: 'Click a unit to fortify it (+25% defense, persists until it moves).' },
                 { action: 'escort' as const, label: '🚗 Escort', tip: 'Select a soldier, then click a capo (or their hex) to call the soldier there.' },
                 { action: 'safehouse' as const, label: '🏠 Safehouse', tip: 'Select a capo on your territory to set up a secondary deploy point (5 turns).' },
-              ] as const).map(({ action, label, tip }) => (
-                <Button
-                  key={action}
-                  size="sm"
-                  variant={gameState.selectedMoveAction === action ? 'default' : 'outline'}
-                  className="text-xs h-7 px-2"
-                  title={tip}
-                  disabled={gameState.tacticalActionsRemaining <= 0}
-                  onClick={() => {
-                    if (action === 'fortify' && gameState.selectedUnitId) {
-                      fortifyUnit();
-                    } else {
-                      setMoveAction(action);
-                    }
-                  }}
-                >
-                  {label}
-                </Button>
-              ))}
+              ] as const).map(({ action, label, tip }) => {
+                const noTactical = gameState.tacticalActionsRemaining <= 0;
+                const selectedUnit = gameState.selectedUnitId ? (gameState.deployedUnits || []).find((u: any) => u.id === gameState.selectedUnitId) : null;
+                const isSoldier = selectedUnit?.type === 'soldier';
+                const isCapo = selectedUnit?.type === 'capo';
+
+                let reason = '';
+                if (noTactical) {
+                  reason = 'No tactical actions left';
+                } else if (action === 'scout') {
+                  if (!selectedUnit) reason = 'Select a soldier first';
+                  else if (!isSoldier) reason = 'Need a soldier selected';
+                } else if (action === 'fortify') {
+                  if (!selectedUnit) reason = 'Select a unit first';
+                  else if ((selectedUnit as any).isFortified) reason = 'Already fortified';
+                } else if (action === 'escort') {
+                  if (!selectedUnit) reason = 'Select a soldier first';
+                  else if (!isSoldier) reason = 'Need a soldier selected';
+                } else if (action === 'safehouse') {
+                  if (!selectedUnit) reason = 'Select a capo first';
+                  else if (!isCapo) reason = 'Need a capo selected';
+                }
+
+                const isDisabled = noTactical || (!!reason && !noTactical);
+
+                return (
+                  <div key={action} className="relative group">
+                    <Button
+                      size="sm"
+                      variant={gameState.selectedMoveAction === action ? 'default' : 'outline'}
+                      className="text-xs h-7 px-2"
+                      title={reason || tip}
+                      disabled={isDisabled && gameState.selectedMoveAction !== action}
+                      onClick={() => {
+                        if (action === 'fortify' && gameState.selectedUnitId) {
+                          fortifyUnit();
+                        } else {
+                          setMoveAction(action);
+                        }
+                      }}
+                    >
+                      {label}
+                    </Button>
+                    {reason && gameState.selectedMoveAction !== action && (
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-0.5 whitespace-nowrap text-[8px] text-destructive/80 font-medium pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 bg-background/90 px-1.5 py-0.5 rounded border border-border shadow-sm">
+                        {reason}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {gameState.safehouse && (
                 <span className="text-xs text-muted-foreground ml-1">🏠 {gameState.safehouse.turnsRemaining}t</span>
               )}
