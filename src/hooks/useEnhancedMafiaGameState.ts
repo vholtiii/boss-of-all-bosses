@@ -23,8 +23,9 @@ import {
   SOLDIER_LOYALTY_CAP, CAPO_LOYALTY_CAP,
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType,
   NEGOTIATION_TYPES,
-  ScoutedHex, Safehouse, MoveAction,
+  ScoutedHex, Safehouse, MoveAction, PlannedHit,
   FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
+  PLAN_HIT_BONUS, PLAN_HIT_DURATION,
   BASE_ACTIONS_PER_TURN, BONUS_ACTION_RESPECT_THRESHOLD, BONUS_ACTION_INFLUENCE_THRESHOLD,
   TACTICAL_ACTIONS_PER_TURN,
   HiddenUnit, AIBounty,
@@ -80,6 +81,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   aiBounties: [...(state.aiBounties || [])],
   scoutedHexes: [...(state.scoutedHexes || [])],
   activeBribes: (state.activeBribes || []).map(b => ({ ...b })),
+  plannedHit: state.plannedHit ? { ...state.plannedHit } : null,
   alliances: (state.alliances || []).map(a => ({ ...a, conditions: a.conditions.map(c => ({ ...c })) })),
   ceasefires: (state.ceasefires || []).map(c => ({ ...c })),
   events: [...(state.events || [])],
@@ -213,6 +215,7 @@ export interface EnhancedMafiaGameState {
   // Move phase systems
   scoutedHexes: ScoutedHex[];
   safehouse: Safehouse | null;
+  plannedHit: PlannedHit | null;
   selectedMoveAction: MoveAction;
   
   // Action & tactical budgets
@@ -514,6 +517,7 @@ const createInitialGameState = (
     pendingNotifications: [],
     scoutedHexes: [],
     safehouse: null,
+    plannedHit: null,
     selectedMoveAction: 'move' as MoveAction,
     actionsRemaining: BASE_ACTIONS_PER_TURN,
     maxActions: BASE_ACTIONS_PER_TURN,
@@ -1643,6 +1647,15 @@ export const useEnhancedMafiaGameState = (
           }];
         }
       }
+
+      // Tick planned hit expiration
+      if (newState.plannedHit && newState.plannedHit.expiresOnTurn <= newState.turn) {
+        newState.plannedHit = null;
+        newState.pendingNotifications = [...newState.pendingNotifications, {
+          type: 'warning' as const, title: '🎯 Plan Hit Expired',
+          message: 'Your planned hit has expired — the intel went cold.',
+        }];
+      }
       
       const seasons = ['spring', 'summer', 'fall', 'winter'] as const;
       newState.season = seasons[Math.floor((newState.turn - 1) / 3) % 4];
@@ -2751,6 +2764,57 @@ export const useEnhancedMafiaGameState = (
         }
         case 'establish_safehouse':
           return processEstablishSafehouse(newState, action);
+        case 'plan_hit': {
+          // Tactical phase action — costs 1 tactical action
+          if (newState.turnPhase !== 'move') {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚠️ Wrong Phase',
+              message: 'Plan Hit is only available during the Tactical phase.',
+            }];
+            return newState;
+          }
+          if (newState.tacticalActionsRemaining <= 0) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚠️ No Tactical Actions',
+              message: 'You have no tactical actions remaining.',
+            }];
+            return newState;
+          }
+          const phQ = action.targetQ;
+          const phR = action.targetR;
+          const phS = action.targetS;
+          const phTile = newState.hexMap.find(t => t.q === phQ && t.r === phR && t.s === phS);
+          if (!phTile || phTile.controllingFamily === newState.playerFamily || phTile.controllingFamily === 'neutral') {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚠️ Invalid Target',
+              message: 'Plan Hit requires an enemy-controlled hex.',
+            }];
+            return newState;
+          }
+          // Validate hex is scouted
+          const phScouted = newState.scoutedHexes.some(s => s.q === phQ && s.r === phR && s.s === phS);
+          if (!phScouted) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚠️ Intel Required',
+              message: 'You must scout a hex before planning a hit on it.',
+            }];
+            return newState;
+          }
+          newState.plannedHit = {
+            q: phQ, r: phR, s: phS,
+            targetFamily: phTile.controllingFamily,
+            plannedOnTurn: newState.turn,
+            expiresOnTurn: newState.turn + PLAN_HIT_DURATION,
+          };
+          newState.tacticalActionsRemaining -= 1;
+          newState.selectedUnitId = null;
+          newState.availableMoveHexes = [];
+          newState.pendingNotifications = [...newState.pendingNotifications, {
+            type: 'success' as const, title: '🎯 Hit Planned',
+            message: `Target marked for +${PLAN_HIT_BONUS}% hit bonus. Execute during Action phase within ${PLAN_HIT_DURATION} turns.`,
+          }];
+          return newState;
+        }
         case 'recruit_soldiers': {
           // Buy Mercenary — expensive, combat-ready, hurts loyalty
           if (newState.tacticalActionsRemaining <= 0) return newState;
@@ -3830,6 +3894,16 @@ export const useEnhancedMafiaGameState = (
         } else {
           chance += SCOUT_STALE_BONUS / 100;
         }
+      }
+
+      // Plan Hit bonus — +20% if this hex was planned
+      if (state.plannedHit && state.plannedHit.q === targetQ && state.plannedHit.r === targetR && state.plannedHit.s === targetS) {
+        chance += PLAN_HIT_BONUS / 100;
+        state.plannedHit = null; // Consume the plan
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'info', title: '🎯 Plan Hit Executed!',
+          message: `+${PLAN_HIT_BONUS}% bonus applied from tactical planning.`,
+        }];
       }
       
       chance = Math.max(0.1, Math.min(0.95, chance));

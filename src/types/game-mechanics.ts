@@ -260,6 +260,19 @@ export const SCOUT_DETECTION_CHANCE = 0.15; // 15% chance scout is detected on e
 export const SAFEHOUSE_DURATION = 5; // turns
 export const MAX_ESCORT_SOLDIERS = 2;
 
+// ============ PLAN HIT ============
+export const PLAN_HIT_BONUS = 20; // +20% hit success on planned hex
+export const PLAN_HIT_DURATION = 2; // expires after 2 turns if unused
+
+export interface PlannedHit {
+  q: number;
+  r: number;
+  s: number;
+  targetFamily: string;
+  plannedOnTurn: number;
+  expiresOnTurn: number;
+}
+
 // ============ ACTION BUDGET ============
 export const BASE_ACTIONS_PER_TURN = 2;
 export const BONUS_ACTION_RESPECT_THRESHOLD = 50;

@@ -33,7 +33,7 @@ import HitmanPanel from '@/components/HitmanPanel';
 import CapoPromotionPanel from '@/components/CapoPromotionPanel';
 import CorruptionPanel from '@/components/CorruptionPanel';
 import VictoryTracker from '@/components/VictoryTracker';
-import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST } from '@/types/game-mechanics';
+import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION } from '@/types/game-mechanics';
 
 interface GameSidePanelProps {
   gameState: EnhancedMafiaGameState;
@@ -125,13 +125,21 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             <ActionButton
               icon={<Target className="h-4 w-4" />}
               label="Plan Hit"
-              sublabel={`Free · 1 soldier`}
-              disabled={resources.soldiers < 1 || legalStatus.jailTime > 0}
-              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : resources.soldiers < 1 ? 'Need 1 soldier' : undefined}
-              phaseLocked={actionsLocked}
+              sublabel={`🎯 +${PLAN_HIT_BONUS}% bonus · 1 tactical · ${PLAN_HIT_DURATION}t`}
+              disabled={gameState.tacticalActionsRemaining <= 0 || !(gameState.scoutedHexes || []).some((s: any) => {
+                const tile = (gameState.hexMap || []).find((t: any) => t.q === s.q && t.r === s.r && t.s === s.s);
+                return tile && tile.controllingFamily !== gameState.playerFamily && tile.controllingFamily !== 'neutral';
+              })}
+              disabledReason={gameState.tacticalActionsRemaining <= 0 ? 'No tactical actions' : 'Scout an enemy hex first'}
+              phaseLocked={!isTacticalPhase}
               variant="destructive"
-              onClick={() => onAction({ type: 'violent_action', violenceType: 'hit', cost: 0, risk: 70 })}
+              onClick={() => onAction({ type: 'enter_plan_hit_mode' })}
             />
+            {gameState.plannedHit && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs text-destructive font-medium flex items-center gap-1.5">
+                🎯 Hit planned — +{PLAN_HIT_BONUS}% bonus · Expires turn {gameState.plannedHit.expiresOnTurn}
+              </div>
+            )}
             <ActionButton
               icon={<Eye className="h-4 w-4" />}
               label="Sabotage Rival"

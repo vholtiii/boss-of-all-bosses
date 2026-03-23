@@ -6,7 +6,7 @@ import { ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
-import { ScoutedHex, Safehouse } from '@/types/game-mechanics';
+import { ScoutedHex, Safehouse, PlannedHit } from '@/types/game-mechanics';
 
 interface EnhancedMafiaHexGridProps {
   width: number;
@@ -21,6 +21,8 @@ interface EnhancedMafiaHexGridProps {
   onSelectHeadquarters?: (family: string) => void;
   onSelectUnitFromHeadquarters?: (unitType: 'soldier' | 'capo', family: string) => void;
   onDeployUnit?: (unitType: 'soldier' | 'capo', targetLocation: { q: number; r: number; s: number }, family: string) => void;
+  planHitMode?: boolean;
+  onPlanHitSelect?: (q: number, r: number, s: number) => void;
 }
 
 const familyColors: Record<string, string> = {
@@ -44,7 +46,7 @@ const businessIcons: Record<string, string> = {
 const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({ 
   width, height, onBusinessClick, selectedBusiness, playerFamily,
   gameState, onAction, onSelectUnit, onMoveUnit, onSelectHeadquarters,
-  onSelectUnitFromHeadquarters, onDeployUnit
+  onSelectUnitFromHeadquarters, onDeployUnit, planHitMode, onPlanHitSelect
 }) => {
   const [zoom, setZoom] = useState(1);
   const [showSoldiers, setShowSoldiers] = useState(true);
@@ -205,6 +207,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
   const handleHexClick = (tile: HexTile) => {
     const turnPhase = gameState?.turnPhase || 'waiting';
+
+    // Plan Hit mode — intercept clicks on scouted enemy hexes
+    if (planHitMode && onPlanHitSelect) {
+      const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== playerFamily;
+      const isScouted = scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
+      if (isEnemy && isScouted) {
+        onPlanHitSelect(tile.q, tile.r, tile.s);
+      }
+      return;
+    }
 
     // Business placement mode — intercept clicks
     if (isBusinessPlacementMode && onAction) {
@@ -594,6 +606,34 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     </g>
                   )}
 
+                  {/* Planned Hit crosshair indicator */}
+                  {gameState?.plannedHit && gameState.plannedHit.q === tile.q && gameState.plannedHit.r === tile.r && gameState.plannedHit.s === tile.s && (
+                    <g className="pointer-events-none">
+                      <circle cx={x + baseHexRadius * 0.55} cy={y + baseHexRadius * 0.55} r="8" fill="#DC2626" stroke="#ffffff" strokeWidth="1" />
+                      <text x={x + baseHexRadius * 0.55} y={y + baseHexRadius * 0.55 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🎯</text>
+                    </g>
+                  )}
+
+                  {/* Plan Hit mode — highlight scouted enemy hexes */}
+                  {planHitMode && (() => {
+                    const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== playerFamily;
+                    const isScouted = scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
+                    if (isEnemy && isScouted) {
+                      return (
+                        <polygon
+                          points={getHexPoints(x, y, baseHexRadius + 3)}
+                          fill="none"
+                          stroke="#DC2626"
+                          strokeWidth="2.5"
+                          opacity="0.8"
+                          strokeDasharray="6,3"
+                          className="pointer-events-none animate-pulse"
+                        />
+                      );
+                    }
+                    return null;
+                  })()}
+
                   {/* Fortified units indicator */}
                   {(() => {
                     const fortifiedHere = (gameState?.deployedUnits || []).filter((u: DeployedUnit) => 
@@ -801,6 +841,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-destructive/90 hover:bg-destructive text-destructive-foreground text-xs font-bold transition-colors"
                       >
                         ⚔️ Hit Territory
+                        {gameState?.plannedHit && gameState.plannedHit.q === actionMenu.tile.q && gameState.plannedHit.r === actionMenu.tile.r && gameState.plannedHit.s === actionMenu.tile.s && (
+                          <span className="ml-1 text-[9px] bg-background/30 px-1 rounded">+20% 🎯</span>
+                        )}
                       </button>
                     ) : reasons.hit ? (
                       <DisabledAction icon="⚔️" label="Hit Territory" reason={reasons.hit} />

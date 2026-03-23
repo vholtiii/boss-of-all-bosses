@@ -84,6 +84,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
   }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications]);
 
+  // Clear planHitMode when phase changes
+  useEffect(() => { setPlanHitMode(false); }, [gameState.turnPhase]);
+
   // Global button click sound
   useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
@@ -129,6 +132,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     capoId: string;
   } | null>(null);
 
+  // Plan Hit mode
+  const [planHitMode, setPlanHitMode] = useState(false);
+
   // Handle action wrapper function
   const handleAction = useCallback((action: any) => {
     if (action.type === 'open_negotiate') {
@@ -139,6 +145,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         targetS: action.targetS,
         capoId: action.capoId,
       });
+      return;
+    }
+    if (action.type === 'enter_plan_hit_mode') {
+      setPlanHitMode(true);
+      return;
+    }
+    if (action.type === 'plan_hit') {
+      performAction(action);
+      setPlanHitMode(false);
       return;
     }
     performAction(action);
@@ -218,6 +233,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onSelectHeadquarters={handleHeadquartersClick}
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
+            planHitMode={planHitMode}
+            onPlanHitSelect={(q, r, s) => handleAction({ type: 'plan_hit', targetQ: q, targetR: r, targetS: s })}
           />
         </div>
       )
@@ -226,7 +243,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       id: 'actions',
       label: 'Actions',
       icon: <Swords className="h-4 w-4" />,
-      content: <LeftSidePanel gameState={gameState} onAction={performAction} turnPhase={gameState.turnPhase} />
+      content: <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} />
     },
     {
       id: 'intel',
@@ -360,7 +377,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   }
 
   const leftSidebar = (
-    <LeftSidePanel gameState={gameState} onAction={performAction} turnPhase={gameState.turnPhase} />
+    <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} />
   );
 
   const rightSidebar = (
@@ -723,6 +740,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onSelectHeadquarters={handleHeadquartersClick}
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
+            planHitMode={planHitMode}
+            onPlanHitSelect={(q, r, s) => handleAction({ type: 'plan_hit', targetQ: q, targetR: r, targetS: s })}
           />
     </div>
   );
