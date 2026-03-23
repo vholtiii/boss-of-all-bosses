@@ -3891,16 +3891,27 @@ export const useEnhancedMafiaGameState = (
     const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
     if (!tile || tile.controllingFamily !== state.playerFamily || tile.isHeadquarters) return state;
 
-    // Only one safehouse at a time
-    state.safehouse = {
+    // Check cost
+    if (state.resources.money < SAFEHOUSE_COST) return state;
+
+    // Check max
+    const playerHexCount = state.hexMap.filter(t => t.controllingFamily === state.playerFamily).length;
+    const maxAllowed = playerHexCount >= SAFEHOUSE_TERRITORY_THRESHOLD ? MAX_SAFEHOUSES : 1;
+    if (state.safehouses.length >= maxAllowed) return state;
+
+    // Check duplicate
+    if (state.safehouses.some(s => s.q === targetQ && s.r === targetR && s.s === targetS)) return state;
+
+    state.safehouses.push({
       q: targetQ, r: targetR, s: targetS,
       turnsRemaining: SAFEHOUSE_DURATION,
       createdTurn: state.turn,
-    };
+    });
+    state.resources.money -= SAFEHOUSE_COST;
 
     state.pendingNotifications = [...state.pendingNotifications, {
       type: 'success', title: '🏠 Safehouse Established!',
-      message: `New safehouse at ${tile.district}. Acts as secondary deploy point for ${SAFEHOUSE_DURATION} turns.`,
+      message: `New safehouse at ${tile.district}. Acts as secondary deploy point for ${SAFEHOUSE_DURATION} turns. Cost: $${SAFEHOUSE_COST.toLocaleString()}.`,
     }];
 
     return state;
