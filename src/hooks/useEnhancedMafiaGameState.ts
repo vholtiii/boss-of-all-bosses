@@ -33,6 +33,78 @@ import {
   LOYALTY_ACTION_BONUS, LOYALTY_COMBAT_BONUS, LOYALTY_INCOME_HEX_BONUS, LOYALTY_INCOME_HEX_THRESHOLD, LOYALTY_UNPAID_PENALTY,
 } from '@/types/game-mechanics';
 
+// ============ SEEDED PRNG (Mulberry32) ============
+function mulberry32(seed: number): () => number {
+  return function() {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// ============ DIFFICULTY SYSTEM ============
+export type Difficulty = 'easy' | 'normal' | 'hard';
+
+export interface DifficultyModifiers {
+  playerMoneyMult: number;
+  aiIncomeMult: number;
+  aiRecruitCapBonus: number;
+  policeHeatMult: number;
+  hitSuccessBonus: number;
+  eventCostMult: number;
+}
+
+const DIFFICULTY_MODIFIERS: Record<Difficulty, DifficultyModifiers> = {
+  easy: { playerMoneyMult: 1.5, aiIncomeMult: 0.6, aiRecruitCapBonus: 0, policeHeatMult: 0.7, hitSuccessBonus: 0.10, eventCostMult: 0.7 },
+  normal: { playerMoneyMult: 1.0, aiIncomeMult: 1.0, aiRecruitCapBonus: 0, policeHeatMult: 1.0, hitSuccessBonus: 0, eventCostMult: 1.0 },
+  hard: { playerMoneyMult: 0.75, aiIncomeMult: 1.5, aiRecruitCapBonus: 2, policeHeatMult: 1.3, hitSuccessBonus: -0.10, eventCostMult: 1.3 },
+};
+
+// ============ IMMUTABLE STATE CLONE HELPER ============
+const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGameState => ({
+  ...state,
+  hexMap: state.hexMap.map(t => ({ ...t, business: t.business ? { ...t.business } : undefined })),
+  deployedUnits: (state.deployedUnits || []).map(u => ({ ...u, escortingSoldierIds: u.escortingSoldierIds ? [...u.escortingSoldierIds] : undefined })),
+  pendingNotifications: [...(state.pendingNotifications || [])],
+  soldierStats: Object.fromEntries(
+    Object.entries(state.soldierStats || {}).map(([k, v]) => [k, { ...v }])
+  ),
+  resources: { ...state.resources },
+  policeHeat: {
+    ...(state.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 }),
+    arrests: [...(state.policeHeat?.arrests || [])],
+    bribedOfficials: [...(state.policeHeat?.bribedOfficials || [])],
+  },
+  hiddenUnits: [...(state.hiddenUnits || [])],
+  aiBounties: [...(state.aiBounties || [])],
+  scoutedHexes: [...(state.scoutedHexes || [])],
+  activeBribes: (state.activeBribes || []).map(b => ({ ...b })),
+  alliances: (state.alliances || []).map(a => ({ ...a, conditions: a.conditions.map(c => ({ ...c })) })),
+  ceasefires: (state.ceasefires || []).map(c => ({ ...c })),
+  events: [...(state.events || [])],
+  hitmanContracts: [...(state.hitmanContracts || [])],
+  aiOpponents: (state.aiOpponents || []).map(o => ({
+    ...o,
+    resources: { ...o.resources },
+    strategy: { ...o.strategy },
+    relationships: { ...o.relationships },
+  })),
+  reputation: {
+    ...state.reputation,
+    familyRelationships: { ...state.reputation.familyRelationships },
+    publicPerception: { ...state.reputation.publicPerception },
+    reputationHistory: [...(state.reputation.reputationHistory || [])],
+    achievements: [...(state.reputation.achievements || [])],
+  },
+  weather: { ...state.weather, currentWeather: { ...state.weather.currentWeather } },
+  finances: { ...state.finances },
+  legalStatus: { ...state.legalStatus },
+  arrestedSoldiers: [...(state.arrestedSoldiers || [])],
+  arrestedCapos: [...(state.arrestedCapos || [])],
+  businesses: (state.businesses || []).map((b: any) => ({ ...b })),
+});
+
 // ============ UNIT TYPES ============
 export interface DeployedUnit {
   id: string;
