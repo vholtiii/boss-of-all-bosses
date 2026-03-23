@@ -865,7 +865,8 @@ export const useEnhancedMafiaGameState = (
         if (moveAction === 'safehouse' && unitType === 'capo') {
           if (prev.tacticalActionsRemaining <= 0) return prev;
           // One-click safehouse: apply immediately on capo select
-          return processSafehouse({ ...prev, selectedUnitId: unit.id }, unit);
+          const result = processSafehouse({ ...prev, selectedUnitId: unit.id }, unit);
+          return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
         }
 
         if (moveAction === 'fortify') {
