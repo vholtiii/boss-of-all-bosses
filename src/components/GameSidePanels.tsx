@@ -294,6 +294,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Public Appearance"
               sublabel="$3,000 · −5 Heat · +2 Rep · 1 action"
               disabled={resources.money < 3000 || gameState.actionsRemaining <= 0}
+              disabledReason={gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 3000 ? 'Need $3,000' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'public_appearance', cost: 3000 })}
             />
@@ -302,6 +303,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Charitable Donation"
               sublabel="$5,000 · −10 Heat · +3 Rep · 1 action"
               disabled={resources.money < 5000 || gameState.actionsRemaining <= 0}
+              disabledReason={gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 5000 ? 'Need $5,000' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'charitable_donation', amount: 5000 })}
             />
