@@ -1675,17 +1675,19 @@ export const useEnhancedMafiaGameState = (
       // Expire reinforcement targets
       newState.reinforceTargets = (newState.reinforceTargets || []).filter(rt => rt.expiresOnTurn > newState.turn);
 
-      // Tick safehouse
-      if (newState.safehouse) {
-        newState.safehouse = { ...newState.safehouse, turnsRemaining: newState.safehouse.turnsRemaining - 1 };
-        if (newState.safehouse.turnsRemaining <= 0) {
-          newState.safehouse = null;
-          newState.pendingNotifications = [...newState.pendingNotifications, {
-            type: 'warning' as const, title: '🏠 Safehouse Expired',
-            message: 'Your safehouse has been dismantled.',
-          }];
-        }
-      }
+      // Tick safehouses
+      newState.safehouses = (newState.safehouses || [])
+        .map(s => ({ ...s, turnsRemaining: s.turnsRemaining - 1 }))
+        .filter(s => {
+          if (s.turnsRemaining <= 0) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '🏠 Safehouse Expired',
+              message: 'A safehouse has been dismantled.',
+            }];
+            return false;
+          }
+          return true;
+        });
 
       // Tick planned hit expiration
       if (newState.plannedHit && newState.plannedHit.expiresOnTurn <= newState.turn) {
