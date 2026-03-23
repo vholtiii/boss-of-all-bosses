@@ -366,11 +366,45 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         const canSafehouse = isOwned && !tile.isHeadquarters;
         const negotiateCapoId = isCapo ? selectedUnit.id : undefined;
         
-        if (canHit || canExtort || canClaim || canNegotiate || canSabotage || canSafehouse) {
+        // Compute reasons for disabled actions (contextually relevant only)
+        const reasons: Record<string, string> = {};
+        const noActions = gameState?.actionsRemaining === 0;
+        
+        if (!canHit && isEnemy) {
+          reasons.hit = noActions ? 'No actions left' : (!isSoldier && !isCapo) ? 'Need soldier or capo' : '';
+        }
+        if (!canExtort) {
+          if (!hasIllegalBusiness && (isNeutral || isEnemy) && tile.business) reasons.extort = 'No illegal business';
+          else if (hasIllegalBusiness && isSoldier && !unitOnTargetHex) reasons.extort = 'Soldier must be on hex';
+          else if (noActions) reasons.extort = 'No actions left';
+        }
+        if (!canClaim && isNeutral) {
+          if (tile.business) reasons.claim = 'Has business (extort instead)';
+          else if (!isSoldier) reasons.claim = 'Need a soldier';
+        }
+        if (!canSabotage && isEnemy) {
+          if (!tile.business) reasons.sabotage = 'No business to sabotage';
+          else if (!isSoldier) reasons.sabotage = 'Need a soldier';
+          else if (noActions) reasons.sabotage = 'No actions left';
+        }
+        if (!canNegotiate && isEnemy && !isCapo) {
+          reasons.negotiate = 'Need a capo';
+        }
+        if (!canSafehouse && isOwned && tile.isHeadquarters) {
+          reasons.safehouse = 'Cannot use HQ';
+        }
+        
+        // Filter out empty reasons
+        Object.keys(reasons).forEach(k => { if (!reasons[k]) delete reasons[k]; });
+        
+        const hasAnyAction = canHit || canExtort || canClaim || canNegotiate || canSabotage || canSafehouse;
+        const hasAnyReason = Object.keys(reasons).length > 0;
+        
+        if (hasAnyAction || hasAnyReason) {
           if (actionMenu && actionMenu.tile.q === tile.q && actionMenu.tile.r === tile.r) {
             setActionMenu(null);
           } else {
-            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, negotiateCapoId });
+            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, negotiateCapoId, reasons });
           }
           return;
         }
