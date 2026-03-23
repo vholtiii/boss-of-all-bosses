@@ -24,7 +24,7 @@ import {
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType,
   NEGOTIATION_TYPES,
   ScoutedHex, Safehouse, MoveAction,
-  FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, SCOUT_DURATION, SCOUT_INTEL_BONUS, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
+  FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
   BASE_ACTIONS_PER_TURN, BONUS_ACTION_RESPECT_THRESHOLD, BONUS_ACTION_INFLUENCE_THRESHOLD,
   TACTICAL_ACTIONS_PER_TURN,
   HiddenUnit, AIBounty,
@@ -266,6 +266,7 @@ export interface EnhancedMafiaGameState {
   difficulty: Difficulty;
   difficultyModifiers: DifficultyModifiers;
   ratIgnored?: boolean; // escalation flag for Rat → Federal Investigation event chain
+  reinforceTargets?: Array<{ q: number; r: number; s: number; family: string; expiresOnTurn: number }>; // AI reinforcement from scout detection
   
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
@@ -1143,6 +1144,7 @@ export const useEnhancedMafiaGameState = (
       q: targetLocation.q, r: targetLocation.r, s: targetLocation.s,
       scoutedTurn: prev.turn,
       turnsRemaining: SCOUT_DURATION,
+      freshUntilTurn: prev.turn + 1, // live data on scout turn, stale after
       enemySoldierCount: enemyUnitsOnHex.length,
       enemyFamily: tile.controllingFamily,
       businessType: tile.business?.type,
@@ -1153,17 +1155,35 @@ export const useEnhancedMafiaGameState = (
     newScoutedHexes.push(scoutInfo);
 
     const newUnits = [...prev.deployedUnits];
+    const notifications = [...prev.pendingNotifications, {
+      type: 'info' as const, title: '👁️ Hex Scouted',
+      message: tile.controllingFamily === 'neutral'
+        ? `Neutral territory${tile.business ? `: ${tile.business.type} generating $${tile.business.income}/turn` : ': no businesses'}.`
+        : `${tile.controllingFamily.toUpperCase()} territory: ${enemyUnitsOnHex.length} units${tile.business ? `, ${tile.business.type} ($${tile.business.income}/turn)` : ''}.`,
+    }];
+
+    // Detection chance on enemy-controlled hexes (no heat, but AI gets reinforcement flag)
+    let reinforceTargets = [...(prev.reinforceTargets || [])];
+    if (tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily) {
+      if (Math.random() < SCOUT_DETECTION_CHANCE) {
+        reinforceTargets.push({
+          q: targetLocation.q, r: targetLocation.r, s: targetLocation.s,
+          family: tile.controllingFamily,
+          expiresOnTurn: prev.turn + 3,
+        });
+        notifications.push({
+          type: 'warning' as const, title: '⚠️ Scout Detected!',
+          message: `The ${tile.controllingFamily} family may reinforce this position.`,
+        });
+      }
+    }
 
     return {
       ...prev, deployedUnits: newUnits, scoutedHexes: newScoutedHexes,
+      reinforceTargets,
       selectedUnitId: null, availableMoveHexes: [],
       selectedMoveAction: 'move' as MoveAction,
-      pendingNotifications: [...prev.pendingNotifications, {
-        type: 'info' as const, title: '👁️ Hex Scouted',
-        message: tile.controllingFamily === 'neutral'
-          ? `Neutral territory${tile.business ? `: ${tile.business.type} generating $${tile.business.income}/turn` : ': no businesses'}.`
-          : `${tile.controllingFamily.toUpperCase()} territory: ${enemyUnitsOnHex.length} units${tile.business ? `, ${tile.business.type} ($${tile.business.income}/turn)` : ''}.`,
-      }],
+      pendingNotifications: notifications,
     };
   };
 
@@ -1608,6 +1628,9 @@ export const useEnhancedMafiaGameState = (
       newState.scoutedHexes = newState.scoutedHexes
         .map(s => ({ ...s, turnsRemaining: s.turnsRemaining - 1 }))
         .filter(s => s.turnsRemaining > 0);
+
+      // Expire reinforcement targets
+      newState.reinforceTargets = (newState.reinforceTargets || []).filter(rt => rt.expiresOnTurn > newState.turn);
 
       // Tick safehouse
       if (newState.safehouse) {
@@ -2307,6 +2330,20 @@ export const useEnhancedMafiaGameState = (
                 targetPool = pools.length > 0 ? pools[Math.floor(Math.random() * pools.length)] : validMoves;
                 break;
               }
+            }
+          }
+
+          // Reinforcement: if this family has a reinforceTarget, try to move toward it
+          const reinforceTargets = (state.reinforceTargets || []).filter(rt => rt.family === fam && rt.expiresOnTurn >= state.turn);
+          const matchingReinforce = reinforceTargets.find(rt => 
+            targetPool.some(t => t.q === rt.q && t.r === rt.r && t.s === rt.s) ||
+            getHexNeighbors(unit.q, unit.r, unit.s).some(n => n.q === rt.q && n.r === rt.r && n.s === rt.s)
+          );
+          if (matchingReinforce) {
+            const reinforceHex = validMoves.find(v => v.q === matchingReinforce.q && v.r === matchingReinforce.r && v.s === matchingReinforce.s);
+            if (reinforceHex) {
+              targetPool = [reinforceHex];
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'reinforce', detail: `Reinforcing detected scout position` });
             }
           }
 
@@ -3785,9 +3822,14 @@ export const useEnhancedMafiaGameState = (
       chance += state.familyBonuses.combatBonus / 100;
       chance += state.familyBonuses.hitSuccess / 100;
 
-      // Scout intel bonus (only if scouted)
+      // Scout intel bonus — fresh intel gives full bonus, stale gives half
       if (isScouted) {
-        chance += SCOUT_INTEL_BONUS / 100;
+        const scoutInfo = state.scoutedHexes.find(s => s.q === tile.q && s.r === tile.r && s.s === tile.s);
+        if (scoutInfo && state.turn <= scoutInfo.freshUntilTurn) {
+          chance += SCOUT_INTEL_BONUS / 100;
+        } else {
+          chance += SCOUT_STALE_BONUS / 100;
+        }
       }
       
       chance = Math.max(0.1, Math.min(0.95, chance));

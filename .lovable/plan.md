@@ -1,40 +1,28 @@
 
+# Event System Refinement — COMPLETED
 
-# Scout System Refinement
+## Changes Applied
+1. **Removed 3 events**: Market Opportunity, Celebrity Endorsement, Dock Workers Strike
+2. **Refined Internal Betrayal**: loyalty-gated (< 40), 3 choices (confront/promote/ignore), defection mechanic with `pendingDefection` flag resolved in `endTurn`
+3. **Merged Rat/Federal**: escalating 2-stage event with `ratIgnored` state flag. Stage 1 at heat > 30, Stage 2 at heat > 60 + ratIgnored. Independent federal at 30% chance if heat > 60 without rat.
 
-## Current State
-- Soldiers only, range 1, 3-turn duration, snapshot intel, no risk, works on neutral hexes
-- `ScoutedHex` stores `enemySoldierCount`, `enemyFamily`, `businessType`, `businessIncome` as frozen values
-- `SCOUT_INTEL_BONUS` (+15% hit success) used in combat
-- Tooltip in `EnhancedMafiaHexGrid.tsx` displays static scouted data
+## Final Event Pool (7 events)
+1. Police Raid — unchanged
+2. Rival Meeting — unchanged
+3. Informant Tip — unchanged
+4. Weapons Shipment — clean buy/sell
+5. Political Scandal — unchanged
+6. Internal Betrayal — loyalty-gated, 3 choices, defection risk
+7. Rat in the Ranks / Federal Investigation — escalating event chain
 
-## Changes
+---
 
-### 1. Decay Model for Intel Freshness — `useEnhancedMafiaGameState.ts` + `EnhancedMafiaHexGrid.tsx`
-- Add `freshUntilTurn: number` to `ScoutedHex` (set to `scoutedTurn + 1`)
-- In the hex grid tooltip and `isHexRevealed`, check if `currentTurn <= freshUntilTurn`:
-  - **Fresh (turn 1)**: show live unit count from `deployedUnits` (real-time query)
-  - **Stale (turns 2-3)**: show original snapshot values with a visual indicator ("⚠️ STALE INTEL")
-- Hit success bonus: full `SCOUT_INTEL_BONUS` (+15%) on fresh intel, half (+7%) on stale intel
-- Update `ScoutedHex` interface in `game-mechanics.ts`
+# Scout System Refinement — COMPLETED
 
-### 2. Detection Chance — `useEnhancedMafiaGameState.ts`
-- In `processScout`, after successful scout of enemy-controlled hex:
-  - 15% detection chance (`Math.random() < 0.15`)
-  - On detection: no heat increase, but the AI family that owns the hex gets a `reinforceTarget` flag
-  - Add `reinforceTargets: { q, r, s, family, expiresOnTurn }[]` to game state
-  - In `processAITurn`, if a family has a matching `reinforceTarget`, prioritize moving a unit to that hex
-  - Notification to player: "⚠️ Your scout was detected! The {family} may reinforce this position."
-- Detection does NOT prevent the scout from succeeding — intel is still gathered
-
-### 3. Neutral Hex Scouting — `useEnhancedMafiaGameState.ts`
-- Keep allowing neutral hex scouting (already works)
-- In `processScout`, when target is neutral: only populate `businessType` and `businessIncome`, set `enemySoldierCount: 0`
-- No detection chance on neutral hexes
-- Already showing business info in tooltip — no grid changes needed
-
-## Files Modified
-- `src/types/game-mechanics.ts` — add `freshUntilTurn` to `ScoutedHex`
-- `src/hooks/useEnhancedMafiaGameState.ts` — decay logic in processScout, detection chance, reinforceTargets in AI turn, stale bonus scaling in combat
-- `src/components/EnhancedMafiaHexGrid.tsx` — fresh vs stale tooltip display, live unit count for fresh intel
-
+## Changes Applied
+1. **Decay Model**: Added `freshUntilTurn` to `ScoutedHex` (scoutedTurn + 1). Turn 1: live data from deployedUnits. Turns 2-3: stale snapshot with "⚠️ STALE INTEL" indicator.
+2. **Scout Intel Bonus Scaling**: Fresh intel = +15% hit success. Stale intel = +7% hit success. Added `SCOUT_STALE_BONUS` constant.
+3. **Detection Chance**: 15% chance on enemy hex scouting. No heat increase but AI gets `reinforceTarget` flag — prioritizes moving units to detected hex. Player notified. Neutral hexes have no detection risk.
+4. **AI Reinforcement**: `reinforceTargets` array on game state, expires after 3 turns. AI units prioritize moving toward flagged hexes during movement phase.
+5. **Neutral Hex Scouting**: Allowed, shows business info only.
+6. **Tooltip Upgrade**: Fresh intel shows blue styling with live unit count. Stale shows amber styling with snapshot + "may be outdated" warning.

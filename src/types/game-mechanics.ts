@@ -234,6 +234,7 @@ export interface ScoutedHex {
   s: number;
   scoutedTurn: number;
   turnsRemaining: number;
+  freshUntilTurn: number; // scoutedTurn + 1 — live data on this turn, stale after
   enemySoldierCount: number;
   enemyFamily: string;
   businessType?: string;
@@ -253,7 +254,9 @@ export type MoveAction = 'move' | 'scout' | 'fortify' | 'escort' | 'safehouse';
 export const FORTIFY_DEFENSE_BONUS = 25; // +25% defense
 export const FORTIFY_CASUALTY_REDUCTION = 50; // -50% casualties when fortified
 export const SCOUT_DURATION = 3; // turns
-export const SCOUT_INTEL_BONUS = 15; // +15% hit success on scouted hexes
+export const SCOUT_INTEL_BONUS = 15; // +15% hit success on scouted hexes (fresh)
+export const SCOUT_STALE_BONUS = 7; // +7% hit success on stale scouted hexes
+export const SCOUT_DETECTION_CHANCE = 0.15; // 15% chance scout is detected on enemy hex
 export const SAFEHOUSE_DURATION = 5; // turns
 export const MAX_ESCORT_SOLDIERS = 2;
 

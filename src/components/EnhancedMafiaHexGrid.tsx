@@ -1030,11 +1030,27 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               {(() => {
                 const scoutInfo = (gameState?.scoutedHexes || []).find((s: ScoutedHex) => s.q === hoveredHex.q && s.r === hoveredHex.r && s.s === hoveredHex.s);
                 if (!scoutInfo) return null;
+                const currentTurn = gameState?.turn || 0;
+                const isFresh = currentTurn <= scoutInfo.freshUntilTurn;
+                
+                // For fresh intel, show live unit count from deployedUnits
+                const liveEnemyCount = isFresh
+                  ? deployedUnits.filter(u => u.q === hoveredHex.q && u.r === hoveredHex.r && u.s === hoveredHex.s && u.family !== playerFamily).length
+                  : scoutInfo.enemySoldierCount;
+
                 return (
-                  <div className="mt-1 p-1.5 rounded bg-blue-900/40 border border-blue-500/30">
-                    <p className="text-blue-300 font-bold text-xs">👁️ SCOUTED ({scoutInfo.turnsRemaining}t left)</p>
-                    <p><span className="text-muted-foreground">Enemy:</span> {scoutInfo.enemySoldierCount} units ({scoutInfo.enemyFamily})</p>
+                  <div className={cn(
+                    "mt-1 p-1.5 rounded border",
+                    isFresh 
+                      ? "bg-blue-900/40 border-blue-500/30" 
+                      : "bg-amber-900/30 border-amber-500/30"
+                  )}>
+                    <p className={cn("font-bold text-xs", isFresh ? "text-blue-300" : "text-amber-300")}>
+                      {isFresh ? '👁️ LIVE INTEL' : '⚠️ STALE INTEL'} ({scoutInfo.turnsRemaining}t left)
+                    </p>
+                    <p><span className="text-muted-foreground">Enemy:</span> {liveEnemyCount} units ({scoutInfo.enemyFamily})</p>
                     {scoutInfo.businessType && <p><span className="text-muted-foreground">Business:</span> {scoutInfo.businessType} (${scoutInfo.businessIncome?.toLocaleString()}/turn)</p>}
+                    {!isFresh && <p className="text-amber-400/70 text-xs italic">Unit count may be outdated</p>}
                   </div>
                 );
               })()}
