@@ -3974,27 +3974,38 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // Plan Hit bonus — +20% if this hex was planned AND target unit is still here
-      if (state.plannedHit && state.plannedHit.q === targetQ && state.plannedHit.r === targetR && state.plannedHit.s === targetS) {
-        const targetStillHere = state.deployedUnits.some(u => 
+      // Plan Hit bonus — target tracking system
+      if (state.plannedHit && (action._executingPlan || (state.plannedHit.q === targetQ && state.plannedHit.r === targetR && state.plannedHit.s === targetS))) {
+        const targetOnOriginalHex = state.deployedUnits.some(u => 
+          u.id === state.plannedHit!.targetUnitId && u.q === state.plannedHit!.q && u.r === state.plannedHit!.r && u.s === state.plannedHit!.s
+        );
+        const targetOnCurrentHex = state.deployedUnits.some(u =>
           u.id === state.plannedHit!.targetUnitId && u.q === targetQ && u.r === targetR && u.s === targetS
         );
-        if (targetStillHere) {
-          // Success — target is still on the planned hex
+
+        if (targetOnOriginalHex) {
+          // Best case — target stayed on planned hex → full +20% bonus
           chance += PLAN_HIT_BONUS / 100;
           state.pendingNotifications = [...state.pendingNotifications, {
             type: 'info', title: '🎯 Plan Hit Executed!',
             message: `+${PLAN_HIT_BONUS}% bonus applied — target was right where expected.`,
           }];
+        } else if (targetOnCurrentHex) {
+          // Target relocated but we followed them → reduced +10% bonus + penalties
+          chance += PLAN_HIT_RELOCATED_BONUS / 100;
+          state.policeHeat.level = Math.min(100, state.policeHeat.level + PLAN_HIT_RELOCATED_HEAT);
+          state.planHitCooldownUntil = state.turn + PLAN_HIT_COOLDOWN;
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'warning', title: '🎯 Target Relocated',
+            message: `Target moved — strike redirected. +${PLAN_HIT_RELOCATED_BONUS}% bonus (reduced), +${PLAN_HIT_RELOCATED_HEAT} heat. Plan Hit on cooldown for ${PLAN_HIT_COOLDOWN} turns.`,
+          }];
         } else {
-          // Failure — target moved away, apply penalties
-          // -5 respect or fear (whichever is higher)
+          // Target gone from this hex entirely (shouldn't happen via execute_planned_hit, but safety net)
           if (state.resources.respect >= state.reputation.fear) {
             state.resources.respect = Math.max(0, state.resources.respect - PLAN_HIT_FAIL_REPUTATION);
           } else {
             state.reputation.fear = Math.max(0, state.reputation.fear - PLAN_HIT_FAIL_REPUTATION);
           }
-          // -10 loyalty on the planner soldier
           const plannerStats = state.soldierStats[state.plannedHit.plannerUnitId];
           if (plannerStats) {
             plannerStats.loyalty = Math.max(0, plannerStats.loyalty - PLAN_HIT_FAIL_LOYALTY);
