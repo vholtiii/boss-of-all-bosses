@@ -1411,19 +1411,52 @@ export const useEnhancedMafiaGameState = (
       }
 
       // Only Capos auto-claim neutral hexes on deploy; soldiers do not
+      let autoExtortNotification: typeof prev.pendingNotifications[0] | null = null;
+      let bonusMoney = 0;
+      let bonusRespect = 0;
+      const deployedUnit = unitType === 'capo' ? newDeployedUnits.find(u => u.family === family && u.type === 'capo' && u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s) : null;
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
-          if (unitType === 'capo' && (tile.controllingFamily === 'neutral' || tile.controllingFamily === family) && !tile.isHeadquarters) {
+          if (unitType === 'capo' && tile.controllingFamily === 'neutral' && !tile.isHeadquarters) {
+            const hasIllegalBusiness = tile.business && !tile.business.isLegal && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
+            if (hasIllegalBusiness) {
+              const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
+              bonusMoney = Math.floor(3000 * respectPayoutMult);
+              bonusRespect = 5;
+              autoExtortNotification = {
+                type: 'success' as const,
+                title: '💰 Capo Auto-Extortion!',
+                message: `${deployedUnit?.name || 'Your Capo'} extorted the illegal business on deployment! +$${bonusMoney.toLocaleString()}, +5 respect.`,
+              };
+            } else {
+              autoExtortNotification = {
+                type: 'info' as const,
+                title: '🏴 Territory Claimed',
+                message: `${deployedUnit?.name || 'Your Capo'} claimed this territory on deployment.`,
+              };
+            }
             return { ...tile, controllingFamily: family as any };
+          }
+          if (unitType === 'capo' && tile.controllingFamily === family && !tile.isHeadquarters) {
+            return tile; // already owned
           }
         }
         return tile;
       });
 
+      if (bonusMoney > 0) {
+        newResources = { ...newResources, money: newResources.money + bonusMoney, respect: (newResources.respect || 0) + bonusRespect };
+      }
+
+      const notifications = autoExtortNotification
+        ? [...(prev.pendingNotifications || []), autoExtortNotification]
+        : (prev.pendingNotifications || []);
+
       const newState = {
         ...prev, deployedUnits: newDeployedUnits, hexMap: newHexMap,
         resources: newResources, soldierStats: newSoldierStats,
         deployMode: null, availableDeployHexes: [],
+        pendingNotifications: notifications,
       };
       syncLegacyUnits(newState);
       return newState;
