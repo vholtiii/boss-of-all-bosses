@@ -4023,6 +4023,11 @@ export const useEnhancedMafiaGameState = (
       if (fortifiedDefenders.length > 0) {
         chance -= FORTIFY_DEFENSE_BONUS / 100;
       }
+      // Safehouse defense bonus for defenders
+      const isDefenderSafehouse = state.safehouses.some(s => s.q === targetQ && s.r === targetR && s.s === targetS);
+      if (isDefenderSafehouse) {
+        chance -= SAFEHOUSE_DEFENSE_BONUS / 100;
+      }
       const fortifiedAttackers = playerUnits.filter(u => u.fortified);
       if (fortifiedAttackers.length > 0) {
         chance += FORTIFY_DEFENSE_BONUS / 200;
