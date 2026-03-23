@@ -387,10 +387,13 @@ const HQ_POSITIONS: Record<string, {q:number;r:number;s:number;district:HexTile[
 // ============ INITIAL STATE ============
 const createInitialGameState = (
   family: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo' = 'gambino',
-  startingResources?: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number }
+  startingResources?: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number },
+  difficulty: Difficulty = 'normal'
 ): EnhancedMafiaGameState => {
   const mapRadius = 10;
-  let hexMap = generateHexMap(mapRadius);
+  const mapSeed = Math.floor(Math.random() * 4294967296);
+  const diffMods = DIFFICULTY_MODIFIERS[difficulty];
+  let hexMap = generateHexMap(mapRadius, mapSeed);
 
   const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'] as const;
   
