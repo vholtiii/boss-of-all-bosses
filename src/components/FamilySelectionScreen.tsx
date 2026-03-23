@@ -119,11 +119,12 @@ const StatBar: React.FC<{ value: number; color: string }> = ({ value, color }) =
 );
 
 interface Props {
-  onSelectFamily: (familyId: FamilyId, resources: FamilyInfo['startingResources']) => void;
+  onSelectFamily: (familyId: FamilyId, resources: FamilyInfo['startingResources'], difficulty: 'easy' | 'normal' | 'hard') => void;
 }
 
 const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const [selectedFamily, setSelectedFamily] = useState<FamilyId | null>(null);
+  const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
 
   const activeFamily = families.find(f => f.id === selectedFamily);
 
