@@ -639,7 +639,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   )}
 
                   {/* Safehouse indicator */}
-                  {gameState?.safehouse && gameState.safehouse.q === tile.q && gameState.safehouse.r === tile.r && gameState.safehouse.s === tile.s && (
+                  {gameState?.safehouses?.some((s: any) => s.q === tile.q && s.r === tile.r && s.s === tile.s) && (
                     <g className="pointer-events-none">
                       <circle cx={x - baseHexRadius * 0.55} cy={y - baseHexRadius * 0.55} r="8" fill="#F59E0B" stroke="#ffffff" strokeWidth="1" />
                       <text x={x - baseHexRadius * 0.55} y={y - baseHexRadius * 0.55 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🏠</text>

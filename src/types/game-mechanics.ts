@@ -258,6 +258,12 @@ export const SCOUT_INTEL_BONUS = 15; // +15% hit success on scouted hexes (fresh
 export const SCOUT_STALE_BONUS = 7; // +7% hit success on stale scouted hexes
 export const SCOUT_DETECTION_CHANCE = 0.15; // 15% chance scout is detected on enemy hex
 export const SAFEHOUSE_DURATION = 5; // turns
+export const SAFEHOUSE_COST = 2500;
+export const SAFEHOUSE_DEFENSE_BONUS = 10; // +10% defense on safehouse hex
+export const SAFEHOUSE_CAPTURE_BOUNTY = 9000; // $ gained by captor
+export const SAFEHOUSE_CAPTURE_INTEL_DURATION = 1; // turns of full intel on former owner
+export const SAFEHOUSE_TERRITORY_THRESHOLD = 15; // hexes needed for 2nd safehouse
+export const MAX_SAFEHOUSES = 2;
 export const MAX_ESCORT_SOLDIERS = 2;
 
 // ============ PLAN HIT ============

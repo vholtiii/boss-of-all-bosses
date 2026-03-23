@@ -25,6 +25,7 @@ import {
   NEGOTIATION_TYPES,
   ScoutedHex, Safehouse, MoveAction, PlannedHit,
   FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
+  SAFEHOUSE_COST, SAFEHOUSE_DEFENSE_BONUS, SAFEHOUSE_CAPTURE_BOUNTY, SAFEHOUSE_CAPTURE_INTEL_DURATION, SAFEHOUSE_TERRITORY_THRESHOLD, MAX_SAFEHOUSES,
   PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_FAIL_REPUTATION, PLAN_HIT_FAIL_LOYALTY,
   PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN,
   BASE_ACTIONS_PER_TURN, BONUS_ACTION_RESPECT_THRESHOLD, BONUS_ACTION_INFLUENCE_THRESHOLD,
@@ -81,6 +82,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   hiddenUnits: [...(state.hiddenUnits || [])],
   aiBounties: [...(state.aiBounties || [])],
   scoutedHexes: [...(state.scoutedHexes || [])],
+  safehouses: (state.safehouses || []).map(s => ({ ...s })),
   activeBribes: (state.activeBribes || []).map(b => ({ ...b })),
   plannedHit: state.plannedHit ? { ...state.plannedHit } : null,
   planHitCooldownUntil: state.planHitCooldownUntil || 0,
@@ -216,7 +218,7 @@ export interface EnhancedMafiaGameState {
   
   // Move phase systems
   scoutedHexes: ScoutedHex[];
-  safehouse: Safehouse | null;
+  safehouses: Safehouse[];
   plannedHit: PlannedHit | null;
   planHitCooldownUntil: number;
   selectedMoveAction: MoveAction;
@@ -519,7 +521,7 @@ const createInitialGameState = (
     lastTurnIncome: 0,
     pendingNotifications: [],
     scoutedHexes: [],
-    safehouse: null,
+    safehouses: [],
     plannedHit: null,
     planHitCooldownUntil: 0,
     selectedMoveAction: 'move' as MoveAction,
@@ -1201,7 +1203,31 @@ export const useEnhancedMafiaGameState = (
     const tile = prev.hexMap.find(t => t.q === unit.q && t.r === unit.r && t.s === unit.s);
     if (!tile || tile.controllingFamily !== prev.playerFamily) return prev;
 
-    const newUnits = [...prev.deployedUnits];
+    // Check cost
+    if (prev.resources.money < SAFEHOUSE_COST) {
+      return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
+        type: 'error' as const, title: '💰 Insufficient Funds',
+        message: `Need $${SAFEHOUSE_COST.toLocaleString()} to establish a safehouse.`,
+      }]};
+    }
+
+    // Check max safehouses (scaling: 2nd allowed at 15+ hexes)
+    const playerHexCount = prev.hexMap.filter(t => t.controllingFamily === prev.playerFamily).length;
+    const maxAllowed = playerHexCount >= SAFEHOUSE_TERRITORY_THRESHOLD ? MAX_SAFEHOUSES : 1;
+    if (prev.safehouses.length >= maxAllowed) {
+      return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
+        type: 'warning' as const, title: '🏠 Safehouse Limit Reached',
+        message: maxAllowed === 1 ? `Control ${SAFEHOUSE_TERRITORY_THRESHOLD}+ hexes to build a 2nd safehouse.` : `Maximum ${MAX_SAFEHOUSES} safehouses allowed.`,
+      }]};
+    }
+
+    // Check not already a safehouse on this hex
+    if (prev.safehouses.some(s => s.q === unit.q && s.r === unit.r && s.s === unit.s)) {
+      return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
+        type: 'warning' as const, title: '🏠 Already a Safehouse',
+        message: 'There is already a safehouse on this hex.',
+      }]};
+    }
 
     const newSafehouse: Safehouse = {
       q: unit.q, r: unit.r, s: unit.s,
@@ -1210,11 +1236,13 @@ export const useEnhancedMafiaGameState = (
     };
 
     return {
-      ...prev, deployedUnits: newUnits, safehouse: newSafehouse,
+      ...prev, 
+      safehouses: [...prev.safehouses, newSafehouse],
+      resources: { ...prev.resources, money: prev.resources.money - SAFEHOUSE_COST },
       selectedUnitId: null, availableMoveHexes: [],
       pendingNotifications: [...prev.pendingNotifications, {
         type: 'success' as const, title: '🏠 Safehouse Established',
-        message: `Secondary deploy point active for ${SAFEHOUSE_DURATION} turns.`,
+        message: `Secondary deploy point active for ${SAFEHOUSE_DURATION} turns. Cost: $${SAFEHOUSE_COST.toLocaleString()}.`,
       }],
     };
   };
@@ -1298,10 +1326,18 @@ export const useEnhancedMafiaGameState = (
         ? getHexNeighbors(hq.q, hq.r, hq.s)
         : getHexesInRange(hq.q, hq.r, hq.s, range);
       
-      // Add safehouse neighbors for soldier deployment
-      if (unitType === 'soldier' && prev.safehouse) {
-        const safehouseNeighbors = getHexNeighbors(prev.safehouse.q, prev.safehouse.r, prev.safehouse.s);
-        candidates = [...candidates, ...safehouseNeighbors];
+      // Add safehouse neighbors for soldier deployment, and safehouse range for capo deployment
+      if (prev.safehouses.length > 0) {
+        for (const sh of prev.safehouses) {
+          if (unitType === 'soldier') {
+            const safehouseNeighbors = getHexNeighbors(sh.q, sh.r, sh.s);
+            candidates = [...candidates, ...safehouseNeighbors];
+          } else {
+            // Capos can deploy up to 5 hexes from safehouse
+            const safehouseRange = getHexesInRange(sh.q, sh.r, sh.s, 5);
+            candidates = [...candidates, ...safehouseRange];
+          }
+        }
         // Deduplicate
         const seen = new Set<string>();
         candidates = candidates.filter(c => {
@@ -1640,17 +1676,19 @@ export const useEnhancedMafiaGameState = (
       // Expire reinforcement targets
       newState.reinforceTargets = (newState.reinforceTargets || []).filter(rt => rt.expiresOnTurn > newState.turn);
 
-      // Tick safehouse
-      if (newState.safehouse) {
-        newState.safehouse = { ...newState.safehouse, turnsRemaining: newState.safehouse.turnsRemaining - 1 };
-        if (newState.safehouse.turnsRemaining <= 0) {
-          newState.safehouse = null;
-          newState.pendingNotifications = [...newState.pendingNotifications, {
-            type: 'warning' as const, title: '🏠 Safehouse Expired',
-            message: 'Your safehouse has been dismantled.',
-          }];
-        }
-      }
+      // Tick safehouses
+      newState.safehouses = (newState.safehouses || [])
+        .map(s => ({ ...s, turnsRemaining: s.turnsRemaining - 1 }))
+        .filter(s => {
+          if (s.turnsRemaining <= 0) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '🏠 Safehouse Expired',
+              message: 'A safehouse has been dismantled.',
+            }];
+            return false;
+          }
+          return true;
+        });
 
       // Tick planned hit expiration
       if (newState.plannedHit && newState.plannedHit.expiresOnTurn <= newState.turn) {
@@ -2309,7 +2347,15 @@ export const useEnhancedMafiaGameState = (
           let targetPool: typeof validMoves;
           const hasBounty = state.aiBounties.some(b => b.fromFamily === fam && b.targetFamily === state.playerFamily);
 
-          if ((hasBounty || isAlerted) && playerHexes.length > 0) {
+          // Prioritize enemy safehouse hexes for bounty + intel
+          const safehouseHexes = validMoves.filter(n => 
+            state.safehouses.some(s => s.q === n.q && s.r === n.r && s.s === n.s) &&
+            !state.hexMap.some(t => t.q === n.q && t.r === n.r && t.s === n.s && t.controllingFamily === fam)
+          );
+
+          if (safehouseHexes.length > 0 && Math.random() < 0.7) {
+            targetPool = safehouseHexes;
+          } else if ((hasBounty || isAlerted) && playerHexes.length > 0) {
             targetPool = playerHexes;
           } else {
             switch (personality) {
@@ -2404,8 +2450,13 @@ export const useEnhancedMafiaGameState = (
               }
 
               if (aiStrength >= enemyUnitsHere.length || Math.random() < combatWillingness) {
+                // Safehouse defense bonus: defenders on safehouse hex are harder to kill
+                const isTargetSafehouse = state.safehouses.some(s => s.q === target.q && s.r === target.r && s.s === target.s);
+                const baseKillChance = isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) : 0.7;
                 enemyUnitsHere.forEach(eu => {
-                  if (Math.random() < 0.7) {
+                  // Fortified defenders also get protection
+                  const killChance = eu.fortified ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
+                  if (Math.random() < killChance) {
                     const idx = state.deployedUnits.indexOf(eu);
                     if (idx !== -1) state.deployedUnits.splice(idx, 1);
                   }
@@ -2416,13 +2467,25 @@ export const useEnhancedMafiaGameState = (
                 if (remainingEnemies.length === 0) {
                   const prevOwner = tile.controllingFamily;
                   tile.controllingFamily = 'neutral' as any;
-                  if (prevOwner === state.playerFamily && state.safehouse && state.safehouse.q === target.q && state.safehouse.r === target.r && state.safehouse.s === target.s) {
-                    state.safehouse = null;
-                    state.pendingNotifications.push({
-                      type: 'error' as const,
-                      title: '🏠 Safehouse Destroyed',
-                      message: `The ${fam} family captured the hex and destroyed your safehouse!`,
-                    });
+                  // Check if any safehouse was on this hex (player's)
+                  const shIdx = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
+                  if (shIdx !== -1) {
+                    state.safehouses.splice(shIdx, 1);
+                    if (prevOwner === state.playerFamily) {
+                      state.pendingNotifications.push({
+                        type: 'error' as const,
+                        title: '🏠 Safehouse Destroyed',
+                        message: `The ${fam} family captured the hex and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} and intel on your operations.`,
+                      });
+                    }
+                    // Bounty to capturing AI family
+                    const captorOpponent = state.aiOpponents.find(o => o.family === fam);
+                    if (captorOpponent) captorOpponent.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
+                    // Intel: scout all of former owner's hexes for 1 turn (AI benefit tracked internally)
+                    if (prevOwner === state.playerFamily) {
+                      // AI gets intel on player — boost their targeting for 1 turn via existing alert mechanism
+                      state.aiAlertState[fam] = Math.max(state.aiAlertState[fam] || 0, SAFEHOUSE_CAPTURE_INTEL_DURATION);
+                    }
                   }
                 }
                 if (Math.random() < 0.3) {
@@ -2456,13 +2519,20 @@ export const useEnhancedMafiaGameState = (
                 if (prevOwner === state.playerFamily && turnReport) {
                   turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
                 }
-                if (prevOwner === state.playerFamily && state.safehouse && state.safehouse.q === target.q && state.safehouse.r === target.r && state.safehouse.s === target.s) {
-                  state.safehouse = null;
-                  state.pendingNotifications.push({
-                    type: 'error' as const,
-                    title: '🏠 Safehouse Destroyed',
-                    message: `The ${fam} family captured your territory and destroyed your safehouse!`,
-                  });
+                const shIdx2 = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
+                if (shIdx2 !== -1) {
+                  state.safehouses.splice(shIdx2, 1);
+                  if (prevOwner === state.playerFamily) {
+                    // Player captures AI safehouse → bounty + intel
+                    state.pendingNotifications.push({
+                      type: 'error' as const,
+                      title: '🏠 Safehouse Destroyed',
+                      message: `The ${fam} family captured your territory and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()}.`,
+                    });
+                  }
+                  // Bounty to capturing AI
+                  const captorOpp2 = state.aiOpponents.find(o => o.family === fam);
+                  if (captorOpp2) captorOpp2.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
                 }
               }
             }
@@ -2534,6 +2604,44 @@ export const useEnhancedMafiaGameState = (
             message: `The ${fam} family signals they want to negotiate peace. Use a Capo to propose a ceasefire on their territory.`,
           });
           if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in ceasefire' });
+        }
+      }
+
+      // ── AI SAFEHOUSE ESTABLISHMENT ──
+      const aiFamHexes = state.hexMap.filter(t => t.controllingFamily === fam && !t.isHeadquarters);
+      const aiCapos = state.deployedUnits.filter(u => u.family === fam && u.type === 'capo');
+      // AI builds safehouse if: 8+ territories, $5000+, has a capo, and doesn't already have one on their territory
+      const aiHasSafehouse = state.safehouses.some(s => {
+        const shTile = state.hexMap.find(t => t.q === s.q && t.r === s.r && t.s === s.s);
+        return shTile && shTile.controllingFamily === fam;
+      });
+      if (aiFamHexes.length >= 8 && opponent.resources.money >= 5000 && aiCapos.length > 0 && !aiHasSafehouse) {
+        // Pick a border hex (adjacent to enemy territory) with most friendly neighbors
+        const borderHexes = aiFamHexes.filter(h => {
+          const neighbors = getHexNeighbors(h.q, h.r, h.s);
+          return neighbors.some(n => {
+            const nt = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+            return nt && nt.controllingFamily !== fam && nt.controllingFamily !== null;
+          });
+        });
+        if (borderHexes.length > 0) {
+          // Score by friendly neighbors
+          const scored = borderHexes.map(h => {
+            const neighbors = getHexNeighbors(h.q, h.r, h.s);
+            const friendlyCount = neighbors.filter(n => {
+              const nt = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+              return nt && nt.controllingFamily === fam;
+            }).length;
+            return { hex: h, score: friendlyCount };
+          }).sort((a, b) => b.score - a.score);
+          const bestHex = scored[0].hex;
+          state.safehouses.push({
+            q: bestHex.q, r: bestHex.r, s: bestHex.s,
+            turnsRemaining: SAFEHOUSE_DURATION,
+            createdTurn: state.turn,
+          });
+          opponent.resources.money -= SAFEHOUSE_COST;
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'safehouse', detail: `Established a safehouse in ${bestHex.district}` });
         }
       }
     });
@@ -3094,7 +3202,7 @@ export const useEnhancedMafiaGameState = (
           // Determine duration based on target's current location
           const targetHex = newState.hexMap.find(t => t.q === targetUnit.q && t.r === targetUnit.r && t.s === targetUnit.s);
           const isAtHQ = targetHex?.isHeadquarters === targetUnit.family;
-          const isAtSafehouse = newState.safehouse && targetUnit.q === newState.safehouse.q && targetUnit.r === newState.safehouse.r && targetUnit.s === newState.safehouse.s;
+          const isAtSafehouse = newState.safehouses.some(s => targetUnit.q === s.q && targetUnit.r === s.r && targetUnit.s === s.s);
           const isFortified = targetUnit.fortified;
           
           let duration = HITMAN_OPEN_TURNS;
@@ -3835,16 +3943,27 @@ export const useEnhancedMafiaGameState = (
     const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
     if (!tile || tile.controllingFamily !== state.playerFamily || tile.isHeadquarters) return state;
 
-    // Only one safehouse at a time
-    state.safehouse = {
+    // Check cost
+    if (state.resources.money < SAFEHOUSE_COST) return state;
+
+    // Check max
+    const playerHexCount = state.hexMap.filter(t => t.controllingFamily === state.playerFamily).length;
+    const maxAllowed = playerHexCount >= SAFEHOUSE_TERRITORY_THRESHOLD ? MAX_SAFEHOUSES : 1;
+    if (state.safehouses.length >= maxAllowed) return state;
+
+    // Check duplicate
+    if (state.safehouses.some(s => s.q === targetQ && s.r === targetR && s.s === targetS)) return state;
+
+    state.safehouses.push({
       q: targetQ, r: targetR, s: targetS,
       turnsRemaining: SAFEHOUSE_DURATION,
       createdTurn: state.turn,
-    };
+    });
+    state.resources.money -= SAFEHOUSE_COST;
 
     state.pendingNotifications = [...state.pendingNotifications, {
       type: 'success', title: '🏠 Safehouse Established!',
-      message: `New safehouse at ${tile.district}. Acts as secondary deploy point for ${SAFEHOUSE_DURATION} turns.`,
+      message: `New safehouse at ${tile.district}. Acts as secondary deploy point for ${SAFEHOUSE_DURATION} turns. Cost: $${SAFEHOUSE_COST.toLocaleString()}.`,
     }];
 
     return state;
@@ -3956,6 +4075,11 @@ export const useEnhancedMafiaGameState = (
       if (fortifiedDefenders.length > 0) {
         chance -= FORTIFY_DEFENSE_BONUS / 100;
       }
+      // Safehouse defense bonus for defenders
+      const isDefenderSafehouse = state.safehouses.some(s => s.q === targetQ && s.r === targetR && s.s === targetS);
+      if (isDefenderSafehouse) {
+        chance -= SAFEHOUSE_DEFENSE_BONUS / 100;
+      }
       const fortifiedAttackers = playerUnits.filter(u => u.fortified);
       if (fortifiedAttackers.length > 0) {
         chance += FORTIFY_DEFENSE_BONUS / 200;
@@ -4034,6 +4158,41 @@ export const useEnhancedMafiaGameState = (
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         });
         tile.controllingFamily = null; // Hit clears enemy control — player must Claim next turn
+        
+        // Check if enemy had a safehouse on this hex → player gets bounty + intel
+        // (AI safehouses are tracked per-AI; for now we check if any AI opponent has a safehouse here)
+        // We store AI safehouses on the same state.safehouses array, marked by checking against player
+        // Actually AI safehouses are separate — we track them via aiSafehouses on opponents
+        // For simplicity, any safehouse on this hex that isn't the player's gets destroyed
+        const enemySafehouseIdx = state.safehouses.findIndex(s => s.q === targetQ && s.r === targetR && s.s === targetS);
+        if (enemySafehouseIdx !== -1) {
+          state.safehouses.splice(enemySafehouseIdx, 1);
+          state.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
+          // Intel: scout all hexes owned by targetFamily for 1 turn
+          if (targetFamily) {
+            const enemyHexes = state.hexMap.filter(t => t.controllingFamily === targetFamily);
+            const newScoutEntries: ScoutedHex[] = enemyHexes.map(h => ({
+              q: h.q, r: h.r, s: h.s,
+              scoutedTurn: state.turn,
+              turnsRemaining: SAFEHOUSE_CAPTURE_INTEL_DURATION,
+              freshUntilTurn: state.turn + 1,
+              enemySoldierCount: state.deployedUnits.filter(u => u.family === targetFamily && u.q === h.q && u.r === h.r && u.s === h.s).length,
+              enemyFamily: targetFamily,
+              businessType: h.business?.type,
+              businessIncome: h.business?.income,
+            }));
+            // Merge — don't duplicate existing scouts
+            const existingKeys = new Set(state.scoutedHexes.map(s => `${s.q},${s.r},${s.s}`));
+            state.scoutedHexes = [
+              ...state.scoutedHexes,
+              ...newScoutEntries.filter(s => !existingKeys.has(`${s.q},${s.r},${s.s}`)),
+            ];
+          }
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'success', title: '🏠 Enemy Safehouse Captured!',
+            message: `You raided their safehouse! +$${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} bounty and full intel on ${targetFamily} operations for 1 turn.`,
+          }];
+        }
         
         if (!isScouted) {
           // ===== BLIND HIT VICTORY: Enhanced rewards =====

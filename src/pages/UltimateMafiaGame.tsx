@@ -621,8 +621,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                   </div>
                 );
               })}
-              {gameState.safehouse && (
-                <span className="text-xs text-muted-foreground ml-1">🏠 {gameState.safehouse.turnsRemaining}t</span>
+              {gameState.safehouses.length > 0 && (
+                <span className="text-xs text-muted-foreground ml-1">🏠 {gameState.safehouses.map(s => `${s.turnsRemaining}t`).join(', ')}</span>
               )}
             </div>
             {/* Tactical action description panel */}
