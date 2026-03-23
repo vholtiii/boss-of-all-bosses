@@ -1,43 +1,22 @@
 
 
-# Safehouse Refinements (Final)
+# Fix: Capo Auto-Claim/Extort Notifications on Deploy
 
-## Changes
+## Problem
+When a capo is deployed from HQ (including turn 1), the `deployUnit` function auto-claims neutral territory and should auto-extort illegal businesses, but it:
+1. **Never adds a notification** — the `pendingNotifications` array is not updated
+2. **Never auto-extorts** — unlike `moveUnit`, it doesn't check for illegal businesses or award money/respect
 
-### 1. Destroy on Capture + Bounty + Intel
-When a safehouse hex is captured, the safehouse is destroyed and the captor gains:
-- **$9,000 bounty** (`SAFEHOUSE_CAPTURE_BOUNTY`)
-- **1-turn full intel** on the former owner's family — all their hexes become scouted (fresh) for 1 turn, then revert to fog of war. Implemented by bulk-adding `ScoutedHex` entries for all hexes owned by that family with `turnsRemaining: 1`.
+The `moveUnit` function (lines 1047-1102) correctly handles both auto-claim notifications and auto-extortion with bonuses, but `deployUnit` (lines 1413-1421) only silently changes the hex owner.
 
-### 2. Defense Bonus (+10%)
-Units on a safehouse hex get +10% defense in combat (`SAFEHOUSE_DEFENSE_BONUS`).
+## Fix — `src/hooks/useEnhancedMafiaGameState.ts`
 
-### 3. Capo Deployment from Safehouse
-Capos can deploy from safehouses matching HQ deploy range (5 hexes).
+In the `deployUnit` function (around lines 1413-1430), replicate the auto-claim/extort logic from `moveUnit`:
 
-### 4. Cost + Scaling
-- `SAFEHOUSE_COST = 2500` deducted on creation
-- 2nd safehouse allowed at 15+ hexes (`SAFEHOUSE_TERRITORY_THRESHOLD = 15`)
-- Migrate `safehouse` to `safehouses: Safehouse[]` (max 2)
-
-### 5. AI Safehouse Behavior
-- AI with 8+ territories and $5,000+ places safehouses on strategic border hexes
-- AI prioritizes capturing enemy safehouse hexes for bounty + intel
-
-## New Constants — `src/types/game-mechanics.ts`
-```
-SAFEHOUSE_COST = 2500
-SAFEHOUSE_DEFENSE_BONUS = 10
-SAFEHOUSE_CAPTURE_BOUNTY = 9000
-SAFEHOUSE_CAPTURE_INTEL_DURATION = 1
-SAFEHOUSE_TERRITORY_THRESHOLD = 15
-MAX_SAFEHOUSES = 2
-```
+1. When a capo deploys to a neutral hex with an illegal business: auto-extort it, award money + respect, push a success notification
+2. When a capo deploys to a neutral hex without an illegal business (or with a legal one): auto-claim it, push an info notification
+3. Include the notification in the returned `pendingNotifications` array so the useEffect in `UltimateMafiaGame.tsx` picks it up and displays the toast
 
 ## Files Modified
-- `src/types/game-mechanics.ts` — new constants
-- `src/hooks/useEnhancedMafiaGameState.ts` — array state, capture destruction + bounty + intel reveal, defense bonus, capo deploy, cost, scaling, AI safehouse logic
-- `src/components/EnhancedMafiaHexGrid.tsx` — render multiple safehouse icons, deploy highlights
-- `src/components/GameSidePanels.tsx` — show cost, count, threshold info
-- `src/pages/UltimateMafiaGame.tsx` — pass updated safehouse array props
+- `src/hooks/useEnhancedMafiaGameState.ts` — add notification + extortion logic to `deployUnit` (single block, ~15 lines)
 
