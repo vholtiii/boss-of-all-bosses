@@ -502,6 +502,18 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           >Cancel</button>
         </div>
       )}
+      {/* Plan Hit mode banner */}
+      {planHitMode && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-6 py-2 rounded-full bg-destructive/90 backdrop-blur-sm border border-destructive/30 shadow-lg flex items-center gap-3">
+          <span className="text-sm font-bold text-white">
+            🎯 {planHitStep === 'selectSoldier' ? 'Select a soldier to plan the hit' : 'Select a scouted enemy hex to target'}
+          </span>
+          <button
+            className="text-xs text-white/70 hover:text-white underline"
+            onClick={() => { setPlanHitUnitMenu(null); onCancelPlanHit?.(); }}
+          >Cancel</button>
+        </div>
+      )}
       {/* Controls */}
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
         <div className="flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-3 border border-noir-light shadow-lg">
