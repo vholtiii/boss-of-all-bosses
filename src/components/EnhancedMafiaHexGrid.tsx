@@ -213,12 +213,35 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const handleHexClick = (tile: HexTile) => {
     const turnPhase = gameState?.turnPhase || 'waiting';
 
-    // Plan Hit mode — intercept clicks on scouted enemy hexes
-    if (planHitMode && onPlanHitSelect) {
-      const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== playerFamily;
-      const isScouted = scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
-      if (isEnemy && isScouted) {
-        onPlanHitSelect(tile.q, tile.r, tile.s);
+    // Plan Hit mode — 2-step selection
+    if (planHitMode) {
+      if (planHitStep === 'selectSoldier') {
+        // Step 1: Select a player soldier
+        const key = `${tile.q},${tile.r},${tile.s}`;
+        const unitsHere = unitsByHex.get(key) || [];
+        const playerSoldier = unitsHere.find(u => u.family === playerFamily && u.type === 'soldier');
+        if (playerSoldier && onPlanHitSelectSoldier) {
+          onPlanHitSelectSoldier(playerSoldier.id);
+        }
+        return;
+      }
+      if (planHitStep === 'selectTarget' && onPlanHitSelect) {
+        // Step 2: Select a scouted enemy hex → show unit picker
+        const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== playerFamily;
+        const isScouted = scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
+        if (isEnemy && isScouted) {
+          const key = `${tile.q},${tile.r},${tile.s}`;
+          const unitsHere = unitsByHex.get(key) || [];
+          const enemyUnits = unitsHere.filter(u => u.family !== playerFamily);
+          if (enemyUnits.length === 1) {
+            // Only one unit — select directly
+            onPlanHitSelect(tile.q, tile.r, tile.s, enemyUnits[0].id);
+          } else if (enemyUnits.length > 1) {
+            // Show unit picker
+            setPlanHitUnitMenu({ tile, enemyUnits });
+          }
+        }
+        return;
       }
       return;
     }
