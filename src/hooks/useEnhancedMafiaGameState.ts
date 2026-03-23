@@ -4168,7 +4168,7 @@ export const useEnhancedMafiaGameState = (
             }];
           }
         }
-        shuffled.slice(casualties).forEach(u => {
+        defeatShuffled.slice(defeatCasualties).forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
             // Loyalty: +5 combat survival bonus
@@ -4178,7 +4178,7 @@ export const useEnhancedMafiaGameState = (
             );
           }
         });
-        const failDetails = `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} suffered`;
+        const failDetails = `${defeatCasualties} casualt${defeatCasualties > 1 ? 'ies' : 'y'} suffered`;
         state.lastCombatResult = {
           q: targetQ, r: targetR, s: targetS,
           success: false, type: 'hit',
