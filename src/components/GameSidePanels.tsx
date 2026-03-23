@@ -190,6 +190,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="🍝 Restaurant"
               sublabel={`$20,000 · $3K/turn · 1 action`}
               disabled={resources.money < 20000 || legalStatus.jailTime > 0 || gameState.actionsRemaining <= 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 20000 ? 'Need $20,000' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'build_business', businessType: 'restaurant' })}
             />
@@ -198,6 +199,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="🏪 Store"
               sublabel={`$12,000 · $1.8K/turn · 1 action`}
               disabled={resources.money < 12000 || legalStatus.jailTime > 0 || gameState.actionsRemaining <= 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 12000 ? 'Need $12,000' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'build_business', businessType: 'store' })}
             />
@@ -206,6 +208,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="🏗️ Construction"
               sublabel={`$35,000 · $5K/turn · 1 action`}
               disabled={resources.money < 35000 || legalStatus.jailTime > 0 || gameState.actionsRemaining <= 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 35000 ? 'Need $35,000' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'build_business', businessType: 'construction' })}
             />
@@ -214,6 +217,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Launder Money"
               sublabel={`20% fee`}
               disabled={gameState.finances.dirtyMoney < 1000 || legalStatus.jailTime > 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : gameState.finances.dirtyMoney < 1000 ? 'No dirty money' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'launder_money', amount: 10000 })}
             />
