@@ -3150,7 +3150,7 @@ export const useEnhancedMafiaGameState = (
           // Determine duration based on target's current location
           const targetHex = newState.hexMap.find(t => t.q === targetUnit.q && t.r === targetUnit.r && t.s === targetUnit.s);
           const isAtHQ = targetHex?.isHeadquarters === targetUnit.family;
-          const isAtSafehouse = newState.safehouse && targetUnit.q === newState.safehouse.q && targetUnit.r === newState.safehouse.r && targetUnit.s === newState.safehouse.s;
+          const isAtSafehouse = newState.safehouses.some(s => targetUnit.q === s.q && targetUnit.r === s.r && targetUnit.s === s.s);
           const isFortified = targetUnit.fortified;
           
           let duration = HITMAN_OPEN_TURNS;
