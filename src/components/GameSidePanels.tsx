@@ -135,11 +135,29 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               variant="destructive"
               onClick={() => onAction({ type: 'enter_plan_hit_mode' })}
             />
-            {gameState.plannedHit && (
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs text-destructive font-medium flex items-center gap-1.5">
-                🎯 Hit planned — +{PLAN_HIT_BONUS}% bonus · Expires turn {gameState.plannedHit.expiresOnTurn}
-              </div>
-            )}
+            {gameState.plannedHit && (() => {
+              const planner = (gameState.deployedUnits || []).find((u: any) => u.id === gameState.plannedHit.plannerUnitId);
+              const target = (gameState.deployedUnits || []).find((u: any) => u.id === gameState.plannedHit.targetUnitId);
+              const plannerName = planner?.name || gameState.plannedHit.plannerUnitId?.split('-').slice(-2).join(' ') || '?';
+              const targetName = target?.name || gameState.plannedHit.targetUnitId?.split('-').slice(-2).join(' ') || '?';
+              const targetStillThere = target && target.q === gameState.plannedHit.q && target.r === gameState.plannedHit.r && target.s === gameState.plannedHit.s;
+              return (
+                <div className={cn(
+                  "rounded-md border px-3 py-1.5 text-xs font-medium flex flex-col gap-0.5",
+                  targetStillThere 
+                    ? "border-destructive/30 bg-destructive/10 text-destructive" 
+                    : "border-orange-500/30 bg-orange-500/10 text-orange-400"
+                )}>
+                  <div className="flex items-center gap-1.5">
+                    🎯 Hit planned — +{PLAN_HIT_BONUS}% bonus · Expires turn {gameState.plannedHit.expiresOnTurn}
+                  </div>
+                  <div className="text-[10px] opacity-80">
+                    Planner: {plannerName} → Target: {targetName}
+                    {!targetStillThere && target && <span className="ml-1 text-orange-400 font-bold">⚠️ TARGET MOVED</span>}
+                  </div>
+                </div>
+              );
+            })()}
             <ActionButton
               icon={<Eye className="h-4 w-4" />}
               label="Sabotage Rival"
