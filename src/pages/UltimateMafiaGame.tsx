@@ -251,7 +251,11 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
             planHitMode={planHitMode}
-            onPlanHitSelect={(q, r, s) => handleAction({ type: 'plan_hit', targetQ: q, targetR: r, targetS: s })}
+            planHitStep={planHitStep}
+            planHitPlannerId={planHitPlannerId}
+            onPlanHitSelect={(q, r, s, targetUnitId) => handleAction({ type: 'plan_hit', plannerUnitId: planHitPlannerId, targetUnitId })}
+            onPlanHitSelectSoldier={(unitId) => handleAction({ type: 'plan_hit_select_soldier', unitId })}
+            onCancelPlanHit={() => handleAction({ type: 'cancel_plan_hit_mode' })}
           />
         </div>
       )
