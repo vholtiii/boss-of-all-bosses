@@ -2448,7 +2448,7 @@ export const useEnhancedMafiaGameState = (
   // ============ ACTION SYSTEM ============
   const performAction = useCallback((action: any) => {
     setGameState(prev => {
-      const newState = { ...prev };
+      const newState = cloneStateForMutation(prev);
       // Defensive guards for arrays
       newState.hitmanContracts = newState.hitmanContracts || [];
       newState.activeBribes = newState.activeBribes || [];
