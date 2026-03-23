@@ -1,22 +1,20 @@
 
 
-# Fix: Capo Auto-Claim/Extort Notifications on Deploy
+# Fix: Plan Hit Visibility During Tactical Phase
 
 ## Problem
-When a capo is deployed from HQ (including turn 1), the `deployUnit` function auto-claims neutral territory and should auto-extort illegal businesses, but it:
-1. **Never adds a notification** — the `pendingNotifications` array is not updated
-2. **Never auto-extorts** — unlike `moveUnit`, it doesn't check for illegal businesses or award money/respect
+The "Plan Hit" button lives inside the "Strategic Actions" section, which displays a 🔒 icon on its header during the tactical phase. Even though the Plan Hit button itself is correctly unlocked (`phaseLocked={!isTacticalPhase}`), the section-level lock icon misleads the player into thinking the entire section is inaccessible.
 
-The `moveUnit` function (lines 1047-1102) correctly handles both auto-claim notifications and auto-extortion with bonuses, but `deployUnit` (lines 1413-1421) only silently changes the hex owner.
+The `disabledReason` text (e.g., "Scout an enemy hex first", "No tactical actions") already renders correctly on the button — but the player never opens the section because the header shows 🔒.
 
-## Fix — `src/hooks/useEnhancedMafiaGameState.ts`
+## Fix — `src/components/GameSidePanels.tsx`
 
-In the `deployUnit` function (around lines 1413-1430), replicate the auto-claim/extort logic from `moveUnit`:
+**Move "Plan Hit" (and its active-hit status card) out of the "Strategic Actions" section** and into the "Recruitment & Tactical" section (which is already unlocked during the tactical phase). This places it alongside other tactical-phase actions like "Hire Mercenary" and "Recruit Local Soldier", where it logically belongs since it costs a tactical action.
 
-1. When a capo deploys to a neutral hex with an illegal business: auto-extort it, award money + respect, push a success notification
-2. When a capo deploys to a neutral hex without an illegal business (or with a legal one): auto-claim it, push an info notification
-3. Include the notification in the returned `pendingNotifications` array so the useEffect in `UltimateMafiaGame.tsx` picks it up and displays the toast
+This is a simple cut-and-paste of ~50 lines (the `ActionButton` for Plan Hit + the `plannedHit` status card) from the Strategic Actions section to the Recruitment & Tactical section.
+
+No logic changes needed — the button's own `disabled`, `disabledReason`, and `phaseLocked` props already handle all edge cases correctly. The player will now see it in an unlocked section with clear feedback text when conditions aren't met.
 
 ## Files Modified
-- `src/hooks/useEnhancedMafiaGameState.ts` — add notification + extortion logic to `deployUnit` (single block, ~15 lines)
+- `src/components/GameSidePanels.tsx` — relocate Plan Hit button + status card to tactical section
 
