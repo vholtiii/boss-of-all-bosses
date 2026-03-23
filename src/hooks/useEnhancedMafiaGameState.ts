@@ -261,6 +261,10 @@ export interface EnhancedMafiaGameState {
   selectedTerritory?: any;
   activeEvent?: GameEvent;
   
+  mapSeed: number;
+  difficulty: Difficulty;
+  difficultyModifiers: DifficultyModifiers;
+  
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
   };
