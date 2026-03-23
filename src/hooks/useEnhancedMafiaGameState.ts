@@ -1182,7 +1182,6 @@ export const useEnhancedMafiaGameState = (
       ...prev, deployedUnits: newUnits, scoutedHexes: newScoutedHexes,
       reinforceTargets,
       selectedUnitId: null, availableMoveHexes: [],
-      selectedMoveAction: 'move' as MoveAction,
       pendingNotifications: notifications,
     };
   };
