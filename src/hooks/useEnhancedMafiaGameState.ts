@@ -2097,12 +2097,14 @@ export const useEnhancedMafiaGameState = (
     state.deployedUnits = state.deployedUnits || [];
     state.aiBounties = state.aiBounties || [];
     state.aiAlertState = state.aiAlertState || {};
+    const diffMods = state.difficultyModifiers || DIFFICULTY_MODIFIERS.normal;
+
     state.aiOpponents.forEach(opponent => {
       const fam = opponent.family as any;
       const hq = state.headquarters[fam];
       if (!hq) return;
 
-      // ── INCOME ──
+      // ── INCOME (difficulty-scaled) ──
       let aiIncome = 0;
       state.hexMap.forEach(tile => {
         if (tile.controllingFamily === fam && tile.business) {
@@ -2113,15 +2115,15 @@ export const useEnhancedMafiaGameState = (
           else aiIncome += Math.floor(tile.business.income * 0.1);
         }
       });
-      // Minimum passive income so AI always grows
-      aiIncome = Math.max(aiIncome, 2000 + state.turn * 500);
+      const minIncome = Math.floor((2000 + state.turn * 500) * diffMods.aiIncomeMult);
+      aiIncome = Math.max(aiIncome, minIncome);
       opponent.resources.money += aiIncome;
       if (turnReport) turnReport.aiActions.push({ family: fam, action: 'income', detail: `Earned $${aiIncome.toLocaleString()} income` });
 
-      // ── RECRUIT ── (always try to recruit up to a scaling cap)
+      // ── RECRUIT (difficulty-scaled cap) ──
       const isAlerted = (state.aiAlertState || {})[fam] > 0;
       const alertBonus = isAlerted ? 1 : 0;
-      const soldierCap = Math.min(8 + alertBonus, 3 + Math.floor(state.turn / 2) + alertBonus);
+      const soldierCap = Math.min(8 + alertBonus + diffMods.aiRecruitCapBonus, 3 + Math.floor(state.turn / 2) + alertBonus + diffMods.aiRecruitCapBonus);
       const currentDeployed = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier').length;
       const totalSoldiers = opponent.resources.soldiers + currentDeployed;
       const wantToRecruit = Math.max(0, soldierCap - totalSoldiers);
@@ -2133,22 +2135,19 @@ export const useEnhancedMafiaGameState = (
         if (toRecruit > 0 && turnReport) turnReport.aiActions.push({ family: fam, action: 'recruit', detail: `Recruited ${toRecruit} soldier(s)` });
       }
 
-      // ── DEPLOY ── (deploy ALL available soldiers from pool)
+      // ── DEPLOY ──
       let soldiersToPlace = opponent.resources.soldiers;
       while (soldiersToPlace > 0) {
-        // Find valid hexes: HQ neighbors first, then neighbors of existing units
         const aiUnitPositions = state.deployedUnits
           .filter(u => u.family === fam)
           .map(u => ({ q: u.q, r: u.r, s: u.s }));
         const spawnPoints = [{ q: hq.q, r: hq.r, s: hq.s }, ...aiUnitPositions];
-        
         let placed = false;
         for (const sp of spawnPoints) {
           const neighbors = getHexNeighbors(sp.q, sp.r, sp.s);
           const validTargets = neighbors.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
             if (!tile || tile.isHeadquarters) return false;
-            // Prefer neutral or own territory, avoid stacking too many
             const unitsHere = state.deployedUnits.filter(u => u.q === n.q && u.r === n.r && u.s === n.s);
             return unitsHere.length < 2;
           });
@@ -2170,17 +2169,20 @@ export const useEnhancedMafiaGameState = (
             }
             soldiersToPlace--;
             placed = true;
-            break; // one per spawn point cycle
+            break;
           }
         }
-        if (!placed) break; // no valid spots
+        if (!placed) break;
       }
-      opponent.resources.soldiers = soldiersToPlace; // leftover
+      opponent.resources.soldiers = soldiersToPlace;
 
-      // ── MOVE ALL UNITS ── (each unit tries to move)
+      // ── PERSONALITY-DRIVEN MOVEMENT & COMBAT ──
+      const personality = opponent.personality || 'aggressive';
+      const aggression = opponent.strategy.aggressionLevel || 50;
+      const cooperation = opponent.strategy.cooperationTendency || 50;
+
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
       for (const unit of aiUnits) {
-        // Each unit gets up to 2 move attempts (alert: +1 range)
         let movesLeft = Math.min(unit.movesRemaining, unit.type === 'soldier' ? (2 + alertBonus) : 3);
         while (movesLeft > 0) {
           const neighbors = unit.type === 'soldier'
@@ -2189,9 +2191,7 @@ export const useEnhancedMafiaGameState = (
           const validMoves = neighbors.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
             if (!tile || tile.isHeadquarters) return false;
-            // Already own this hex — always valid
             if (tile.controllingFamily === fam) return true;
-            // Only expand to hexes adjacent to already-controlled territory
             const nNeighbors = getHexNeighbors(n.q, n.r, n.s);
             return nNeighbors.some(nn => {
               const nt = state.hexMap.find(t => t.q === nn.q && t.r === nn.r && t.s === nn.s);
@@ -2200,7 +2200,7 @@ export const useEnhancedMafiaGameState = (
           });
           if (validMoves.length === 0) break;
 
-          // Prioritize: 1) player territory, 2) neutral territory, 3) expand away from HQ
+          // Personality-driven target prioritization
           const playerHexes = validMoves.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
             return tile && tile.controllingFamily === state.playerFamily;
@@ -2209,26 +2209,57 @@ export const useEnhancedMafiaGameState = (
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
             return tile && tile.controllingFamily === 'neutral';
           });
-          const enemyHexes = validMoves.filter(n => {
+          const otherAIHexes = validMoves.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
-            return tile && tile.controllingFamily !== fam && tile.controllingFamily !== 'neutral';
+            return tile && tile.controllingFamily !== fam && tile.controllingFamily !== 'neutral' && tile.controllingFamily !== state.playerFamily;
           });
+          const enemyHexes = [...playerHexes, ...otherAIHexes];
 
-          let targetPool = playerHexes.length > 0 ? playerHexes
-            : enemyHexes.length > 0 ? enemyHexes
-            : neutralHexes.length > 0 ? neutralHexes
-            : validMoves;
-          
-          // Bounty or alert active: always prioritize player hexes
+          let targetPool: typeof validMoves;
           const hasBounty = state.aiBounties.some(b => b.fromFamily === fam && b.targetFamily === state.playerFamily);
+
           if ((hasBounty || isAlerted) && playerHexes.length > 0) {
             targetPool = playerHexes;
-          } else if (!hasBounty && !isAlerted && neutralHexes.length > 0 && Math.random() < 0.3) {
-            // 30% chance to just expand to neutral instead of attacking (variety)
-            targetPool = neutralHexes;
+          } else {
+            switch (personality) {
+              case 'aggressive':
+                targetPool = enemyHexes.length > 0 ? enemyHexes : neutralHexes.length > 0 ? neutralHexes : validMoves;
+                break;
+              case 'defensive':
+                targetPool = neutralHexes.length > 0 ? neutralHexes : validMoves;
+                break;
+              case 'opportunistic': {
+                const weakest = enemyHexes.reduce((best, hex) => {
+                  const t = state.hexMap.find(t2 => t2.q === hex.q && t2.r === hex.r && t2.s === hex.s);
+                  if (!t) return best;
+                  const dc = state.deployedUnits.filter(u => u.family === t.controllingFamily && u.q === hex.q && u.r === hex.r && u.s === hex.s).length;
+                  if (!best || dc < best.count) return { hex, count: dc };
+                  return best;
+                }, null as { hex: typeof validMoves[0]; count: number } | null);
+                targetPool = weakest ? [weakest.hex] : neutralHexes.length > 0 ? neutralHexes : validMoves;
+                break;
+              }
+              case 'diplomatic':
+                if (Math.random() < 0.4) {
+                  targetPool = neutralHexes.length > 0 ? neutralHexes : validMoves.filter(n => {
+                    const t = state.hexMap.find(t2 => t2.q === n.q && t2.r === n.r && t2.s === n.s);
+                    return t && t.controllingFamily === fam;
+                  });
+                  if (targetPool.length === 0) targetPool = validMoves;
+                } else {
+                  targetPool = neutralHexes.length > 0 ? neutralHexes : enemyHexes.length > 0 ? enemyHexes : validMoves;
+                }
+                break;
+              case 'unpredictable':
+              default: {
+                const pools = [playerHexes, neutralHexes, otherAIHexes, enemyHexes].filter(s => s.length > 0);
+                targetPool = pools.length > 0 ? pools[Math.floor(Math.random() * pools.length)] : validMoves;
+                break;
+              }
+            }
           }
 
-          // Alert: fortify 1-2 units per turn (random chance)
+          // Alert: fortify chance
           if (isAlerted && !unit.fortified && Math.random() < 0.3) {
             unit.fortified = true;
             unit.movesRemaining = 0;
@@ -2236,12 +2267,12 @@ export const useEnhancedMafiaGameState = (
             continue;
           }
 
+          if (targetPool.length === 0) targetPool = validMoves;
           const target = targetPool[Math.floor(Math.random() * targetPool.length)];
           unit.q = target.q;
           unit.r = target.r;
           unit.s = target.s;
 
-          // Community resistance: entering player's empty claimed territory costs an extra move
           const targetTile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
           const isCommunityHex = targetTile && targetTile.controllingFamily === state.playerFamily && !targetTile.business && !targetTile.isHeadquarters;
           const moveCost = isCommunityHex ? 2 : 1;
@@ -2250,29 +2281,37 @@ export const useEnhancedMafiaGameState = (
 
           const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
           if (tile && !tile.isHeadquarters) {
-            // Combat: check for enemy units on this hex
+            // Combat: ANY enemy units (including other AI — enables AI-to-AI combat)
             const enemyUnitsHere = state.deployedUnits.filter(u =>
               u.family !== fam && u.q === target.q && u.r === target.r && u.s === target.s
             );
             if (enemyUnitsHere.length > 0) {
               const aiStrength = state.deployedUnits.filter(u => u.family === fam && u.q === target.q && u.r === target.r && u.s === target.s).length;
-              // Combat resolution — attacker advantage
-              if (aiStrength >= enemyUnitsHere.length || Math.random() < 0.4) {
-                // Remove enemy units (with some surviving based on luck)
+
+              // Personality-driven combat willingness (replaces flat 0.4)
+              let combatWillingness: number;
+              switch (personality) {
+                case 'aggressive': combatWillingness = 0.8; break;
+                case 'defensive': combatWillingness = aiStrength >= enemyUnitsHere.length + 2 ? 0.7 : 0.15; break;
+                case 'diplomatic': combatWillingness = 0.2; break;
+                case 'opportunistic': combatWillingness = aiStrength >= enemyUnitsHere.length ? 0.6 : 0.2; break;
+                default: combatWillingness = Math.random(); break;
+              }
+
+              if (aiStrength >= enemyUnitsHere.length || Math.random() < combatWillingness) {
                 enemyUnitsHere.forEach(eu => {
-                  if (Math.random() < 0.7) { // 70% chance to eliminate each enemy
+                  if (Math.random() < 0.7) {
                     const idx = state.deployedUnits.indexOf(eu);
                     if (idx !== -1) state.deployedUnits.splice(idx, 1);
                   }
                 });
-                // Check if we cleared the hex
                 const remainingEnemies = state.deployedUnits.filter(u =>
                   u.family !== fam && u.q === target.q && u.r === target.r && u.s === target.s
                 );
                 if (remainingEnemies.length === 0) {
-                  tile.controllingFamily = null; // AI hit sets to neutral — AI must claim next turn
-                  // Destroy player safehouse if on this hex
-                  if (state.safehouse && state.safehouse.q === target.q && state.safehouse.r === target.r && state.safehouse.s === target.s) {
+                  const prevOwner = tile.controllingFamily;
+                  tile.controllingFamily = 'neutral' as any;
+                  if (prevOwner === state.playerFamily && state.safehouse && state.safehouse.q === target.q && state.safehouse.r === target.r && state.safehouse.s === target.s) {
                     state.safehouse = null;
                     state.pendingNotifications.push({
                       type: 'error' as const,
@@ -2281,7 +2320,6 @@ export const useEnhancedMafiaGameState = (
                     });
                   }
                 }
-                // AI may also lose units
                 if (Math.random() < 0.3) {
                   const aiHere = state.deployedUnits.filter(u => u.family === fam && u.q === target.q && u.r === target.r && u.s === target.s);
                   if (aiHere.length > 1) {
@@ -2290,7 +2328,6 @@ export const useEnhancedMafiaGameState = (
                     if (idx !== -1) state.deployedUnits.splice(idx, 1);
                   }
                 }
-                // Notify player if their units were attacked
                 if (enemyUnitsHere.some(u => u.family === state.playerFamily)) {
                   state.pendingNotifications.push({
                     type: 'warning' as const,
@@ -2299,17 +2336,21 @@ export const useEnhancedMafiaGameState = (
                   });
                   if (turnReport) turnReport.aiActions.push({ family: fam, action: 'attack', detail: `Attacked your units in ${tile.district}` });
                 }
+                // Log AI-to-AI combat
+                const aiVictims = enemyUnitsHere.filter(u => u.family !== state.playerFamily);
+                if (aiVictims.length > 0 && turnReport) {
+                  const victimFams = [...new Set(aiVictims.map(u => u.family))];
+                  turnReport.aiActions.push({ family: fam, action: 'ai_combat', detail: `Fought ${victimFams.join(', ')} in ${tile.district}` });
+                }
               }
-              break; // Stop moving after combat
+              break;
             } else {
-              // Claim empty territory
               if (tile.controllingFamily !== fam) {
                 const prevOwner = tile.controllingFamily;
                 tile.controllingFamily = fam;
                 if (prevOwner === state.playerFamily && turnReport) {
                   turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
                 }
-                // Destroy player safehouse if on this hex
                 if (prevOwner === state.playerFamily && state.safehouse && state.safehouse.q === target.q && state.safehouse.r === target.r && state.safehouse.s === target.s) {
                   state.safehouse = null;
                   state.pendingNotifications.push({
@@ -2324,13 +2365,12 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // ── DEPLOY CAPO ── (if capo is still at HQ, move it out)
+      // ── DEPLOY CAPO ──
       const caposAtHQ = state.deployedUnits.filter(u =>
         u.family === fam && u.type === 'capo' && u.q === hq.q && u.r === hq.r && u.s === hq.s
       );
       if (caposAtHQ.length > 0) {
         const capo = caposAtHQ[0];
-        // Move capo to a controlled territory with a business
         const valuableTiles = state.hexMap.filter(t =>
           t.controllingFamily === fam && t.business && !t.isHeadquarters &&
           !state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
@@ -2345,15 +2385,13 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // ── PROMOTE SOLDIERS TO CAPOS ── (AI follows same rules as player)
+      // ── PROMOTE SOLDIERS TO CAPOS ──
       const aiCapoCount = state.deployedUnits.filter(u => u.family === fam && u.type === 'capo').length;
       if (aiCapoCount < MAX_CAPOS && opponent.resources.money >= CAPO_PROMOTION_COST) {
         const aiSoldierUnits = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
-        
-        // Find the best eligible soldier (highest victories)
         let bestCandidate: { unit: typeof aiSoldierUnits[0]; stats: SoldierStats } | null = null;
-        for (const unit of aiSoldierUnits) {
-          const stats = state.soldierStats[unit.id];
+        for (const solUnit of aiSoldierUnits) {
+          const stats = state.soldierStats[solUnit.id];
           if (!stats) continue;
           if (
             stats.victories >= CAPO_PROMOTION_REQUIREMENTS.minVictories &&
@@ -2363,27 +2401,34 @@ export const useEnhancedMafiaGameState = (
             stats.racketeering >= CAPO_PROMOTION_REQUIREMENTS.minRacketeering
           ) {
             if (!bestCandidate || stats.victories > bestCandidate.stats.victories) {
-              bestCandidate = { unit, stats };
+              bestCandidate = { unit: solUnit, stats };
             }
           }
         }
-
         if (bestCandidate) {
-          const { unit } = bestCandidate;
-          unit.type = 'capo' as any;
-          unit.maxMoves = 3;
-          unit.movesRemaining = 3;
-          (unit as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
-          (unit as any).name = `${fam.charAt(0).toUpperCase() + fam.slice(1)} Capo`;
+          const { unit: promUnit } = bestCandidate;
+          promUnit.type = 'capo' as any;
+          promUnit.maxMoves = 3;
+          promUnit.movesRemaining = 3;
+          (promUnit as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
+          (promUnit as any).name = `${fam.charAt(0).toUpperCase() + fam.slice(1)} Capo`;
           opponent.resources.money -= CAPO_PROMOTION_COST;
-          
           if (turnReport) {
-            turnReport.aiActions.push({
-              family: fam,
-              action: 'promote',
-              detail: `Promoted a soldier to Capo`,
-            });
+            turnReport.aiActions.push({ family: fam, action: 'promote', detail: `Promoted a soldier to Capo` });
           }
+        }
+      }
+
+      // ── DIPLOMATIC AI: Ceasefire proposals ──
+      if (personality === 'diplomatic' && Math.random() < (cooperation / 200)) {
+        const hasCeasefire = state.ceasefires.some(c => c.active && c.family === fam);
+        if (!hasCeasefire) {
+          state.pendingNotifications.push({
+            type: 'info' as const,
+            title: `🤝 ${fam.charAt(0).toUpperCase() + fam.slice(1)} Offers Ceasefire`,
+            message: `The ${fam} family signals they want to negotiate peace. Use a Capo to propose a ceasefire on their territory.`,
+          });
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in ceasefire' });
         }
       }
     });
