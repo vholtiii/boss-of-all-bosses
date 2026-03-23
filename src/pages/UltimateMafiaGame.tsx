@@ -38,6 +38,7 @@ type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
 interface GameConfig {
   family: FamilyId;
   resources: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number };
+  difficulty: 'easy' | 'normal' | 'hard';
 }
 
 const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = ({ config, onExitToMenu }) => {
@@ -62,7 +63,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     fortifyUnit,
     setMoveAction,
     startEscort,
-  } = useEnhancedMafiaGameState(config.family, config.resources);
+  } = useEnhancedMafiaGameState(config.family, config.resources, config.difficulty);
 
   const { notifySuccess, notifyError, notifyWarning, notifyInfo, notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
   const { playSound, playSoundSequence, updateSoundConfig, soundConfig } = useSoundSystem();
@@ -817,7 +818,7 @@ const UltimateMafiaGame: React.FC = () => {
   if (!gameConfig) {
     return (
       <FamilySelectionScreen
-        onSelectFamily={(family, resources) => setGameConfig({ family, resources })}
+        onSelectFamily={(family, resources, difficulty) => setGameConfig({ family, resources, difficulty })}
       />
     );
   }

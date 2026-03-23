@@ -119,11 +119,12 @@ const StatBar: React.FC<{ value: number; color: string }> = ({ value, color }) =
 );
 
 interface Props {
-  onSelectFamily: (familyId: FamilyId, resources: FamilyInfo['startingResources']) => void;
+  onSelectFamily: (familyId: FamilyId, resources: FamilyInfo['startingResources'], difficulty: 'easy' | 'normal' | 'hard') => void;
 }
 
 const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const [selectedFamily, setSelectedFamily] = useState<FamilyId | null>(null);
+  const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
 
   const activeFamily = families.find(f => f.id === selectedFamily);
 
@@ -155,8 +156,32 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         </h1>
         <div className="w-24 h-px bg-primary/30 mx-auto mt-4" />
         <p className="text-sm text-muted-foreground mt-4 font-source max-w-md mx-auto">
-          Choose your family. Each has unique strengths, weaknesses, and strategies for domination.
+          Choose your family and difficulty. Each has unique strengths, weaknesses, and strategies for domination.
         </p>
+        {/* Difficulty Selector */}
+        <div className="flex items-center justify-center gap-2 mt-5">
+          {(['easy', 'normal', 'hard'] as const).map(d => {
+            const labels = { easy: '🟢 Easy', normal: '🟡 Normal', hard: '🔴 Hard' };
+            const descs = { easy: '+50% money, weaker AI', normal: 'Balanced experience', hard: '-25% money, stronger AI' };
+            const isActive = difficulty === d;
+            return (
+              <button
+                key={d}
+                onClick={() => setDifficulty(d)}
+                className={cn(
+                  'px-4 py-2 rounded-lg border-2 text-xs font-bold uppercase tracking-wider transition-all duration-200',
+                  'bg-card/80 backdrop-blur-sm',
+                  isActive
+                    ? 'border-primary text-primary shadow-md scale-105'
+                    : 'border-border/50 text-muted-foreground hover:border-muted-foreground/50'
+                )}
+                title={descs[d]}
+              >
+                {labels[d]}
+              </button>
+            );
+          })}
+        </div>
       </motion.div>
 
       {/* Family cards — horizontal row */}
@@ -290,7 +315,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
             </div>
 
             <Button
-              onClick={() => onSelectFamily(activeFamily.id, activeFamily.startingResources)}
+              onClick={() => onSelectFamily(activeFamily.id, activeFamily.startingResources, difficulty)}
               className="w-full font-playfair font-bold text-base py-5 transition-all duration-200"
               style={{
                 backgroundColor: activeFamily.color,
