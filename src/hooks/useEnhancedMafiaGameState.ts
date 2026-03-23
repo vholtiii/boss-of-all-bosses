@@ -82,6 +82,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   hiddenUnits: [...(state.hiddenUnits || [])],
   aiBounties: [...(state.aiBounties || [])],
   scoutedHexes: [...(state.scoutedHexes || [])],
+  safehouses: (state.safehouses || []).map(s => ({ ...s })),
   activeBribes: (state.activeBribes || []).map(b => ({ ...b })),
   plannedHit: state.plannedHit ? { ...state.plannedHit } : null,
   planHitCooldownUntil: state.planHitCooldownUntil || 0,
