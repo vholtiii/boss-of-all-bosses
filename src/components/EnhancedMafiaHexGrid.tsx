@@ -208,6 +208,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const handleHexClick = (tile: HexTile) => {
     const turnPhase = gameState?.turnPhase || 'waiting';
 
+    // Plan Hit mode — intercept clicks on scouted enemy hexes
+    if (planHitMode && onPlanHitSelect) {
+      const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== playerFamily;
+      const isScouted = scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
+      if (isEnemy && isScouted) {
+        onPlanHitSelect(tile.q, tile.r, tile.s);
+      }
+      return;
+    }
+
     // Business placement mode — intercept clicks
     if (isBusinessPlacementMode && onAction) {
       const isValid = validPlacementHexes.some(h => h.q === tile.q && h.r === tile.r && h.s === tile.s);
