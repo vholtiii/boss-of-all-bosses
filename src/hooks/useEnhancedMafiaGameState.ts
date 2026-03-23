@@ -1202,7 +1202,6 @@ export const useEnhancedMafiaGameState = (
     return {
       ...prev, deployedUnits: newUnits, safehouse: newSafehouse,
       selectedUnitId: null, availableMoveHexes: [],
-      selectedMoveAction: 'move' as MoveAction,
       pendingNotifications: [...prev.pendingNotifications, {
         type: 'success' as const, title: '🏠 Safehouse Established',
         message: `Secondary deploy point active for ${SAFEHOUSE_DURATION} turns.`,
