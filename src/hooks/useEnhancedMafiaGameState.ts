@@ -3805,9 +3805,14 @@ export const useEnhancedMafiaGameState = (
       chance += state.familyBonuses.combatBonus / 100;
       chance += state.familyBonuses.hitSuccess / 100;
 
-      // Scout intel bonus (only if scouted)
+      // Scout intel bonus — fresh intel gives full bonus, stale gives half
       if (isScouted) {
-        chance += SCOUT_INTEL_BONUS / 100;
+        const scoutInfo = state.scoutedHexes.find(s => s.q === tile.q && s.r === tile.r && s.s === tile.s);
+        if (scoutInfo && state.turn <= scoutInfo.freshUntilTurn) {
+          chance += SCOUT_INTEL_BONUS / 100;
+        } else {
+          chance += SCOUT_STALE_BONUS / 100;
+        }
       }
       
       chance = Math.max(0.1, Math.min(0.95, chance));
