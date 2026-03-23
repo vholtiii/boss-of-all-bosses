@@ -1202,7 +1202,31 @@ export const useEnhancedMafiaGameState = (
     const tile = prev.hexMap.find(t => t.q === unit.q && t.r === unit.r && t.s === unit.s);
     if (!tile || tile.controllingFamily !== prev.playerFamily) return prev;
 
-    const newUnits = [...prev.deployedUnits];
+    // Check cost
+    if (prev.resources.money < SAFEHOUSE_COST) {
+      return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
+        type: 'error' as const, title: '💰 Insufficient Funds',
+        message: `Need $${SAFEHOUSE_COST.toLocaleString()} to establish a safehouse.`,
+      }]};
+    }
+
+    // Check max safehouses (scaling: 2nd allowed at 15+ hexes)
+    const playerHexCount = prev.hexMap.filter(t => t.controllingFamily === prev.playerFamily).length;
+    const maxAllowed = playerHexCount >= SAFEHOUSE_TERRITORY_THRESHOLD ? MAX_SAFEHOUSES : 1;
+    if (prev.safehouses.length >= maxAllowed) {
+      return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
+        type: 'warning' as const, title: '🏠 Safehouse Limit Reached',
+        message: maxAllowed === 1 ? `Control ${SAFEHOUSE_TERRITORY_THRESHOLD}+ hexes to build a 2nd safehouse.` : `Maximum ${MAX_SAFEHOUSES} safehouses allowed.`,
+      }]};
+    }
+
+    // Check not already a safehouse on this hex
+    if (prev.safehouses.some(s => s.q === unit.q && s.r === unit.r && s.s === unit.s)) {
+      return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
+        type: 'warning' as const, title: '🏠 Already a Safehouse',
+        message: 'There is already a safehouse on this hex.',
+      }]};
+    }
 
     const newSafehouse: Safehouse = {
       q: unit.q, r: unit.r, s: unit.s,
@@ -1211,11 +1235,13 @@ export const useEnhancedMafiaGameState = (
     };
 
     return {
-      ...prev, deployedUnits: newUnits, safehouse: newSafehouse,
+      ...prev, 
+      safehouses: [...prev.safehouses, newSafehouse],
+      resources: { ...prev.resources, money: prev.resources.money - SAFEHOUSE_COST },
       selectedUnitId: null, availableMoveHexes: [],
       pendingNotifications: [...prev.pendingNotifications, {
         type: 'success' as const, title: '🏠 Safehouse Established',
-        message: `Secondary deploy point active for ${SAFEHOUSE_DURATION} turns.`,
+        message: `Secondary deploy point active for ${SAFEHOUSE_DURATION} turns. Cost: $${SAFEHOUSE_COST.toLocaleString()}.`,
       }],
     };
   };
