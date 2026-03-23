@@ -22,7 +22,11 @@ interface EnhancedMafiaHexGridProps {
   onSelectUnitFromHeadquarters?: (unitType: 'soldier' | 'capo', family: string) => void;
   onDeployUnit?: (unitType: 'soldier' | 'capo', targetLocation: { q: number; r: number; s: number }, family: string) => void;
   planHitMode?: boolean;
-  onPlanHitSelect?: (q: number, r: number, s: number) => void;
+  planHitStep?: 'selectSoldier' | 'selectTarget';
+  planHitPlannerId?: string | null;
+  onPlanHitSelect?: (q: number, r: number, s: number, targetUnitId: string) => void;
+  onPlanHitSelectSoldier?: (unitId: string) => void;
+  onCancelPlanHit?: () => void;
 }
 
 const familyColors: Record<string, string> = {
