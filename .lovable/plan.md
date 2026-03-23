@@ -1,52 +1,38 @@
 
 
-# Add Hover Tooltip for Disabled ActionButtons
+# Fix: Tactical Actions Should Work Action-First
 
 ## Problem
-When an ActionButton is greyed out (disabled), the `disabledReason` text shows inline but can be hard to notice. The user wants a tooltip on hover explaining why the button is disabled.
+The tactical action buttons (Scout, Fortify, Escort, Safehouse) are **disabled** when no unit is selected, showing messages like "Select a soldier first". But the user expects to click the action first, then select a unit on the board — which is the more intuitive flow.
 
-## Fix — `src/components/GameSidePanels.tsx`
+The backend already supports this: `selectUnit` reads `selectedMoveAction` from state and branches accordingly (scout → show scoutable hexes, fortify → instant fortify, etc.). So if the user clicks "Scout" first (setting `selectedMoveAction='scout'`), then clicks a soldier on the map, it works correctly.
 
-Wrap the `ActionButton`'s `<Button>` in a `<Tooltip>` from the existing UI tooltip components when the button is disabled and has a `disabledReason` (or is `phaseLocked`).
+The problem is purely in the **button disabling logic** in `UltimateMafiaGame.tsx` (lines 583-600): it computes a `reason` like "Select a soldier first" and then disables the button, preventing the action-first flow.
 
-Since disabled buttons don't fire pointer events by default, wrap in a `<span>` to capture hover.
+## Fix — `src/pages/UltimateMafiaGame.tsx`
 
-### Changes to `ActionButton` component (lines 729-747):
+**1. Remove the unit-selection requirement from the disabled logic** (lines 583-600)
 
-```tsx
-const ActionButton: React.FC<{...}> = ({ icon, label, sublabel, disabled, phaseLocked, disabledReason, variant = 'outline', onClick }) => {
-  const isDisabled = disabled || phaseLocked;
-  const tooltipText = phaseLocked ? 'Available in a different phase' : disabledReason;
+The buttons should only be disabled when `tacticalActionsRemaining <= 0`. The "Select a soldier" / "Select a capo" text should become **instructional hints** shown *after* the button is clicked (i.e., when `selectedMoveAction === action`), not blocking reasons.
 
-  const button = (
-    <Button ...existing props...>
-      ...existing content...
-    </Button>
-  );
+Change the logic so:
+- `isDisabled` is only true when `noTactical` (no tactical actions remaining)
+- The `reason` text ("Select a soldier first", etc.) becomes the **description panel text** shown below the buttons when that action is active, rather than a tooltip that blocks clicking
+- Keep the existing description panel (lines 629-644) which already explains what to do for each action
 
-  if (isDisabled && tooltipText) {
-    return (
-      <TooltipProvider delayDuration={200}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="w-full block">
-              {button}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="left">
-            <p>{tooltipText}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
+**2. Update the hover tooltip to show only real blocking reasons**
 
-  return button;
-};
-```
+When disabled (`noTactical`), the tooltip shows "No tactical actions left". When enabled but active, the description panel below already instructs the player on what to do next.
 
-Add imports for `Tooltip, TooltipTrigger, TooltipContent, TooltipProvider` from `@/components/ui/tooltip`.
+**3. Clear selectedUnitId when switching tactical actions**
+
+Add a `setMoveAction` wrapper or modify the onClick to also clear `selectedUnitId` when switching between tactical modes, so stale unit selections don't confuse the flow. This can be done by calling the existing state setter.
+
+## Summary of Changes
+- Lines 583-600: Simplify — only disable when `noTactical`, remove unit-check reasons from disabled logic
+- Lines 608-609: Update disabled prop to just `noTactical`
+- Lines 616-620: Remove or simplify the reason tooltip (only show for `noTactical`)
 
 ## Files Modified
-- `src/components/GameSidePanels.tsx` — add tooltip wrapper to ActionButton component
+- `src/pages/UltimateMafiaGame.tsx` — simplify tactical button disabled logic to allow action-first flow
 
