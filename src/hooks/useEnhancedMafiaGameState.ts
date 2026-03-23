@@ -121,6 +121,7 @@ export interface DeployedUnit {
   fortified?: boolean;
   escortingSoldierIds?: string[]; // capo only — IDs of soldiers being escorted
   recruited?: boolean; // true = locally recruited (loyal), false/undefined = mercenary (bought)
+  pendingDefection?: boolean; // set by Internal Betrayal event — resolved in endTurn
 }
 
 // ============ HEX TILE ============
@@ -264,6 +265,7 @@ export interface EnhancedMafiaGameState {
   mapSeed: number;
   difficulty: Difficulty;
   difficultyModifiers: DifficultyModifiers;
+  ratIgnored?: boolean; // escalation flag for Rat → Federal Investigation event chain
   
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
@@ -1496,6 +1498,55 @@ export const useEnhancedMafiaGameState = (
         turnReport.events.push(`🕵️ ${stillHiding} unit(s) still in hiding. Next return: Turn ${nextReturn}.`);
       }
 
+      // ============ PENDING DEFECTIONS (from Internal Betrayal) ============
+      const defectors = newState.deployedUnits.filter(u => u.pendingDefection && u.family === newState.playerFamily);
+      if (defectors.length > 0) {
+        const aiFamilies = newState.aiOpponents.map(o => o.family);
+        defectors.forEach(defector => {
+          if (Math.random() < 0.5) {
+            // Defects to a random AI family
+            const targetFamily = aiFamilies[Math.floor(Math.random() * aiFamilies.length)];
+            const aiHexes = newState.hexMap.filter(t => t.controllingFamily === targetFamily);
+            const targetHex = aiHexes.length > 0 ? aiHexes[Math.floor(Math.random() * aiHexes.length)] : null;
+            if (targetHex && targetFamily) {
+              newState.deployedUnits = newState.deployedUnits.map(u =>
+                u.id === defector.id
+                  ? { ...u, family: targetFamily as any, q: targetHex.q, r: targetHex.r, s: targetHex.s, pendingDefection: undefined }
+                  : u
+              );
+              delete newState.soldierStats[defector.id];
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'error', title: '💀 Soldier Defected!',
+                message: `A disloyal soldier has defected to the ${targetFamily} family!`,
+              }];
+              if (turnReport) turnReport.events.push(`A soldier defected to the ${targetFamily} family.`);
+            } else {
+              // No valid hex — soldier just leaves
+              newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== defector.id);
+              delete newState.soldierStats[defector.id];
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'error', title: '💀 Soldier Deserted',
+                message: 'A disloyal soldier has deserted the family.',
+              }];
+              if (turnReport) turnReport.events.push('A disloyal soldier deserted.');
+            }
+          } else {
+            // Stays — loyalty resets to 50, clear flag
+            newState.deployedUnits = newState.deployedUnits.map(u =>
+              u.id === defector.id ? { ...u, pendingDefection: undefined } : u
+            );
+            if (newState.soldierStats[defector.id]) {
+              newState.soldierStats[defector.id] = { ...newState.soldierStats[defector.id], loyalty: 50 };
+            }
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'info', title: '🤝 Soldier Stayed',
+              message: 'The disloyal soldier decided to remain with the family. Loyalty reset.',
+            }];
+            if (turnReport) turnReport.events.push('A soldier reconsidered defection and stayed.');
+          }
+        });
+      }
+
       // ============ EXPIRE AI BOUNTIES ============
       newState.aiBounties = newState.aiBounties.filter(b => newState.turn < b.expiresOnTurn);
       newState.selectedMoveAction = 'move' as MoveAction;
@@ -2530,113 +2581,77 @@ export const useEnhancedMafiaGameState = (
         });
       }
 
-      // 6. Internal Betrayal (3+ soldiers)
-      if (state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier').length > 2) {
+      // 6. Internal Betrayal — loyalty-gated
+      {
+        const playerSoldiers = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier');
+        const lowLoyaltySoldier = playerSoldiers.find(u => {
+          const stats = state.soldierStats[u.id];
+          return stats && stats.loyalty < 40;
+        });
+        if (lowLoyaltySoldier) {
+          const soldierName = lowLoyaltySoldier.id.slice(-6);
+          eligibleEvents.push({
+            id: `event-${Date.now()}-betrayal`, type: 'random' as const,
+            title: 'Internal Betrayal',
+            description: `Soldier ${soldierName} (loyalty: ${state.soldierStats[lowLoyaltySoldier.id]?.loyalty ?? '?'}) is showing signs of disloyalty. Word on the street says he's talking to the other side.`,
+            choices: [
+              { id: 'confront', text: 'Confront & dismiss the soldier', consequences: [{ type: 'soldiers' as const, value: -1, description: 'Soldier removed' }] },
+              { id: 'promote', text: `Offer a promotion ($${Math.floor(5000 * costMult).toLocaleString()})`, cost: Math.floor(5000 * costMult), consequences: [{ type: 'money' as const, value: -Math.floor(5000 * costMult), description: 'Promotion cost' }] },
+              { id: 'ignore', text: 'Ignore it', consequences: [{ type: 'reputation' as const, value: -3, description: 'Potential defection risk' }] },
+            ],
+            consequences: [], turn: state.turn, expires: state.turn + 1,
+            // Store the target soldier ID in the event for resolution
+            requirements: { money: 0, soldiers: 0, reputation: 0, territory: [lowLoyaltySoldier.id] },
+          });
+        }
+      }
+
+      // 7. Rat in the Ranks / Federal Investigation — escalating event
+      if (heat > 30 && !state.ratIgnored) {
+        // Stage 1: Rat in the Ranks
         eligibleEvents.push({
-          id: `event-${Date.now()}-betrayal`, type: 'random' as const,
-          title: 'Internal Betrayal',
-          description: 'Rumors say one of your soldiers is planning to flip.',
+          id: `event-${Date.now()}-rat`, type: 'random' as const,
+          title: 'Rat in the Ranks',
+          description: 'Someone in your crew is feeding info to the cops. Deal with it now or face consequences later.',
           choices: [
-            { id: 'investigate', text: `Investigate ($${Math.floor(5000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(5000 * costMult), description: 'Investigation' }] },
-            { id: 'ignore', text: 'Ignore the rumor', consequences: [{ type: 'reputation' as const, value: -5, description: 'Loyalty erosion' }] },
+            { id: 'find', text: `Find the rat ($${Math.floor(3000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(3000 * costMult), description: 'Investigation' },{ type: 'heat' as const, value: -10, description: 'Leak plugged' }] },
+            { id: 'ignore', text: 'Ignore it', consequences: [{ type: 'heat' as const, value: 15, description: 'Info leaked to feds' }] },
           ],
           consequences: [], turn: state.turn, expires: state.turn + 1,
         });
       }
-
-      // 7. Federal Investigation (heat > 60)
-      if (heat > 60) {
+      if (heat > 60 && state.ratIgnored) {
+        // Stage 2: Federal Investigation (escalated from ignored rat)
         eligibleEvents.push({
           id: `event-${Date.now()}-federal`, type: 'random' as const,
           title: 'Federal Investigation',
-          description: 'The FBI has opened an investigation. Pay to derail it or risk losing a business.',
+          description: 'The rat you ignored led the FBI straight to your operations. A federal case has been opened.',
           choices: [
-            { id: 'pay', text: `Pay off ($${Math.floor(15000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(15000 * costMult), description: 'Payoff' },{ type: 'heat' as const, value: -25, description: 'Investigation stalled' }] },
+            { id: 'pay', text: `Pay off ($${Math.floor(15000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(15000 * costMult), description: 'Federal payoff' },{ type: 'heat' as const, value: -25, description: 'Investigation derailed' }] },
             { id: 'risk', text: 'Take the risk', consequences: [{ type: 'heat' as const, value: 15, description: 'Investigation intensifies' }] },
           ],
           consequences: [], turn: state.turn, expires: state.turn + 1,
         });
-      }
-
-      // 8. Market Opportunity (money > 10k)
-      if (money > 10000) {
-        eligibleEvents.push({
-          id: `event-${Date.now()}-market`, type: 'random' as const,
-          title: 'Market Opportunity',
-          description: 'A lucrative but risky investment opportunity.',
-          choices: [
-            { id: 'invest', text: `Invest ($${Math.floor(10000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: Math.random() < 0.7 ? Math.floor(10000 * costMult) : -Math.floor(10000 * costMult), description: 'Investment' }] },
-            { id: 'pass', text: 'Pass', consequences: [] },
-          ],
-          consequences: [], turn: state.turn, expires: state.turn + 1,
-        });
-      }
-
-      // 9. Rival Turf War (2+ AI families)
-      if (state.aiOpponents.length >= 2) {
-        const f1 = state.aiOpponents[Math.floor(Math.random() * state.aiOpponents.length)];
-        const others = state.aiOpponents.filter(o => o.family !== f1.family);
-        const f2 = others[Math.floor(Math.random() * others.length)];
-        if (f1 && f2) {
+      } else if (heat > 60 && !state.ratIgnored) {
+        // Independent Federal Investigation (lower weight — only added if no rat escalation)
+        if (Math.random() < 0.3) {
           eligibleEvents.push({
-            id: `event-${Date.now()}-turfwar`, type: 'random' as const,
-            title: 'Rival Turf War',
-            description: `The ${f1.family} and ${f2.family} families are at war. Pick a side?`,
+            id: `event-${Date.now()}-federal`, type: 'random' as const,
+            title: 'Federal Investigation',
+            description: 'The FBI has opened an investigation into your operations.',
             choices: [
-              { id: 'support1', text: `Support ${f1.family}`, consequences: [{ type: 'reputation' as const, value: 5, description: `${f1.family} favor` },{ type: 'relationship' as const, value: -15, description: `${f2.family} hostility` }] },
-              { id: 'neutral', text: 'Stay out of it', consequences: [{ type: 'reputation' as const, value: 2, description: 'Neutral stance' }] },
+              { id: 'pay', text: `Pay off ($${Math.floor(15000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(15000 * costMult), description: 'Payoff' },{ type: 'heat' as const, value: -25, description: 'Investigation stalled' }] },
+              { id: 'risk', text: 'Take the risk', consequences: [{ type: 'heat' as const, value: 15, description: 'Investigation intensifies' }] },
             ],
             consequences: [], turn: state.turn, expires: state.turn + 1,
           });
         }
       }
 
-      // 10. Celebrity Endorsement (respect > 50)
-      if (respect > 50) {
-        eligibleEvents.push({
-          id: `event-${Date.now()}-celebrity`, type: 'random' as const,
-          title: 'Celebrity Endorsement',
-          description: 'A famous entertainer wants to associate with your family.',
-          choices: [
-            { id: 'accept', text: `Accept ($${Math.floor(8000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(8000 * costMult), description: 'Endorsement' },{ type: 'reputation' as const, value: 15, description: 'Image boost' },{ type: 'heat' as const, value: -10, description: 'Positive press' }] },
-            { id: 'decline', text: 'Decline', consequences: [] },
-          ],
-          consequences: [], turn: state.turn, expires: state.turn + 1,
-        });
-      }
-
-      // 11. Rat in the Ranks (heat > 30)
-      if (heat > 30) {
-        eligibleEvents.push({
-          id: `event-${Date.now()}-rat`, type: 'random' as const,
-          title: 'Rat in the Ranks',
-          description: 'Someone in your crew is feeding info to the cops.',
-          choices: [
-            { id: 'find', text: `Find the rat ($${Math.floor(3000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(3000 * costMult), description: 'Investigation' },{ type: 'heat' as const, value: -10, description: 'Leak plugged' }] },
-            { id: 'ignore', text: 'Ignore it', consequences: [{ type: 'heat' as const, value: 15, description: 'Info leaked' }] },
-          ],
-          consequences: [], turn: state.turn, expires: state.turn + 1,
-        });
-      }
-
-      // 12. Dock Workers Strike (Brooklyn territory)
-      if (state.hexMap.some(t => t.controllingFamily === state.playerFamily && t.district === 'Brooklyn')) {
-        eligibleEvents.push({
-          id: `event-${Date.now()}-strike`, type: 'random' as const,
-          title: 'Dock Workers Strike',
-          description: 'Brooklyn dock workers are threatening to strike.',
-          choices: [
-            { id: 'pay', text: `Pay off ($${Math.floor(6000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(6000 * costMult), description: 'Worker payoff' },{ type: 'reputation' as const, value: 3, description: 'Worker respect' }] },
-            { id: 'threaten', text: 'Intimidate them', consequences: [{ type: 'reputation' as const, value: 5, description: 'Fear gained' },{ type: 'heat' as const, value: 10, description: 'Public attention' }] },
-          ],
-          consequences: [], turn: state.turn, expires: state.turn + 1,
-        });
-      }
-
       // Pick one random event
       if (eligibleEvents.length > 0) {
         const chosen = eligibleEvents[Math.floor(Math.random() * eligibleEvents.length)];
-        state.events.push(chosen);
+        state.events = [...state.events, chosen];
       }
     }
     state.events = state.events.filter(e => !e.expires || e.expires > state.turn);
@@ -3414,11 +3429,12 @@ export const useEnhancedMafiaGameState = (
 
   const handleEventChoice = useCallback((eventId: string, choiceId: string) => {
     setGameState(prev => {
-      const newState = { ...prev };
+      const newState = cloneStateForMutation(prev);
       const event = newState.events.find(e => e.id === eventId);
       if (event) {
         const choice = event.choices.find(c => c.id === choiceId);
         if (choice) {
+          // Apply standard consequences
           choice.consequences.forEach(c => {
             switch (c.type) {
               case 'money': newState.resources.money += c.value; break;
@@ -3426,6 +3442,98 @@ export const useEnhancedMafiaGameState = (
               case 'reputation': newState.reputation.reputation += c.value; break;
             }
           });
+
+          // === Special: Internal Betrayal resolution ===
+          if (event.title === 'Internal Betrayal' && event.requirements?.territory?.[0]) {
+            const targetSoldierId = event.requirements.territory[0];
+            if (choiceId === 'confront') {
+              // Remove the soldier
+              newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== targetSoldierId);
+              delete newState.soldierStats[targetSoldierId];
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'warning', title: '🔪 Soldier Dismissed',
+                message: 'The disloyal soldier has been dealt with. Your crew\'s loyalty is stabilized.',
+              }];
+            } else if (choiceId === 'promote') {
+              if (Math.random() < 0.2) {
+                // 20% chance: promotion fails, soldier defects
+                const aiFamilies = newState.aiOpponents.map(o => o.family);
+                const targetFamily = aiFamilies[Math.floor(Math.random() * aiFamilies.length)];
+                const defector = newState.deployedUnits.find(u => u.id === targetSoldierId);
+                if (defector && targetFamily) {
+                  // Move soldier to random AI hex
+                  const aiHexes = newState.hexMap.filter(t => t.controllingFamily === targetFamily);
+                  const targetHex = aiHexes[Math.floor(Math.random() * aiHexes.length)];
+                  if (targetHex) {
+                    newState.deployedUnits = newState.deployedUnits.map(u =>
+                      u.id === targetSoldierId
+                        ? { ...u, family: targetFamily as any, q: targetHex.q, r: targetHex.r, s: targetHex.s }
+                        : u
+                    );
+                  } else {
+                    newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== targetSoldierId);
+                  }
+                  delete newState.soldierStats[targetSoldierId];
+                  newState.pendingNotifications = [...newState.pendingNotifications, {
+                    type: 'error', title: '💀 Promotion Backfired!',
+                    message: `The soldier took your money and defected to the ${targetFamily} family!`,
+                  }];
+                }
+              } else {
+                // Success: loyalty boost
+                const stats = newState.soldierStats[targetSoldierId];
+                if (stats) {
+                  newState.soldierStats[targetSoldierId] = {
+                    ...stats,
+                    loyalty: Math.min(80, stats.loyalty + 30),
+                  };
+                }
+                newState.pendingNotifications = [...newState.pendingNotifications, {
+                  type: 'success', title: '⬆️ Promotion Accepted',
+                  message: 'The soldier is grateful. Loyalty restored.',
+                }];
+              }
+            } else if (choiceId === 'ignore') {
+              // Set pending defection flag
+              newState.deployedUnits = newState.deployedUnits.map(u =>
+                u.id === targetSoldierId ? { ...u, pendingDefection: true } : u
+              );
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'warning', title: '⚠️ Ignored Betrayal',
+                message: 'The soldier may defect next turn...',
+              }];
+            }
+          }
+
+          // === Special: Rat in the Ranks — set ratIgnored flag ===
+          if (event.title === 'Rat in the Ranks' && choiceId === 'ignore') {
+            newState.ratIgnored = true;
+          }
+
+          // === Special: Federal Investigation — clear ratIgnored ===
+          if (event.title === 'Federal Investigation') {
+            newState.ratIgnored = false;
+            if (choiceId === 'risk') {
+              // Shut down a random player business
+              const playerBusinessHexes = newState.hexMap.filter(
+                t => t.controllingFamily === newState.playerFamily && t.business
+              );
+              if (playerBusinessHexes.length > 0) {
+                const victim = playerBusinessHexes[Math.floor(Math.random() * playerBusinessHexes.length)];
+                const lostBiz = victim.business!.type;
+                newState.hexMap = newState.hexMap.map(t =>
+                  t.q === victim.q && t.r === victim.r && t.s === victim.s
+                    ? { ...t, business: undefined }
+                    : t
+                );
+                newState.pendingNotifications = [...newState.pendingNotifications, {
+                  type: 'error', title: '🏛️ Business Seized',
+                  message: `The feds shut down your ${lostBiz} operation!`,
+                }];
+              }
+            }
+          }
+
           newState.events = newState.events.filter(e => e.id !== eventId);
         }
       }
