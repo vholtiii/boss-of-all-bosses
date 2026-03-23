@@ -864,7 +864,9 @@ export const useEnhancedMafiaGameState = (
 
         if (moveAction === 'safehouse' && unitType === 'capo') {
           if (prev.tacticalActionsRemaining <= 0) return prev;
-          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: [{ q: unit.q, r: unit.r, s: unit.s }], deployMode: null, availableDeployHexes: [] };
+          // One-click safehouse: apply immediately on capo select
+          const result = processSafehouse({ ...prev, selectedUnitId: unit.id }, unit);
+          return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
         }
 
         if (moveAction === 'fortify') {
@@ -1182,7 +1184,6 @@ export const useEnhancedMafiaGameState = (
       ...prev, deployedUnits: newUnits, scoutedHexes: newScoutedHexes,
       reinforceTargets,
       selectedUnitId: null, availableMoveHexes: [],
-      selectedMoveAction: 'move' as MoveAction,
       pendingNotifications: notifications,
     };
   };
@@ -1203,7 +1204,6 @@ export const useEnhancedMafiaGameState = (
     return {
       ...prev, deployedUnits: newUnits, safehouse: newSafehouse,
       selectedUnitId: null, availableMoveHexes: [],
-      selectedMoveAction: 'move' as MoveAction,
       pendingNotifications: [...prev.pendingNotifications, {
         type: 'success' as const, title: '🏠 Safehouse Established',
         message: `Secondary deploy point active for ${SAFEHOUSE_DURATION} turns.`,
