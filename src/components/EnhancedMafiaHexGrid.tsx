@@ -46,7 +46,7 @@ const businessIcons: Record<string, string> = {
 const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({ 
   width, height, onBusinessClick, selectedBusiness, playerFamily,
   gameState, onAction, onSelectUnit, onMoveUnit, onSelectHeadquarters,
-  onSelectUnitFromHeadquarters, onDeployUnit
+  onSelectUnitFromHeadquarters, onDeployUnit, planHitMode, onPlanHitSelect
 }) => {
   const [zoom, setZoom] = useState(1);
   const [showSoldiers, setShowSoldiers] = useState(true);
