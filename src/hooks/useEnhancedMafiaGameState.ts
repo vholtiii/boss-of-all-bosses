@@ -2592,6 +2592,44 @@ export const useEnhancedMafiaGameState = (
           if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in ceasefire' });
         }
       }
+
+      // ── AI SAFEHOUSE ESTABLISHMENT ──
+      const aiFamHexes = state.hexMap.filter(t => t.controllingFamily === fam && !t.isHeadquarters);
+      const aiCapos = state.deployedUnits.filter(u => u.family === fam && u.type === 'capo');
+      // AI builds safehouse if: 8+ territories, $5000+, has a capo, and doesn't already have one on their territory
+      const aiHasSafehouse = state.safehouses.some(s => {
+        const shTile = state.hexMap.find(t => t.q === s.q && t.r === s.r && t.s === s.s);
+        return shTile && shTile.controllingFamily === fam;
+      });
+      if (aiFamHexes.length >= 8 && opponent.resources.money >= 5000 && aiCapos.length > 0 && !aiHasSafehouse) {
+        // Pick a border hex (adjacent to enemy territory) with most friendly neighbors
+        const borderHexes = aiFamHexes.filter(h => {
+          const neighbors = getHexNeighbors(h.q, h.r, h.s);
+          return neighbors.some(n => {
+            const nt = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+            return nt && nt.controllingFamily !== fam && nt.controllingFamily !== null;
+          });
+        });
+        if (borderHexes.length > 0) {
+          // Score by friendly neighbors
+          const scored = borderHexes.map(h => {
+            const neighbors = getHexNeighbors(h.q, h.r, h.s);
+            const friendlyCount = neighbors.filter(n => {
+              const nt = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+              return nt && nt.controllingFamily === fam;
+            }).length;
+            return { hex: h, score: friendlyCount };
+          }).sort((a, b) => b.score - a.score);
+          const bestHex = scored[0].hex;
+          state.safehouses.push({
+            q: bestHex.q, r: bestHex.r, s: bestHex.s,
+            turnsRemaining: SAFEHOUSE_DURATION,
+            createdTurn: state.turn,
+          });
+          opponent.resources.money -= SAFEHOUSE_COST;
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'safehouse', detail: `Established a safehouse in ${bestHex.district}` });
+        }
+      }
     });
   };
 
