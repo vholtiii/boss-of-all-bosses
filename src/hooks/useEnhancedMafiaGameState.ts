@@ -2918,7 +2918,7 @@ export const useEnhancedMafiaGameState = (
 
   const performBusinessAction = useCallback((action: any) => {
     setGameState(prev => {
-      const newState = { ...prev };
+      const newState = cloneStateForMutation(prev);
       const businessNames: Record<string, string[]> = {
         restaurant: ['Tony\'s Pizzeria', 'Mama Mia Restaurant', 'Little Italy Bistro'],
         laundromat: ['Clean Slate Laundry', 'Fresh Start Cleaners', 'Spotless Services'],
