@@ -1647,6 +1647,15 @@ export const useEnhancedMafiaGameState = (
           }];
         }
       }
+
+      // Tick planned hit expiration
+      if (newState.plannedHit && newState.plannedHit.expiresOnTurn <= newState.turn) {
+        newState.plannedHit = null;
+        newState.pendingNotifications = [...newState.pendingNotifications, {
+          type: 'warning' as const, title: '🎯 Plan Hit Expired',
+          message: 'Your planned hit has expired — the intel went cold.',
+        }];
+      }
       
       const seasons = ['spring', 'summer', 'fall', 'winter'] as const;
       newState.season = seasons[Math.floor((newState.turn - 1) / 3) % 4];
