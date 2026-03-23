@@ -318,6 +318,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                   label="Hire Lawyer"
                   sublabel={onCooldown ? `Cooldown: ${turnsLeft} turn${turnsLeft > 1 ? 's' : ''}` : '$8,000 · Clears arrest, −25% sentences · 1 action'}
                   disabled={resources.money < 8000 || gameState.actionsRemaining <= 0 || onCooldown}
+                  disabledReason={onCooldown ? `Cooldown: ${turnsLeft}t` : gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 8000 ? 'Need $8,000' : undefined}
                   phaseLocked={actionsLocked}
                   onClick={() => onAction({ type: 'hire_lawyer' })}
                 />
