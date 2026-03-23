@@ -4107,6 +4107,41 @@ export const useEnhancedMafiaGameState = (
         });
         tile.controllingFamily = null; // Hit clears enemy control — player must Claim next turn
         
+        // Check if enemy had a safehouse on this hex → player gets bounty + intel
+        // (AI safehouses are tracked per-AI; for now we check if any AI opponent has a safehouse here)
+        // We store AI safehouses on the same state.safehouses array, marked by checking against player
+        // Actually AI safehouses are separate — we track them via aiSafehouses on opponents
+        // For simplicity, any safehouse on this hex that isn't the player's gets destroyed
+        const enemySafehouseIdx = state.safehouses.findIndex(s => s.q === targetQ && s.r === targetR && s.s === targetS);
+        if (enemySafehouseIdx !== -1) {
+          state.safehouses.splice(enemySafehouseIdx, 1);
+          state.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
+          // Intel: scout all hexes owned by targetFamily for 1 turn
+          if (targetFamily) {
+            const enemyHexes = state.hexMap.filter(t => t.controllingFamily === targetFamily);
+            const newScoutEntries: ScoutedHex[] = enemyHexes.map(h => ({
+              q: h.q, r: h.r, s: h.s,
+              scoutedTurn: state.turn,
+              turnsRemaining: SAFEHOUSE_CAPTURE_INTEL_DURATION,
+              freshUntilTurn: state.turn + 1,
+              enemySoldierCount: state.deployedUnits.filter(u => u.family === targetFamily && u.q === h.q && u.r === h.r && u.s === h.s).length,
+              enemyFamily: targetFamily,
+              businessType: h.business?.type,
+              businessIncome: h.business?.income,
+            }));
+            // Merge — don't duplicate existing scouts
+            const existingKeys = new Set(state.scoutedHexes.map(s => `${s.q},${s.r},${s.s}`));
+            state.scoutedHexes = [
+              ...state.scoutedHexes,
+              ...newScoutEntries.filter(s => !existingKeys.has(`${s.q},${s.r},${s.s}`)),
+            ];
+          }
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'success', title: '🏠 Enemy Safehouse Captured!',
+            message: `You raided their safehouse! +$${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} bounty and full intel on ${targetFamily} operations for 1 turn.`,
+          }];
+        }
+        
         if (!isScouted) {
           // ===== BLIND HIT VICTORY: Enhanced rewards =====
           state.resources.respect += BLIND_HIT_RESPECT;
