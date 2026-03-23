@@ -472,6 +472,9 @@ const createInitialGameState = (
     playerFamily: family,
     turn: 1,
     season: 'spring',
+    mapSeed,
+    difficulty,
+    difficultyModifiers: diffMods,
     
     resources: {
       money: startingResources?.money ?? 50000,
