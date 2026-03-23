@@ -1498,6 +1498,55 @@ export const useEnhancedMafiaGameState = (
         turnReport.events.push(`🕵️ ${stillHiding} unit(s) still in hiding. Next return: Turn ${nextReturn}.`);
       }
 
+      // ============ PENDING DEFECTIONS (from Internal Betrayal) ============
+      const defectors = newState.deployedUnits.filter(u => u.pendingDefection && u.family === newState.playerFamily);
+      if (defectors.length > 0) {
+        const aiFamilies = newState.aiOpponents.map(o => o.family);
+        defectors.forEach(defector => {
+          if (Math.random() < 0.5) {
+            // Defects to a random AI family
+            const targetFamily = aiFamilies[Math.floor(Math.random() * aiFamilies.length)];
+            const aiHexes = newState.hexMap.filter(t => t.controllingFamily === targetFamily);
+            const targetHex = aiHexes.length > 0 ? aiHexes[Math.floor(Math.random() * aiHexes.length)] : null;
+            if (targetHex && targetFamily) {
+              newState.deployedUnits = newState.deployedUnits.map(u =>
+                u.id === defector.id
+                  ? { ...u, family: targetFamily as any, q: targetHex.q, r: targetHex.r, s: targetHex.s, pendingDefection: undefined }
+                  : u
+              );
+              delete newState.soldierStats[defector.id];
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'error', title: '💀 Soldier Defected!',
+                message: `A disloyal soldier has defected to the ${targetFamily} family!`,
+              }];
+              if (turnReport) turnReport.events.push(`A soldier defected to the ${targetFamily} family.`);
+            } else {
+              // No valid hex — soldier just leaves
+              newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== defector.id);
+              delete newState.soldierStats[defector.id];
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'error', title: '💀 Soldier Deserted',
+                message: 'A disloyal soldier has deserted the family.',
+              }];
+              if (turnReport) turnReport.events.push('A disloyal soldier deserted.');
+            }
+          } else {
+            // Stays — loyalty resets to 50, clear flag
+            newState.deployedUnits = newState.deployedUnits.map(u =>
+              u.id === defector.id ? { ...u, pendingDefection: undefined } : u
+            );
+            if (newState.soldierStats[defector.id]) {
+              newState.soldierStats[defector.id] = { ...newState.soldierStats[defector.id], loyalty: 50 };
+            }
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'info', title: '🤝 Soldier Stayed',
+              message: 'The disloyal soldier decided to remain with the family. Loyalty reset.',
+            }];
+            if (turnReport) turnReport.events.push('A soldier reconsidered defection and stayed.');
+          }
+        });
+      }
+
       // ============ EXPIRE AI BOUNTIES ============
       newState.aiBounties = newState.aiBounties.filter(b => newState.turn < b.expiresOnTurn);
       newState.selectedMoveAction = 'move' as MoveAction;
