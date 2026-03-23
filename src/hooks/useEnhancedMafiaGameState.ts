@@ -1367,7 +1367,7 @@ export const useEnhancedMafiaGameState = (
   // ============ END TURN ============
   const endTurn = useCallback(() => {
     setGameState(prev => {
-      const newState = { ...prev };
+      const newState = cloneStateForMutation(prev);
       // Defensive guards for arrays that may be undefined (e.g. from older saved state)
       newState.hiddenUnits = newState.hiddenUnits || [];
       newState.aiBounties = newState.aiBounties || [];
