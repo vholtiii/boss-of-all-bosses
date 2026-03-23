@@ -520,6 +520,7 @@ const createInitialGameState = (
     scoutedHexes: [],
     safehouse: null,
     plannedHit: null,
+    planHitCooldownUntil: 0,
     selectedMoveAction: 'move' as MoveAction,
     actionsRemaining: BASE_ACTIONS_PER_TURN,
     maxActions: BASE_ACTIONS_PER_TURN,
