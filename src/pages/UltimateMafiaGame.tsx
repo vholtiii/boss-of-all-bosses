@@ -590,7 +590,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                       variant={gameState.selectedMoveAction === action ? 'default' : 'outline'}
                       className="text-xs h-7 px-2"
                       title={reason || tip}
-                      disabled={isDisabled && gameState.selectedMoveAction !== action}
+                      disabled={isDisabled}
                       onClick={() => {
                         setMoveAction(action);
                       }}
