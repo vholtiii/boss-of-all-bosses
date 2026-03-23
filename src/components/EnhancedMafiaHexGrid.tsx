@@ -654,8 +654,29 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     </g>
                   )}
 
-                  {/* Plan Hit mode — highlight scouted enemy hexes */}
-                  {planHitMode && (() => {
+                  {/* Plan Hit mode — step 1: highlight hexes with player soldiers */}
+                  {planHitMode && planHitStep === 'selectSoldier' && (() => {
+                    const key2 = `${tile.q},${tile.r},${tile.s}`;
+                    const unitsHere2 = unitsByHex.get(key2) || [];
+                    const hasPlayerSoldier = unitsHere2.some(u => u.family === playerFamily && u.type === 'soldier');
+                    if (hasPlayerSoldier) {
+                      return (
+                        <polygon
+                          points={getHexPoints(x, y, baseHexRadius + 3)}
+                          fill="none"
+                          stroke="#22C55E"
+                          strokeWidth="2.5"
+                          opacity="0.8"
+                          strokeDasharray="6,3"
+                          className="pointer-events-none animate-pulse"
+                        />
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Plan Hit mode — step 2: highlight scouted enemy hexes */}
+                  {planHitMode && planHitStep === 'selectTarget' && (() => {
                     const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== playerFamily;
                     const isScouted = scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
                     if (isEnemy && isScouted) {
