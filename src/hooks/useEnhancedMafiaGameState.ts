@@ -1325,10 +1325,18 @@ export const useEnhancedMafiaGameState = (
         ? getHexNeighbors(hq.q, hq.r, hq.s)
         : getHexesInRange(hq.q, hq.r, hq.s, range);
       
-      // Add safehouse neighbors for soldier deployment
-      if (unitType === 'soldier' && prev.safehouse) {
-        const safehouseNeighbors = getHexNeighbors(prev.safehouse.q, prev.safehouse.r, prev.safehouse.s);
-        candidates = [...candidates, ...safehouseNeighbors];
+      // Add safehouse neighbors for soldier deployment, and safehouse range for capo deployment
+      if (prev.safehouses.length > 0) {
+        for (const sh of prev.safehouses) {
+          if (unitType === 'soldier') {
+            const safehouseNeighbors = getHexNeighbors(sh.q, sh.r, sh.s);
+            candidates = [...candidates, ...safehouseNeighbors];
+          } else {
+            // Capos can deploy up to 5 hexes from safehouse
+            const safehouseRange = getHexesInRange(sh.q, sh.r, sh.s, 5);
+            candidates = [...candidates, ...safehouseRange];
+          }
+        }
         // Deduplicate
         const seen = new Set<string>();
         candidates = candidates.filter(c => {
