@@ -1,30 +1,43 @@
 
 
-# Fortify Refinements: Per-Unit Casualty Protection + Shield Icon
+# Safehouse Refinements (Final)
 
-## What's Changing
+## Changes
 
-### 1. Per-Unit Casualty Protection (Replace blanket reduction)
+### 1. Destroy on Capture + Bounty + Intel
+When a safehouse hex is captured, the safehouse is destroyed and the captor gains:
+- **$9,000 bounty** (`SAFEHOUSE_CAPTURE_BOUNTY`)
+- **1-turn full intel** on the former owner's family — all their hexes become scouted (fresh) for 1 turn, then revert to fog of war. Implemented by bulk-adding `ScoutedHex` entries for all hexes owned by that family with `turnsRemaining: 1`.
 
-Currently, if ANY unit is fortified, the entire casualty count is reduced by 50%. This is a flat group bonus that protects even unfortified units.
+### 2. Defense Bonus (+10%)
+Units on a safehouse hex get +10% defense in combat (`SAFEHOUSE_DEFENSE_BONUS`).
 
-**New behavior**: When selecting casualties from the shuffled pool, each fortified unit picked gets a 50% re-roll to survive. If they survive, the next unfortified unit in the pool takes the hit instead. If all remaining units are fortified, the re-roll still applies but there's no substitute.
+### 3. Capo Deployment from Safehouse
+Capos can deploy from safehouses matching HQ deploy range (5 hexes).
 
-**In `src/hooks/useEnhancedMafiaGameState.ts`** — Victory casualty block (lines ~4119-4128):
-- Remove the blanket `attackersFortified` count reduction
-- Keep `casualties = Math.floor(playerUnits.length * 0.2)`
-- Change the removal loop: iterate through shuffled units, for each casualty slot, if the picked unit is fortified, roll 50% — on success skip them and try the next non-fortified unit
-- Same approach for AI-initiated combat casualty sections
+### 4. Cost + Scaling
+- `SAFEHOUSE_COST = 2500` deducted on creation
+- 2nd safehouse allowed at 15+ hexes (`SAFEHOUSE_TERRITORY_THRESHOLD = 15`)
+- Migrate `safehouse` to `safehouses: Safehouse[]` (max 2)
 
-**Defeat block (lines ~4138-4153)**: Remove the fortified casualty reduction entirely (fortification doesn't help attackers who lost — they got overrun).
+### 5. AI Safehouse Behavior
+- AI with 8+ territories and $5,000+ places safehouses on strategic border hexes
+- AI prioritizes capturing enemy safehouse hexes for bounty + intel
 
-### 2. Shield Icon Enhancement
-
-The shield icon already exists (line 720-731) showing a green circle with 🛡️. This is functional. Minor refinement:
-- Add a count badge showing how many units are fortified (e.g., "🛡️2") when multiple units are fortified on the same hex
-- Keep it hidden for enemy units (already correct — filters by `playerFamily`)
+## New Constants — `src/types/game-mechanics.ts`
+```
+SAFEHOUSE_COST = 2500
+SAFEHOUSE_DEFENSE_BONUS = 10
+SAFEHOUSE_CAPTURE_BOUNTY = 9000
+SAFEHOUSE_CAPTURE_INTEL_DURATION = 1
+SAFEHOUSE_TERRITORY_THRESHOLD = 15
+MAX_SAFEHOUSES = 2
+```
 
 ## Files Modified
-- `src/hooks/useEnhancedMafiaGameState.ts` — per-unit casualty re-roll logic, remove defeat fortify reduction
-- `src/components/EnhancedMafiaHexGrid.tsx` — fortified count badge on shield icon
+- `src/types/game-mechanics.ts` — new constants
+- `src/hooks/useEnhancedMafiaGameState.ts` — array state, capture destruction + bounty + intel reveal, defense bonus, capo deploy, cost, scaling, AI safehouse logic
+- `src/components/EnhancedMafiaHexGrid.tsx` — render multiple safehouse icons, deploy highlights
+- `src/components/GameSidePanels.tsx` — show cost, count, threshold info
+- `src/pages/UltimateMafiaGame.tsx` — pass updated safehouse array props
 
