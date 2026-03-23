@@ -4116,22 +4116,43 @@ export const useEnhancedMafiaGameState = (
           }];
         }
         
-        // Casualties (same for both)
-        let casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
-        const attackersFortified = playerUnits.some(u => u.fortified);
-        if (attackersFortified) {
-          casualties = Math.max(0, Math.floor(casualties * (1 - FORTIFY_CASUALTY_REDUCTION / 100)));
-        }
+        // Casualties — per-unit fortify re-roll
+        const casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
         const shuffled = [...playerUnits].sort(() => Math.random() - 0.5);
-        for (let i = 0; i < casualties; i++) {
-          const idx = state.deployedUnits.indexOf(shuffled[i]);
+        let removed = 0;
+        const alreadyRemoved = new Set<string>();
+        for (let i = 0; i < shuffled.length && removed < casualties; i++) {
+          const unit = shuffled[i];
+          if (alreadyRemoved.has(unit.id)) continue;
+          // Fortified units get a 50% chance to survive — pass hit to next unfortified unit
+          if (unit.fortified && Math.random() < 0.5) {
+            const substitute = shuffled.find((u, j) => j > i && !u.fortified && !alreadyRemoved.has(u.id));
+            if (substitute) {
+              alreadyRemoved.add(substitute.id);
+              const idx = state.deployedUnits.indexOf(substitute);
+              if (idx !== -1) {
+                state.deployedUnits.splice(idx, 1);
+                state.pendingNotifications = [...state.pendingNotifications, {
+                  type: 'error' as const, title: '⚔️ Soldier Lost in Combat',
+                  message: `Your ${substitute.type === 'capo' ? 'capo' : 'soldier'} fell during the assault on ${tile.district}.`,
+                }];
+              }
+              removed++;
+              continue;
+            }
+            // No substitute available — fortified unit still saved by re-roll, skip this casualty slot
+            continue;
+          }
+          alreadyRemoved.add(unit.id);
+          const idx = state.deployedUnits.indexOf(unit);
           if (idx !== -1) {
             state.deployedUnits.splice(idx, 1);
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'error' as const, title: '⚔️ Soldier Lost in Combat',
-              message: `Your ${shuffled[i].type === 'capo' ? 'capo' : 'soldier'} fell during the assault on ${tile.district}.`,
+              message: `Your ${unit.type === 'capo' ? 'capo' : 'soldier'} fell during the assault on ${tile.district}.`,
             }];
           }
+          removed++;
         }
       } else {
         // ============ DEFEAT ============
