@@ -516,6 +516,7 @@ const createInitialGameState = (
     pendingNotifications: [],
     scoutedHexes: [],
     safehouse: null,
+    plannedHit: null,
     selectedMoveAction: 'move' as MoveAction,
     actionsRemaining: BASE_ACTIONS_PER_TURN,
     maxActions: BASE_ACTIONS_PER_TURN,
