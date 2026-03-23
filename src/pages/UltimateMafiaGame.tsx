@@ -570,11 +570,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                       title={reason || tip}
                       disabled={isDisabled && gameState.selectedMoveAction !== action}
                       onClick={() => {
-                        if (action === 'fortify' && gameState.selectedUnitId) {
-                          fortifyUnit();
-                        } else {
-                          setMoveAction(action);
-                        }
+                        setMoveAction(action);
                       }}
                     >
                       {label}
