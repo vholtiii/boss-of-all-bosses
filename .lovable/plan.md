@@ -1,45 +1,30 @@
 
-# Plan Hit — Target Tracking with Penalties
 
-## Mechanic: Scout → Plan → Strike (Target-Tracking)
+# Fortify Refinements: Per-Unit Casualty Protection + Shield Icon
 
-1. **Scout** an enemy hex (Tactical phase, 1 tactical action)
-2. **Plan Hit** — select your soldier (planner), then pick a specific enemy unit on the scouted hex (Tactical phase, 1 tactical action) — marks hex with 🎯 crosshair
-3. **Execute Plan** during Action phase — system finds target's current location automatically
+## What's Changing
 
-## Target Tracking Table
+### 1. Per-Unit Casualty Protection (Replace blanket reduction)
 
-| Scenario | Bonus | Penalties |
-|---|---|---|
-| Target on original hex | +20% | None |
-| Target moved to new hex | +10% (reduced) | +5 heat, 2-turn Plan Hit cooldown |
-| Target gone (dead/removed) | None | -5 respect/fear, -10 planner loyalty |
+Currently, if ANY unit is fortified, the entire casualty count is reduced by 50%. This is a flat group bonus that protects even unfortified units.
 
-## Rules
-- Phase: Tactical (costs 1 tactical action to plan)
-- Requirement: Target hex must be scouted (fresh or stale)
-- Selection: 2-step — select your soldier first, then the enemy unit
-- Expiration: 2 turns — if not executed, plan expires silently (no penalty)
-- Limit: 1 planned hit at a time (new plan replaces old)
-- Cooldown: After a relocated execution, Plan Hit is locked for 2 turns
-- Visual: 🎯 crosshair on planned hex (faded if target moved), bright orange 🎯 on target's current hex
+**New behavior**: When selecting casualties from the shuffled pool, each fortified unit picked gets a 50% re-roll to survive. If they survive, the next unfortified unit in the pool takes the hit instead. If all remaining units are fortified, the re-roll still applies but there's no substitute.
 
-## Execute Plan (Action Phase)
-- "Execute Plan" button appears in side panel during Action phase
-- Shows target status: on original hex, relocated, or eliminated
-- Clicking executes the hit on the target's **current** hex (auto-redirect)
-- Costs 1 action
+**In `src/hooks/useEnhancedMafiaGameState.ts`** — Victory casualty block (lines ~4119-4128):
+- Remove the blanket `attackersFortified` count reduction
+- Keep `casualties = Math.floor(playerUnits.length * 0.2)`
+- Change the removal loop: iterate through shuffled units, for each casualty slot, if the picked unit is fortified, roll 50% — on success skip them and try the next non-fortified unit
+- Same approach for AI-initiated combat casualty sections
 
-## Constants
-- `PLAN_HIT_BONUS = 20` — full bonus when target is on original hex
-- `PLAN_HIT_RELOCATED_BONUS = 10` — reduced bonus when target moved
-- `PLAN_HIT_RELOCATED_HEAT = 5` — heat penalty for chasing relocated target
-- `PLAN_HIT_COOLDOWN = 2` — turns before next Plan Hit after relocated execution
-- `PLAN_HIT_FAIL_REPUTATION = 5` — respect/fear loss when target gone
-- `PLAN_HIT_FAIL_LOYALTY = 10` — planner loyalty loss when target gone
+**Defeat block (lines ~4138-4153)**: Remove the fortified casualty reduction entirely (fortification doesn't help attackers who lost — they got overrun).
+
+### 2. Shield Icon Enhancement
+
+The shield icon already exists (line 720-731) showing a green circle with 🛡️. This is functional. Minor refinement:
+- Add a count badge showing how many units are fortified (e.g., "🛡️2") when multiple units are fortified on the same hex
+- Keep it hidden for enemy units (already correct — filters by `playerFamily`)
 
 ## Files Modified
-- `src/types/game-mechanics.ts` — constants
-- `src/hooks/useEnhancedMafiaGameState.ts` — execute_planned_hit action, target tracking in processTerritoryHit, cooldown state
-- `src/components/GameSidePanels.tsx` — cooldown display, Execute Plan button, relocated status
-- `src/components/EnhancedMafiaHexGrid.tsx` — dual crosshair (faded original + bright relocated)
+- `src/hooks/useEnhancedMafiaGameState.ts` — per-unit casualty re-roll logic, remove defeat fortify reduction
+- `src/components/EnhancedMafiaHexGrid.tsx` — fortified count badge on shield icon
+
