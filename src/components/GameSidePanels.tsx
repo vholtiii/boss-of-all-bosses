@@ -127,6 +127,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Plan Hit"
               sublabel={`Free · 1 soldier`}
               disabled={resources.soldiers < 1 || legalStatus.jailTime > 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : resources.soldiers < 1 ? 'Need 1 soldier' : undefined}
               phaseLocked={actionsLocked}
               variant="destructive"
               onClick={() => onAction({ type: 'violent_action', violenceType: 'hit', cost: 0, risk: 70 })}
@@ -136,6 +137,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Sabotage Rival"
               sublabel={`$12,000`}
               disabled={resources.money < 12000 || legalStatus.jailTime > 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : resources.money < 12000 ? `Need $12,000` : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'sabotage', cost: 12000 })}
             />
@@ -144,6 +146,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               label="Extort Business"
               sublabel={`Free · +Heat`}
               disabled={legalStatus.jailTime > 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'extort_business', amount: 5000 })}
             />
