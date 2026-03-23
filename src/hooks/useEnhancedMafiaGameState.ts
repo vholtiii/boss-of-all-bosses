@@ -265,6 +265,7 @@ export interface EnhancedMafiaGameState {
   mapSeed: number;
   difficulty: Difficulty;
   difficultyModifiers: DifficultyModifiers;
+  ratIgnored?: boolean; // escalation flag for Rat → Federal Investigation event chain
   
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
