@@ -4116,42 +4116,59 @@ export const useEnhancedMafiaGameState = (
           }];
         }
         
-        // Casualties (same for both)
-        let casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
-        const attackersFortified = playerUnits.some(u => u.fortified);
-        if (attackersFortified) {
-          casualties = Math.max(0, Math.floor(casualties * (1 - FORTIFY_CASUALTY_REDUCTION / 100)));
-        }
+        // Casualties — per-unit fortify re-roll
+        const casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
         const shuffled = [...playerUnits].sort(() => Math.random() - 0.5);
-        for (let i = 0; i < casualties; i++) {
-          const idx = state.deployedUnits.indexOf(shuffled[i]);
+        let removed = 0;
+        const alreadyRemoved = new Set<string>();
+        for (let i = 0; i < shuffled.length && removed < casualties; i++) {
+          const unit = shuffled[i];
+          if (alreadyRemoved.has(unit.id)) continue;
+          // Fortified units get a 50% chance to survive — pass hit to next unfortified unit
+          if (unit.fortified && Math.random() < 0.5) {
+            const substitute = shuffled.find((u, j) => j > i && !u.fortified && !alreadyRemoved.has(u.id));
+            if (substitute) {
+              alreadyRemoved.add(substitute.id);
+              const idx = state.deployedUnits.indexOf(substitute);
+              if (idx !== -1) {
+                state.deployedUnits.splice(idx, 1);
+                state.pendingNotifications = [...state.pendingNotifications, {
+                  type: 'error' as const, title: '⚔️ Soldier Lost in Combat',
+                  message: `Your ${substitute.type === 'capo' ? 'capo' : 'soldier'} fell during the assault on ${tile.district}.`,
+                }];
+              }
+              removed++;
+              continue;
+            }
+            // No substitute available — fortified unit still saved by re-roll, skip this casualty slot
+            continue;
+          }
+          alreadyRemoved.add(unit.id);
+          const idx = state.deployedUnits.indexOf(unit);
           if (idx !== -1) {
             state.deployedUnits.splice(idx, 1);
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'error' as const, title: '⚔️ Soldier Lost in Combat',
-              message: `Your ${shuffled[i].type === 'capo' ? 'capo' : 'soldier'} fell during the assault on ${tile.district}.`,
+              message: `Your ${unit.type === 'capo' ? 'capo' : 'soldier'} fell during the assault on ${tile.district}.`,
             }];
           }
+          removed++;
         }
       } else {
-        // ============ DEFEAT ============
-        let casualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
-        const defendersFortified = playerUnits.some(u => u.fortified);
-        if (defendersFortified) {
-          casualties = Math.max(1, Math.floor(casualties * (1 - FORTIFY_CASUALTY_REDUCTION / 100)));
-        }
-        const shuffled = [...playerUnits].sort(() => Math.random() - 0.5);
-        for (let i = 0; i < casualties; i++) {
-          const idx = state.deployedUnits.indexOf(shuffled[i]);
+        // ============ DEFEAT — no fortify protection (attackers got overrun) ============
+        const defeatCasualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
+        const defeatShuffled = [...playerUnits].sort(() => Math.random() - 0.5);
+        for (let i = 0; i < defeatCasualties && i < defeatShuffled.length; i++) {
+          const idx = state.deployedUnits.indexOf(defeatShuffled[i]);
           if (idx !== -1) {
             state.deployedUnits.splice(idx, 1);
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'error' as const, title: '⚔️ Soldier Killed in Battle',
-              message: `Your ${shuffled[i].type === 'capo' ? 'capo' : 'soldier'} was killed in the failed attack on ${tile.district}.`,
+              message: `Your ${defeatShuffled[i].type === 'capo' ? 'capo' : 'soldier'} was killed in the failed attack on ${tile.district}.`,
             }];
           }
         }
-        shuffled.slice(casualties).forEach(u => {
+        defeatShuffled.slice(defeatCasualties).forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
             // Loyalty: +5 combat survival bonus
@@ -4161,7 +4178,7 @@ export const useEnhancedMafiaGameState = (
             );
           }
         });
-        const failDetails = `${casualties} casualt${casualties > 1 ? 'ies' : 'y'} suffered`;
+        const failDetails = `${defeatCasualties} casualt${defeatCasualties > 1 ? 'ies' : 'y'} suffered`;
         state.lastCombatResult = {
           q: targetQ, r: targetR, s: targetS,
           success: false, type: 'hit',
