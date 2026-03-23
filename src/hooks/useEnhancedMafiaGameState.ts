@@ -25,7 +25,7 @@ import {
   NEGOTIATION_TYPES,
   ScoutedHex, Safehouse, MoveAction, PlannedHit,
   FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
-  PLAN_HIT_BONUS, PLAN_HIT_DURATION,
+  PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_FAIL_REPUTATION, PLAN_HIT_FAIL_LOYALTY,
   BASE_ACTIONS_PER_TURN, BONUS_ACTION_RESPECT_THRESHOLD, BONUS_ACTION_INFLUENCE_THRESHOLD,
   TACTICAL_ACTIONS_PER_TURN,
   HiddenUnit, AIBounty,
@@ -2780,9 +2780,29 @@ export const useEnhancedMafiaGameState = (
             }];
             return newState;
           }
-          const phQ = action.targetQ;
-          const phR = action.targetR;
-          const phS = action.targetS;
+          // Validate planner soldier
+          const plannerUnitId = action.plannerUnitId;
+          const plannerUnit = newState.deployedUnits.find(u => u.id === plannerUnitId && u.family === newState.playerFamily);
+          if (!plannerUnit) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚠️ No Planner Selected',
+              message: 'Select one of your soldiers to plan the hit.',
+            }];
+            return newState;
+          }
+          // Validate target unit
+          const targetUnitId = action.targetUnitId;
+          const targetUnit = newState.deployedUnits.find(u => u.id === targetUnitId);
+          if (!targetUnit || targetUnit.family === newState.playerFamily) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚠️ Invalid Target Unit',
+              message: 'Select an enemy unit on a scouted hex.',
+            }];
+            return newState;
+          }
+          const phQ = targetUnit.q;
+          const phR = targetUnit.r;
+          const phS = targetUnit.s;
           const phTile = newState.hexMap.find(t => t.q === phQ && t.r === phR && t.s === phS);
           if (!phTile || phTile.controllingFamily === newState.playerFamily || phTile.controllingFamily === 'neutral') {
             newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -2803,15 +2823,19 @@ export const useEnhancedMafiaGameState = (
           newState.plannedHit = {
             q: phQ, r: phR, s: phS,
             targetFamily: phTile.controllingFamily,
+            targetUnitId,
+            plannerUnitId,
             plannedOnTurn: newState.turn,
             expiresOnTurn: newState.turn + PLAN_HIT_DURATION,
           };
           newState.tacticalActionsRemaining -= 1;
           newState.selectedUnitId = null;
           newState.availableMoveHexes = [];
+          const targetName = targetUnit.name || targetUnit.id.split('-').slice(-2).join(' ');
+          const plannerName = plannerUnit.name || plannerUnit.id.split('-').slice(-2).join(' ');
           newState.pendingNotifications = [...newState.pendingNotifications, {
             type: 'success' as const, title: '🎯 Hit Planned',
-            message: `Target marked for +${PLAN_HIT_BONUS}% hit bonus. Execute during Action phase within ${PLAN_HIT_DURATION} turns.`,
+            message: `${plannerName} is planning a hit on ${targetName}. +${PLAN_HIT_BONUS}% bonus if target stays put. Execute within ${PLAN_HIT_DURATION} turns.`,
           }];
           return newState;
         }
@@ -3896,14 +3920,37 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // Plan Hit bonus — +20% if this hex was planned
+      // Plan Hit bonus — +20% if this hex was planned AND target unit is still here
       if (state.plannedHit && state.plannedHit.q === targetQ && state.plannedHit.r === targetR && state.plannedHit.s === targetS) {
-        chance += PLAN_HIT_BONUS / 100;
-        state.plannedHit = null; // Consume the plan
-        state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'info', title: '🎯 Plan Hit Executed!',
-          message: `+${PLAN_HIT_BONUS}% bonus applied from tactical planning.`,
-        }];
+        const targetStillHere = state.deployedUnits.some(u => 
+          u.id === state.plannedHit!.targetUnitId && u.q === targetQ && u.r === targetR && u.s === targetS
+        );
+        if (targetStillHere) {
+          // Success — target is still on the planned hex
+          chance += PLAN_HIT_BONUS / 100;
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'info', title: '🎯 Plan Hit Executed!',
+            message: `+${PLAN_HIT_BONUS}% bonus applied — target was right where expected.`,
+          }];
+        } else {
+          // Failure — target moved away, apply penalties
+          // -5 respect or fear (whichever is higher)
+          if (state.resources.respect >= state.reputation.fear) {
+            state.resources.respect = Math.max(0, state.resources.respect - PLAN_HIT_FAIL_REPUTATION);
+          } else {
+            state.reputation.fear = Math.max(0, state.reputation.fear - PLAN_HIT_FAIL_REPUTATION);
+          }
+          // -10 loyalty on the planner soldier
+          const plannerStats = state.soldierStats[state.plannedHit.plannerUnitId];
+          if (plannerStats) {
+            plannerStats.loyalty = Math.max(0, plannerStats.loyalty - PLAN_HIT_FAIL_LOYALTY);
+          }
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'error', title: '🎯 Plan Hit Failed!',
+            message: `The target slipped away — your plan was exposed. -${PLAN_HIT_FAIL_REPUTATION} reputation, planner morale shaken.`,
+          }];
+        }
+        state.plannedHit = null; // Consume the plan either way
       }
       
       chance = Math.max(0.1, Math.min(0.95, chance));

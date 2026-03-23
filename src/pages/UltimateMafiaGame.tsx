@@ -85,7 +85,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications]);
 
   // Clear planHitMode when phase changes
-  useEffect(() => { setPlanHitMode(false); }, [gameState.turnPhase]);
+  useEffect(() => { setPlanHitMode(false); setPlanHitStep('selectSoldier'); setPlanHitPlannerId(null); }, [gameState.turnPhase]);
 
   // Global button click sound
   useEffect(() => {
@@ -132,8 +132,10 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     capoId: string;
   } | null>(null);
 
-  // Plan Hit mode
+  // Plan Hit mode — 2-step: select soldier, then select target hex+unit
   const [planHitMode, setPlanHitMode] = useState(false);
+  const [planHitStep, setPlanHitStep] = useState<'selectSoldier' | 'selectTarget'>('selectSoldier');
+  const [planHitPlannerId, setPlanHitPlannerId] = useState<string | null>(null);
 
   // Handle action wrapper function
   const handleAction = useCallback((action: any) => {
@@ -149,11 +151,26 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
     if (action.type === 'enter_plan_hit_mode') {
       setPlanHitMode(true);
+      setPlanHitStep('selectSoldier');
+      setPlanHitPlannerId(null);
+      return;
+    }
+    if (action.type === 'cancel_plan_hit_mode') {
+      setPlanHitMode(false);
+      setPlanHitStep('selectSoldier');
+      setPlanHitPlannerId(null);
+      return;
+    }
+    if (action.type === 'plan_hit_select_soldier') {
+      setPlanHitPlannerId(action.unitId);
+      setPlanHitStep('selectTarget');
       return;
     }
     if (action.type === 'plan_hit') {
       performAction(action);
       setPlanHitMode(false);
+      setPlanHitStep('selectSoldier');
+      setPlanHitPlannerId(null);
       return;
     }
     performAction(action);
@@ -234,7 +251,11 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
             planHitMode={planHitMode}
-            onPlanHitSelect={(q, r, s) => handleAction({ type: 'plan_hit', targetQ: q, targetR: r, targetS: s })}
+            planHitStep={planHitStep}
+            planHitPlannerId={planHitPlannerId}
+            onPlanHitSelect={(q, r, s, targetUnitId) => handleAction({ type: 'plan_hit', plannerUnitId: planHitPlannerId, targetUnitId })}
+            onPlanHitSelectSoldier={(unitId) => handleAction({ type: 'plan_hit_select_soldier', unitId })}
+            onCancelPlanHit={() => handleAction({ type: 'cancel_plan_hit_mode' })}
           />
         </div>
       )
@@ -741,7 +762,11 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
             planHitMode={planHitMode}
-            onPlanHitSelect={(q, r, s) => handleAction({ type: 'plan_hit', targetQ: q, targetR: r, targetS: s })}
+            planHitStep={planHitStep}
+            planHitPlannerId={planHitPlannerId}
+            onPlanHitSelect={(q, r, s, targetUnitId) => handleAction({ type: 'plan_hit', plannerUnitId: planHitPlannerId, targetUnitId })}
+            onPlanHitSelectSoldier={(unitId) => handleAction({ type: 'plan_hit_select_soldier', unitId })}
+            onCancelPlanHit={() => handleAction({ type: 'cancel_plan_hit_mode' })}
           />
     </div>
   );

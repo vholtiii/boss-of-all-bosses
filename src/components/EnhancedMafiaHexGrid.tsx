@@ -22,7 +22,11 @@ interface EnhancedMafiaHexGridProps {
   onSelectUnitFromHeadquarters?: (unitType: 'soldier' | 'capo', family: string) => void;
   onDeployUnit?: (unitType: 'soldier' | 'capo', targetLocation: { q: number; r: number; s: number }, family: string) => void;
   planHitMode?: boolean;
-  onPlanHitSelect?: (q: number, r: number, s: number) => void;
+  planHitStep?: 'selectSoldier' | 'selectTarget';
+  planHitPlannerId?: string | null;
+  onPlanHitSelect?: (q: number, r: number, s: number, targetUnitId: string) => void;
+  onPlanHitSelectSoldier?: (unitId: string) => void;
+  onCancelPlanHit?: () => void;
 }
 
 const familyColors: Record<string, string> = {
@@ -46,12 +50,13 @@ const businessIcons: Record<string, string> = {
 const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({ 
   width, height, onBusinessClick, selectedBusiness, playerFamily,
   gameState, onAction, onSelectUnit, onMoveUnit, onSelectHeadquarters,
-  onSelectUnitFromHeadquarters, onDeployUnit, planHitMode, onPlanHitSelect
+  onSelectUnitFromHeadquarters, onDeployUnit, planHitMode, planHitStep, planHitPlannerId, onPlanHitSelect, onPlanHitSelectSoldier, onCancelPlanHit
 }) => {
   const [zoom, setZoom] = useState(1);
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; negotiateCapoId?: string; reasons?: Record<string, string> } | null>(null);
+  const [planHitUnitMenu, setPlanHitUnitMenu] = useState<{ tile: HexTile; enemyUnits: DeployedUnit[] } | null>(null);
   const [expandedHQKey, setExpandedHQKey] = useState<string | null>(null);
   const [combatOverlay, setCombatOverlay] = useState<{
     q: number; r: number; s: number;
@@ -208,12 +213,35 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const handleHexClick = (tile: HexTile) => {
     const turnPhase = gameState?.turnPhase || 'waiting';
 
-    // Plan Hit mode — intercept clicks on scouted enemy hexes
-    if (planHitMode && onPlanHitSelect) {
-      const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== playerFamily;
-      const isScouted = scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
-      if (isEnemy && isScouted) {
-        onPlanHitSelect(tile.q, tile.r, tile.s);
+    // Plan Hit mode — 2-step selection
+    if (planHitMode) {
+      if (planHitStep === 'selectSoldier') {
+        // Step 1: Select a player soldier
+        const key = `${tile.q},${tile.r},${tile.s}`;
+        const unitsHere = unitsByHex.get(key) || [];
+        const playerSoldier = unitsHere.find(u => u.family === playerFamily && u.type === 'soldier');
+        if (playerSoldier && onPlanHitSelectSoldier) {
+          onPlanHitSelectSoldier(playerSoldier.id);
+        }
+        return;
+      }
+      if (planHitStep === 'selectTarget' && onPlanHitSelect) {
+        // Step 2: Select a scouted enemy hex → show unit picker
+        const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== playerFamily;
+        const isScouted = scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
+        if (isEnemy && isScouted) {
+          const key = `${tile.q},${tile.r},${tile.s}`;
+          const unitsHere = unitsByHex.get(key) || [];
+          const enemyUnits = unitsHere.filter(u => u.family !== playerFamily);
+          if (enemyUnits.length === 1) {
+            // Only one unit — select directly
+            onPlanHitSelect(tile.q, tile.r, tile.s, enemyUnits[0].id);
+          } else if (enemyUnits.length > 1) {
+            // Show unit picker
+            setPlanHitUnitMenu({ tile, enemyUnits });
+          }
+        }
+        return;
       }
       return;
     }
@@ -474,6 +502,18 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           >Cancel</button>
         </div>
       )}
+      {/* Plan Hit mode banner */}
+      {planHitMode && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-6 py-2 rounded-full bg-destructive/90 backdrop-blur-sm border border-destructive/30 shadow-lg flex items-center gap-3">
+          <span className="text-sm font-bold text-white">
+            🎯 {planHitStep === 'selectSoldier' ? 'Select a soldier to plan the hit' : 'Select a scouted enemy hex to target'}
+          </span>
+          <button
+            className="text-xs text-white/70 hover:text-white underline"
+            onClick={() => { setPlanHitUnitMenu(null); onCancelPlanHit?.(); }}
+          >Cancel</button>
+        </div>
+      )}
       {/* Controls */}
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
         <div className="flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-3 border border-noir-light shadow-lg">
@@ -614,8 +654,29 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     </g>
                   )}
 
-                  {/* Plan Hit mode — highlight scouted enemy hexes */}
-                  {planHitMode && (() => {
+                  {/* Plan Hit mode — step 1: highlight hexes with player soldiers */}
+                  {planHitMode && planHitStep === 'selectSoldier' && (() => {
+                    const key2 = `${tile.q},${tile.r},${tile.s}`;
+                    const unitsHere2 = unitsByHex.get(key2) || [];
+                    const hasPlayerSoldier = unitsHere2.some(u => u.family === playerFamily && u.type === 'soldier');
+                    if (hasPlayerSoldier) {
+                      return (
+                        <polygon
+                          points={getHexPoints(x, y, baseHexRadius + 3)}
+                          fill="none"
+                          stroke="#22C55E"
+                          strokeWidth="2.5"
+                          opacity="0.8"
+                          strokeDasharray="6,3"
+                          className="pointer-events-none animate-pulse"
+                        />
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Plan Hit mode — step 2: highlight scouted enemy hexes */}
+                  {planHitMode && planHitStep === 'selectTarget' && (() => {
                     const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== playerFamily;
                     const isScouted = scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
                     if (isEnemy && isScouted) {
@@ -949,7 +1010,31 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })()}
 
-            {/* Combat Result Overlay */}
+            {/* Plan Hit — target unit picker popup */}
+            {planHitUnitMenu && (() => {
+              const { x, y } = getHexPosition(planHitUnitMenu.tile.q, planHitUnitMenu.tile.r);
+              const menuWidth = 160;
+              const menuHeight = planHitUnitMenu.enemyUnits.length * 34 + 30;
+              return (
+                <foreignObject x={x - menuWidth / 2} y={y - menuHeight - baseHexRadius} width={menuWidth} height={menuHeight}>
+                  <div className="bg-background/95 backdrop-blur-sm border border-destructive/50 rounded-lg p-2 shadow-xl">
+                    <div className="text-xs font-bold text-destructive text-center mb-1.5">🎯 Select Target</div>
+                    {planHitUnitMenu.enemyUnits.map(unit => (
+                      <button
+                        key={unit.id}
+                        onClick={() => {
+                          onPlanHitSelect?.(planHitUnitMenu.tile.q, planHitUnitMenu.tile.r, planHitUnitMenu.tile.s, unit.id);
+                          setPlanHitUnitMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-md bg-destructive/20 hover:bg-destructive/40 text-foreground text-xs font-medium transition-colors"
+                      >
+                        {unit.type === 'capo' ? '👔' : '🔫'} {unit.name || unit.id.split('-').slice(-2).join(' ')}
+                      </button>
+                    ))}
+                  </div>
+                </foreignObject>
+              );
+            })()}
             <AnimatePresence>
               {combatOverlay && (() => {
                 const { x, y } = getHexPosition(combatOverlay.q, combatOverlay.r);
