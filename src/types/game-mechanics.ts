@@ -269,9 +269,15 @@ export interface PlannedHit {
   r: number;
   s: number;
   targetFamily: string;
+  targetUnitId: string;    // specific enemy unit being targeted
+  plannerUnitId: string;   // player soldier who planned the hit
   plannedOnTurn: number;
   expiresOnTurn: number;
 }
+
+// ============ PLAN HIT FAILURE PENALTIES ============
+export const PLAN_HIT_FAIL_REPUTATION = 5;  // -5 respect or fear (whichever is higher)
+export const PLAN_HIT_FAIL_LOYALTY = 10;    // -10 loyalty on planner soldier
 
 // ============ ACTION BUDGET ============
 export const BASE_ACTIONS_PER_TURN = 2;

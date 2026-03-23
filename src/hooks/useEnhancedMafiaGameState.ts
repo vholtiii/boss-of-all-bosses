@@ -3920,14 +3920,37 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // Plan Hit bonus — +20% if this hex was planned
+      // Plan Hit bonus — +20% if this hex was planned AND target unit is still here
       if (state.plannedHit && state.plannedHit.q === targetQ && state.plannedHit.r === targetR && state.plannedHit.s === targetS) {
-        chance += PLAN_HIT_BONUS / 100;
-        state.plannedHit = null; // Consume the plan
-        state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'info', title: '🎯 Plan Hit Executed!',
-          message: `+${PLAN_HIT_BONUS}% bonus applied from tactical planning.`,
-        }];
+        const targetStillHere = state.deployedUnits.some(u => 
+          u.id === state.plannedHit!.targetUnitId && u.q === targetQ && u.r === targetR && u.s === targetS
+        );
+        if (targetStillHere) {
+          // Success — target is still on the planned hex
+          chance += PLAN_HIT_BONUS / 100;
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'info', title: '🎯 Plan Hit Executed!',
+            message: `+${PLAN_HIT_BONUS}% bonus applied — target was right where expected.`,
+          }];
+        } else {
+          // Failure — target moved away, apply penalties
+          // -5 respect or fear (whichever is higher)
+          if (state.resources.respect >= state.reputation.fear) {
+            state.resources.respect = Math.max(0, state.resources.respect - PLAN_HIT_FAIL_REPUTATION);
+          } else {
+            state.reputation.fear = Math.max(0, state.reputation.fear - PLAN_HIT_FAIL_REPUTATION);
+          }
+          // -10 loyalty on the planner soldier
+          const plannerStats = state.soldierStats[state.plannedHit.plannerUnitId];
+          if (plannerStats) {
+            plannerStats.loyalty = Math.max(0, plannerStats.loyalty - PLAN_HIT_FAIL_LOYALTY);
+          }
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'error', title: '🎯 Plan Hit Failed!',
+            message: `The target slipped away — your plan was exposed. -${PLAN_HIT_FAIL_REPUTATION} reputation, planner morale shaken.`,
+          }];
+        }
+        state.plannedHit = null; // Consume the plan either way
       }
       
       chance = Math.max(0.1, Math.min(0.95, chance));
