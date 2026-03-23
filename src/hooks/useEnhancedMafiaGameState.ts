@@ -266,6 +266,7 @@ export interface EnhancedMafiaGameState {
   difficulty: Difficulty;
   difficultyModifiers: DifficultyModifiers;
   ratIgnored?: boolean; // escalation flag for Rat → Federal Investigation event chain
+  reinforceTargets?: Array<{ q: number; r: number; s: number; family: string; expiresOnTurn: number }>; // AI reinforcement from scout detection
   
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
