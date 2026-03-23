@@ -21,6 +21,8 @@ interface EnhancedMafiaHexGridProps {
   onSelectHeadquarters?: (family: string) => void;
   onSelectUnitFromHeadquarters?: (unitType: 'soldier' | 'capo', family: string) => void;
   onDeployUnit?: (unitType: 'soldier' | 'capo', targetLocation: { q: number; r: number; s: number }, family: string) => void;
+  planHitMode?: boolean;
+  onPlanHitSelect?: (q: number, r: number, s: number) => void;
 }
 
 const familyColors: Record<string, string> = {
