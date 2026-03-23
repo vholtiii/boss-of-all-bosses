@@ -2783,6 +2783,15 @@ export const useEnhancedMafiaGameState = (
             }];
             return newState;
           }
+          // Check cooldown
+          if (newState.turn < (newState.planHitCooldownUntil || 0)) {
+            const turnsLeft = (newState.planHitCooldownUntil || 0) - newState.turn;
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⏳ Plan Hit Cooldown',
+              message: `Your crew needs to regroup. Plan Hit available in ${turnsLeft} turn${turnsLeft !== 1 ? 's' : ''}.`,
+            }];
+            return newState;
+          }
           // Validate planner soldier
           const plannerUnitId = action.plannerUnitId;
           const plannerUnit = newState.deployedUnits.find(u => u.id === plannerUnitId && u.family === newState.playerFamily);
