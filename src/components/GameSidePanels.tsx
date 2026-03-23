@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import {
   DollarSign,
   Users,
@@ -726,25 +727,47 @@ const ActionButton: React.FC<{
   disabledReason?: string;
   variant?: 'default' | 'destructive' | 'outline';
   onClick: () => void;
-}> = ({ icon, label, sublabel, disabled, phaseLocked, disabledReason, variant = 'outline', onClick }) => (
-  <Button
-    variant={variant}
-    size="sm"
-    disabled={disabled || phaseLocked}
-    onClick={onClick}
-    className={cn("w-full justify-start text-xs h-9 gap-2", phaseLocked && "opacity-50")}
-  >
-    {phaseLocked ? <Shield className="h-3.5 w-3.5 text-muted-foreground" /> : icon}
-    <span className="flex-1 text-left">{label}</span>
-    {phaseLocked ? (
-      <span className="text-[10px] text-muted-foreground font-normal">🔒</span>
-    ) : disabled && disabledReason ? (
-      <span className="text-[10px] text-destructive/80 font-normal">{disabledReason}</span>
-    ) : (
-      <span className="text-[10px] text-muted-foreground font-normal">{sublabel}</span>
-    )}
-  </Button>
-);
+}> = ({ icon, label, sublabel, disabled, phaseLocked, disabledReason, variant = 'outline', onClick }) => {
+  const isDisabled = disabled || phaseLocked;
+  const tooltipText = phaseLocked ? 'Available in a different phase' : disabledReason;
+
+  const button = (
+    <Button
+      variant={variant}
+      size="sm"
+      disabled={isDisabled}
+      onClick={onClick}
+      className={cn("w-full justify-start text-xs h-9 gap-2", phaseLocked && "opacity-50")}
+    >
+      {phaseLocked ? <Shield className="h-3.5 w-3.5 text-muted-foreground" /> : icon}
+      <span className="flex-1 text-left">{label}</span>
+      {phaseLocked ? (
+        <span className="text-[10px] text-muted-foreground font-normal">🔒</span>
+      ) : disabled && disabledReason ? (
+        <span className="text-[10px] text-destructive/80 font-normal">{disabledReason}</span>
+      ) : (
+        <span className="text-[10px] text-muted-foreground font-normal">{sublabel}</span>
+      )}
+    </Button>
+  );
+
+  if (isDisabled && tooltipText) {
+    return (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="w-full block">{button}</span>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <p>{tooltipText}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return button;
+};
 
 const CollapsibleSection: React.FC<{
   title: string;
