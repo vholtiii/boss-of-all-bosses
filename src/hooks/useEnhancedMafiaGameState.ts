@@ -1629,6 +1629,9 @@ export const useEnhancedMafiaGameState = (
         .map(s => ({ ...s, turnsRemaining: s.turnsRemaining - 1 }))
         .filter(s => s.turnsRemaining > 0);
 
+      // Expire reinforcement targets
+      newState.reinforceTargets = (newState.reinforceTargets || []).filter(rt => rt.expiresOnTurn > newState.turn);
+
       // Tick safehouse
       if (newState.safehouse) {
         newState.safehouse = { ...newState.safehouse, turnsRemaining: newState.safehouse.turnsRemaining - 1 };
