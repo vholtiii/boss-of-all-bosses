@@ -3380,11 +3380,12 @@ export const useEnhancedMafiaGameState = (
 
   const handleEventChoice = useCallback((eventId: string, choiceId: string) => {
     setGameState(prev => {
-      const newState = { ...prev };
+      const newState = cloneStateForMutation(prev);
       const event = newState.events.find(e => e.id === eventId);
       if (event) {
         const choice = event.choices.find(c => c.id === choiceId);
         if (choice) {
+          // Apply standard consequences
           choice.consequences.forEach(c => {
             switch (c.type) {
               case 'money': newState.resources.money += c.value; break;
@@ -3392,6 +3393,98 @@ export const useEnhancedMafiaGameState = (
               case 'reputation': newState.reputation.reputation += c.value; break;
             }
           });
+
+          // === Special: Internal Betrayal resolution ===
+          if (event.title === 'Internal Betrayal' && event.requirements?.territory?.[0]) {
+            const targetSoldierId = event.requirements.territory[0];
+            if (choiceId === 'confront') {
+              // Remove the soldier
+              newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== targetSoldierId);
+              delete newState.soldierStats[targetSoldierId];
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'warning', title: '🔪 Soldier Dismissed',
+                message: 'The disloyal soldier has been dealt with. Your crew\'s loyalty is stabilized.',
+              }];
+            } else if (choiceId === 'promote') {
+              if (Math.random() < 0.2) {
+                // 20% chance: promotion fails, soldier defects
+                const aiFamilies = newState.aiOpponents.map(o => o.family);
+                const targetFamily = aiFamilies[Math.floor(Math.random() * aiFamilies.length)];
+                const defector = newState.deployedUnits.find(u => u.id === targetSoldierId);
+                if (defector && targetFamily) {
+                  // Move soldier to random AI hex
+                  const aiHexes = newState.hexMap.filter(t => t.controllingFamily === targetFamily);
+                  const targetHex = aiHexes[Math.floor(Math.random() * aiHexes.length)];
+                  if (targetHex) {
+                    newState.deployedUnits = newState.deployedUnits.map(u =>
+                      u.id === targetSoldierId
+                        ? { ...u, family: targetFamily as any, q: targetHex.q, r: targetHex.r, s: targetHex.s }
+                        : u
+                    );
+                  } else {
+                    newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== targetSoldierId);
+                  }
+                  delete newState.soldierStats[targetSoldierId];
+                  newState.pendingNotifications = [...newState.pendingNotifications, {
+                    type: 'error', title: '💀 Promotion Backfired!',
+                    message: `The soldier took your money and defected to the ${targetFamily} family!`,
+                  }];
+                }
+              } else {
+                // Success: loyalty boost
+                const stats = newState.soldierStats[targetSoldierId];
+                if (stats) {
+                  newState.soldierStats[targetSoldierId] = {
+                    ...stats,
+                    loyalty: Math.min(80, stats.loyalty + 30),
+                  };
+                }
+                newState.pendingNotifications = [...newState.pendingNotifications, {
+                  type: 'success', title: '⬆️ Promotion Accepted',
+                  message: 'The soldier is grateful. Loyalty restored.',
+                }];
+              }
+            } else if (choiceId === 'ignore') {
+              // Set pending defection flag
+              newState.deployedUnits = newState.deployedUnits.map(u =>
+                u.id === targetSoldierId ? { ...u, pendingDefection: true } : u
+              );
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'warning', title: '⚠️ Ignored Betrayal',
+                message: 'The soldier may defect next turn...',
+              }];
+            }
+          }
+
+          // === Special: Rat in the Ranks — set ratIgnored flag ===
+          if (event.title === 'Rat in the Ranks' && choiceId === 'ignore') {
+            newState.ratIgnored = true;
+          }
+
+          // === Special: Federal Investigation — clear ratIgnored ===
+          if (event.title === 'Federal Investigation') {
+            newState.ratIgnored = false;
+            if (choiceId === 'risk') {
+              // Shut down a random player business
+              const playerBusinessHexes = newState.hexMap.filter(
+                t => t.controllingFamily === newState.playerFamily && t.business
+              );
+              if (playerBusinessHexes.length > 0) {
+                const victim = playerBusinessHexes[Math.floor(Math.random() * playerBusinessHexes.length)];
+                const lostBiz = victim.business!.type;
+                newState.hexMap = newState.hexMap.map(t =>
+                  t.q === victim.q && t.r === victim.r && t.s === victim.s
+                    ? { ...t, business: undefined }
+                    : t
+                );
+                newState.pendingNotifications = [...newState.pendingNotifications, {
+                  type: 'error', title: '🏛️ Business Seized',
+                  message: `The feds shut down your ${lostBiz} operation!`,
+                }];
+              }
+            }
+          }
+
           newState.events = newState.events.filter(e => e.id !== eventId);
         }
       }
