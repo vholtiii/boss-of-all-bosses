@@ -4155,20 +4155,16 @@ export const useEnhancedMafiaGameState = (
           removed++;
         }
       } else {
-        // ============ DEFEAT ============
-        let casualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
-        const defendersFortified = playerUnits.some(u => u.fortified);
-        if (defendersFortified) {
-          casualties = Math.max(1, Math.floor(casualties * (1 - FORTIFY_CASUALTY_REDUCTION / 100)));
-        }
-        const shuffled = [...playerUnits].sort(() => Math.random() - 0.5);
-        for (let i = 0; i < casualties; i++) {
-          const idx = state.deployedUnits.indexOf(shuffled[i]);
+        // ============ DEFEAT — no fortify protection (attackers got overrun) ============
+        const defeatCasualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
+        const defeatShuffled = [...playerUnits].sort(() => Math.random() - 0.5);
+        for (let i = 0; i < defeatCasualties && i < defeatShuffled.length; i++) {
+          const idx = state.deployedUnits.indexOf(defeatShuffled[i]);
           if (idx !== -1) {
             state.deployedUnits.splice(idx, 1);
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'error' as const, title: '⚔️ Soldier Killed in Battle',
-              message: `Your ${shuffled[i].type === 'capo' ? 'capo' : 'soldier'} was killed in the failed attack on ${tile.district}.`,
+              message: `Your ${defeatShuffled[i].type === 'capo' ? 'capo' : 'soldier'} was killed in the failed attack on ${tile.district}.`,
             }];
           }
         }
