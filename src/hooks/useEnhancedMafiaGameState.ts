@@ -217,6 +217,7 @@ export interface EnhancedMafiaGameState {
   scoutedHexes: ScoutedHex[];
   safehouse: Safehouse | null;
   plannedHit: PlannedHit | null;
+  planHitCooldownUntil: number;
   selectedMoveAction: MoveAction;
   
   // Action & tactical budgets
