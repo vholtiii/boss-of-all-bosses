@@ -230,6 +230,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onSelectHeadquarters={handleHeadquartersClick}
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
+            planHitMode={planHitMode}
+            onPlanHitSelect={(q, r, s) => handleAction({ type: 'plan_hit', targetQ: q, targetR: r, targetS: s })}
           />
         </div>
       )
