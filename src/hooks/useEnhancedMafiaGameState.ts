@@ -520,7 +520,7 @@ const createInitialGameState = (
     lastTurnIncome: 0,
     pendingNotifications: [],
     scoutedHexes: [],
-    safehouse: null,
+    safehouses: [],
     plannedHit: null,
     planHitCooldownUntil: 0,
     selectedMoveAction: 'move' as MoveAction,
