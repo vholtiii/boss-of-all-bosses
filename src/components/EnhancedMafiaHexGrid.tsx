@@ -1010,7 +1010,31 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })()}
 
-            {/* Combat Result Overlay */}
+            {/* Plan Hit — target unit picker popup */}
+            {planHitUnitMenu && (() => {
+              const { x, y } = getHexPosition(planHitUnitMenu.tile.q, planHitUnitMenu.tile.r);
+              const menuWidth = 160;
+              const menuHeight = planHitUnitMenu.enemyUnits.length * 34 + 30;
+              return (
+                <foreignObject x={x - menuWidth / 2} y={y - menuHeight - baseHexRadius} width={menuWidth} height={menuHeight}>
+                  <div className="bg-background/95 backdrop-blur-sm border border-destructive/50 rounded-lg p-2 shadow-xl">
+                    <div className="text-xs font-bold text-destructive text-center mb-1.5">🎯 Select Target</div>
+                    {planHitUnitMenu.enemyUnits.map(unit => (
+                      <button
+                        key={unit.id}
+                        onClick={() => {
+                          onPlanHitSelect?.(planHitUnitMenu.tile.q, planHitUnitMenu.tile.r, planHitUnitMenu.tile.s, unit.id);
+                          setPlanHitUnitMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-md bg-destructive/20 hover:bg-destructive/40 text-foreground text-xs font-medium transition-colors"
+                      >
+                        {unit.type === 'capo' ? '👔' : '🔫'} {unit.name || unit.id.split('-').slice(-2).join(' ')}
+                      </button>
+                    ))}
+                  </div>
+                </foreignObject>
+              );
+            })()}
             <AnimatePresence>
               {combatOverlay && (() => {
                 const { x, y } = getHexPosition(combatOverlay.q, combatOverlay.r);
