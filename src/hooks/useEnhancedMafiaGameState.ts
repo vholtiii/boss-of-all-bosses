@@ -2330,6 +2330,20 @@ export const useEnhancedMafiaGameState = (
             }
           }
 
+          // Reinforcement: if this family has a reinforceTarget, try to move toward it
+          const reinforceTargets = (state.reinforceTargets || []).filter(rt => rt.family === fam && rt.expiresOnTurn >= state.turn);
+          const matchingReinforce = reinforceTargets.find(rt => 
+            targetPool.some(t => t.q === rt.q && t.r === rt.r && t.s === rt.s) ||
+            getHexNeighbors(unit.q, unit.r, unit.s).some(n => n.q === rt.q && n.r === rt.r && n.s === rt.s)
+          );
+          if (matchingReinforce) {
+            const reinforceHex = validMoves.find(v => v.q === matchingReinforce.q && v.r === matchingReinforce.r && v.s === matchingReinforce.s);
+            if (reinforceHex) {
+              targetPool = [reinforceHex];
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'reinforce', detail: `Reinforcing detected scout position` });
+            }
+          }
+
           // Alert: fortify chance
           if (isAlerted && !unit.fortified && Math.random() < 0.3) {
             unit.fortified = true;
