@@ -2505,13 +2505,20 @@ export const useEnhancedMafiaGameState = (
                 if (prevOwner === state.playerFamily && turnReport) {
                   turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
                 }
-                if (prevOwner === state.playerFamily && state.safehouse && state.safehouse.q === target.q && state.safehouse.r === target.r && state.safehouse.s === target.s) {
-                  state.safehouse = null;
-                  state.pendingNotifications.push({
-                    type: 'error' as const,
-                    title: '🏠 Safehouse Destroyed',
-                    message: `The ${fam} family captured your territory and destroyed your safehouse!`,
-                  });
+                const shIdx2 = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
+                if (shIdx2 !== -1) {
+                  state.safehouses.splice(shIdx2, 1);
+                  if (prevOwner === state.playerFamily) {
+                    // Player captures AI safehouse → bounty + intel
+                    state.pendingNotifications.push({
+                      type: 'error' as const,
+                      title: '🏠 Safehouse Destroyed',
+                      message: `The ${fam} family captured your territory and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()}.`,
+                    });
+                  }
+                  // Bounty to capturing AI
+                  const captorOpp2 = state.aiOpponents.find(o => o.family === fam);
+                  if (captorOpp2) captorOpp2.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
                 }
               }
             }
