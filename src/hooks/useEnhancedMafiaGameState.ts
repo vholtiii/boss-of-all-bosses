@@ -2453,13 +2453,25 @@ export const useEnhancedMafiaGameState = (
                 if (remainingEnemies.length === 0) {
                   const prevOwner = tile.controllingFamily;
                   tile.controllingFamily = 'neutral' as any;
-                  if (prevOwner === state.playerFamily && state.safehouse && state.safehouse.q === target.q && state.safehouse.r === target.r && state.safehouse.s === target.s) {
-                    state.safehouse = null;
-                    state.pendingNotifications.push({
-                      type: 'error' as const,
-                      title: '🏠 Safehouse Destroyed',
-                      message: `The ${fam} family captured the hex and destroyed your safehouse!`,
-                    });
+                  // Check if any safehouse was on this hex (player's)
+                  const shIdx = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
+                  if (shIdx !== -1) {
+                    state.safehouses.splice(shIdx, 1);
+                    if (prevOwner === state.playerFamily) {
+                      state.pendingNotifications.push({
+                        type: 'error' as const,
+                        title: '🏠 Safehouse Destroyed',
+                        message: `The ${fam} family captured the hex and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} and intel on your operations.`,
+                      });
+                    }
+                    // Bounty to capturing AI family
+                    const captorOpponent = state.aiOpponents.find(o => o.family === fam);
+                    if (captorOpponent) captorOpponent.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
+                    // Intel: scout all of former owner's hexes for 1 turn (AI benefit tracked internally)
+                    if (prevOwner === state.playerFamily) {
+                      // AI gets intel on player — boost their targeting for 1 turn via existing alert mechanism
+                      state.aiAlertState[fam] = Math.max(state.aiAlertState[fam] || 0, SAFEHOUSE_CAPTURE_INTEL_DURATION);
+                    }
                   }
                 }
                 if (Math.random() < 0.3) {
