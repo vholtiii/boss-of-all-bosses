@@ -818,7 +818,7 @@ const UltimateMafiaGame: React.FC = () => {
   if (!gameConfig) {
     return (
       <FamilySelectionScreen
-        onSelectFamily={(family, resources) => setGameConfig({ family, resources })}
+        onSelectFamily={(family, resources, difficulty) => setGameConfig({ family, resources, difficulty })}
       />
     );
   }
