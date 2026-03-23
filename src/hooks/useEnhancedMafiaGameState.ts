@@ -477,7 +477,7 @@ const createInitialGameState = (
     difficultyModifiers: diffMods,
     
     resources: {
-      money: startingResources?.money ?? 50000,
+      money: Math.floor((startingResources?.money ?? 50000) * diffMods.playerMoneyMult),
       respect: startingResources?.respect ?? 25,
       soldiers: startingResources?.soldiers ?? 2,
       influence: startingResources?.influence ?? 10,
