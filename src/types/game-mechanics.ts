@@ -263,6 +263,9 @@ export const MAX_ESCORT_SOLDIERS = 2;
 // ============ PLAN HIT ============
 export const PLAN_HIT_BONUS = 20; // +20% hit success on planned hex
 export const PLAN_HIT_DURATION = 2; // expires after 2 turns if unused
+export const PLAN_HIT_RELOCATED_BONUS = 10; // +10% bonus when target moved to different hex
+export const PLAN_HIT_RELOCATED_HEAT = 5; // +5 heat penalty when chasing relocated target
+export const PLAN_HIT_COOLDOWN = 2; // turns before next Plan Hit allowed after relocated execution
 
 export interface PlannedHit {
   q: number;
