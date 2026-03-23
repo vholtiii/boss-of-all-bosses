@@ -652,9 +652,10 @@ const ActionButton: React.FC<{
   sublabel: string;
   disabled?: boolean;
   phaseLocked?: boolean;
+  disabledReason?: string;
   variant?: 'default' | 'destructive' | 'outline';
   onClick: () => void;
-}> = ({ icon, label, sublabel, disabled, phaseLocked, variant = 'outline', onClick }) => (
+}> = ({ icon, label, sublabel, disabled, phaseLocked, disabledReason, variant = 'outline', onClick }) => (
   <Button
     variant={variant}
     size="sm"
@@ -666,6 +667,8 @@ const ActionButton: React.FC<{
     <span className="flex-1 text-left">{label}</span>
     {phaseLocked ? (
       <span className="text-[10px] text-muted-foreground font-normal">🔒</span>
+    ) : disabled && disabledReason ? (
+      <span className="text-[10px] text-destructive/80 font-normal">{disabledReason}</span>
     ) : (
       <span className="text-[10px] text-muted-foreground font-normal">{sublabel}</span>
     )}
