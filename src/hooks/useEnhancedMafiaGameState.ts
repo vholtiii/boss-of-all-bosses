@@ -310,8 +310,9 @@ const getHexesInRange = (q:number, r:number, s:number, range:number) => {
 };
 
 // ============ MAP GENERATION ============
-const generateHexMap = (radius: number): HexTile[] => {
+const generateHexMap = (radius: number, seed?: number): HexTile[] => {
   const tiles: HexTile[] = [];
+  const rng = mulberry32(seed ?? Math.floor(Math.random() * 4294967296));
   
   const getDistrict = (q: number, r: number): HexTile['district'] => {
     if (q <= -4 && r >= 3) return 'Little Italy';
@@ -333,35 +334,32 @@ const generateHexMap = (radius: number): HexTile[] => {
       if (Math.abs(s) > radius) continue;
 
       const district = getDistrict(q, r);
-      const terrain = terrainTypes[Math.abs((q * 7 + r * 13) % terrainTypes.length)];
+      const terrain = terrainTypes[Math.floor(rng() * terrainTypes.length)];
       
-      // District-specific business density, income multiplier, and type weights
       const districtConfig: Record<string, { density: number; incomeMult: number; weights: number[] }> = {
-        'Manhattan':      { density: 0.35, incomeMult: 1.8, weights: [5, 40, 15, 40] },  // gambling dens & store fronts
-        'Little Italy':   { density: 0.25, incomeMult: 1.0, weights: [5, 30, 10, 55] },  // restaurants/store fronts, card games
-        'Brooklyn':       { density: 0.20, incomeMult: 0.9, weights: [20, 25, 30, 25] }, // balanced, more loan sharking
-        'Bronx':          { density: 0.15, incomeMult: 0.7, weights: [35, 15, 35, 15] }, // grittier: brothels & loan sharking
-        'Queens':         { density: 0.15, incomeMult: 0.8, weights: [10, 25, 15, 50] }, // immigrant businesses, store fronts
-        'Staten Island':  { density: 0.10, incomeMult: 0.75, weights: [5, 10, 20, 65] }, // suburban, mostly store fronts
+        'Manhattan':      { density: 0.35, incomeMult: 1.8, weights: [5, 40, 15, 40] },
+        'Little Italy':   { density: 0.25, incomeMult: 1.0, weights: [5, 30, 10, 55] },
+        'Brooklyn':       { density: 0.20, incomeMult: 0.9, weights: [20, 25, 30, 25] },
+        'Bronx':          { density: 0.15, incomeMult: 0.7, weights: [35, 15, 35, 15] },
+        'Queens':         { density: 0.15, incomeMult: 0.8, weights: [10, 25, 15, 50] },
+        'Staten Island':  { density: 0.10, incomeMult: 0.75, weights: [5, 10, 20, 65] },
       };
-      // weights order: [brothel, gambling_den, loan_sharking, store_front]
       const cfg = districtConfig[district] || { density: 0.20, incomeMult: 1.0, weights: [25, 25, 25, 25] };
-      const hashVal = Math.abs((q * 31 + r * 47) % 100);
-      const hasBusiness = hashVal < (cfg.density * 100);
+      const hasBusiness = rng() < cfg.density;
       
       const tile: HexTile = { q, r, s, district, terrain, controllingFamily: 'neutral' };
 
       if (hasBusiness) {
-        // Weighted business type selection using cumulative weights
-        const typeHash = Math.abs((q * 17 + r * 23) % 100);
+        const typeRoll = rng() * 100;
         const cumWeights = cfg.weights.reduce((acc: number[], w, i) => {
           acc.push((acc[i - 1] || 0) + w);
           return acc;
         }, []);
-        const typeIdx = cumWeights.findIndex(cw => typeHash < cw);
+        const typeIdx = cumWeights.findIndex(cw => typeRoll < cw);
         const bConfig = DOC_BUSINESS_TYPES[typeIdx >= 0 ? typeIdx : 0];
         
-        const baseIncome = Math.round((bConfig.baseIncome + Math.abs((q * 13 + r * 29) % 2000)) * cfg.incomeMult);
+        const incomeVariation = Math.floor(rng() * 2000);
+        const baseIncome = Math.round((bConfig.baseIncome + incomeVariation) * cfg.incomeMult);
         tile.business = {
           type: bConfig.type,
           income: baseIncome,
