@@ -593,6 +593,9 @@ const createInitialGameState = (
     activeBribes: [],
     alliances: [],
     ceasefires: [],
+    shareProfitsPacts: [],
+    safePassagePacts: [],
+    negotiationUsedThisTurn: false,
     victoryProgress: {
       territory: { current: 0, target: mapSize === 'small' ? 40 : mapSize === 'large' ? 80 : 60, met: false },
       economic: { current: 0, target: 50000, met: false },
