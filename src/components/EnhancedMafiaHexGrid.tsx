@@ -115,6 +115,39 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return map;
   }, [deployedUnits]);
 
+  // Compute district boundary segments for border outlines
+  const districtBorderSegments = useMemo(() => {
+    const dirs = [
+      { dq: 1, dr: 0, ds: -1 },
+      { dq: 1, dr: -1, ds: 0 },
+      { dq: 0, dr: -1, ds: 1 },
+      { dq: -1, dr: 0, ds: 1 },
+      { dq: -1, dr: 1, ds: 0 },
+      { dq: 0, dr: 1, ds: -1 },
+    ];
+    const dMap = new Map<string, string>();
+    hexMap.forEach(t => dMap.set(`${t.q},${t.r},${t.s}`, t.district));
+    const segs: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    const seen = new Set<string>();
+    hexMap.forEach(tile => {
+      const { x: cx, y: cy } = getHexPosition(tile.q, tile.r);
+      dirs.forEach((dir, ei) => {
+        const nd = dMap.get(`${tile.q + dir.dq},${tile.r + dir.dr},${tile.s + dir.ds}`);
+        if (nd !== tile.district) {
+          const a1 = (Math.PI / 3) * ei;
+          const a2 = (Math.PI / 3) * ((ei + 1) % 6);
+          const x1 = Math.round((cx + baseHexRadius * Math.cos(a1)) * 100) / 100;
+          const y1 = Math.round((cy + baseHexRadius * Math.sin(a1)) * 100) / 100;
+          const x2 = Math.round((cx + baseHexRadius * Math.cos(a2)) * 100) / 100;
+          const y2 = Math.round((cy + baseHexRadius * Math.sin(a2)) * 100) / 100;
+          const key = [Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2), Math.max(y1, y2)].join(',');
+          if (!seen.has(key)) { seen.add(key); segs.push({ x1, y1, x2, y2 }); }
+        }
+      });
+    });
+    return segs;
+  }, [hexMap]);
+
   // Keyboard zoom shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
