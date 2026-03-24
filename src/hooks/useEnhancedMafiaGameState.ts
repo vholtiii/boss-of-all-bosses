@@ -1202,17 +1202,56 @@ export const useEnhancedMafiaGameState = (
       }
 
       let newAvailableMoves: Array<{q:number;r:number;s:number}> = [];
-      if (updatedUnit.movesRemaining > 0) {
-        const range = updatedUnit.type === 'soldier' ? 1 : Math.min(5, updatedUnit.movesRemaining);
-        const candidates = updatedUnit.type === 'soldier'
-          ? getHexNeighbors(updatedUnit.q, updatedUnit.r, updatedUnit.s)
-          : getHexesInRange(updatedUnit.q, updatedUnit.r, updatedUnit.s, range);
-        newAvailableMoves = candidates.filter(h => {
-          const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
-          if (!tile) return false;
-          if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
-          return true;
-        });
+      // After free move or if moves remain, recalculate available hexes
+      if (updatedUnit.movesRemaining > 0 || isFreeMove) {
+        if (updatedUnit.type === 'capo') {
+          const range = Math.min(5, updatedUnit.movesRemaining);
+          const candidates = getHexesInRange(updatedUnit.q, updatedUnit.r, updatedUnit.s, range);
+          newAvailableMoves = candidates.filter(h => {
+            const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+            if (!tile) return false;
+            if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+            return true;
+          });
+        } else {
+          // Soldier: recalculate with connected territory logic
+          const connectedSetPost = getConnectedTerritory(newHexMap, prev.playerFamily);
+          const updKey = hexKey(updatedUnit.q, updatedUnit.r, updatedUnit.s);
+          const isOnConnectedPost = connectedSetPost.has(updKey);
+
+          if (isOnConnectedPost) {
+            // Show connected territory + adjacent for venturing out
+            connectedSetPost.forEach(k => {
+              if (k !== updKey) {
+                const [q, r, s] = k.split(',').map(Number);
+                const tile = newHexMap.find(t => t.q === q && t.r === r && t.s === s);
+                if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily)) {
+                  newAvailableMoves.push({ q, r, s });
+                }
+              }
+            });
+            if (updatedUnit.movesRemaining > 0) {
+              const adjacentHexes = getHexNeighbors(updatedUnit.q, updatedUnit.r, updatedUnit.s);
+              for (const h of adjacentHexes) {
+                const hk = hexKey(h.q, h.r, h.s);
+                if (!connectedSetPost.has(hk)) {
+                  const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+                  if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily)) {
+                    newAvailableMoves.push(h);
+                  }
+                }
+              }
+            }
+          } else if (updatedUnit.movesRemaining > 0) {
+            const candidates = getHexNeighbors(updatedUnit.q, updatedUnit.r, updatedUnit.s);
+            newAvailableMoves = candidates.filter(h => {
+              const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+              if (!tile) return false;
+              if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+              return true;
+            });
+          }
+        }
       }
 
       const notifications = autoExtortNotification 
