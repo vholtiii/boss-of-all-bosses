@@ -183,6 +183,7 @@ export interface EnhancedMafiaGameState {
   playerFamily: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
   turn: number;
   season: 'spring' | 'summer' | 'fall' | 'winter';
+  mapSize: 'small' | 'medium' | 'large';
   
   resources: {
     money: number;
