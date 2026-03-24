@@ -2696,7 +2696,8 @@ export const useEnhancedMafiaGameState = (
           else aiIncome += Math.floor(tile.business.income * 0.1);
         }
       });
-      const minIncome = Math.floor((2000 + state.turn * 500) * diffMods.aiIncomeMult);
+      const mapScale = state.mapSize === 'small' ? 0.6 : state.mapSize === 'large' ? 1.5 : 1.0;
+      const minIncome = Math.floor((2000 + state.turn * 500) * diffMods.aiIncomeMult * mapScale);
       aiIncome = Math.max(aiIncome, minIncome);
       opponent.resources.money += aiIncome;
       if (turnReport) turnReport.aiActions.push({ family: fam, action: 'income', detail: `Earned $${aiIncome.toLocaleString()} income` });
