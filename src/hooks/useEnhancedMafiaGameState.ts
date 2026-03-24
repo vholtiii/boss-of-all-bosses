@@ -618,6 +618,7 @@ const createInitialGameState = (
     pendingNotifications: [],
     scoutedHexes: [],
     safehouses: [],
+    fortifiedHexes: [],
     plannedHit: null,
     planHitCooldownUntil: 0,
     selectedMoveAction: 'move' as MoveAction,
