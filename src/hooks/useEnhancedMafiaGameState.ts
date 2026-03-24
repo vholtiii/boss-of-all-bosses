@@ -1208,7 +1208,7 @@ const isHexFortifiedAny = (fortifiedHexes: FortifiedHex[], q: number, r: number,
         }
       }
 
-      const updatedUnit = { ...unit, q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: remainingMoves, fortified: false };
+      const updatedUnit = { ...unit, q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: remainingMoves };
       newUnits[unitIdx] = updatedUnit;
 
       // Handle escort: move escorted soldiers along with capo (works in any move action during deploy phase)
