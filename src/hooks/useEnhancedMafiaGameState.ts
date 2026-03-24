@@ -2507,9 +2507,10 @@ export const useEnhancedMafiaGameState = (
       const aggression = opponent.strategy.aggressionLevel || 50;
       const cooperation = opponent.strategy.cooperationTendency || 50;
 
-      // AI action budget — matches player constraints (AI lacks respect stat, use influence as proxy)
-      let aiActionsRemaining = 2 + (opponent.resources.influence >= 50 ? 1 : 0);
-      let aiTacticalRemaining = 3;
+      // AI action budget — boosted in early game (turns 1-8) for faster expansion
+      const earlyGameBonus = state.turn <= 8 ? 2 : 0;
+      let aiActionsRemaining = 2 + (opponent.resources.influence >= 50 ? 1 : 0) + earlyGameBonus;
+      let aiTacticalRemaining = 3 + earlyGameBonus;
 
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
       for (const unit of aiUnits) {
