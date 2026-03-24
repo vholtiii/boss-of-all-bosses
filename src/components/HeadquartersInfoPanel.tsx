@@ -17,8 +17,20 @@ import {
   ChevronDown,
   ChevronUp,
   MapPin,
-  Store
+  Store,
+  Map
 } from 'lucide-react';
+
+interface HexBusiness {
+  q: number;
+  r: number;
+  s: number;
+  district: string;
+  businessType: string;
+  income: number;
+  isLegal: boolean;
+  isExtorted: boolean;
+}
 
 interface HeadquartersInfoPanelProps {
   family: string;
@@ -33,8 +45,10 @@ interface HeadquartersInfoPanelProps {
     capos: Array<{ q: number; r: number; s: number; id: string }>;
     boss: { q: number; r: number; s: number; id: string };
   };
-  businesses: any[];
+  hexBusinesses?: HexBusiness[];
   finances?: { totalIncome: number; totalExpenses: number; legalProfit: number; illegalProfit: number; totalProfit: number; dirtyMoney: number; cleanMoney: number; legalCosts: number; soldierMaintenance?: number; communityUpkeep?: number; arrestPenalty?: number; heatPenalty?: number };
+  totalMoney?: number;
+  territoryCount?: number;
   onClose: () => void;
   onSelectUnitFromHeadquarters?: (unitType: 'soldier' | 'capo', family: string) => void;
   movementPhase?: boolean;
@@ -69,8 +83,10 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   family,
   headquarters,
   units,
-  businesses,
+  hexBusinesses = [],
   finances,
+  totalMoney,
+  territoryCount = 0,
   onClose,
   onSelectUnitFromHeadquarters,
   movementPhase = false,
@@ -99,22 +115,10 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [onClose]);
 
-  const familyBusinesses = businesses.filter(business => business.family === family);
-  
-  // Use actual game finances when available, fall back to legacy calculation
-  const legalProfits = finances?.legalProfit ?? familyBusinesses
-    .filter(business => business.isLegal)
-    .reduce((total: number, business: any) => total + business.income, 0);
-    
-  const illegalProfits = finances?.illegalProfit ?? familyBusinesses
-    .filter(business => !business.isLegal)
-    .reduce((total: number, business: any) => total + business.income, 0);
-    
-  const totalProfits = finances?.totalProfit ?? (legalProfits + illegalProfits);
-  const totalExpenses = finances?.totalExpenses ?? 0;
-  const dirtyMoney = finances?.dirtyMoney ?? 0;
-  const cleanMoney = finances?.cleanMoney ?? 0;
-  
+  const isPlayerFamily = family === playerFamily;
+  const familyColor = familyColors[family] || '#696969';
+  const familyName = familyNames[family] || family.toUpperCase();
+
   const soldiersAtHQ = units.soldiers.filter(soldier => 
     soldier.q === headquarters.q && soldier.r === headquarters.r && soldier.s === headquarters.s
   ).length;
@@ -125,10 +129,6 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   
   const deployedSoldiers = units.soldiers.length - soldiersAtHQ;
   const deployedCapos = units.capos.length - caposAtHQ;
-  
-  const isPlayerFamily = family === playerFamily;
-  const familyColor = familyColors[family] || '#696969';
-  const familyName = familyNames[family] || family.toUpperCase();
 
   // Get deployed units for boss overview
   const familyDeployedUnits = deployedUnits.filter((u: any) => u.family === family);
@@ -156,6 +156,10 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
       onBossHighlightHex({ q, r, s });
     }
   };
+
+  // Derived business stats
+  const ownedBusinesses = hexBusinesses.filter(b => !b.isExtorted);
+  const extortedBusinesses = hexBusinesses.filter(b => b.isExtorted);
 
   return (
     <motion.div
@@ -188,76 +192,119 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
         </CardHeader>
         
         <CardContent className="space-y-4 pt-0">
-          {/* Profits Section */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-mafia-gold font-playfair flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Financial Overview
-            </h3>
-            
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-2">
-                <div className="text-xs text-green-400 font-medium">Legal</div>
-                <div className="text-sm font-bold text-green-400">
-                  ${legalProfits.toLocaleString()}
-                </div>
-              </div>
-              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2">
-                <div className="text-xs text-red-400 font-medium">Illegal</div>
-                <div className="text-sm font-bold text-red-400">
-                  ${illegalProfits.toLocaleString()}
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-mafia-gold/10 border border-mafia-gold/20 rounded-lg p-2">
-              <div className="text-xs text-mafia-gold font-medium">Net Income/Turn</div>
-              <div className="text-base font-bold text-mafia-gold">
-                ${totalProfits.toLocaleString()}
-              </div>
-            </div>
-            {finances && (
-              <div className="grid grid-cols-3 gap-1.5">
-                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-1.5 col-span-3">
-                  <div className="text-[10px] text-orange-400 font-medium mb-1">Expenses — ${totalExpenses.toLocaleString()}/turn</div>
-                  <div className="space-y-0.5">
-                    {(finances.soldierMaintenance ?? 0) > 0 && (
-                      <div className="flex justify-between text-[9px]">
-                        <span className="text-orange-300/80">🔫 Soldier Maintenance</span>
-                        <span className="text-orange-400 font-semibold">-${(finances.soldierMaintenance ?? 0).toLocaleString()}</span>
-                      </div>
-                    )}
-                    {(finances.communityUpkeep ?? 0) > 0 && (
-                      <div className="flex justify-between text-[9px]">
-                        <span className="text-orange-300/80">🏘️ Community Upkeep</span>
-                        <span className="text-orange-400 font-semibold">-${(finances.communityUpkeep ?? 0).toLocaleString()}</span>
-                      </div>
-                    )}
-                    {(finances.arrestPenalty ?? 0) > 0 && (
-                      <div className="flex justify-between text-[9px]">
-                        <span className="text-red-300/80">🚔 Arrest Penalties</span>
-                        <span className="text-red-400 font-semibold">-${(finances.arrestPenalty ?? 0).toLocaleString()}</span>
-                      </div>
-                    )}
-                    {(finances.heatPenalty ?? 0) > 0 && (
-                      <div className="flex justify-between text-[9px]">
-                        <span className="text-red-300/80">🔥 Heat Penalties</span>
-                        <span className="text-red-400 font-semibold">-${(finances.heatPenalty ?? 0).toLocaleString()}</span>
-                      </div>
-                    )}
+          {/* Financial Overview — Player Only */}
+          {isPlayerFamily && finances ? (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-mafia-gold font-playfair flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Financial Overview
+              </h3>
+
+              {/* Cash on Hand */}
+              {totalMoney !== undefined && (
+                <div className="bg-mafia-gold/15 border border-mafia-gold/30 rounded-lg p-2">
+                  <div className="text-xs text-mafia-gold font-medium">💰 Cash on Hand</div>
+                  <div className="text-lg font-bold text-mafia-gold">
+                    ${totalMoney.toLocaleString()}
                   </div>
                 </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-2">
+                  <div className="text-xs text-green-400 font-medium">Legal Income</div>
+                  <div className="text-sm font-bold text-green-400">
+                    ${finances.legalProfit.toLocaleString()}
+                  </div>
+                </div>
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2">
+                  <div className="text-xs text-red-400 font-medium">Illegal Income</div>
+                  <div className="text-sm font-bold text-red-400">
+                    ${finances.illegalProfit.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-mafia-gold/10 border border-mafia-gold/20 rounded-lg p-2">
+                <div className="text-xs text-mafia-gold font-medium">Net Income/Turn</div>
+                <div className="text-base font-bold text-mafia-gold">
+                  ${finances.totalProfit.toLocaleString()}
+                </div>
+              </div>
+
+              {/* Expenses Breakdown */}
+              <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-1.5">
+                <div className="text-[10px] text-orange-400 font-medium mb-1">Expenses — ${finances.totalExpenses.toLocaleString()}/turn</div>
+                <div className="space-y-0.5">
+                  {(finances.soldierMaintenance ?? 0) > 0 && (
+                    <div className="flex justify-between text-[9px]">
+                      <span className="text-orange-300/80">🔫 Soldier Maintenance</span>
+                      <span className="text-orange-400 font-semibold">-${(finances.soldierMaintenance ?? 0).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {(finances.communityUpkeep ?? 0) > 0 && (
+                    <div className="flex justify-between text-[9px]">
+                      <span className="text-orange-300/80">🏘️ Community Upkeep</span>
+                      <span className="text-orange-400 font-semibold">-${(finances.communityUpkeep ?? 0).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {(finances.arrestPenalty ?? 0) > 0 && (
+                    <div className="flex justify-between text-[9px]">
+                      <span className="text-red-300/80">🚔 Arrest Penalties</span>
+                      <span className="text-red-400 font-semibold">-${(finances.arrestPenalty ?? 0).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {(finances.heatPenalty ?? 0) > 0 && (
+                    <div className="flex justify-between text-[9px]">
+                      <span className="text-red-300/80">🔥 Heat Penalties</span>
+                      <span className="text-red-400 font-semibold">-${(finances.heatPenalty ?? 0).toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Dirty / Clean Money */}
+              <div className="grid grid-cols-2 gap-1.5">
                 <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-1.5">
                   <div className="text-[10px] text-yellow-400 font-medium">Dirty $</div>
-                  <div className="text-xs font-bold text-yellow-400">${dirtyMoney.toLocaleString()}</div>
+                  <div className="text-xs font-bold text-yellow-400">${finances.dirtyMoney.toLocaleString()}</div>
                 </div>
                 <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-1.5">
                   <div className="text-[10px] text-emerald-400 font-medium">Clean $</div>
-                  <div className="text-xs font-bold text-emerald-400">${cleanMoney.toLocaleString()}</div>
+                  <div className="text-xs font-bold text-emerald-400">${finances.cleanMoney.toLocaleString()}</div>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            /* Rival HQ — limited info */
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-mafia-gold font-playfair flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Rival Intelligence
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-muted/20 border border-border/30 rounded-lg p-2">
+                  <div className="text-xs text-muted-foreground font-medium">Businesses</div>
+                  <div className="text-sm font-bold text-foreground">{hexBusinesses.length}</div>
+                </div>
+                <div className="bg-muted/20 border border-border/30 rounded-lg p-2">
+                  <div className="text-xs text-muted-foreground font-medium">Territory</div>
+                  <div className="text-sm font-bold text-foreground">{territoryCount} hexes</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Territory Count — Player */}
+          {isPlayerFamily && (
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2 flex items-center gap-2">
+              <Map className="h-4 w-4 text-blue-400" />
+              <div>
+                <div className="text-xs text-blue-400 font-medium">Territory</div>
+                <div className="text-sm font-bold text-blue-400">{territoryCount} hexes</div>
+              </div>
+            </div>
+          )}
 
           {/* Units Section */}
           <div className="space-y-2">
@@ -389,18 +436,23 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                       )}
                     </div>
 
-                    {/* Businesses */}
+                    {/* Businesses from hex map */}
                     <div>
                       <div className="text-xs font-semibold text-foreground/80 mb-1.5 flex items-center gap-1">
                         <Store className="h-3 w-3" />
-                        Businesses ({familyBusinesses.length})
+                        Businesses ({hexBusinesses.length})
+                        {extortedBusinesses.length > 0 && (
+                          <span className="text-[9px] text-muted-foreground ml-1">
+                            ({ownedBusinesses.length} owned, {extortedBusinesses.length} extorted)
+                          </span>
+                        )}
                       </div>
-                      {familyBusinesses.length === 0 ? (
-                        <div className="text-[10px] text-muted-foreground italic px-1">No businesses owned</div>
+                      {hexBusinesses.length === 0 ? (
+                        <div className="text-[10px] text-muted-foreground italic px-1">No businesses controlled</div>
                       ) : (
                         <ScrollArea className="max-h-48">
                           <div className="space-y-1">
-                            {familyBusinesses.map((biz: any, idx: number) => {
+                            {hexBusinesses.map((biz, idx) => {
                               const highlighted = isHexHighlighted(biz.q, biz.r, biz.s);
                               return (
                                 <button
@@ -414,18 +466,23 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                                 >
                                   <div className="flex-1 min-w-0">
                                     <div className="font-medium text-foreground truncate flex items-center gap-1">
-                                      {biz.businessType || biz.type || 'Business'}
+                                      {biz.businessType}
                                       <Badge 
                                         variant="outline" 
                                         className={`text-[9px] h-4 ${biz.isLegal ? 'text-green-400 border-green-400/30' : 'text-red-400 border-red-400/30'}`}
                                       >
                                         {biz.isLegal ? 'Legal' : 'Illegal'}
                                       </Badge>
+                                      {biz.isExtorted && (
+                                        <Badge variant="outline" className="text-[9px] h-4 text-yellow-400 border-yellow-400/30">
+                                          Extorted
+                                        </Badge>
+                                      )}
                                     </div>
                                     <div className="text-[10px] text-muted-foreground flex items-center gap-1">
                                       <MapPin className="h-2.5 w-2.5" />
-                                      {biz.district || getDistrictForHex(biz.q, biz.r, biz.s)}
-                                      <span className="ml-auto text-green-400">${biz.income?.toLocaleString()}/turn</span>
+                                      {biz.district}
+                                      <span className="ml-auto text-green-400">${biz.income.toLocaleString()}/turn</span>
                                     </div>
                                   </div>
                                   {highlighted && <div className="w-2 h-2 rounded-full bg-mafia-gold animate-pulse" />}
@@ -557,12 +614,25 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
             )}
           </div>
 
-          {/* Business Count */}
-          <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-2">
-            <div className="text-xs font-medium text-gray-400">Controlled Businesses</div>
-            <div className="text-sm font-bold text-gray-400">
-              {familyBusinesses.length}
+          {/* Business & Territory Summary */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-2">
+              <div className="text-xs font-medium text-gray-400">Businesses</div>
+              <div className="text-sm font-bold text-gray-400">
+                {hexBusinesses.length}
+              </div>
+              {extortedBusinesses.length > 0 && (
+                <div className="text-[9px] text-muted-foreground">
+                  {ownedBusinesses.length} owned · {extortedBusinesses.length} extorted
+                </div>
+              )}
             </div>
+            {!isPlayerFamily && (
+              <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-2">
+                <div className="text-xs font-medium text-gray-400">Soldiers</div>
+                <div className="text-sm font-bold text-gray-400">{units.soldiers.length}</div>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons for Player Family */}
