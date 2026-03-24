@@ -5772,12 +5772,7 @@ export const useEnhancedMafiaGameState = (
     }).filter(p => p.active);
 };
 
-// ============ HEX FORTIFICATION HELPERS ============
-const isHexFortified = (fortifiedHexes: FortifiedHex[], q: number, r: number, s: number, family: string): boolean =>
-  (fortifiedHexes || []).some(f => f.q === q && f.r === r && f.s === s && f.family === family);
 
-const isHexFortifiedAny = (fortifiedHexes: FortifiedHex[], q: number, r: number, s: number): boolean =>
-  (fortifiedHexes || []).some(f => f.q === q && f.r === r && f.s === s);
 
   const clearNotifications = useCallback(() => {
     setGameState(prev => ({ ...prev, pendingNotifications: [] }));
