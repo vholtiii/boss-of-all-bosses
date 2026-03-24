@@ -118,8 +118,10 @@ const StatBar: React.FC<{ value: number; color: string }> = ({ value, color }) =
   </div>
 );
 
+type MapSize = 'small' | 'medium' | 'large';
+
 interface Props {
-  onSelectFamily: (familyId: FamilyId, resources: FamilyInfo['startingResources'], difficulty: 'easy' | 'normal' | 'hard', seed?: number) => void;
+  onSelectFamily: (familyId: FamilyId, resources: FamilyInfo['startingResources'], difficulty: 'easy' | 'normal' | 'hard', seed?: number, mapSize?: MapSize) => void;
 }
 
 const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
