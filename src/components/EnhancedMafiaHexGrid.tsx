@@ -549,7 +549,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       {planHitMode && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-6 py-2 rounded-full bg-destructive/90 backdrop-blur-sm border border-destructive/30 shadow-lg flex items-center gap-3">
           <span className="text-sm font-bold text-white">
-            🎯 {planHitStep === 'selectSoldier' ? 'Select a soldier to plan the hit' : 'Select a scouted enemy hex to target'}
+            🎯 {planHitStep === 'selectSoldier' ? 'Select a soldier from the menu' : 'Select a scouted enemy hex to target'}
           </span>
           <button
             className="text-xs text-white/70 hover:text-white underline"
