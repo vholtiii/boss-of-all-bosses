@@ -2610,6 +2610,12 @@ export const useEnhancedMafiaGameState = (
               u.family !== fam && u.q === target.q && u.r === target.r && u.s === target.s
             );
             if (enemyUnitsHere.length > 0) {
+              // Combat costs an action point
+              if (aiActionsRemaining <= 0) {
+                // No action budget left — revert position and skip
+                unit.q = origQ; unit.r = origR; unit.s = origS;
+                break;
+              }
               const aiStrength = state.deployedUnits.filter(u => u.family === fam && u.q === target.q && u.r === target.r && u.s === target.s).length;
 
               // Personality-driven combat willingness (replaces flat 0.4)
@@ -2623,6 +2629,7 @@ export const useEnhancedMafiaGameState = (
               }
 
               if (aiStrength >= enemyUnitsHere.length || Math.random() < combatWillingness) {
+                aiActionsRemaining--; // Deduct action point for combat
                 // Safehouse defense bonus: defenders on safehouse hex are harder to kill
                 const isTargetSafehouse = state.safehouses.some(s => s.q === target.q && s.r === target.r && s.s === target.s);
                 const baseKillChance = isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) : 0.7;
@@ -2689,12 +2696,13 @@ export const useEnhancedMafiaGameState = (
                     // Bounty to capturing AI family
                     const captorOpponent = state.aiOpponents.find(o => o.family === fam);
                     if (captorOpponent) captorOpponent.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
-                    // Intel: scout all of former owner's hexes for 1 turn (AI benefit tracked internally)
                     if (prevOwner === state.playerFamily) {
-                      // AI gets intel on player — boost their targeting for 1 turn via existing alert mechanism
                       state.aiAlertState[fam] = Math.max(state.aiAlertState[fam] || 0, SAFEHOUSE_CAPTURE_INTEL_DURATION);
                     }
                   }
+                } else {
+                  // Combat didn't clear the hex — revert AI unit position
+                  unit.q = origQ; unit.r = origR; unit.s = origS;
                 }
                 if (Math.random() < 0.3) {
                   const aiHere = state.deployedUnits.filter(u => u.family === fam && u.q === target.q && u.r === target.r && u.s === target.s);
@@ -2718,6 +2726,9 @@ export const useEnhancedMafiaGameState = (
                   const victimFams = [...new Set(aiVictims.map(u => u.family))];
                   turnReport.aiActions.push({ family: fam, action: 'ai_combat', detail: `Fought ${victimFams.join(', ')} in ${tile.district}` });
                 }
+              } else {
+                // AI declined to fight — revert position
+                unit.q = origQ; unit.r = origR; unit.s = origS;
               }
               break;
             } else {
