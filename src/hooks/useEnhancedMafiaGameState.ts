@@ -3309,8 +3309,10 @@ export const useEnhancedMafiaGameState = (
           }
           const respectDiscount2 = (newState.reputation.respect / 100) * 0.3;
           const cost2 = Math.floor(LOCAL_SOLDIER_COST * (1 - discount) * (1 - respectDiscount2));
-          if (newState.resources.money >= cost2) {
-            newState.resources.money -= cost2;
+          const bronxDiscount2 = hasPlayerDistrictBonus(newState, 'recruit_discount') ? 500 : 0;
+          const finalCost2 = Math.max(100, cost2 - bronxDiscount2);
+          if (newState.resources.money >= finalCost2) {
+            newState.resources.money -= finalCost2;
             newState.resources.soldiers += 1;
             newState.tacticalActionsRemaining -= 1;
             // Loyal recruit boosts loyalty
