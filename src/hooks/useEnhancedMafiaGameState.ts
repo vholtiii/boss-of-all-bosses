@@ -147,7 +147,7 @@ export interface DeployedUnit {
   level: number;
   name?: string;
   personality?: CapoPersonality;
-  fortified?: boolean;
+  fortified?: boolean; // DEPRECATED — use fortifiedHexes on game state instead
   escortingSoldierIds?: string[]; // capo only — IDs of soldiers being escorted
   recruited?: boolean; // true = locally recruited (loyal), false/undefined = mercenary (bought)
   pendingDefection?: boolean; // set by Internal Betrayal event — resolved in endTurn
