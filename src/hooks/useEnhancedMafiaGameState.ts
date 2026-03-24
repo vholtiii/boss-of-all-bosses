@@ -4498,7 +4498,7 @@ export const useEnhancedMafiaGameState = (
             type: 'warning' as const, title: '🩸 Capo Wounded!',
             message: `Your capo was wounded in the failed attack on ${tile.district}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
           }];
-        });
+          state.combatLog = [...(state.combatLog || []), `🩸 Capo wounded in failed attack on ${tile.district}`];
         defeatShuffled.slice(defeatCasualties).forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
