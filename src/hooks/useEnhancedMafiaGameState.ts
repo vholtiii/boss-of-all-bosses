@@ -1531,6 +1531,15 @@ export const useEnhancedMafiaGameState = (
       let newSoldierStats = { ...prev.soldierStats };
 
       if (unitType === 'soldier') {
+        // FIX #4: Check stacking limit (max 2 units per non-HQ hex)
+        const isTargetHQ = prev.hexMap.some(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s && t.isHeadquarters === family);
+        if (!isTargetHQ) {
+          const unitsAtTarget = newDeployedUnits.filter(u => u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s);
+          if (unitsAtTarget.length >= 2) {
+            return prev; // Hex is full
+          }
+        }
+
         // First try to move a soldier already sitting at HQ
         const soldierAtHQ = newDeployedUnits.findIndex(u => 
           u.family === family && u.type === 'soldier' &&
