@@ -1671,7 +1671,9 @@ export const useEnhancedMafiaGameState = (
       });
 
       if (bonusMoney > 0) {
-        newResources = { ...newResources, money: newResources.money + bonusMoney, respect: (newResources.respect || 0) + bonusRespect };
+        newResources = { ...newResources, money: newResources.money + bonusMoney, respect: Math.min(100, (newResources.respect || 0) + bonusRespect) };
+        // Sync reputation.respect to match
+        prev.reputation.respect = newResources.respect;
       }
 
       const notifications = autoExtortNotification
