@@ -59,6 +59,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     moveUnit,
     endMovementPhase,
     advancePhase,
+    skipToActionPhase,
     selectHeadquarters,
     selectUnitFromHeadquarters,
     deployUnit,
@@ -536,6 +537,17 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           <SkipForward className="h-4 w-4 mr-2" />
           {gameState.turnPhase === 'action' ? 'Next Phase' : gameState.turnPhase === 'waiting' ? 'Waiting...' : `End ${gameState.turnPhase === 'move' ? 'Tactical' : gameState.turnPhase.charAt(0).toUpperCase() + gameState.turnPhase.slice(1)}`}
         </Button>
+
+        {(gameState.turnPhase === 'deploy' || gameState.turnPhase === 'move') && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => skipToActionPhase()}
+            className="font-medium text-muted-foreground hover:text-foreground"
+          >
+            ⏭ Skip to Action
+          </Button>
+        )}
 
         <SaveLoadDialog 
           gameState={gameState} 
