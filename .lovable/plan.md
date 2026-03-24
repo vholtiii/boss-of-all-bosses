@@ -1,24 +1,34 @@
 
 
-# Fix HQ Financial Overview — Use Actual Game Finances
+# Fix HQ Financial Overview — Compute Legal/Illegal Split in processEconomy
 
 ## Problem
-The HQ panel calculates profits by summing `business.income` from `gameState.businesses` (a legacy array). But actual income is computed from `hexMap` tiles in `processEconomy()` and stored in `gameState.finances`. These two data sources are disconnected, so the HQ panel shows stale/incorrect numbers.
+`processEconomy()` computes `totalIncome`, `totalExpenses`, and `totalProfit` from hex-based businesses correctly — but **never sets** `legalProfit`, `illegalProfit`, `dirtyMoney`, or `cleanMoney`. These stay at 0 forever. The HQ panel then falls back to the legacy `businesses[]` array (which is always empty), showing $0 for everything.
 
 ## Solution
-Pass `gameState.finances` directly to `HeadquartersInfoPanel` and display the real computed values instead of re-calculating from the businesses array.
+Track legal vs illegal income separately during the hex iteration in `processEconomy()`, then write all finance fields before returning.
 
 ## Changes
 
-### `src/components/HeadquartersInfoPanel.tsx`
-- Add `finances` prop typed as `{ totalIncome: number; totalExpenses: number; legalProfit: number; illegalProfit: number; totalProfit: number; dirtyMoney: number; cleanMoney: number; legalCosts: number }`
-- Replace the local profit calculation (lines 100-110) with direct use of `finances.legalProfit`, `finances.illegalProfit`, `finances.totalProfit`
-- Also display dirty/clean money split and maintenance costs so the player sees a complete financial picture
+### `src/hooks/useEnhancedMafiaGameState.ts` — `processEconomy()` (lines 2500-2615)
 
-### `src/pages/UltimateMafiaGame.tsx`
-- Pass `finances={gameState.finances}` to `HeadquartersInfoPanel` (around line 860)
+**In the main hex income loop (lines 2501-2533):**
+- Add two accumulators: `legalIncome = 0`, `illegalIncome = 0`
+- After computing `tileIncome` for each hex, check `tile.business.isLegal`:
+  - If true: `legalIncome += tileIncome`
+  - If false: `illegalIncome += tileIncome`
+
+**After heat penalties and before writing finances (lines 2598-2615):**
+- Recalculate legal/illegal split post-penalties (illegal portion reduced by heat penalty percentage)
+- Set `state.finances.legalProfit = legalIncome`
+- Set `state.finances.illegalProfit = illegalIncome` (after heat penalty reduction)
+- Set `state.finances.dirtyMoney += illegalIncome` (accumulates unlaundred money)
+- Set `state.finances.cleanMoney = state.resources.money - state.finances.dirtyMoney` (approximation)
+- Set `state.finances.legalCosts = maintenance`
+
+**Remove the legacy double-collection block (lines 2604-2615):**
+- The "Auto-collect legal business profits" block reads from `state.businesses[]` (legacy array that's always empty) and double-adds income. Remove it entirely — hex-based income already covers everything.
 
 ## Files Modified
-- `src/components/HeadquartersInfoPanel.tsx`
-- `src/pages/UltimateMafiaGame.tsx`
+- `src/hooks/useEnhancedMafiaGameState.ts`
 
