@@ -2261,13 +2261,13 @@ export const useEnhancedMafiaGameState = (
       }
     });
     
-    // Soldier maintenance — $500/soldier base
+    // Soldier maintenance — $600/soldier per turn
     const playerSoldiers = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier');
     let maintenance = 0;
     playerSoldiers.forEach(s => {
-      maintenance += SOLDIER_COST;
+      maintenance += SOLDIER_MAINTENANCE;
     });
-    maintenance += state.resources.soldiers * SOLDIER_COST; // undeployed pool
+    maintenance += state.resources.soldiers * SOLDIER_MAINTENANCE; // undeployed pool
 
     // Community upkeep — $150/turn for each empty claimed hex (neighborhood expenses)
     const communityHexCount = (state.hexMap || []).filter(tile =>
