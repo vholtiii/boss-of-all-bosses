@@ -5055,9 +5055,9 @@ export const useEnhancedMafiaGameState = (
         chance -= BLIND_HIT_PENALTY;
       }
       
-      // Fortification modifiers
-      const fortifiedDefenders = enemyUnits.filter(u => u.fortified);
-      if (fortifiedDefenders.length > 0) {
+      // Fortification modifiers (hex-based)
+      const defenderHexFortified = isHexFortified(state.fortifiedHexes || [], targetQ, targetR, targetS, tile.controllingFamily);
+      if (defenderHexFortified) {
         chance -= FORTIFY_DEFENSE_BONUS / 100;
       }
       // Safehouse defense bonus for defenders
@@ -5065,8 +5065,10 @@ export const useEnhancedMafiaGameState = (
       if (isDefenderSafehouse) {
         chance -= SAFEHOUSE_DEFENSE_BONUS / 100;
       }
-      const fortifiedAttackers = playerUnits.filter(u => u.fortified);
-      if (fortifiedAttackers.length > 0) {
+      // Attacker bonus: attacking FROM a fortified hex
+      const attackerUnit = playerUnits[0];
+      const attackerHexFortified = attackerUnit && isHexFortified(state.fortifiedHexes || [], attackerUnit.q, attackerUnit.r, attackerUnit.s, state.playerFamily);
+      if (attackerHexFortified) {
         chance += FORTIFY_DEFENSE_BONUS / 200;
       }
       
