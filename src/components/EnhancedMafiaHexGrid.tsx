@@ -906,21 +906,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })}
 
-            {/* District boundary outlines */}
-            <g className="pointer-events-none">
-              {districtBorderSegments.map((seg, i) => (
-                <line
-                  key={`district-border-${i}`}
-                  x1={seg.x1}
-                  y1={seg.y1}
-                  x2={seg.x2}
-                  y2={seg.y2}
-                  stroke="rgba(255, 220, 120, 0.6)"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                />
-              ))}
-            </g>
 
             {/* District name labels */}
             {(() => {
