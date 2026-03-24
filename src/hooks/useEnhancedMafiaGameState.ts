@@ -3336,7 +3336,11 @@ export const useEnhancedMafiaGameState = (
       }
 
       // ── AI PLAN HIT AGAINST PLAYER CAPOS ──
-      if ((personality === 'aggressive' || personality === 'opportunistic') && Math.random() < AI_PLAN_HIT_CHANCE) {
+      const hasCeasefireWithPlayer = (state.ceasefires || []).some(p => p.family === fam && p.active);
+      const hasAllianceWithPlayer = (state.alliances || []).some(p => p.alliedFamily === fam && p.active);
+      if (hasCeasefireWithPlayer || hasAllianceWithPlayer) {
+        // Skip plan hit — active pact with player
+      } else if ((personality === 'aggressive' || personality === 'opportunistic') && Math.random() < AI_PLAN_HIT_CHANCE) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
         const availableTargets = playerCapos.filter(c => !alreadyTargeted.has(c.id));
@@ -3531,6 +3535,19 @@ export const useEnhancedMafiaGameState = (
       for (const hit of state.aiPlannedHits) {
         hit.turnsRemaining -= 1;
         if (hit.turnsRemaining <= 0) {
+          // Safety net: check if pact is now active (formed after hit was planned)
+          const hitCeasefire = (state.ceasefires || []).some(p => p.family === hit.family && p.active);
+          const hitAlliance = (state.alliances || []).some(p => p.alliedFamily === hit.family && p.active);
+          if (hitCeasefire || hitAlliance) {
+            const pactType = hitCeasefire ? 'ceasefire' : 'alliance';
+            state.pendingNotifications.push({
+              type: 'info' as const,
+              title: '🕊️ Hit Called Off',
+              message: `The ${hit.family} family stood down from a planned hit — ${pactType} in effect.`,
+            });
+            continue; // skip execution, don't keep
+          }
+
           // Execute the hit
           const targetUnit = state.deployedUnits.find(u => u.id === hit.targetUnitId);
           if (targetUnit) {
@@ -3553,6 +3570,13 @@ export const useEnhancedMafiaGameState = (
               });
               if (turnReport) turnReport.aiActions.push({ family: hit.family, action: 'assassination_failed', detail: 'Failed assassination attempt on player capo' });
             }
+          } else {
+            // Target unit gone — notify player
+            state.pendingNotifications.push({
+              type: 'info' as const,
+              title: '🔫 Hit Abandoned',
+              message: `The ${hit.family} family abandoned a planned hit — the target could not be found.`,
+            });
           }
           // Hit executed or target gone — don't keep
         } else {
@@ -5618,6 +5642,15 @@ export const useEnhancedMafiaGameState = (
           turnFormed: state.turn,
           active: true,
         }];
+        // Cancel any pending AI hits from this family
+        const cancelledCeasefire = (state.aiPlannedHits || []).filter(h => h.family === enemyFamily);
+        if (cancelledCeasefire.length > 0) {
+          state.aiPlannedHits = state.aiPlannedHits.filter(h => h.family !== enemyFamily);
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'info', title: '🕊️ Hit Called Off',
+            message: `The ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} family called off a planned hit — ceasefire agreement honored.`,
+          }];
+        }
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '🤝 Ceasefire Agreed!',
           message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} won't attack for ${duration} turns. -${config.reputationCost} respect.`,
@@ -5651,6 +5684,15 @@ export const useEnhancedMafiaGameState = (
         }];
         if (state.reputation.familyRelationships[enemyFamily] !== undefined) {
           state.reputation.familyRelationships[enemyFamily] += 20;
+        }
+        // Cancel any pending AI hits from this family
+        const cancelledAlliance = (state.aiPlannedHits || []).filter(h => h.family === enemyFamily);
+        if (cancelledAlliance.length > 0) {
+          state.aiPlannedHits = state.aiPlannedHits.filter(h => h.family !== enemyFamily);
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'info', title: '🕊️ Hit Called Off',
+            message: `The ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} family called off a planned hit — alliance pact honored.`,
+          }];
         }
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '⚖️ Alliance Formed!',
