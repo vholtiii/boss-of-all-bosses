@@ -1,49 +1,37 @@
 
 
-# Longer Combat Notifications + Turn Summary Combat Log
+# Plan Hit: Unit Selection Menu Flow
 
 ## Problem
-1. **Notifications disappear too fast** — combat/death notifications use default durations (error: 6s, warning: 5s) which is too short for critical events like soldier deaths and failed hits
-2. **Turn summary missing combat events** — AI combat kills and player hit outcomes are not logged in `turnReport.events` or `turnReport.resourceDeltas.soldiers`, so they don't appear in the end-of-turn summary modal
+Currently, clicking "Plan Hit" enters a map-based selection mode where the player must find and click their soldier on the map. The user wants a **popup menu listing all available soldiers** to appear immediately, then the selected soldier should be highlighted on the map while the player picks a target.
 
 ## Changes
 
-### 1. Increase notification durations for combat events — `src/components/ui/notification-system.tsx`
+### 1. Show Soldier Picker Dialog on Plan Hit — `src/pages/UltimateMafiaGame.tsx`
 
-Add a new `notifyCombat` helper in `useMafiaNotifications` with longer duration (10s for errors, 8s for warnings). Alternatively, increase default durations:
-- `error` duration: 6000 → **10000ms**
-- `warning` duration: 5000 → **8000ms**
-- `success` duration: 4000 → **6000ms**
-- `info` duration: 4000 → **5000ms**
+When `enter_plan_hit_mode` fires, instead of just setting `planHitMode=true` and waiting for a map click:
+- Collect all deployed player soldiers from `gameState.deployedUnits`
+- Set a new state `planHitSoldierMenu: DeployedUnit[]` containing the eligible soldiers
+- Render a floating panel/dialog listing each soldier with name, location (district), and a "Select" button
+- On selection: set `planHitPlannerId`, clear the menu, advance to `selectTarget` step, and highlight that soldier on the map
 
-This is the simplest approach — all combat notifications already use `error`/`warning` types.
+### 2. Highlight Selected Planner on Map — `src/components/EnhancedMafiaHexGrid.tsx`
 
-### 2. Log combat events in turn report — `src/hooks/useEnhancedMafiaGameState.ts`
+During `planHitStep === 'selectTarget'`, use `planHitPlannerId` to find the planner's hex and render a distinct gold/green pulsing outline around that soldier's hex so the player knows where their planner is. This replaces the current step-1 green highlights on all soldier hexes (which become unnecessary since step 1 is now a menu).
 
-**AI combat loop** (~lines 2521-2533): When a player soldier is killed by AI, add:
-```
-turnReport.events.push(`💀 A soldier was killed by the ${fam} family in ${tile.district}`);
-turnReport.resourceDeltas.soldiers--;
-```
+### 3. Remove Map-Based Soldier Selection — `src/components/EnhancedMafiaHexGrid.tsx`
 
-Same for capo wounds (~lines 2504-2516):
-```
-turnReport.events.push(`🩸 A capo was wounded by the ${fam} family in ${tile.district}`);
-```
+In `handleHexClick`, the `planHitStep === 'selectSoldier'` branch can be simplified — if the soldier menu is the primary selection method, map clicks during step 1 can either be disabled or serve as an alternative selection path.
 
-**Player hit victory casualties** (~lines 4413-4456): Add turn report logging for each soldier killed and capo wounded during player-initiated hits.
+### 4. Soldier Picker UI — `src/pages/UltimateMafiaGame.tsx`
 
-**Player hit defeat** (~lines 4458-4505): Add turn report logging for casualties and the failed hit event.
-
-Since player hits happen during the action phase (not inside `endTurn`), we need to store these events so they appear in the *next* turn summary. Add a `combatLog: string[]` array to the game state that accumulates mid-turn combat events, then flush them into `turnReport.events` at the start of `endTurn`.
-
-### 3. Add combatLog state field — `src/hooks/useEnhancedMafiaGameState.ts`
-
-- Add `combatLog: string[]` to initial state
-- In `processHitAction` and extort/claim combat: push events to `state.combatLog`
-- In `endTurn`, flush `state.combatLog` into `turnReport.events` and reset it
+Render a centered modal/card when `planHitSoldierMenu` is set:
+- Title: "Select a Soldier for the Hit"
+- List each soldier: name, district, moves remaining
+- Click → selects that soldier, closes menu, enters target selection
+- Cancel button → exits plan hit mode
 
 ## Files Modified
-- `src/components/ui/notification-system.tsx` — increase durations
-- `src/hooks/useEnhancedMafiaGameState.ts` — add combatLog, log AI kills + player hit outcomes to turnReport
+- `src/pages/UltimateMafiaGame.tsx` — add soldier picker state + modal, modify `enter_plan_hit_mode` handler
+- `src/components/EnhancedMafiaHexGrid.tsx` — add planner hex highlight during target selection step, keep step-1 hex highlights as fallback
 
