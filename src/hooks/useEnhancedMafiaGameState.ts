@@ -2485,6 +2485,9 @@ export const useEnhancedMafiaGameState = (
           const validMoves = neighbors.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
             if (!tile || tile.isHeadquarters) return false;
+            // Hex stacking limit: max 2 friendly units per hex
+            const friendlyUnitsHere = state.deployedUnits.filter(u => u.family === fam && u.q === n.q && u.r === n.r && u.s === n.s);
+            if (friendlyUnitsHere.length >= 2) return false;
             if (tile.controllingFamily === fam) return true;
             const nNeighbors = getHexNeighbors(n.q, n.r, n.s);
             return nNeighbors.some(nn => {
