@@ -480,6 +480,52 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           )}
         </CollapsibleSection>
 
+        {/* ── DISTRICT CONTROL BONUSES ── */}
+        <CollapsibleSection
+          title="District Control"
+          icon={<Building2 className="h-4 w-4" />}
+          isOpen={openSection === 'district_control'}
+          onToggle={() => toggle('district_control')}
+        >
+          <div className="space-y-1.5">
+            {(() => {
+              const districts = ['Manhattan', 'Little Italy', 'Brooklyn', 'Bronx', 'Queens', 'Staten Island'];
+              const bonusLabels: Record<string, string> = {
+                'Manhattan': '+20% income',
+                'Little Italy': '+15% loyalty',
+                'Brooklyn': '-3 heat/turn',
+                'Bronx': '-$500 recruits',
+                'Queens': '+10% extortion',
+                'Staten Island': '+2 respect/turn',
+              };
+              const activeBonuses = (gameState as any).activeDistrictBonuses || [];
+              return districts.map(district => {
+                const districtHexes = (gameState.hexMap || []).filter((t: any) => t.district === district);
+                const playerHexes = districtHexes.filter((t: any) => t.controllingFamily === gameState.playerFamily);
+                const pct = districtHexes.length > 0 ? Math.round((playerHexes.length / districtHexes.length) * 100) : 0;
+                const isActive = activeBonuses.some((b: any) => b.district === district && b.family === gameState.playerFamily);
+                return (
+                  <div key={district} className={cn(
+                    "rounded-md border px-2.5 py-1.5 text-xs",
+                    isActive ? "border-primary/50 bg-primary/10" : "border-border/30 bg-muted/30"
+                  )}>
+                    <div className="flex items-center justify-between">
+                      <span className={cn("font-medium", isActive ? "text-primary" : "text-muted-foreground")}>
+                        {isActive && '✅ '}{district}
+                      </span>
+                      <span className="text-muted-foreground">{pct}% / 60%</span>
+                    </div>
+                    <Progress value={Math.min(100, (pct / 60) * 100)} className="h-1.5 mt-1" />
+                    <div className={cn("text-[10px] mt-0.5", isActive ? "text-primary/80" : "text-muted-foreground/60")}>
+                      {bonusLabels[district]}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        </CollapsibleSection>
+
         {/* ── VICTORY TRACKER ── */}
         <VictoryTracker progress={gameState.victoryProgress} />
 
