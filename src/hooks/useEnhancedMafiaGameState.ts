@@ -2732,24 +2732,38 @@ export const useEnhancedMafiaGameState = (
               }
               break;
             } else {
+              // No enemies on hex — handle territory claiming
               if (tile.controllingFamily !== fam) {
                 const prevOwner = tile.controllingFamily;
-                tile.controllingFamily = fam;
-                if (prevOwner === state.playerFamily && turnReport) {
-                  turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
+                const isNeutral = prevOwner === 'neutral';
+                
+                if (isNeutral) {
+                  // Neutral hex: capos auto-claim (matches player rules), soldiers don't
+                  if (unit.type === 'capo') {
+                    tile.controllingFamily = fam;
+                  }
+                } else {
+                  // Enemy territory with no defenders: requires an action point to claim
+                  if (aiActionsRemaining > 0) {
+                    aiActionsRemaining--;
+                    tile.controllingFamily = fam;
+                    if (prevOwner === state.playerFamily && turnReport) {
+                      turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
+                    }
+                  }
+                  // No action budget? Can't claim — just occupying the hex
                 }
+                
                 const shIdx2 = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
-                if (shIdx2 !== -1) {
+                if (shIdx2 !== -1 && tile.controllingFamily === fam) {
                   state.safehouses.splice(shIdx2, 1);
                   if (prevOwner === state.playerFamily) {
-                    // Player captures AI safehouse → bounty + intel
                     state.pendingNotifications.push({
                       type: 'error' as const,
                       title: '🏠 Safehouse Destroyed',
                       message: `The ${fam} family captured your territory and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()}.`,
                     });
                   }
-                  // Bounty to capturing AI
                   const captorOpp2 = state.aiOpponents.find(o => o.family === fam);
                   if (captorOpp2) captorOpp2.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
                 }
