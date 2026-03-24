@@ -85,6 +85,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   hiddenUnits: [...(state.hiddenUnits || [])],
   aiBounties: [...(state.aiBounties || [])],
   aiPlannedHits: (state.aiPlannedHits || []).map(h => ({ ...h })),
+  combatLog: [...(state.combatLog || [])],
   scoutedHexes: [...(state.scoutedHexes || [])],
   safehouses: (state.safehouses || []).map(s => ({ ...s })),
   activeBribes: (state.activeBribes || []).map(b => ({ ...b })),
@@ -262,6 +263,7 @@ export interface EnhancedMafiaGameState {
   hiddenUnits: HiddenUnit[];
   aiBounties: AIBounty[];
   aiPlannedHits: AIPlannedHit[];
+  combatLog: string[];
 
   turnReport: TurnReport | null;
   lastCombatResult?: {
@@ -615,6 +617,7 @@ const createInitialGameState = (
     hiddenUnits: [],
     aiBounties: [],
     aiPlannedHits: [],
+    combatLog: [],
     
     selectedTerritory: null,
     activeEvent: null,
@@ -1513,6 +1516,12 @@ export const useEnhancedMafiaGameState = (
         territoriesLost: [],
         territoriesGained: [],
       };
+
+      // Flush mid-turn combat log into turn report events
+      if (newState.combatLog && newState.combatLog.length > 0) {
+        turnReport.events.push(...newState.combatLog);
+        newState.combatLog = [];
+      }
 
       // Reset to deploy phase for next turn
       newState.turnPhase = 'deploy';
@@ -2512,6 +2521,9 @@ export const useEnhancedMafiaGameState = (
                           title: '🩸 Capo Wounded!',
                           message: `Your capo was wounded by the ${fam} family in ${tile.district || 'unknown territory'}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
                         });
+                        if (turnReport) {
+                          turnReport.events.push(`🩸 Capo wounded by the ${fam} family in ${tile.district || 'unknown territory'}`);
+                        }
                       }
                     }
                     return; // capo survives either way
@@ -2528,6 +2540,10 @@ export const useEnhancedMafiaGameState = (
                           title: '💀 Soldier Killed!',
                           message: `Your soldier was killed by the ${fam} family in ${tile.district || 'unknown territory'}!`,
                         });
+                        if (turnReport) {
+                          turnReport.events.push(`💀 Soldier killed by the ${fam} family in ${tile.district || 'unknown territory'}`);
+                          turnReport.resourceDeltas.soldiers--;
+                        }
                       }
                     }
                   }
@@ -4438,6 +4454,7 @@ export const useEnhancedMafiaGameState = (
               type: 'error' as const, title: '⚔️ Soldier Lost in Combat',
               message: `Your soldier fell during the assault on ${tile.district}.`,
             }];
+            state.combatLog = [...(state.combatLog || []), `⚔️ Soldier lost during assault on ${tile.district}`];
           }
           removed++;
         }
@@ -4452,6 +4469,7 @@ export const useEnhancedMafiaGameState = (
               type: 'warning' as const, title: '🩸 Capo Wounded!',
               message: `Your capo was wounded during the assault on ${tile.district}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
             }];
+            state.combatLog = [...(state.combatLog || []), `🩸 Capo wounded during assault on ${tile.district}`];
           }
         });
       } else {
@@ -4468,6 +4486,7 @@ export const useEnhancedMafiaGameState = (
               type: 'error' as const, title: '⚔️ Soldier Killed in Battle',
               message: `Your soldier was killed in the failed attack on ${tile.district}.`,
             }];
+            state.combatLog = [...(state.combatLog || []), `⚔️ Soldier killed in failed attack on ${tile.district}`];
           }
         }
         // Wound capos in defeat
@@ -4480,6 +4499,7 @@ export const useEnhancedMafiaGameState = (
             type: 'warning' as const, title: '🩸 Capo Wounded!',
             message: `Your capo was wounded in the failed attack on ${tile.district}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
           }];
+          state.combatLog = [...(state.combatLog || []), `🩸 Capo wounded in failed attack on ${tile.district}`];
         });
         defeatShuffled.slice(defeatCasualties).forEach(u => {
           if (state.soldierStats[u.id]) {
@@ -4503,6 +4523,7 @@ export const useEnhancedMafiaGameState = (
           type: 'error', title: !isScouted ? '💀 Blind Hit Failed!' : 'Hit Failed!',
           message: `The attack was repelled. ${failDetails}.`,
         }];
+        state.combatLog = [...(state.combatLog || []), `💀 Hit on ${tile.district} failed! ${failDetails}`];
       }
       state.policeHeat.level = Math.min(100, state.policeHeat.level + heatGain);
     }
