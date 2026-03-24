@@ -2521,6 +2521,9 @@ export const useEnhancedMafiaGameState = (
                           title: '🩸 Capo Wounded!',
                           message: `Your capo was wounded by the ${fam} family in ${tile.district || 'unknown territory'}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
                         });
+                        if (turnReport) {
+                          turnReport.events.push(`🩸 Capo wounded by the ${fam} family in ${tile.district || 'unknown territory'}`);
+                        }
                       }
                     }
                     return; // capo survives either way
