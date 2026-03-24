@@ -137,11 +137,11 @@ export const FAMILY_BONUSES: Record<string, FamilyBonuses> = {
     income: 0, recruitmentDiscount: 0, reputationGain: 0,
   },
   colombo: {
-    combatBonus: 20, territoryIncome: 0, intimidation: 0,
+    combatBonus: 0, territoryIncome: 0, intimidation: 0,
     businessIncome: 0, laundering: 0, businessUpgrade: 0,
     hitSuccess: 0, heatReduction: 0, intel: 0,
     extortion: 0, fearGeneration: 15,
-    income: 0, recruitmentDiscount: 15, reputationGain: 0,
+    income: 20, recruitmentDiscount: 15, reputationGain: 0,
   },
 };
 
