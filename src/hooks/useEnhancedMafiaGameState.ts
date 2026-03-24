@@ -5472,7 +5472,7 @@ export const useEnhancedMafiaGameState = (
         const respectPenalty = 3;
         const fearPenalty = 2;
         const extraHeat = 5;
-        state.reputation.respect = Math.max(0, state.reputation.respect - respectPenalty);
+        syncRespect(state, Math.max(0, state.reputation.respect - respectPenalty));
         state.reputation.fear = Math.max(0, state.reputation.fear - fearPenalty);
         const failDetails = `Respect -${respectPenalty}, Fear -${fearPenalty}, Heat +${(isEnemy ? 12 : 8) + extraHeat} — the locals refused and word spread`;
         state.lastCombatResult = {
