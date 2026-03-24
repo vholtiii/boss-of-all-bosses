@@ -186,6 +186,30 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
             );
           })}
         </div>
+        {/* Map Size Selector */}
+        <div className="flex items-center justify-center gap-2 mt-3">
+          {(['small', 'medium', 'large'] as const).map(s => {
+            const labels = { small: '🗺️ Small', medium: '🗺️ Medium', large: '🗺️ Large' };
+            const descs = { small: '~169 hexes · Fast games', medium: '~331 hexes · Classic', large: '~547 hexes · Epic sprawl' };
+            const isActive = mapSize === s;
+            return (
+              <button
+                key={s}
+                onClick={() => setMapSize(s)}
+                className={cn(
+                  'px-4 py-2 rounded-lg border-2 text-xs font-bold uppercase tracking-wider transition-all duration-200',
+                  'bg-card/80 backdrop-blur-sm',
+                  isActive
+                    ? 'border-primary text-primary shadow-md scale-105'
+                    : 'border-border/50 text-muted-foreground hover:border-muted-foreground/50'
+                )}
+                title={descs[s]}
+              >
+                {labels[s]}
+              </button>
+            );
+          })}
+        </div>
       </motion.div>
 
       {/* Map Seed Input */}
