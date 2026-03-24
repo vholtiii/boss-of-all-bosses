@@ -4723,7 +4723,9 @@ export const useEnhancedMafiaGameState = (
     const targetStats = state.soldierStats[target.id]!;
 
     let chance = FLIP_SOLDIER_BASE_CHANCE;
-    if (targetStats.loyalty >= 60 && targetStats.loyalty <= 70) chance += 0.10;
+    // Low loyalty = easier to flip, high loyalty = harder
+    if (targetStats.loyalty < 60) chance += 0.15;
+    else if (targetStats.loyalty > 70) chance -= 0.10;
     const playerInfluence = state.resources.influence || 0;
     if (playerInfluence > 50) chance += (playerInfluence - 50) * 0.005;
     const schemerAdjacent = state.deployedUnits.some(u =>
