@@ -119,7 +119,7 @@ const StatBar: React.FC<{ value: number; color: string }> = ({ value, color }) =
 );
 
 interface Props {
-  onSelectFamily: (familyId: FamilyId, resources: FamilyInfo['startingResources'], difficulty: 'easy' | 'normal' | 'hard') => void;
+  onSelectFamily: (familyId: FamilyId, resources: FamilyInfo['startingResources'], difficulty: 'easy' | 'normal' | 'hard', seed?: number) => void;
 }
 
 const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
