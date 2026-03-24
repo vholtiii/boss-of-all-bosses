@@ -355,7 +355,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
             </div>
 
             <Button
-              onClick={() => onSelectFamily(activeFamily.id, activeFamily.startingResources, difficulty, seedInput ? parseInt(seedInput) : undefined)}
+              onClick={() => onSelectFamily(activeFamily.id, activeFamily.startingResources, difficulty, seedInput ? parseInt(seedInput) : undefined, mapSize)}
               className="w-full font-playfair font-bold text-base py-5 transition-all duration-200"
               style={{
                 backgroundColor: activeFamily.color,
