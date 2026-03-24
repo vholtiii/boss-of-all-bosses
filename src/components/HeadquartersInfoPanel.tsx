@@ -608,7 +608,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                       ))}
                     </div>
                     {negotiationUsedThisTurn && (
-                      <p className="text-[9px] text-muted-foreground italic">Already negotiated this turn</p>
+                      <p className="text-[9px] text-muted-foreground italic">Cooldown — wait another turn</p>
                     )}
                   </div>
                 )}

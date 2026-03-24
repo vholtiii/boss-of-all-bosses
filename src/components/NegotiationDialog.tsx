@@ -135,9 +135,9 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
         {/* Cooldown notice */}
         {negotiationUsedThisTurn && (
           <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-center">
-            <p className="text-sm font-semibold text-destructive">⏳ Already Negotiated This Turn</p>
+            <p className="text-sm font-semibold text-destructive">⏳ Negotiation on Cooldown</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {scope === 'family' ? 'The Boss has already negotiated this turn.' : 'A Capo has already negotiated this turn.'}
+              {scope === 'family' ? 'The Boss must wait another turn before negotiating again.' : 'Capos must wait another turn before negotiating again.'}
             </p>
           </div>
         )}

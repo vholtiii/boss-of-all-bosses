@@ -101,8 +101,8 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   ceasefires: (state.ceasefires || []).map(c => ({ ...c })),
   shareProfitsPacts: (state.shareProfitsPacts || []).map(p => ({ ...p })),
   safePassagePacts: (state.safePassagePacts || []).map(p => ({ ...p })),
-  bossNegotiationUsedThisTurn: state.bossNegotiationUsedThisTurn || false,
-  capoNegotiationUsedThisTurn: state.capoNegotiationUsedThisTurn || false,
+  bossNegotiationCooldown: state.bossNegotiationCooldown || 0,
+  capoNegotiationCooldown: state.capoNegotiationCooldown || 0,
   events: [...(state.events || [])],
   flippedSoldiers: (state.flippedSoldiers || []).map(f => ({ ...f })),
   eliminatedFamilies: [...(state.eliminatedFamilies || [])],
@@ -231,8 +231,8 @@ export interface EnhancedMafiaGameState {
   ceasefires: CeasefirePact[];
   shareProfitsPacts: ShareProfitsPact[];
   safePassagePacts: SafePassagePact[];
-  bossNegotiationUsedThisTurn: boolean;
-  capoNegotiationUsedThisTurn: boolean;
+  bossNegotiationCooldown: number;
+  capoNegotiationCooldown: number;
   victoryProgress: VictoryProgress;
   victoryType: VictoryType;
   familyBonuses: FamilyBonuses;
@@ -597,8 +597,8 @@ const createInitialGameState = (
     ceasefires: [],
     shareProfitsPacts: [],
     safePassagePacts: [],
-    bossNegotiationUsedThisTurn: false,
-    capoNegotiationUsedThisTurn: false,
+    bossNegotiationCooldown: 0,
+    capoNegotiationCooldown: 0,
     victoryProgress: {
       territory: { current: 0, target: mapSize === 'small' ? 40 : mapSize === 'large' ? 80 : 60, met: false },
       economic: { current: 0, target: 50000, met: false },
@@ -1709,8 +1709,8 @@ export const useEnhancedMafiaGameState = (
       newState.hitmanContracts = newState.hitmanContracts || [];
       newState.shareProfitsPacts = newState.shareProfitsPacts || [];
       newState.safePassagePacts = newState.safePassagePacts || [];
-      newState.bossNegotiationUsedThisTurn = false;
-      newState.capoNegotiationUsedThisTurn = false;
+      newState.bossNegotiationCooldown = Math.max(0, (newState.bossNegotiationCooldown || 0) - 1);
+      newState.capoNegotiationCooldown = Math.max(0, (newState.capoNegotiationCooldown || 0) - 1);
       newState.pendingNotifications = newState.pendingNotifications || [];
       newState.deployedUnits = newState.deployedUnits || [];
       newState.policeHeat = newState.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
@@ -5489,17 +5489,17 @@ export const useEnhancedMafiaGameState = (
 
     // Separate cooldowns for Boss and Capo
     const isFamily = isBossNegotiation;
-    if (isFamily && state.bossNegotiationUsedThisTurn) {
+    if (isFamily && (state.bossNegotiationCooldown || 0) > 0) {
       state.pendingNotifications = [...state.pendingNotifications, {
         type: 'warning', title: '⏳ Boss Negotiation Cooldown',
-        message: 'The Boss has already negotiated this turn.',
+        message: `The Boss must wait ${state.bossNegotiationCooldown} more turn(s) before negotiating again.`,
       }];
       return state;
     }
-    if (!isFamily && state.capoNegotiationUsedThisTurn) {
+    if (!isFamily && (state.capoNegotiationCooldown || 0) > 0) {
       state.pendingNotifications = [...state.pendingNotifications, {
         type: 'warning', title: '⏳ Capo Negotiation Cooldown',
-        message: 'A Capo has already negotiated this turn.',
+        message: `A Capo must wait ${state.capoNegotiationCooldown} more turn(s) before negotiating again.`,
       }];
       return state;
     }
@@ -5531,9 +5531,9 @@ export const useEnhancedMafiaGameState = (
 
     state.resources.money -= cost;
     if (isFamily) {
-      state.bossNegotiationUsedThisTurn = true;
+      state.bossNegotiationCooldown = 2;
     } else {
-      state.capoNegotiationUsedThisTurn = true;
+      state.capoNegotiationCooldown = 2;
     }
 
     // Reputation cost
