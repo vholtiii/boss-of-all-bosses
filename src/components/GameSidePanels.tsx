@@ -557,25 +557,10 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                   </>
                 )}
               </div>
-              <div className="mt-3 space-y-1.5">
-                <Button
-                  size="sm"
-                  variant="default"
-                  className="w-full text-xs"
-                  disabled={gameState.selectedTerritory.family === gameState.playerFamily || legalStatus.jailTime > 0}
-                  onClick={() => onAction({ type: 'hit_territory', targetTerritory: gameState.selectedTerritory?.district })}
-                >
-                  <Swords className="h-3 w-3 mr-1" /> Take Over
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full text-xs"
-                  disabled={gameState.selectedTerritory.family !== 'neutral' || legalStatus.jailTime > 0}
-                  onClick={() => onAction({ type: 'extort_territory', targetTerritory: gameState.selectedTerritory?.district })}
-                >
-                  <HandCoins className="h-3 w-3 mr-1" /> Extort
-                </Button>
+              <div className="mt-3 px-2 py-2 rounded bg-muted/30 text-center">
+                <p className="text-xs text-muted-foreground italic">
+                  💡 Select a unit, then click a hex for actions
+                </p>
               </div>
             </div>
           </>
