@@ -8,7 +8,10 @@ export interface SoldierStats {
   toughness: number;     // 0-5 (+1 per survived combat encounter)
   racketeering: number;  // 0-5 (+1 per successful extortion)
   turnsDeployed: number; // internal tracker for training calc
+  toughnessProgress: number; // 0.0-1.0 fractional progress toward next toughness point
 }
+
+export const CLAIM_TOUGHNESS_GAIN = 0.25; // +0.25 progress per territory claim (4 claims = +1 toughness)
 
 export const SOLDIER_LOYALTY_CAP = 80;
 export const CAPO_LOYALTY_CAP = 99;

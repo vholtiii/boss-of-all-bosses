@@ -4752,9 +4752,24 @@ export const useEnhancedMafiaGameState = (
     state.reputation.streetInfluence = Math.min(100, state.reputation.streetInfluence + influenceGain);
 
     const claimBonus = hasRecruitedSoldier ? ' (Recruit bonus!)' : '';
+    // Toughness progress for the claiming soldier
+    let toughnessMsg = '';
+    const claimingSoldier = soldierToMove || playerUnitsOnHex.find(u => u.type === 'soldier');
+    if (claimingSoldier && state.soldierStats[claimingSoldier.id]) {
+      const sStats = state.soldierStats[claimingSoldier.id];
+      if (sStats.toughness < 5) {
+        sStats.toughnessProgress = (sStats.toughnessProgress || 0) + CLAIM_TOUGHNESS_GAIN;
+        if (sStats.toughnessProgress >= 1.0) {
+          sStats.toughness = Math.min(5, sStats.toughness + 1);
+          sStats.toughnessProgress -= 1.0;
+          toughnessMsg = ` 💪 Soldier toughness increased to ${sStats.toughness}!`;
+        }
+      }
+    }
+
     state.pendingNotifications = [...state.pendingNotifications, {
       type: 'success' as const, title: '🏴 Territory Claimed!',
-      message: `Your family takes ${tile.district} under its wing.${claimBonus} (+${respectGain} Respect, +${influenceGain} Influence)`,
+      message: `Your family takes ${tile.district} under its wing.${claimBonus} (+${respectGain} Respect, +${influenceGain} Influence)${toughnessMsg}`,
     }];
 
     syncLegacyUnits(state);
