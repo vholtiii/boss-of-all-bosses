@@ -4471,6 +4471,7 @@ export const useEnhancedMafiaGameState = (
             }];
             state.combatLog = [...(state.combatLog || []), `🩸 Capo wounded during assault on ${tile.district}`];
           }
+        });
       } else {
         // ============ DEFEAT — no fortify protection (attackers got overrun), capos wounded only ============
         const defeatKillable = playerUnits.filter(u => u.type !== 'capo');
