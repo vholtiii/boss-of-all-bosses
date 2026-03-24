@@ -666,7 +666,7 @@ export const RightSidePanel: React.FC<{
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Soldiers</p>
-                    <p className="text-xs font-medium text-foreground">{opponent.resources.soldiers}</p>
+                    <p className="text-xs font-medium text-foreground">{opponent.resources.soldiers + (gameState.deployedUnits || []).filter((u: any) => u.family === opponent.family).length}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Influence</p>
