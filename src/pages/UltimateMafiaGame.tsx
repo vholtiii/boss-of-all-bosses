@@ -736,8 +736,12 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   };
   const currentPhaseConfig = phaseConfig[gameState.turnPhase] || phaseConfig.waiting;
 
+  const deselectUnit = () => {
+    handleAction({ type: 'deselect_unit' });
+  };
+
   const mainContent = (
-    <div className="h-full relative">
+    <div className="h-full relative" onClick={deselectUnit}>
       {/* Phase indicator banner */}
       <motion.div
         key={gameState.turnPhase}

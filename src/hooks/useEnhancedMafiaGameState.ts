@@ -3891,6 +3891,8 @@ export const useEnhancedMafiaGameState = (
           
           return newState;
         }
+        case 'deselect_unit':
+          return { ...newState, selectedUnitId: null, availableMoveHexes: [], deployMode: null, availableDeployHexes: [] };
         case 'bribe_official':
           // Legacy fallback — use corruption panel for new system
           if (newState.resources.money >= 15000) {
