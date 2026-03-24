@@ -2689,7 +2689,7 @@ export const useEnhancedMafiaGameState = (
         opponent.resources.soldiers += toRecruit;
         opponent.resources.money -= toRecruit * SOLDIER_COST;
         if (toRecruit > 0 && turnReport) {
-          const hasRecruitIntel = (state.activeBribes || []).some(b => b.tier === 'police_captain' || b.tier === 'police_chief');
+          const hasRecruitIntel = (state.activeBribes || []).some(b => (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'mayor') && b.active);
           if (hasRecruitIntel) {
             turnReport.aiActions.push({ family: fam, action: 'recruit', detail: `Recruited ${toRecruit} soldier(s)` });
           }
@@ -2740,6 +2740,17 @@ export const useEnhancedMafiaGameState = (
         if (!placed) break;
       }
       opponent.resources.soldiers = soldiersToPlace;
+      // Intel: report AI deployments if player has captain+ bribe on this family
+      if (turnReport) {
+        const hasDeployIntel = (state.activeBribes || []).some(b => 
+          (b.tier === 'police_captain' && b.active && b.targetFamily === fam) ||
+          ((b.tier === 'police_chief' || b.tier === 'mayor') && b.active)
+        );
+        const deployedCount = state.deployedUnits.filter(u => u.family === fam).length - currentDeployed;
+        if (hasDeployIntel && deployedCount > 0) {
+          turnReport.aiActions.push({ family: fam, action: 'deploy', detail: `Deployed ${deployedCount} soldier(s) to the field` });
+        }
+      }
 
       // ── PERSONALITY-DRIVEN MOVEMENT & COMBAT ──
       const personality = opponent.personality || 'aggressive';
@@ -3225,7 +3236,7 @@ export const useEnhancedMafiaGameState = (
           opponent.resources.money -= SAFEHOUSE_COST;
           if (turnReport) {
             const hasIntel = state.scoutedHexes.some(s => s.q === bestHex.q && s.r === bestHex.r && s.s === bestHex.s) ||
-              (state.activeBribes || []).some(b => b.tier === 'police_captain' || b.tier === 'police_chief');
+              (state.activeBribes || []).some(b => (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'mayor') && b.active);
             if (hasIntel) {
               turnReport.aiActions.push({ family: fam, action: 'safehouse', detail: `Established a safehouse in ${bestHex.district}` });
             }
@@ -3251,7 +3262,7 @@ export const useEnhancedMafiaGameState = (
             const targetUnit = state.deployedUnits.find(u => u.id === target.id);
             const hasHitIntel = targetUnit && (
               state.scoutedHexes.some(s => s.q === targetUnit.q && s.r === targetUnit.r && s.s === targetUnit.s) ||
-              (state.activeBribes || []).some(b => b.tier === 'police_captain' || b.tier === 'police_chief')
+              (state.activeBribes || []).some(b => (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'mayor') && b.active)
             );
             if (hasHitIntel) {
               turnReport.aiActions.push({ family: fam, action: 'plan_hit', detail: `Planned a hit against a player capo` });

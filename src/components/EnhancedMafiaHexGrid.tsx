@@ -91,6 +91,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const scoutedHexes: ScoutedHex[] = gameState?.scoutedHexes || [];
   const bribedOfficials = gameState?.policeHeat?.bribedOfficials || [];
 
+  const activeBribes = gameState?.activeBribes || [];
+
   // Fog of War: check if a rival hex's intel is revealed
   const isHexRevealed = (tile: HexTile): boolean => {
     // Player's own hexes and neutral hexes are always visible
@@ -99,9 +101,12 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     if (tile.isHeadquarters) return true;
     // Scouted hexes are revealed
     if (scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s)) return true;
-    // Captain Rodriguez bribe reveals all rival intel
+    // Police Chief or Mayor bribe reveals ALL rival hexes
+    if (activeBribes.some((b: any) => (b.tier === 'police_chief' || b.tier === 'mayor') && b.active)) return true;
+    // Police Captain bribe reveals targeted family's hexes
+    if (activeBribes.some((b: any) => b.tier === 'police_captain' && b.active && b.targetFamily === tile.controllingFamily)) return true;
+    // Legacy bribed officials (fallback)
     if (bribedOfficials.some((o: any) => o.id === 'captain_rodriguez')) return true;
-    // Chief Sullivan (rival_intelligence) also reveals
     if (bribedOfficials.some((o: any) => o.permissions?.includes('rival_intelligence'))) return true;
     return false;
   };
