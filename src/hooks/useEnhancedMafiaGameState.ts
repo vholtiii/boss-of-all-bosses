@@ -183,6 +183,7 @@ export interface EnhancedMafiaGameState {
   playerFamily: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
   turn: number;
   season: 'spring' | 'summer' | 'fall' | 'winter';
+  mapSize: 'small' | 'medium' | 'large';
   
   resources: {
     money: number;
@@ -557,6 +558,7 @@ const createInitialGameState = (
     playerFamily: family,
     turn: 1,
     season: 'spring',
+    mapSize,
     mapSeed,
     difficulty,
     difficultyModifiers: diffMods,
@@ -586,7 +588,7 @@ const createInitialGameState = (
     alliances: [],
     ceasefires: [],
     victoryProgress: {
-      territory: { current: 0, target: 60, met: false },
+      territory: { current: 0, target: mapSize === 'small' ? 40 : mapSize === 'large' ? 80 : 60, met: false },
       economic: { current: 0, target: 50000, met: false },
       legacy: { current: 0, highestRival: 0, met: false },
       domination: { eliminated: 0, target: 4, met: false },
@@ -766,7 +768,7 @@ export const useEnhancedMafiaGameState = (
 
   // ============ VICTORY CHECK ============
   const updateVictoryProgress = (state: EnhancedMafiaGameState) => {
-    const TERRITORY_TARGET = 60;
+    const TERRITORY_TARGET = state.mapSize === 'small' ? 40 : state.mapSize === 'large' ? 80 : 60;
     const ECONOMIC_TARGET = 50000;
     const LEGACY_MIN_TURN = 15;
     const LEGACY_MARGIN = 1.25; // Must exceed rival by 25%
@@ -2694,7 +2696,8 @@ export const useEnhancedMafiaGameState = (
           else aiIncome += Math.floor(tile.business.income * 0.1);
         }
       });
-      const minIncome = Math.floor((2000 + state.turn * 500) * diffMods.aiIncomeMult);
+      const mapScale = state.mapSize === 'small' ? 0.6 : state.mapSize === 'large' ? 1.5 : 1.0;
+      const minIncome = Math.floor((2000 + state.turn * 500) * diffMods.aiIncomeMult * mapScale);
       aiIncome = Math.max(aiIncome, minIncome);
       opponent.resources.money += aiIncome;
       if (turnReport) turnReport.aiActions.push({ family: fam, action: 'income', detail: `Earned $${aiIncome.toLocaleString()} income` });
@@ -2702,7 +2705,8 @@ export const useEnhancedMafiaGameState = (
       // ── RECRUIT (difficulty-scaled cap) ──
       const isAlerted = (state.aiAlertState || {})[fam] > 0;
       const alertBonus = isAlerted ? 1 : 0;
-      const soldierCap = Math.max(8 + alertBonus + diffMods.aiRecruitCapBonus, 3 + Math.floor(state.turn / 2) + alertBonus + diffMods.aiRecruitCapBonus);
+      const capScale = state.mapSize === 'small' ? -2 : state.mapSize === 'large' ? 4 : 0;
+      const soldierCap = Math.max(8 + alertBonus + diffMods.aiRecruitCapBonus + capScale, 3 + Math.floor(state.turn / 2) + alertBonus + diffMods.aiRecruitCapBonus + capScale);
       const currentDeployed = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier').length;
       const totalSoldiers = opponent.resources.soldiers + currentDeployed;
       const wantToRecruit = Math.max(0, soldierCap - totalSoldiers);
@@ -2780,10 +2784,11 @@ export const useEnhancedMafiaGameState = (
       const aggression = opponent.strategy.aggressionLevel || 50;
       const cooperation = opponent.strategy.cooperationTendency || 50;
 
-      // AI action budget — boosted in early game (turns 1-8) for faster expansion
+      // AI action budget — boosted in early game (turns 1-8) for faster expansion, scaled by map size
       const earlyGameBonus = state.turn <= 8 ? 2 : 0;
-      let aiActionsRemaining = 2 + (opponent.resources.influence >= 50 ? 1 : 0) + earlyGameBonus;
-      let aiTacticalRemaining = 3 + earlyGameBonus;
+      const mapActionBonus = state.mapSize === 'small' ? -1 : state.mapSize === 'large' ? 1 : 0;
+      let aiActionsRemaining = Math.max(1, 2 + (opponent.resources.influence >= 50 ? 1 : 0) + earlyGameBonus + mapActionBonus);
+      let aiTacticalRemaining = Math.max(2, 3 + earlyGameBonus + mapActionBonus);
 
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
       for (const unit of aiUnits) {
