@@ -2679,7 +2679,7 @@ export const useEnhancedMafiaGameState = (
       // ── RECRUIT (difficulty-scaled cap) ──
       const isAlerted = (state.aiAlertState || {})[fam] > 0;
       const alertBonus = isAlerted ? 1 : 0;
-      const soldierCap = Math.min(8 + alertBonus + diffMods.aiRecruitCapBonus, 3 + Math.floor(state.turn / 2) + alertBonus + diffMods.aiRecruitCapBonus);
+      const soldierCap = Math.max(8 + alertBonus + diffMods.aiRecruitCapBonus, 3 + Math.floor(state.turn / 2) + alertBonus + diffMods.aiRecruitCapBonus);
       const currentDeployed = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier').length;
       const totalSoldiers = opponent.resources.soldiers + currentDeployed;
       const wantToRecruit = Math.max(0, soldierCap - totalSoldiers);
