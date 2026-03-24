@@ -1,23 +1,28 @@
 
 
-# Click Soldier Card in Capo Promotion to Highlight on Map
+# HQ Expenses Breakdown
 
-## Change
-When clicking a soldier's card in the Capo Promotion panel, that soldier gets highlighted on the map (selected state with gold ring/pulse). This is info-only — no movement or action triggered.
+## Problem
+The HQ panel shows a single "Expenses" number with no breakdown. The player can't see what's costing them money.
 
-## Implementation
+## Expense Categories (from `processEconomy`)
+1. **Soldier Maintenance**: $600/turn per deployed soldier + $600/turn per reserve soldier
+2. **Community Upkeep**: $150/turn per empty claimed hex (no business, not HQ)
+3. **Arrest Penalties**: Profit reduction from active arrests (percentage-based)
+4. **Heat Penalties**: Illegal income reduction from police heat
 
-### `src/components/CapoPromotionPanel.tsx`
-- Add prop `onHighlightSoldier?: (unitId: string) => void`
-- Add `onClick={() => onHighlightSoldier?.(s.id)}` to each soldier card div (line 90-96), with `cursor-pointer` class
+## Changes
 
-### `src/components/GameSidePanels.tsx` (~line 464-475)
-- Pass `onHighlightSoldier` to `CapoPromotionPanel` that finds the soldier's position from `gameState.deployedUnits` and calls `onSelectUnit('soldier', { q, r, s })` — reusing the existing unit selection mechanism which already triggers the gold highlight ring on the map
+### `src/hooks/useEnhancedMafiaGameState.ts`
+- Extend `state.finances` to include breakdown fields: `soldierMaintenance`, `communityUpkeep`, `arrestPenalty`, `heatPenalty`
+- Set these values during `processEconomy()` so they're available to the UI
 
-### `src/components/EnhancedMafiaHexGrid.tsx`
-- No changes needed — the existing `selectedUnitId` + `SoldierIcon` already renders the gold pulse ring for selected units
+### `src/components/HeadquartersInfoPanel.tsx`
+- Update `finances` prop type to include `soldierMaintenance`, `communityUpkeep`, `arrestPenalty`, `heatPenalty`
+- Replace the single "Expenses" box (line 222-224) with an expandable breakdown showing each cost category with its amount
+- Show soldier count × $600, empty hex count × $150, arrest penalty %, heat penalty % — each as a labeled row
 
 ## Files Modified
-- `src/components/CapoPromotionPanel.tsx` — add callback prop + click handler on card
-- `src/components/GameSidePanels.tsx` — wire callback to find unit position and call `onSelectUnit`
+- `src/hooks/useEnhancedMafiaGameState.ts` — compute and store expense breakdown
+- `src/components/HeadquartersInfoPanel.tsx` — display expense breakdown
 
