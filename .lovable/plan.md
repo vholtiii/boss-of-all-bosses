@@ -1,174 +1,119 @@
 
 
-# Update READMEs + Full Gameplay Analysis Report
+# Gameplay Simulation Report — 3 Strategies Tested
 
-This is a two-part task: (1) update all documentation files to match the current codebase, and (2) produce a comprehensive gameplay analysis report with simulation findings.
+## Simulation 1: Aggressive Territorial Rush (Gambino)
 
----
+**Strategy**: Deploy all 4 soldiers outward turn 1, claim/extort every turn, attack enemy territory early.
 
-## Part 1: Update Documentation Files (4 files)
+**Turn-by-turn**:
+- T1: Deploy 4 soldiers to adjacent hexes. Capo deploys to nearest business hex (auto-claims + auto-extorts). ~$3K one-time extortion income.
+- T2: Advance phase to Tactical → fortify 1 border soldier. Action phase → claim 2 neutral hexes, extort 1 business.
+- T3: Soldiers move outward using free movement across connected territory. Contact enemy border ~turn 4.
+- T4-6: Hit enemy hexes (Gambino +25% combat, +25% hitSuccess = 75-90% on 1v1). Hexes reset to neutral after hit → must spend next action turn to claim.
+- T7-10: AI early-game boost ends. Player has 15-20 hexes. Income ~$2K-5K/turn from passive businesses. Maintenance: 4 soldiers × $600 = $2,400 + empty hex upkeep.
 
-### README.md — Major Updates Needed
-- **Soldier costs**: Says $500 — code has $1,500 (mercenary) and $300 (local recruit, requires 10 hexes)
-- **Starting soldiers**: Says "3 per family" — code has variable counts: Gambino:4, Genovese:4, Lucchese:3, Bonanno:2, Colombo:1
-- **Maintenance**: Says "Base rate" — code says $600/turn/soldier + $150/turn per empty claimed hex
-- **HQ coordinates**: Listed wrong (e.g., Gambino says (-5,5,0), code is (-8,8,0))
-- **Project structure**: References deleted files (CombatInterface.tsx, BusinessManagement.tsx, SoldierRecruitmentSystem.ts)
-- **Core state**: Says "~2800 lines" — now ~5,463 lines
-- **Missing systems**: No mention of free movement in connected territory, HQ Assault/Domination victory, Flip Soldier, Call a Sitdown, bankruptcy mechanic, difficulty system, district control bonuses, blind hit/civilian casualty system
-- **Victory conditions**: Missing Domination path (eliminate all 4 families)
-- **Capo promotion**: Says "5 conflicts, 60 loyalty, 3 training" — code requires victories≥5, loyalty≥80, training≥3, toughness≥5, racketeering≥5
+**Issues Found**:
 
-### GAME_MECHANICS.md — Major Updates Needed
-- Same cost/stat discrepancies as README
-- Missing: Free movement system, HQ Assault, Flip Soldier, Sitdown, Domination victory, Bankruptcy, Difficulty modes
-- Soldier recruitment section incomplete (no mercenary vs local distinction)
-- HQ coordinates wrong
+### BUG: Soldier Deploy from HQ Never Checks Stacking Limit
+Lines 1533-1559: `deployUnit()` for soldiers either moves one from HQ or spawns from reserve pool. Neither check if the target hex already has 2 units. A player can stack unlimited soldiers via HQ deployment. AI deployment correctly checks `unitsHere.length < 2` (line 2613) but player deployment does not.
 
-### COMBAT_SYSTEM_GUIDE.md — Minor Updates
-- Missing: HQ Assault combat mechanics
-- Victory conditions missing Domination
-- Otherwise mostly accurate
+### BUG: Free Movement Bypasses Zone of Control Completely  
+Lines 1142-1147: ZoC check is skipped when `isFreeMove === true`. This means a soldier on connected territory can freely move through hexes adjacent to enemies without stopping. In real gameplay, this allows teleporting a soldier past a frontline to attack behind enemy lines — breaks the entire frontline concept.
 
-### HEADQUARTERS_SYSTEM_GUIDE.md — Updates Needed
-- HQ coordinates wrong
-- Says "HQ cannot be captured or destroyed" — now HQ CAN be assaulted (elimination mechanic)
-- Missing: Call a Sitdown boss action, HQ defense bonuses from soldiers, Flip Soldier mechanic
-- Starting soldier counts wrong
-
-### SOLDIER_RECRUITMENT_GUIDE.md — Updates Needed
-- Costs wrong ($500 vs $1,500/$300)
-- Missing mercenary vs local recruit distinction
-- Capo promotion requirements outdated
-- Says 3 starting soldiers — variable per family
-- Maintenance section incomplete
+### BUG: AI Soldiers Claim Neutral Territory Without Action Points on Arrival
+Lines 2962-2978: AI extorts neutral businesses and claims the hex in the same "for" loop as their action phase. However, on line 2917-2933, when AI moves onto neutral territory with no enemies, soldiers DON'T auto-claim (correct per rules). But then in the action phase loop (line 2962), any AI soldier standing on a neutral hex with a business claims it for free. This double-pass means AI soldiers effectively auto-claim any neutral hex they walk onto if it has a business — bypassing the intent that only capos auto-claim.
 
 ---
 
-## Part 2: Gameplay Simulation & Analysis Report
+## Simulation 2: Economic Turtle (Genovese)
 
-### Simulation 1: Aggressive Expansion as Gambino (Combat Family)
+**Strategy**: Minimal expansion, focus on businesses and capo income. Build legal businesses. Avoid combat.
 
-**Setup**: Gambino, normal difficulty. 4 soldiers, 1 capo, $50K. +25% combat, +15% intimidation.
+**Turn-by-turn**:
+- T1-3: Deploy capo to highest-value hex (auto-claims, auto-extorts). Deploy soldiers defensively around HQ. Claim 6-8 adjacent hexes.
+- T4-8: Capo generates 130% income (+30% Genovese bonus). Build a legal business ($12K-35K, 3-turn construction, 2 with capo). Use "Call a Sitdown" once for defense if threatened.
+- T9-15: Legal businesses complete. Revenue should climb. Negotiate ceasefires with aggressive families.
 
-**Turns 1-3**: Deploy soldiers to adjacent hexes. Move outward, claim neutral territory. Capo deployed to highest-income business hex for 100% income.
-- Income: ~$500-1500/turn from 1-2 businesses (10% passive on uncovered, 100% on capo hex)
-- Costs: 4 soldiers * $600 = $2,400 + empty hex upkeep ($150 * ~8 empty hexes) = $3,600/turn
-- Net: -$2,100 to -$3,100/turn. Money at ~$42K by turn 3.
+**Issues Found**:
 
-**Turns 4-8**: AI has early game boost (+2 actions, +2 tactical). AI expands aggressively. Player needs to extort and claim to keep up. Each claim costs 1 action point (2-3 available). Player can claim ~6-9 hexes per 3 turns.
-- By turn 8: ~15-20 hexes. Money at ~$30K. Need businesses under capo for income.
+### BUG: Legal Business Construction Never Progresses
+The `performBusinessAction` handler (around line 4200) processes `build_legal`/`build_illegal` actions and sets `turnsUntilComplete` and `constructionProgress`/`constructionGoal` on the hex business. However, **nowhere in `endTurn` or `processEconomy` does construction progress increment**. Legal businesses created via `performBusinessAction` will NEVER complete. The only construction progress code is in `processEconomy` (around line 2380-2400) but it only processes the legacy `state.businesses[]` array, not hex-based businesses.
 
-**Turns 9-15**: Expansion slows. AI families have 5-10 hexes each. Borders form. Combat begins.
-- Hitting enemy hexes costs heat, risks soldiers. With Gambino +25% combat, hits succeed ~75-90% vs single defenders.
-- Problem: soldier casualties (20% on victory, 40% on defeat) drain forces.
+This is a **game-breaking bug for economic strategies**. The Genovese family bonus (+25% business upgrade) is worthless because no business construction ever finishes.
 
-**Victory path**: Territory Domination (60 hexes) at ~turn 25-30, or Economic ($50K/turn) if capos cover enough businesses.
+### ISSUE: Capo Auto-Extortion Applies to Store Fronts (Legal Businesses)
+Lines 1171-1183: When a capo moves onto a neutral hex with a business, it auto-extorts. But store fronts are legal businesses (`isLegal: true`). Auto-extorting a legal business doesn't make thematic sense and the payout ($1,500) is low. This isn't a bug but feels wrong — legal businesses should perhaps be "acquired" not "extorted."
 
-### Simulation 2: Economic as Genovese (Business Family)
+### BUG: `resources.respect` and `reputation.respect` Are Two Separate Values
+Line 5044-5046: Hit victory adds to `state.resources.respect`. Line 2237: End-of-turn respect growth writes to `state.reputation.respect`. These are **different fields** and they're never synced. `resources.respect` is used for the bonus action threshold check (line 813), while `reputation.respect` is displayed in the UI. A player could have 50 `resources.respect` (getting bonus actions) while `reputation.respect` shows 10, or vice versa.
 
-**Setup**: Genovese, normal difficulty. 4 soldiers, 1 capo, $50K. +30% business income, +20% laundering, +25% upgrade.
+---
 
-**Turns 1-5**: Similar expansion but focus on hexes WITH businesses. Capo on highest-income hex generates 130% income. Build legal businesses ($12K-35K) for long-term revenue.
-- Better income trajectory but still negative early due to maintenance.
-- Construction takes 3 turns (2 with capo present due to 1.5x speed).
+## Simulation 3: Diplomatic Schemer (Lucchese)
 
-**Turns 5-10**: First legal businesses complete. Revenue climbs. Less combat-focused, more diplomatic.
-- Economic victory path viable but requires $50K/month — needs 10+ high-income hexes with capos (max 3 capos + passive).
+**Strategy**: Scout everything, plan hits, negotiate ceasefires, use hitmen, flip soldiers. Target economic victory.
 
-**Result**: Genovese has smoother mid-game economy but struggles with territory defense.
+**Turn-by-turn**:
+- T1-3: Deploy soldiers. Scout enemy hexes (+25% intel bonus from Lucchese). Plan hits on enemy capos.
+- T4-6: Execute planned hits. Negotiate ceasefires with 2 families (Lucchese: +20% hitSuccess helps Plan Hits). Use 15% heat reduction bonus to stay under radar.
+- T7-12: Hire hitmen ($15K each, max 3). Target isolated enemy units. Flip soldiers near enemy HQs.
+- T13+: Attempt HQ assaults using flipped-soldier bonus.
 
-### Critical Issues Found
+**Issues Found**:
 
-#### CRITICAL: Negotiation Never Rolls for Success (Severity: HIGH)
-`processNegotiation()` (line 5309) applies ceasefire/alliance/bribe_territory directly without checking against the defined `baseSuccess` rates. Every negotiation auto-succeeds. The `NEGOTIATION_TYPES` success rates (50%/40%/30%) are defined but never used.
+### BUG: Hitman Contracts Never Execute
+The `hitmanContracts` array is populated when hiring (around line 4100), but there is **no code in `endTurn` that processes hitman contracts** — no countdown, no execution, no removal. Hitmen are paid for ($15K) and sit in the array forever doing nothing. The constants `HITMAN_OPEN_TURNS`, `HITMAN_BASE_SUCCESS`, etc. are defined but never used in gameplay logic.
 
-**Fix**: Add success roll check in processNegotiation using config.baseSuccess + capo personality bonus + influence modifier.
+### BUG: Plan Hit "Execute" Uses Wrong Hex When Target Moves
+Lines 4900-4940: The execute_planned_hit action redirects to the target's current hex. But the `targetOnCurrentHex` check (line 4904) checks if the target unit is on `targetQ/targetR/targetS` — which is the hex the PLAYER clicked, not the target's actual position. If the player clicks the original planned hex but the target moved, neither `targetOnOriginalHex` nor `targetOnCurrentHex` is true, triggering the fail path even though the target exists elsewhere on the map.
 
-#### CRITICAL: Hit Sets Territory to `null` Instead of `'neutral'` (Severity: HIGH)
-Line 4957: `tile.controllingFamily = null`. All other code checks `=== 'neutral'`. This means hit-cleared hexes become invisible to territory logic — they can't be claimed, extorted, or counted. Player must re-engage with a broken hex.
+### BUG: Flip Soldier Targets Only Soldiers with Loyalty > 60
+Line 4703: `uStats.loyalty > 60`. The intent was that loyal soldiers are HARDER to flip, not that only loyal ones can be targeted. Low-loyalty enemy soldiers (loyalty 30-50) should be EASIER to flip but they're excluded entirely. This is backwards.
 
-**Fix**: Change `null` to `'neutral'` on line 4957.
+### ISSUE: AI Never Uses Hitmen
+AI families have no hitman hiring logic. Only the player can hire hitmen, but since hitman contracts never execute (bug above), this is doubly broken.
 
-#### HIGH: Capo Promotion Is Nearly Impossible (Severity: HIGH)
-Requirements: victories≥5 AND loyalty≥80 AND training≥3 AND toughness≥5 AND racketeering≥5. A single soldier needs:
-- 5 successful hits/extortions (victories cap at 5, so exactly 5 needed)
-- 5 survived combats (toughness cap at 5)
-- 5 successful extortions (racketeering cap at 5)
-- Exactly 80 loyalty (soldier cap is 80)
-- 3 turns deployed away from HQ (training cap at 3)
+---
 
-This requires the same soldier to participate in 5+ combats, 5+ extortions, AND reach max loyalty. At 2-3 actions/turn, this takes 10-15 turns minimum. Meanwhile AI can promote capos using the same requirements — they'll also struggle.
+## Summary of All Issues Found
 
-**Fix**: Reduce requirements to: victories≥3, loyalty≥60, training≥2, toughness≥3, racketeering≥3. Or increase stat caps.
+| # | Issue | Severity | Category |
+|---|-------|----------|----------|
+| 1 | Legal business construction never progresses | **CRITICAL** | Economy broken |
+| 2 | Hitman contracts never execute | **CRITICAL** | Feature dead |
+| 3 | `resources.respect` vs `reputation.respect` desync | **HIGH** | State bug |
+| 4 | Player deploy doesn't check hex stacking limit | **HIGH** | Exploit |
+| 5 | Free movement bypasses Zone of Control | **HIGH** | Balance exploit |
+| 6 | Flip Soldier excludes low-loyalty targets (inverted logic) | **HIGH** | Logic bug |
+| 7 | Plan Hit execute fails when target relocated (wrong hex check) | **MEDIUM** | Logic bug |
+| 8 | AI soldiers auto-claim neutral business hexes via action phase double-pass | **MEDIUM** | AI fairness |
 
-#### HIGH: Unbalanced Starting Soldiers (Severity: MEDIUM)
-Gambino/Genovese start with 4, Lucchese with 3, Bonanno with 2, Colombo with 1. Colombo is severely disadvantaged — 1 soldier can only perform 1 action per turn vs Gambino's 4 soldiers providing 4x the action coverage.
+## Proposed Fixes
 
-**Fix**: Normalize to 3 soldiers each, or compensate weaker families with bonus money/bonuses.
+### Fix 1: Hex-based business construction progress
+In `endTurn` (after `processEconomy`), iterate `hexMap` tiles where `business.constructionProgress !== undefined && constructionProgress < constructionGoal`. Increment progress +1/turn (+0.5 extra if capo present). When complete, clear construction fields.
 
-#### MEDIUM: AI Respect Never Grows (Severity: MEDIUM)
-`opponent.resources.respect` is initialized at 15-25 and never updated in `processAITurn()`. AI families never reach the respect≥50 threshold for bonus actions, giving the player an inherent action advantage.
+### Fix 2: Hitman contract execution
+In `endTurn`, tick down `hitmanContracts[].turnsRemaining`. When 0, roll success using the defined constants (`HITMAN_BASE_SUCCESS`, etc. based on target hex type). On success, kill target unit. On failure, refund 50%, alert target family.
 
-**Fix**: Add AI respect growth in processAITurn based on territory + combat, mirroring player formula.
+### Fix 3: Sync respect fields
+After all end-of-turn calculations, add: `state.resources.respect = Math.round(state.reputation.respect)`. Use `reputation.respect` as the source of truth everywhere.
 
-#### MEDIUM: AI Soldiers Can Never Qualify for HQ Assault (Severity: MEDIUM)
-AI HQ assault requires toughness≥4 and loyalty≥70. AI soldiers start with toughness:0 and loyalty:40-70. Toughness only grows +1 per survived combat, and AI soldiers are often killed before reaching 4. The AI assault mechanic after turn 12 will almost never trigger.
+### Fix 4: Stacking limit on player deploy
+In `deployUnit()`, before placing a soldier, check: `deployedUnits.filter(u => u.q === target.q && ...).length < 2`. If 2+ units already present (and target is not HQ), block deployment.
 
-**Fix**: Add toughness growth for AI soldiers that survive end-of-turn combat encounters. Or lower AI assault requirements.
+### Fix 5: Zone of Control on free movement
+When `isFreeMove && isAdjacentToEnemy(target)`, set `remainingMoves = 0` (stop movement). Free movement should skip move COST but not ZoC.
 
-#### MEDIUM: Double Economy System (Severity: LOW-MEDIUM)
-Two separate business systems exist:
-1. Hex-based (processEconomy) — the real system
-2. Legacy (state.businesses[], performBusinessAction) — builds restaurants/casinos/etc.
+### Fix 6: Flip Soldier — invert loyalty check
+Change line 4703 from `uStats.loyalty > 60` to `uStats.loyalty < 80`. Low-loyalty soldiers (< 60) get +15% flip bonus; high-loyalty (> 70) get -10% penalty. Any soldier loyalty < 80 can be targeted.
 
-Both contribute income separately. The legacy system's businesses are NOT on the hex map and generate income invisibly. This is confusing and could cause unintended income stacking.
+### Fix 7: Plan Hit redirect — find target's actual hex
+In execute_planned_hit, look up the target unit's current position dynamically instead of using the clicked hex. Route the attack to wherever the target unit actually is.
 
-**Fix**: Remove legacy business system (performBusinessAction build_legal/build_illegal) or merge into hex-based system.
-
-#### LOW: Community Upkeep Punishes Expansion
-$150/empty hex means claiming 30 empty hexes costs $4,500/turn in upkeep with no income. Players are punished for claiming territory without businesses.
-
-**Suggestion**: Reduce to $50/hex or cap at 20 hexes, or make upkeep scale with distance from HQ.
-
-#### LOW: Free Movement BFS Performance
-`getConnectedTerritory()` runs a BFS over all hexes every time a soldier is selected or moved. With 331 hexes and potentially 60+ owned, this is O(n) per call. Not a problem now but could lag with very large territories.
-
-### AI Behavior Assessment
-
-**Strengths:**
-- AI personality system creates distinct strategies (aggressive Colombo, defensive Bonanno)
-- Early game boost (turns 1-8) prevents AI from falling behind
-- AI claims, extorts, and builds safehouses appropriately
-- AI respects stacking limits and ceasefire/alliance rules
-
-**Weaknesses:**
-- AI never negotiates proactively (only diplomatic AI signals interest, player must initiate)
-- AI doesn't use free movement in connected territory (uses basic adjacency)
-- AI never builds legal businesses
-- AI respect stagnation limits bonus actions
-- AI soldiers rarely qualify for HQ assault
-- AI capo deployment always goes to highest-income hex — predictable and exploitable
-
-### Summary Priority List
-
-| # | Issue | Severity | Effort |
-|---|-------|----------|--------|
-| 1 | Negotiation auto-succeeds (no roll) | CRITICAL | Small |
-| 2 | Hit sets territory to null not 'neutral' | CRITICAL | Tiny |
-| 3 | Capo promotion requirements too high | HIGH | Small |
-| 4 | Unbalanced starting soldiers | HIGH | Small |
-| 5 | AI respect never grows | MEDIUM | Small |
-| 6 | AI can't qualify for HQ assault | MEDIUM | Small |
-| 7 | Legacy double economy system | MEDIUM | Medium |
-| 8 | Update all 5 documentation files | DOCS | Large |
+### Fix 8: AI action phase — skip already-owned hexes
+In AI action phase Priority 1 (line 2962), add check: `tile.controllingFamily !== fam` before letting soldiers claim. They should only extort/claim neutral hexes, not re-process owned ones.
 
 ## Files to Modify
-- `README.md` — full rewrite of game data
-- `GAME_MECHANICS.md` — update all stats, add new systems
-- `COMBAT_SYSTEM_GUIDE.md` — add HQ assault, domination victory
-- `HEADQUARTERS_SYSTEM_GUIDE.md` — update coordinates, add assault/sitdown
-- `SOLDIER_RECRUITMENT_GUIDE.md` — update costs, requirements, add local recruit
-- `src/hooks/useEnhancedMafiaGameState.ts` — fix null→'neutral' (line 4957), add negotiation roll, fix AI respect growth
-- `src/types/game-mechanics.ts` — adjust capo promotion requirements
-
+- `src/hooks/useEnhancedMafiaGameState.ts` — all 8 fixes
