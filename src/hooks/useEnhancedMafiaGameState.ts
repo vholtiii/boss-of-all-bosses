@@ -34,6 +34,9 @@ import {
   BLIND_HIT_PENALTY, BLIND_HIT_RESPECT, BLIND_HIT_FEAR, HIDING_DURATION, BOUNTY_DURATION, BLIND_HIT_INFLUENCE_LOSS,
   INTERNAL_HIT_LOYALTY_THRESHOLD, INTERNAL_HIT_HEAT_REDUCTION, INTERNAL_HIT_MORALE_RISK, INTERNAL_HIT_MORALE_PENALTY,
   LOYALTY_ACTION_BONUS, LOYALTY_COMBAT_BONUS, LOYALTY_INCOME_HEX_BONUS, LOYALTY_INCOME_HEX_THRESHOLD, LOYALTY_UNPAID_PENALTY,
+  CAPO_WOUND_LOYALTY_PENALTY, CAPO_WOUND_MOVE_PENALTY,
+  AI_PLAN_HIT_CHANCE, AI_PLAN_HIT_SUCCESS_RATE, AI_PLAN_HIT_DURATION,
+  AIPlannedHit,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -81,6 +84,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   },
   hiddenUnits: [...(state.hiddenUnits || [])],
   aiBounties: [...(state.aiBounties || [])],
+  aiPlannedHits: (state.aiPlannedHits || []).map(h => ({ ...h })),
   scoutedHexes: [...(state.scoutedHexes || [])],
   safehouses: (state.safehouses || []).map(s => ({ ...s })),
   activeBribes: (state.activeBribes || []).map(b => ({ ...b })),
@@ -257,7 +261,8 @@ export interface EnhancedMafiaGameState {
   // Blind hit system
   hiddenUnits: HiddenUnit[];
   aiBounties: AIBounty[];
-  
+  aiPlannedHits: AIPlannedHit[];
+
   turnReport: TurnReport | null;
   lastCombatResult?: {
     q: number; r: number; s: number;
@@ -609,6 +614,7 @@ const createInitialGameState = (
     
     hiddenUnits: [],
     aiBounties: [],
+    aiPlannedHits: [],
     
     selectedTerritory: null,
     activeEvent: null,
@@ -1657,8 +1663,12 @@ export const useEnhancedMafiaGameState = (
       newState.maxTacticalActions = TACTICAL_ACTIONS_PER_TURN;
 
       // Reset moves and escort for new turn (fortified persists until unit moves)
+      // Restore wounded capo maxMoves back to 3 (wound is 1-turn penalty)
       newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
-        ...u, movesRemaining: u.maxMoves, escortingSoldierIds: undefined,
+        ...u,
+        movesRemaining: u.type === 'capo' ? 3 : u.maxMoves,
+        maxMoves: u.type === 'capo' ? 3 : u.maxMoves,
+        escortingSoldierIds: undefined,
       }));
 
       // --- Training increment & individual soldier loyalty (per-turn) ---
@@ -2487,11 +2497,39 @@ export const useEnhancedMafiaGameState = (
                 const isTargetSafehouse = state.safehouses.some(s => s.q === target.q && s.r === target.r && s.s === target.s);
                 const baseKillChance = isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) : 0.7;
                 enemyUnitsHere.forEach(eu => {
+                  // Capos cannot be killed in regular combat — only wounded
+                  if (eu.type === 'capo') {
+                    const woundChance = eu.fortified ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
+                    if (Math.random() < woundChance) {
+                      // Wound the capo instead of killing
+                      if (state.soldierStats[eu.id]) {
+                        state.soldierStats[eu.id].loyalty = Math.max(0, state.soldierStats[eu.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
+                      }
+                      eu.maxMoves = Math.max(1, (eu.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+                      if (eu.family === state.playerFamily) {
+                        state.pendingNotifications.push({
+                          type: 'warning' as const,
+                          title: '🩸 Capo Wounded!',
+                          message: `Your capo was wounded by the ${fam} family in ${tile.district || 'unknown territory'}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
+                        });
+                      }
+                    }
+                    return; // capo survives either way
+                  }
                   // Fortified defenders also get protection
                   const killChance = eu.fortified ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
                   if (Math.random() < killChance) {
                     const idx = state.deployedUnits.indexOf(eu);
-                    if (idx !== -1) state.deployedUnits.splice(idx, 1);
+                    if (idx !== -1) {
+                      state.deployedUnits.splice(idx, 1);
+                      if (eu.family === state.playerFamily) {
+                        state.pendingNotifications.push({
+                          type: 'error' as const,
+                          title: '💀 Soldier Killed!',
+                          message: `Your soldier was killed by the ${fam} family in ${tile.district || 'unknown territory'}!`,
+                        });
+                      }
+                    }
                   }
                 });
                 const remainingEnemies = state.deployedUnits.filter(u =>
@@ -2677,7 +2715,61 @@ export const useEnhancedMafiaGameState = (
           if (turnReport) turnReport.aiActions.push({ family: fam, action: 'safehouse', detail: `Established a safehouse in ${bestHex.district}` });
         }
       }
+
+      // ── AI PLAN HIT AGAINST PLAYER CAPOS ──
+      if ((personality === 'aggressive' || personality === 'opportunistic') && Math.random() < AI_PLAN_HIT_CHANCE) {
+        const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
+        const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
+        const availableTargets = playerCapos.filter(c => !alreadyTargeted.has(c.id));
+        if (availableTargets.length > 0) {
+          const target = availableTargets[Math.floor(Math.random() * availableTargets.length)];
+          state.aiPlannedHits.push({
+            family: fam,
+            targetUnitId: target.id,
+            turnsRemaining: AI_PLAN_HIT_DURATION,
+            plannedOnTurn: state.turn,
+          });
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'plan_hit', detail: `Planned a hit against a player capo` });
+        }
+      }
     });
+
+    // ── EXECUTE PENDING AI PLANNED HITS ──
+    if (state.aiPlannedHits && state.aiPlannedHits.length > 0) {
+      const remaining: typeof state.aiPlannedHits = [];
+      for (const hit of state.aiPlannedHits) {
+        hit.turnsRemaining -= 1;
+        if (hit.turnsRemaining <= 0) {
+          // Execute the hit
+          const targetUnit = state.deployedUnits.find(u => u.id === hit.targetUnitId);
+          if (targetUnit) {
+            if (Math.random() < AI_PLAN_HIT_SUCCESS_RATE) {
+              // Success — capo is killed
+              const idx = state.deployedUnits.indexOf(targetUnit);
+              if (idx !== -1) state.deployedUnits.splice(idx, 1);
+              state.pendingNotifications.push({
+                type: 'error' as const,
+                title: '💀 Capo Assassinated!',
+                message: `The ${hit.family} family executed a planned hit on your capo! They have been eliminated.`,
+              });
+              if (turnReport) turnReport.aiActions.push({ family: hit.family, action: 'assassination', detail: 'Successfully assassinated a player capo' });
+            } else {
+              // Failed — capo survives
+              state.pendingNotifications.push({
+                type: 'warning' as const,
+                title: '🔫 Assassination Foiled!',
+                message: `The ${hit.family} family attempted a planned hit on your capo, but the attempt was foiled!`,
+              });
+              if (turnReport) turnReport.aiActions.push({ family: hit.family, action: 'assassination_failed', detail: 'Failed assassination attempt on player capo' });
+            }
+          }
+          // Hit executed or target gone — don't keep
+        } else {
+          remaining.push(hit);
+        }
+      }
+      state.aiPlannedHits = remaining;
+    }
   };
 
   // ============ WEATHER ============
@@ -4311,15 +4403,16 @@ export const useEnhancedMafiaGameState = (
           }];
         }
         
-        // Casualties — per-unit fortify re-roll
-        const casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
-        const shuffled = [...playerUnits].sort(() => Math.random() - 0.5);
+        // Casualties — per-unit fortify re-roll (capos immune — wounded only)
+        const killableUnits = playerUnits.filter(u => u.type !== 'capo');
+        const playerCapos = playerUnits.filter(u => u.type === 'capo');
+        const casualties = Math.max(0, Math.floor(killableUnits.length * 0.2));
+        const shuffled = [...killableUnits].sort(() => Math.random() - 0.5);
         let removed = 0;
         const alreadyRemoved = new Set<string>();
         for (let i = 0; i < shuffled.length && removed < casualties; i++) {
           const unit = shuffled[i];
           if (alreadyRemoved.has(unit.id)) continue;
-          // Fortified units get a 50% chance to survive — pass hit to next unfortified unit
           if (unit.fortified && Math.random() < 0.5) {
             const substitute = shuffled.find((u, j) => j > i && !u.fortified && !alreadyRemoved.has(u.id));
             if (substitute) {
@@ -4329,13 +4422,12 @@ export const useEnhancedMafiaGameState = (
                 state.deployedUnits.splice(idx, 1);
                 state.pendingNotifications = [...state.pendingNotifications, {
                   type: 'error' as const, title: '⚔️ Soldier Lost in Combat',
-                  message: `Your ${substitute.type === 'capo' ? 'capo' : 'soldier'} fell during the assault on ${tile.district}.`,
+                  message: `Your soldier fell during the assault on ${tile.district}.`,
                 }];
               }
               removed++;
               continue;
             }
-            // No substitute available — fortified unit still saved by re-roll, skip this casualty slot
             continue;
           }
           alreadyRemoved.add(unit.id);
@@ -4344,25 +4436,51 @@ export const useEnhancedMafiaGameState = (
             state.deployedUnits.splice(idx, 1);
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'error' as const, title: '⚔️ Soldier Lost in Combat',
-              message: `Your ${unit.type === 'capo' ? 'capo' : 'soldier'} fell during the assault on ${tile.district}.`,
+              message: `Your soldier fell during the assault on ${tile.district}.`,
             }];
           }
           removed++;
         }
+        // Wound capos in combat (not killed)
+        playerCapos.forEach(capo => {
+          if (Math.random() < 0.3) {
+            if (state.soldierStats[capo.id]) {
+              state.soldierStats[capo.id].loyalty = Math.max(0, state.soldierStats[capo.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
+            }
+            capo.maxMoves = Math.max(1, (capo.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+            state.pendingNotifications = [...state.pendingNotifications, {
+              type: 'warning' as const, title: '🩸 Capo Wounded!',
+              message: `Your capo was wounded during the assault on ${tile.district}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
+            }];
+          }
+        });
       } else {
-        // ============ DEFEAT — no fortify protection (attackers got overrun) ============
-        const defeatCasualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
-        const defeatShuffled = [...playerUnits].sort(() => Math.random() - 0.5);
+        // ============ DEFEAT — no fortify protection (attackers got overrun), capos wounded only ============
+        const defeatKillable = playerUnits.filter(u => u.type !== 'capo');
+        const defeatCapos = playerUnits.filter(u => u.type === 'capo');
+        const defeatCasualties = Math.max(1, Math.floor(defeatKillable.length * 0.4));
+        const defeatShuffled = [...defeatKillable].sort(() => Math.random() - 0.5);
         for (let i = 0; i < defeatCasualties && i < defeatShuffled.length; i++) {
           const idx = state.deployedUnits.indexOf(defeatShuffled[i]);
           if (idx !== -1) {
             state.deployedUnits.splice(idx, 1);
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'error' as const, title: '⚔️ Soldier Killed in Battle',
-              message: `Your ${defeatShuffled[i].type === 'capo' ? 'capo' : 'soldier'} was killed in the failed attack on ${tile.district}.`,
+              message: `Your soldier was killed in the failed attack on ${tile.district}.`,
             }];
           }
         }
+        // Wound capos in defeat
+        defeatCapos.forEach(capo => {
+          if (state.soldierStats[capo.id]) {
+            state.soldierStats[capo.id].loyalty = Math.max(0, state.soldierStats[capo.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
+          }
+          capo.maxMoves = Math.max(1, (capo.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'warning' as const, title: '🩸 Capo Wounded!',
+            message: `Your capo was wounded in the failed attack on ${tile.district}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
+          }];
+        });
         defeatShuffled.slice(defeatCasualties).forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);

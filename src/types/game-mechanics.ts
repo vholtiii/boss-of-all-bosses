@@ -325,3 +325,19 @@ export const LOYALTY_COMBAT_BONUS = 5;         // +5 loyalty per survived combat
 export const LOYALTY_INCOME_HEX_BONUS = 3;     // +3 loyalty/turn if on hex with business >= threshold
 export const LOYALTY_INCOME_HEX_THRESHOLD = 4000; // minimum business income for hex loyalty bonus
 export const LOYALTY_UNPAID_PENALTY = 2;       // -2 loyalty/turn when family can't afford maintenance
+
+// ============ CAPO COMBAT PROTECTION ============
+export const CAPO_WOUND_LOYALTY_PENALTY = 10;  // -10 loyalty when capo is wounded in combat
+export const CAPO_WOUND_MOVE_PENALTY = 1;      // -1 max moves next turn for wounded capo
+
+// ============ AI PLAN HIT SYSTEM ============
+export const AI_PLAN_HIT_CHANCE = 0.15;        // 15% chance per turn for aggressive/opportunistic AI
+export const AI_PLAN_HIT_SUCCESS_RATE = 0.5;   // 50% success when executing
+export const AI_PLAN_HIT_DURATION = 2;         // turns before AI executes the hit
+
+export interface AIPlannedHit {
+  family: string;
+  targetUnitId: string;
+  turnsRemaining: number;
+  plannedOnTurn: number;
+}

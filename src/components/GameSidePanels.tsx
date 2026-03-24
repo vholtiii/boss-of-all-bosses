@@ -292,6 +292,18 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 </div>
               );
             })()}
+            {/* AI Assassination Warnings */}
+            {(gameState as any).aiPlannedHits && (gameState as any).aiPlannedHits.length > 0 && (
+              <div className="p-2 rounded-lg bg-red-500/20 border border-red-500/40 text-[11px] text-red-300">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  ⚠️ Intel Warning: {(gameState as any).aiPlannedHits.length} assassination plot{(gameState as any).aiPlannedHits.length > 1 ? 's' : ''} detected
+                </div>
+                <div className="text-[10px] opacity-80 mt-0.5">
+                  Rival families are planning hits on your capos. Stay vigilant.
+                </div>
+              </div>
+            )}
             <Separator className="my-1" />
             <ActionButton
               icon={<Users className="h-4 w-4" />}
