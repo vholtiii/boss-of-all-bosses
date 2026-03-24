@@ -4345,15 +4345,16 @@ export const useEnhancedMafiaGameState = (
           }];
         }
         
-        // Casualties — per-unit fortify re-roll
-        const casualties = Math.max(0, Math.floor(playerUnits.length * 0.2));
-        const shuffled = [...playerUnits].sort(() => Math.random() - 0.5);
+        // Casualties — per-unit fortify re-roll (capos immune — wounded only)
+        const killableUnits = playerUnits.filter(u => u.type !== 'capo');
+        const playerCapos = playerUnits.filter(u => u.type === 'capo');
+        const casualties = Math.max(0, Math.floor(killableUnits.length * 0.2));
+        const shuffled = [...killableUnits].sort(() => Math.random() - 0.5);
         let removed = 0;
         const alreadyRemoved = new Set<string>();
         for (let i = 0; i < shuffled.length && removed < casualties; i++) {
           const unit = shuffled[i];
           if (alreadyRemoved.has(unit.id)) continue;
-          // Fortified units get a 50% chance to survive — pass hit to next unfortified unit
           if (unit.fortified && Math.random() < 0.5) {
             const substitute = shuffled.find((u, j) => j > i && !u.fortified && !alreadyRemoved.has(u.id));
             if (substitute) {
@@ -4363,13 +4364,12 @@ export const useEnhancedMafiaGameState = (
                 state.deployedUnits.splice(idx, 1);
                 state.pendingNotifications = [...state.pendingNotifications, {
                   type: 'error' as const, title: '⚔️ Soldier Lost in Combat',
-                  message: `Your ${substitute.type === 'capo' ? 'capo' : 'soldier'} fell during the assault on ${tile.district}.`,
+                  message: `Your soldier fell during the assault on ${tile.district}.`,
                 }];
               }
               removed++;
               continue;
             }
-            // No substitute available — fortified unit still saved by re-roll, skip this casualty slot
             continue;
           }
           alreadyRemoved.add(unit.id);
@@ -4378,11 +4378,24 @@ export const useEnhancedMafiaGameState = (
             state.deployedUnits.splice(idx, 1);
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'error' as const, title: '⚔️ Soldier Lost in Combat',
-              message: `Your ${unit.type === 'capo' ? 'capo' : 'soldier'} fell during the assault on ${tile.district}.`,
+              message: `Your soldier fell during the assault on ${tile.district}.`,
             }];
           }
           removed++;
         }
+        // Wound capos in combat (not killed)
+        playerCapos.forEach(capo => {
+          if (Math.random() < 0.3) {
+            if (state.soldierStats[capo.id]) {
+              state.soldierStats[capo.id].loyalty = Math.max(0, state.soldierStats[capo.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
+            }
+            capo.maxMoves = Math.max(1, (capo.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+            state.pendingNotifications = [...state.pendingNotifications, {
+              type: 'warning' as const, title: '🩸 Capo Wounded!',
+              message: `Your capo was wounded during the assault on ${tile.district}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
+            }];
+          }
+        });
       } else {
         // ============ DEFEAT — no fortify protection (attackers got overrun) ============
         const defeatCasualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
