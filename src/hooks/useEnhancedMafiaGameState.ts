@@ -2740,6 +2740,17 @@ export const useEnhancedMafiaGameState = (
         if (!placed) break;
       }
       opponent.resources.soldiers = soldiersToPlace;
+      // Intel: report AI deployments if player has captain+ bribe on this family
+      if (turnReport) {
+        const hasDeployIntel = (state.activeBribes || []).some(b => 
+          (b.tier === 'police_captain' && b.active && b.targetFamily === fam) ||
+          ((b.tier === 'police_chief' || b.tier === 'mayor') && b.active)
+        );
+        const deployedCount = state.deployedUnits.filter(u => u.family === fam).length - currentDeployed;
+        if (hasDeployIntel && deployedCount > 0) {
+          turnReport.aiActions.push({ family: fam, action: 'deploy', detail: `Deployed ${deployedCount} soldier(s) to the field` });
+        }
+      }
 
       // ── PERSONALITY-DRIVEN MOVEMENT & COMBAT ──
       const personality = opponent.personality || 'aggressive';
