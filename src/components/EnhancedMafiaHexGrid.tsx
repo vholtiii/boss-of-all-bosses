@@ -1140,6 +1140,43 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     ) : reasons.safehouse ? (
                       <DisabledAction icon="🏠" label="Safehouse" reason={reasons.safehouse} />
                     ) : null}
+                    {actionMenu.canAssaultHQ ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAction) onAction({
+                            type: 'assault_hq',
+                            targetQ: actionMenu.tile.q,
+                            targetR: actionMenu.tile.r,
+                            targetS: actionMenu.tile.s,
+                            selectedUnitId: gameState?.selectedUnitId,
+                          });
+                          setActionMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-destructive hover:bg-destructive/80 text-destructive-foreground text-xs font-bold transition-colors"
+                      >
+                        💀 Assault HQ
+                      </button>
+                    ) : reasons.assault_hq ? (
+                      <DisabledAction icon="💀" label="Assault HQ" reason={reasons.assault_hq} />
+                    ) : null}
+                    {actionMenu.canFlipSoldier ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAction) onAction({
+                            type: 'flip_soldier',
+                            targetQ: actionMenu.tile.q,
+                            targetR: actionMenu.tile.r,
+                            targetS: actionMenu.tile.s,
+                          });
+                          setActionMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-muted hover:bg-muted/80 text-foreground text-xs font-bold transition-colors"
+                      >
+                        🐀 Flip Soldier ($5K)
+                      </button>
+                    ) : null}
                   </div>
                 </foreignObject>
               );
