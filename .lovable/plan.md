@@ -1,19 +1,37 @@
 
 
-# Fortify Rework: Unit → Hex-Based — COMPLETED
+# Fix: AI Plan Hit Must Respect Pacts + Notification on Cancellation
 
-## Summary
-Fortification is now tied to hexes, not individual units. Any friendly unit on a fortified hex gets the defense bonus. Fortifications persist until the hex is captured by an enemy or abandoned (no friendly units for 3 turns).
+## Changes
 
-## Changes Made
-- **`src/types/game-mechanics.ts`**: Added `FortifiedHex` interface and `FORTIFY_ABANDON_TURNS = 3` constant
-- **`src/hooks/useEnhancedMafiaGameState.ts`**: 
-  - Added `fortifiedHexes: FortifiedHex[]` to state, initial state, and clone helper
-  - Added `isHexFortified` / `isHexFortifiedAny` helper functions
-  - Replaced all `unit.fortified` checks with hex-based lookups (combat, hitman, AI, casualty re-roll)
-  - Fortify action now pushes to `fortifiedHexes[]` instead of setting `unit.fortified = true`
-  - Moving a unit no longer removes fortification (it stays on the hex)
-  - Added abandonment tick in turn advancement (3 turns with no units → removed)
-  - Territory capture/elimination now destroys fortifications on affected hexes
-- **`src/components/EnhancedMafiaHexGrid.tsx`**: Shield icon renders on fortified hexes (not per-unit)
-- **`src/pages/UltimateMafiaGame.tsx`**: Updated fortify tooltips to reflect hex-based mechanics
+### `src/hooks/useEnhancedMafiaGameState.ts`
+
+**1. Block AI Plan Hit initiation (~line 3338)**
+Before the personality check, add ceasefire/alliance lookup. If active pact exists with that family, `continue` — skip planning.
+
+**2. Cancel existing hits when pact is formed**
+In `processNegotiation`, when ceasefire or alliance succeeds, filter `aiPlannedHits` to remove hits from that family. Push notification:
+- `"🕊️ Hit Called Off"` / `"The [Family] called off a planned hit — ceasefire agreement honored."`
+- Or for alliance: `"...alliance pact honored."`
+
+**3. Block execution of stale hits (~line 3531, safety net)**
+Inside the execution loop, before executing, check if the hit family has an active ceasefire or alliance. If so, skip execution, remove the hit, and push notification:
+- `"🕊️ Hit Called Off"` / `"The [Family] stood down from a planned hit — [ceasefire/alliance] in effect."`
+
+**4. Target gone notification (~line 3557)**
+Currently when `targetUnit` is not found, the hit is silently dropped. Add a notification:
+- `"🔫 Hit Abandoned"` / `"The [Family] abandoned a planned hit — the target could not be found."`
+
+### Notification summary
+
+| Scenario | Title | Message |
+|----------|-------|---------|
+| Pact formed, pending hit cancelled | 🕊️ Hit Called Off | The [Family] called off a planned hit — [ceasefire/alliance] honored. |
+| Execution blocked by active pact | 🕊️ Hit Called Off | The [Family] stood down from a planned hit — [ceasefire/alliance] in effect. |
+| Target unit gone before execution | 🔫 Hit Abandoned | The [Family] abandoned a planned hit — the target could not be found. |
+
+All notifications are `type: 'info'` (not errors — these are good news for the player).
+
+## Files Modified
+- `src/hooks/useEnhancedMafiaGameState.ts` — 4 surgical additions
+
