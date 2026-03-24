@@ -5287,24 +5287,25 @@ export const useEnhancedMafiaGameState = (
         state.reputation.respect = Math.min(100, state.reputation.respect + respectGain);
         state.resources.respect = Math.round(state.reputation.respect);
         
-        allPlayerUnits.forEach(u => {
-          if (state.soldierStats[u.id]) {
-            state.soldierStats[u.id].extortions += 1;
-            state.soldierStats[u.id].victories = Math.min(5, state.soldierStats[u.id].victories + 1);
-            state.soldierStats[u.id].racketeering = Math.min(5, state.soldierStats[u.id].racketeering + 1);
-            state.soldierStats[u.id].loyalty = Math.min(
-              u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
-              state.soldierStats[u.id].loyalty + LOYALTY_ACTION_BONUS
-            );
-            // Toughness progress from extortion
-            const extStats = state.soldierStats[u.id];
-            extStats.toughnessProgress = (extStats.toughnessProgress || 0) + EXTORTION_TOUGHNESS_GAIN;
-            if (extStats.toughnessProgress >= 1.0 && extStats.toughness < 5) {
-              extStats.toughness += 1;
-              extStats.toughnessProgress -= 1.0;
-            }
+        // Only the acting unit (first soldier, or first capo if no soldiers) gets stat rewards
+        const actingSoldiers = allPlayerUnits.filter(u => u.type === 'soldier');
+        const actingUnit = actingSoldiers.length > 0 ? actingSoldiers[0] : allPlayerUnits[0];
+        if (actingUnit && state.soldierStats[actingUnit.id]) {
+          const stats = state.soldierStats[actingUnit.id];
+          stats.extortions += 1;
+          stats.victories = Math.min(5, stats.victories + 1);
+          stats.racketeering = Math.min(5, stats.racketeering + 1);
+          stats.loyalty = Math.min(
+            actingUnit.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
+            stats.loyalty + LOYALTY_ACTION_BONUS
+          );
+          // Toughness progress from extortion
+          stats.toughnessProgress = (stats.toughnessProgress || 0) + EXTORTION_TOUGHNESS_GAIN;
+          if (stats.toughnessProgress >= 1.0 && stats.toughness < 5) {
+            stats.toughness += 1;
+            stats.toughnessProgress -= 1.0;
           }
-        });
+        }
 
         // No auto-move needed — soldiers must already be on the hex
         
