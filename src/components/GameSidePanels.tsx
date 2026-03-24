@@ -68,7 +68,11 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
   const canRecruit = playerTerritoryCount >= RECRUIT_TERRITORY_REQUIREMENT;
   const isTacticalPhase = phase === 'move';
 
-  const toggle = (id: string) => setOpenSection(prev => (prev === id ? '' : id));
+  const toggle = (id: string) => setOpenSections(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   return (
     <ScrollArea className="h-full">
