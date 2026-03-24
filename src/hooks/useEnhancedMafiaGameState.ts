@@ -4397,19 +4397,32 @@ export const useEnhancedMafiaGameState = (
           }
         });
       } else {
-        // ============ DEFEAT — no fortify protection (attackers got overrun) ============
-        const defeatCasualties = Math.max(1, Math.floor(playerUnits.length * 0.4));
-        const defeatShuffled = [...playerUnits].sort(() => Math.random() - 0.5);
+        // ============ DEFEAT — no fortify protection (attackers got overrun), capos wounded only ============
+        const defeatKillable = playerUnits.filter(u => u.type !== 'capo');
+        const defeatCapos = playerUnits.filter(u => u.type === 'capo');
+        const defeatCasualties = Math.max(1, Math.floor(defeatKillable.length * 0.4));
+        const defeatShuffled = [...defeatKillable].sort(() => Math.random() - 0.5);
         for (let i = 0; i < defeatCasualties && i < defeatShuffled.length; i++) {
           const idx = state.deployedUnits.indexOf(defeatShuffled[i]);
           if (idx !== -1) {
             state.deployedUnits.splice(idx, 1);
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'error' as const, title: '⚔️ Soldier Killed in Battle',
-              message: `Your ${defeatShuffled[i].type === 'capo' ? 'capo' : 'soldier'} was killed in the failed attack on ${tile.district}.`,
+              message: `Your soldier was killed in the failed attack on ${tile.district}.`,
             }];
           }
         }
+        // Wound capos in defeat
+        defeatCapos.forEach(capo => {
+          if (state.soldierStats[capo.id]) {
+            state.soldierStats[capo.id].loyalty = Math.max(0, state.soldierStats[capo.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
+          }
+          capo.maxMoves = Math.max(1, (capo.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'warning' as const, title: '🩸 Capo Wounded!',
+            message: `Your capo was wounded in the failed attack on ${tile.district}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
+          }];
+        });
         defeatShuffled.slice(defeatCasualties).forEach(u => {
           if (state.soldierStats[u.id]) {
             state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
