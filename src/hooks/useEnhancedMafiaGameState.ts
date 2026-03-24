@@ -1797,7 +1797,7 @@ export const useEnhancedMafiaGameState = (
             type: 'error' as const, title: '☠️ Game Over — Bankruptcy',
             message: `The family collapsed under $${debt.toLocaleString()} in debt. The other families have divided your territory.`,
           });
-          newState.victoryAchieved = { type: 'elimination' as VictoryType, family: 'neutral', turn: newState.turn };
+          newState.victoryType = 'elimination';
         } else if (debt >= 20000) {
           turnReport.events.push(`⚠️ WARNING: Family is $${debt.toLocaleString()} in debt! Soldiers will desert. Bankruptcy at -$50K.`);
         }
