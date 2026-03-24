@@ -891,6 +891,28 @@ export const useEnhancedMafiaGameState = (
     }));
   }, []);
 
+  const skipToActionPhase = useCallback(() => {
+    setGameState(prev => {
+      if (prev.turnPhase === 'action' || prev.turnPhase === 'waiting') return prev;
+      const hasBonus = prev.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD && 
+                       prev.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
+      const maxActs = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0);
+      return {
+        ...prev,
+        turnPhase: 'action' as TurnPhase,
+        movementPhase: false,
+        selectedUnitId: null,
+        availableMoveHexes: [],
+        deployMode: null,
+        availableDeployHexes: [],
+        selectedMoveAction: 'move' as MoveAction,
+        actionsRemaining: maxActs,
+        maxActions: maxActs,
+        tacticalActionsRemaining: 0,
+      };
+    });
+  }, []);
+
   // ============ SELECT UNIT FOR MOVEMENT ============
   const selectUnit = useCallback((unitType: 'soldier' | 'capo', location: { q: number; r: number; s: number }) => {
     setGameState(prev => {
