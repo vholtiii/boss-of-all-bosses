@@ -2493,11 +2493,39 @@ export const useEnhancedMafiaGameState = (
                 const isTargetSafehouse = state.safehouses.some(s => s.q === target.q && s.r === target.r && s.s === target.s);
                 const baseKillChance = isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) : 0.7;
                 enemyUnitsHere.forEach(eu => {
+                  // Capos cannot be killed in regular combat — only wounded
+                  if (eu.type === 'capo') {
+                    const woundChance = eu.fortified ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
+                    if (Math.random() < woundChance) {
+                      // Wound the capo instead of killing
+                      if (state.soldierStats[eu.id]) {
+                        state.soldierStats[eu.id].loyalty = Math.max(0, state.soldierStats[eu.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
+                      }
+                      eu.maxMoves = Math.max(1, (eu.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+                      if (eu.family === state.playerFamily) {
+                        state.pendingNotifications.push({
+                          type: 'warning' as const,
+                          title: '🩸 Capo Wounded!',
+                          message: `Your capo was wounded by the ${fam} family in ${tile.district || 'unknown territory'}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
+                        });
+                      }
+                    }
+                    return; // capo survives either way
+                  }
                   // Fortified defenders also get protection
                   const killChance = eu.fortified ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
                   if (Math.random() < killChance) {
                     const idx = state.deployedUnits.indexOf(eu);
-                    if (idx !== -1) state.deployedUnits.splice(idx, 1);
+                    if (idx !== -1) {
+                      state.deployedUnits.splice(idx, 1);
+                      if (eu.family === state.playerFamily) {
+                        state.pendingNotifications.push({
+                          type: 'error' as const,
+                          title: '💀 Soldier Killed!',
+                          message: `Your soldier was killed by the ${fam} family in ${tile.district || 'unknown territory'}!`,
+                        });
+                      }
+                    }
                   }
                 });
                 const remainingEnemies = state.deployedUnits.filter(u =>
