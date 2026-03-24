@@ -2689,7 +2689,7 @@ export const useEnhancedMafiaGameState = (
         opponent.resources.soldiers += toRecruit;
         opponent.resources.money -= toRecruit * SOLDIER_COST;
         if (toRecruit > 0 && turnReport) {
-          const hasRecruitIntel = (state.activeBribes || []).some(b => b.tier === 'police_captain' || b.tier === 'police_chief');
+          const hasRecruitIntel = (state.activeBribes || []).some(b => (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'mayor') && b.active);
           if (hasRecruitIntel) {
             turnReport.aiActions.push({ family: fam, action: 'recruit', detail: `Recruited ${toRecruit} soldier(s)` });
           }
