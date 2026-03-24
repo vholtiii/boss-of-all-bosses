@@ -3765,7 +3765,7 @@ export const useEnhancedMafiaGameState = (
           if (!planTarget) {
             // Target is gone (dead/removed) — apply failure penalties
             if (newState.resources.respect >= newState.reputation.fear) {
-              newState.resources.respect = Math.max(0, newState.resources.respect - PLAN_HIT_FAIL_REPUTATION);
+              syncRespect(newState, Math.max(0, newState.resources.respect - PLAN_HIT_FAIL_REPUTATION));
             } else {
               newState.reputation.fear = Math.max(0, newState.reputation.fear - PLAN_HIT_FAIL_REPUTATION);
             }
