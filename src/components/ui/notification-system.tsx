@@ -151,7 +151,7 @@ export const useMafiaNotifications = () => {
       type: 'success',
       title,
       message,
-      duration: 4000,
+      duration: 6000,
     });
   }, [addNotification]);
 
@@ -160,7 +160,7 @@ export const useMafiaNotifications = () => {
       type: 'error',
       title,
       message,
-      duration: 6000,
+      duration: 10000,
     });
   }, [addNotification]);
 
@@ -169,7 +169,7 @@ export const useMafiaNotifications = () => {
       type: 'warning',
       title,
       message,
-      duration: 5000,
+      duration: 8000,
     });
   }, [addNotification]);
 
@@ -178,7 +178,7 @@ export const useMafiaNotifications = () => {
       type: 'info',
       title,
       message,
-      duration: 4000,
+      duration: 5000,
     });
   }, [addNotification]);
 
