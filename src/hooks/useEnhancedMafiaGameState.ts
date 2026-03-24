@@ -1894,7 +1894,6 @@ export const useEnhancedMafiaGameState = (
       const maintenanceUnpaid = (() => {
         const pSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
         let maint = pSoldiers.length * SOLDIER_MAINTENANCE;
-        maint += newState.resources.soldiers * SOLDIER_MAINTENANCE;
         return newState.resources.money < maint;
       })();
 
@@ -2061,7 +2060,7 @@ export const useEnhancedMafiaGameState = (
         
         // Can't afford soldier maintenance?
         const playerSoldiersForMaint = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
-        const totalMaint = playerSoldiersForMaint.length * SOLDIER_MAINTENANCE + newState.resources.soldiers * SOLDIER_MAINTENANCE;
+        const totalMaint = playerSoldiersForMaint.length * SOLDIER_MAINTENANCE;
         if (newState.resources.money < totalMaint) loyaltyDelta -= 5;
         
         newState.reputation.loyalty = Math.min(100, Math.max(0, newState.reputation.loyalty + loyaltyDelta));
@@ -2591,72 +2590,67 @@ export const useEnhancedMafiaGameState = (
       }
     });
     
-    // Soldier maintenance — $600/soldier per turn
+    // Soldier maintenance — $600/soldier per turn (deployed only, undeployed are free)
     const playerSoldiers = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier');
-    let maintenance = 0;
-    playerSoldiers.forEach(s => {
-      maintenance += SOLDIER_MAINTENANCE;
-    });
-    maintenance += state.resources.soldiers * SOLDIER_MAINTENANCE; // undeployed pool
+    const soldierMaintenance = playerSoldiers.length * SOLDIER_MAINTENANCE;
 
     // Community upkeep — $150/turn for each empty claimed hex (neighborhood expenses)
     const communityHexCount = (state.hexMap || []).filter(tile =>
       tile.controllingFamily === state.playerFamily && !tile.business && !tile.isHeadquarters
     ).length;
     const communityUpkeep = communityHexCount * 150;
-    maintenance += communityUpkeep;
+
+    // Store gross income before penalties
+    const grossIncome = income;
+    const grossLegalIncome = legalIncome;
+    const grossIllegalIncome = illegalIncome;
     
-    // Apply arrest profit penalties
+    // Compute arrest penalty from gross income (not stale previous turn data)
     const activeArrests = state.policeHeat.arrests.filter(a => state.turn - a.turn < a.sentence);
     const totalProfitPenalty = activeArrests.reduce((sum, a) => sum + a.impactOnProfit, 0);
+    let arrestPenaltyAmount = 0;
     if (totalProfitPenalty > 0) {
       const penaltyMultiplier = Math.max(0.1, (100 - totalProfitPenalty) / 100);
-      income = Math.floor(income * penaltyMultiplier);
-      legalIncome = Math.floor(legalIncome * penaltyMultiplier);
-      illegalIncome = Math.floor(illegalIncome * penaltyMultiplier);
+      arrestPenaltyAmount = grossIncome - Math.floor(grossIncome * penaltyMultiplier);
     }
 
-    // Apply heat-based illegal income penalty
+    // Compute heat penalty from gross illegal income
+    let heatPenaltyAmount = 0;
     {
       const heat = state.policeHeat.level;
       let heatPenaltyRate = 0;
       if (heat >= 70) {
-        heatPenaltyRate = 0.25; // -25% illegal income at high heat
+        heatPenaltyRate = 0.25;
       } else if (heat >= 30) {
-        heatPenaltyRate = 0.15; // -15% illegal income at moderate heat
+        heatPenaltyRate = 0.15;
       }
       if (heatPenaltyRate > 0) {
-        const penalty = Math.floor(illegalIncome * heatPenaltyRate);
-        illegalIncome -= penalty;
-        income = Math.max(0, income - penalty);
+        heatPenaltyAmount = Math.floor(grossIllegalIncome * heatPenaltyRate);
       }
     }
+
+    // Total expenses = maintenance + upkeep + penalties
+    const totalExpenses = soldierMaintenance + communityUpkeep + arrestPenaltyAmount + heatPenaltyAmount;
+    const totalProfit = grossIncome - totalExpenses;
+
+    // Apply to money
+    state.lastTurnIncome = grossIncome;
+    state.resources.money += totalProfit;
     
-    const soldierMaintenance = (playerSoldiers.length + state.resources.soldiers) * SOLDIER_MAINTENANCE;
-
-    // Compute arrest penalty dollar amount
-    const arrestPenaltyAmount = totalProfitPenalty > 0 ? Math.floor((state.finances.totalIncome || income) * totalProfitPenalty / 100) : 0;
-
-    // Compute heat penalty dollar amount
-    let heatPenaltyAmount = 0;
-    {
-      const heat = state.policeHeat.level;
-      let hpRate = 0;
-      if (heat >= 70) hpRate = 0.25;
-      else if (heat >= 30) hpRate = 0.15;
-      if (hpRate > 0) heatPenaltyAmount = Math.floor((illegalIncome / (1 - hpRate)) * hpRate); // approximate pre-penalty illegal * rate
-    }
-
-    state.lastTurnIncome = income;
-    state.resources.money += income - maintenance;
-    state.finances.totalIncome = income;
-    state.finances.totalExpenses = maintenance;
-    state.finances.totalProfit = income - maintenance;
-    state.finances.legalProfit = legalIncome;
-    state.finances.illegalProfit = illegalIncome;
-    state.finances.legalCosts = maintenance;
-    state.finances.dirtyMoney = illegalIncome;
-    state.finances.cleanMoney = Math.max(0, state.resources.money - illegalIncome);
+    // Post-penalty income values for display of legal/illegal split
+    const postPenaltyLegalIncome = totalProfitPenalty > 0 
+      ? Math.floor(grossLegalIncome * Math.max(0.1, (100 - totalProfitPenalty) / 100))
+      : grossLegalIncome;
+    const postPenaltyIllegalIncome = Math.max(0, grossIllegalIncome - heatPenaltyAmount - (totalProfitPenalty > 0 ? (arrestPenaltyAmount - (grossLegalIncome - postPenaltyLegalIncome)) : 0));
+    
+    state.finances.totalIncome = grossIncome;
+    state.finances.totalExpenses = totalExpenses;
+    state.finances.totalProfit = totalProfit;
+    state.finances.legalProfit = grossLegalIncome;
+    state.finances.illegalProfit = grossIllegalIncome;
+    state.finances.legalCosts = soldierMaintenance + communityUpkeep;
+    state.finances.dirtyMoney = grossIllegalIncome;
+    state.finances.cleanMoney = Math.max(0, state.resources.money - grossIllegalIncome);
     state.finances.soldierMaintenance = soldierMaintenance;
     state.finances.communityUpkeep = communityUpkeep;
     state.finances.arrestPenalty = arrestPenaltyAmount;

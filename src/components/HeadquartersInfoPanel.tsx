@@ -212,17 +212,16 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                 </div>
               )}
               
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-2">
-                  <div className="text-xs text-green-400 font-medium">Legal Income</div>
-                  <div className="text-sm font-bold text-green-400">
-                    ${finances.legalProfit.toLocaleString()}
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-1.5 mb-1">
+                <div className="text-[10px] text-blue-400 font-medium mb-1">Gross Income — ${finances.totalIncome.toLocaleString()}/turn</div>
+                <div className="space-y-0.5">
+                  <div className="flex justify-between text-[9px]">
+                    <span className="text-green-300/80">📋 Legal</span>
+                    <span className="text-green-400 font-semibold">${finances.legalProfit.toLocaleString()}</span>
                   </div>
-                </div>
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2">
-                  <div className="text-xs text-red-400 font-medium">Illegal Income</div>
-                  <div className="text-sm font-bold text-red-400">
-                    ${finances.illegalProfit.toLocaleString()}
+                  <div className="flex justify-between text-[9px]">
+                    <span className="text-red-300/80">💰 Illegal</span>
+                    <span className="text-red-400 font-semibold">${finances.illegalProfit.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
