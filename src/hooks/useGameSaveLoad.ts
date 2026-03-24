@@ -44,8 +44,14 @@ export const useGameSaveLoad = () => {
 
       const saveData: SaveGameData = JSON.parse(saveDataString);
       
-      // Check version compatibility
-      if (saveData.gameVersion !== CURRENT_VERSION) {
+      // Check version compatibility — only reject on major version mismatch
+      const savedMajor = parseInt(saveData.gameVersion?.split('.')[0] || '0');
+      const currentMajor = parseInt(CURRENT_VERSION.split('.')[0]);
+      const versionWarning = saveData.gameVersion !== CURRENT_VERSION
+        ? ` (saved with v${saveData.gameVersion}, current v${CURRENT_VERSION})`
+        : '';
+      
+      if (savedMajor !== currentMajor) {
         return { 
           success: false, 
           message: `Save file version ${saveData.gameVersion} is not compatible with current version ${CURRENT_VERSION}` 
