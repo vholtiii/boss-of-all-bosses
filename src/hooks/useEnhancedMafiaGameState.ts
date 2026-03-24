@@ -4523,6 +4523,7 @@ export const useEnhancedMafiaGameState = (
           type: 'error', title: !isScouted ? '💀 Blind Hit Failed!' : 'Hit Failed!',
           message: `The attack was repelled. ${failDetails}.`,
         }];
+        state.combatLog = [...(state.combatLog || []), `💀 Hit on ${tile.district} failed! ${failDetails}`];
       }
       state.policeHeat.level = Math.min(100, state.policeHeat.level + heatGain);
     }
