@@ -1785,6 +1785,11 @@ export const useEnhancedMafiaGameState = (
       {
         let loyaltyDelta = 0.5; // baseline recovery
         
+        // District control bonus: Little Italy +15% loyalty retention (reduce decay)
+        if (hasPlayerDistrictBonus(newState, 'loyalty')) {
+          loyaltyDelta += 0.5; // extra baseline = less net decay
+        }
+        
         // +0.5 per successful extortion this turn (check turn report events)
         const extortionCount = turnReport.events.filter(e => e.toLowerCase().includes('extort')).length;
         loyaltyDelta += extortionCount * 0.5;
