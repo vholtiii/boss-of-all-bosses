@@ -101,15 +101,19 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
 
   const familyBusinesses = businesses.filter(business => business.family === family);
   
-  const legalProfits = familyBusinesses
+  // Use actual game finances when available, fall back to legacy calculation
+  const legalProfits = finances?.legalProfit ?? familyBusinesses
     .filter(business => business.isLegal)
     .reduce((total: number, business: any) => total + business.income, 0);
     
-  const illegalProfits = familyBusinesses
+  const illegalProfits = finances?.illegalProfit ?? familyBusinesses
     .filter(business => !business.isLegal)
     .reduce((total: number, business: any) => total + business.income, 0);
     
-  const totalProfits = legalProfits + illegalProfits;
+  const totalProfits = finances?.totalProfit ?? (legalProfits + illegalProfits);
+  const totalExpenses = finances?.totalExpenses ?? 0;
+  const dirtyMoney = finances?.dirtyMoney ?? 0;
+  const cleanMoney = finances?.cleanMoney ?? 0;
   
   const soldiersAtHQ = units.soldiers.filter(soldier => 
     soldier.q === headquarters.q && soldier.r === headquarters.r && soldier.s === headquarters.s
