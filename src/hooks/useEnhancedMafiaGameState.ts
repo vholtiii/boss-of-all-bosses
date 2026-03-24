@@ -86,6 +86,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   aiBounties: [...(state.aiBounties || [])],
   aiPlannedHits: (state.aiPlannedHits || []).map(h => ({ ...h })),
   combatLog: [...(state.combatLog || [])],
+  activeDistrictBonuses: [...(state.activeDistrictBonuses || [])],
   scoutedHexes: [...(state.scoutedHexes || [])],
   safehouses: (state.safehouses || []).map(s => ({ ...s })),
   activeBribes: (state.activeBribes || []).map(b => ({ ...b })),
