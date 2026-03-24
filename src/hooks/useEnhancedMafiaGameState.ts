@@ -5448,6 +5448,13 @@ export const useEnhancedMafiaGameState = (
               u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
               state.soldierStats[u.id].loyalty + LOYALTY_ACTION_BONUS
             );
+            // Toughness progress from extortion
+            const extStats = state.soldierStats[u.id];
+            extStats.toughnessProgress = (extStats.toughnessProgress || 0) + EXTORTION_TOUGHNESS_GAIN;
+            if (extStats.toughnessProgress >= 1.0 && extStats.toughness < 5) {
+              extStats.toughness += 1;
+              extStats.toughnessProgress -= 1.0;
+            }
           }
         });
 
