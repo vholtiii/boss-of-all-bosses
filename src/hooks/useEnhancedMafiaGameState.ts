@@ -260,7 +260,8 @@ export interface EnhancedMafiaGameState {
   // Blind hit system
   hiddenUnits: HiddenUnit[];
   aiBounties: AIBounty[];
-  
+  aiPlannedHits: AIPlannedHit[];
+
   turnReport: TurnReport | null;
   lastCombatResult?: {
     q: number; r: number; s: number;
