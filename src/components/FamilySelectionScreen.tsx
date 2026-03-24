@@ -209,7 +209,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
               transition={{ delay: 0.15 + i * 0.08, duration: 0.4 }}
               onClick={() => setSelectedFamily(family.id)}
               className={cn(
-                'w-[170px] cursor-pointer rounded-xl border-2 p-4 transition-all duration-200 relative',
+                'w-[150px] cursor-pointer rounded-xl border-2 p-4 transition-all duration-200 relative',
                 'bg-card/80 backdrop-blur-sm',
                 isSelected
                   ? 'scale-[1.03] shadow-xl'
