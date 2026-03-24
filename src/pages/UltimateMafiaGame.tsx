@@ -755,7 +755,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 <p><span className="text-foreground font-semibold">👁️ Scout:</span> Select a soldier or capo, then click an enemy hex to reveal intel for 3 turns. Soldiers scout 1 hex away, Capos scout up to 2 hexes away.</p>
               )}
               {gameState.selectedMoveAction === 'fortify' && (
-                <p><span className="text-foreground font-semibold">🛡️ Fortify:</span> Click any unit to fortify it — grants +25% defense and 50% casualty reduction. Persists until the unit moves.</p>
+                <p><span className="text-foreground font-semibold">🛡️ Fortify:</span> Click any unit to build defenses on its hex — grants +25% defense and 50% casualty reduction for all friendly units there. Persists until abandoned or captured.</p>
               )}
               {gameState.selectedMoveAction === 'escort' && (
                 <p><span className="text-foreground font-semibold">🚗 Escort:</span> Select a soldier, then click a capo unit (or their hex) to call the soldier there (1 tactical action). The capo can carry up to 2 soldiers — they'll auto-travel and detach at the destination.</p>
