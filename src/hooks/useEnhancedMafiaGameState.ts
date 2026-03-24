@@ -558,6 +558,7 @@ const createInitialGameState = (
     playerFamily: family,
     turn: 1,
     season: 'spring',
+    mapSize,
     mapSeed,
     difficulty,
     difficultyModifiers: diffMods,
