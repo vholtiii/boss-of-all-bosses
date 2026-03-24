@@ -625,6 +625,7 @@ const createInitialGameState = (
     aiBounties: [],
     aiPlannedHits: [],
     combatLog: [],
+    activeDistrictBonuses: [],
     
     selectedTerritory: null,
     activeEvent: null,
