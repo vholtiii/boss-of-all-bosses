@@ -3939,12 +3939,15 @@ export const useEnhancedMafiaGameState = (
 
     tile.controllingFamily = state.playerFamily;
 
-    // Auto-move: find the first adjacent SOLDIER (not on hex) and move them to the target
-    const adjacentSoldier = playerUnitsAdjacent.find(u => u.type === 'soldier');
-    if (adjacentSoldier) {
-      adjacentSoldier.q = targetQ;
-      adjacentSoldier.r = targetR;
-      adjacentSoldier.s = targetS;
+    // Auto-move: move the selected soldier to the claimed hex (fall back to first adjacent soldier)
+    const selectedSoldier = action.unitId 
+      ? playerUnits.find(u => u.id === action.unitId && u.type === 'soldier')
+      : null;
+    const soldierToMove = selectedSoldier || playerUnitsAdjacent.find(u => u.type === 'soldier');
+    if (soldierToMove && (soldierToMove.q !== targetQ || soldierToMove.r !== targetR || soldierToMove.s !== targetS)) {
+      soldierToMove.q = targetQ;
+      soldierToMove.r = targetR;
+      soldierToMove.s = targetS;
     }
     // Capos do NOT move — they claim at range
 

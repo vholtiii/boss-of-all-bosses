@@ -981,6 +981,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             targetQ: actionMenu.tile.q,
                             targetR: actionMenu.tile.r,
                             targetS: actionMenu.tile.s,
+                            unitId: gameState.selectedUnitId,
                           });
                           setActionMenu(null);
                         }}
