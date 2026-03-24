@@ -2498,8 +2498,15 @@ export const useEnhancedMafiaGameState = (
       }
     });
     
+    let legalIncome = 0;
+    let illegalIncome = 0;
+    
     (state.hexMap || []).forEach(tile => {
       if (tile.controllingFamily === state.playerFamily && tile.business) {
+        // Skip businesses still under construction
+        if (tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3)) {
+          return;
+        }
         const hasCapo = units.some(u => 
           u.family === state.playerFamily && u.type === 'capo' &&
           u.q === tile.q && u.r === tile.r && u.s === tile.s
@@ -2528,6 +2535,11 @@ export const useEnhancedMafiaGameState = (
           tileIncome = Math.floor(tileIncome * 1.2);
         }
         
+        if (tile.business.isLegal) {
+          legalIncome += tileIncome;
+        } else {
+          illegalIncome += tileIncome;
+        }
         income += tileIncome;
       }
     });
@@ -2551,46 +2563,24 @@ export const useEnhancedMafiaGameState = (
     const activeArrests = state.policeHeat.arrests.filter(a => state.turn - a.turn < a.sentence);
     const totalProfitPenalty = activeArrests.reduce((sum, a) => sum + a.impactOnProfit, 0);
     if (totalProfitPenalty > 0) {
-      income = Math.floor(income * Math.max(0.1, (100 - totalProfitPenalty) / 100));
+      const penaltyMultiplier = Math.max(0.1, (100 - totalProfitPenalty) / 100);
+      income = Math.floor(income * penaltyMultiplier);
+      legalIncome = Math.floor(legalIncome * penaltyMultiplier);
+      illegalIncome = Math.floor(illegalIncome * penaltyMultiplier);
     }
 
-    // Apply heat-based illegal income penalty (Tier 1: 30+ = -15%, Tier 3: 70+ = -25%)
+    // Apply heat-based illegal income penalty
     {
       const heat = state.policeHeat.level;
+      let heatPenaltyRate = 0;
       if (heat >= 70) {
-        // -25% illegal income at high heat
-        let illegalIncome = 0;
-        let legalIncome = 0;
-        (state.hexMap || []).forEach(tile => {
-          if (tile.controllingFamily === state.playerFamily && tile.business) {
-            const hasCapo = (state.deployedUnits || []).some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
-            const hasSoldier = (state.deployedUnits || []).some(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
-            let tileInc = 0;
-            if (hasCapo) tileInc = tile.business.income;
-            else if (hasSoldier) tileInc = Math.floor(tile.business.income * 0.3);
-            else tileInc = Math.floor(tile.business.income * 0.1);
-            if (!tile.business.isLegal) illegalIncome += tileInc;
-            else legalIncome += tileInc;
-          }
-        });
-        // Reduce illegal portion by 25%
-        const penalty = Math.floor(illegalIncome * 0.25);
-        income = Math.max(0, income - penalty);
+        heatPenaltyRate = 0.25; // -25% illegal income at high heat
       } else if (heat >= 30) {
-        // -15% illegal income at low heat
-        let illegalIncome = 0;
-        (state.hexMap || []).forEach(tile => {
-          if (tile.controllingFamily === state.playerFamily && tile.business && !tile.business.isLegal) {
-            const hasCapo = (state.deployedUnits || []).some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
-            const hasSoldier = (state.deployedUnits || []).some(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
-            let tileInc = 0;
-            if (hasCapo) tileInc = tile.business.income;
-            else if (hasSoldier) tileInc = Math.floor(tile.business.income * 0.3);
-            else tileInc = Math.floor(tile.business.income * 0.1);
-            illegalIncome += tileInc;
-          }
-        });
-        const penalty = Math.floor(illegalIncome * 0.15);
+        heatPenaltyRate = 0.15; // -15% illegal income at moderate heat
+      }
+      if (heatPenaltyRate > 0) {
+        const penalty = Math.floor(illegalIncome * heatPenaltyRate);
+        illegalIncome -= penalty;
         income = Math.max(0, income - penalty);
       }
     }
@@ -2600,19 +2590,11 @@ export const useEnhancedMafiaGameState = (
     state.finances.totalIncome = income;
     state.finances.totalExpenses = maintenance;
     state.finances.totalProfit = income - maintenance;
-
-    // Auto-collect legal business profits each turn
-    const legalBiz = (state.businesses || []).filter((b: any) => b.type === 'legal');
-    const legalAutoIncome = legalBiz.reduce((sum: number, b: any) => {
-      const baseProfit = b.monthlyIncome - b.monthlyExpenses;
-      const extortionBonus = b.isExtorted ? baseProfit * b.extortionRate : 0;
-      return sum + baseProfit + extortionBonus;
-    }, 0) - (state.legalStatus?.totalLegalCosts || 0);
-    if (legalAutoIncome > 0) {
-      state.resources.money += legalAutoIncome;
-      state.finances.totalIncome += legalAutoIncome;
-      state.finances.totalProfit += legalAutoIncome;
-    }
+    state.finances.legalProfit = legalIncome;
+    state.finances.illegalProfit = illegalIncome;
+    state.finances.legalCosts = maintenance;
+    state.finances.dirtyMoney = (state.finances.dirtyMoney || 0) + illegalIncome;
+    state.finances.cleanMoney = Math.max(0, state.resources.money - (state.finances.dirtyMoney || 0));
   };
 
   // ============ PROCESS BRIBES ============
