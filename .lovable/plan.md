@@ -1,45 +1,49 @@
 
 
-# Boss Action: Call a Sitdown
+# Rework Soldier Movement: Free Movement in Connected Territory
 
 ## Concept
-The Boss can召集 all or selected soldiers back to HQ instantly, regardless of map position. This is a strategic defensive action — more units at HQ = stronger defense against HQ assaults (aligns with existing HQ defense mechanics).
+
+Soldiers can move **unlimited hexes** within territory that forms an unbroken path back to HQ — for free (no move cost). Normal 1-hex-per-move rules apply when leaving connected territory or crossing gaps.
 
 ## Rules
-- **Available during**: Action phase only, player HQ panel (Boss card)
-- **Cooldown**: Once every 5 turns (powerful action)
-- **Cost**: $2,000 (meeting expenses)
-- **Selection**: Modal lets player choose "All Soldiers" or pick individual soldiers via checkboxes
-- **Effect**: Selected soldiers are teleported to HQ hex instantly
-- **Stacking override**: HQ hex is exempt from the 2-unit stacking limit (it's invulnerable and already holds hidden units)
-- **Defense bonus**: Each soldier at HQ adds +5% to HQ assault defense (stacks with existing -30% HQ defense)
-- **Loyalty bonus**: All recalled soldiers gain +5 loyalty (Boss shows care)
-- **Tradeoff**: Recalled soldiers lose any fortification status and cannot act again this turn
 
-## Changes
+| Scenario | Cost | Restriction |
+|----------|------|-------------|
+| Moving within connected claimed territory | **Free** (0 moves) | Path of owned hexes must connect to HQ |
+| Moving to adjacent unclaimed/enemy hex | **1 move** (normal) | Standard deploy rules |
+| Moving to disconnected claimed territory | **1 move** (normal) | No free jump across gaps |
+| Capo movement | **Unchanged** | Still flies up to 5 hexes |
 
-### 1. `src/types/game-mechanics.ts`
-Add constants: `SITDOWN_COST = 2000`, `SITDOWN_COOLDOWN = 5`, `SITDOWN_LOYALTY_BONUS = 5`, `SITDOWN_DEFENSE_PER_SOLDIER = 5`
+**"Connected territory"** = a hex controlled by the player's family, where a BFS/flood-fill from HQ through only player-owned hexes can reach that hex.
 
-### 2. `src/hooks/useEnhancedMafiaGameState.ts`
-- Add `sitdownCooldownUntil: number` to game state (init 0)
-- Add `'call_sitdown'` action handler: validates cooldown/cost/phase, moves selected soldier IDs to HQ coords, applies loyalty bonus, sets cooldown
-- Does NOT consume action budget (Boss action, not soldier action)
+## Technical Changes
 
-### 3. `src/components/HeadquartersInfoPanel.tsx`
-- Add "📋 Call a Sitdown" button below the Boss card (visible during action phase, player family only)
-- Shows cooldown timer if on cooldown
-- On click: opens inline selection UI listing all deployed soldiers (not at HQ) with checkboxes + "Select All" toggle
-- "Confirm Sitdown" button triggers the action
-- Pass new `onCallSitdown` callback prop and `turnPhase`/`sitdownCooldownUntil`/`currentTurn` props
+### `src/hooks/useEnhancedMafiaGameState.ts`
 
-### 4. `src/pages/UltimateMafiaGame.tsx`
-- Wire `onCallSitdown` prop to `performAction({ type: 'call_sitdown', soldierIds: [...] })`
-- Pass `turnPhase`, `sitdownCooldownUntil`, `currentTurn` to HeadquartersInfoPanel
+**New helper function: `getConnectedTerritory()`**
+- BFS from player HQ through hexMap tiles where `controllingFamily === playerFamily`
+- Returns a `Set<string>` of `"q,r,s"` keys for all connected hexes
+
+**Modify `selectUnit()` (~line 979-992) — deploy phase hex calculation for soldiers:**
+- Compute connected territory set
+- If soldier is on a connected hex: show ALL connected territory hexes as valid moves (green highlights), PLUS normal adjacent hexes (for venturing out)
+- If soldier is on a disconnected hex: normal 1-hex adjacent only (current behavior)
+
+**Modify `moveUnit()` (~line 1057-1068) — move cost calculation:**
+- Before deducting `moveCost = 1`, check: is the soldier on a connected hex AND is the target also a connected hex?
+- If both connected: `moveCost = 0`, no zone-of-control stop
+- If either is not connected: `moveCost = 1` (normal rules, ZoC applies)
+
+**Modify post-move hex recalculation (~line 1125-1137):**
+- Same logic: if soldier landed on connected hex, show full connected territory + adjacent; if not, show normal 1-hex neighbors
+- Keep soldier selected after free moves (movesRemaining unchanged)
+
+**No changes to capo movement** — capos already fly freely.
+
+### Visual Distinction (optional, low effort)
+Connected territory hexes could use a slightly different highlight color (e.g., lighter green) vs the normal adjacent move hex to help players distinguish free vs costed moves. This can be done in `EnhancedMafiaHexGrid.tsx` by passing a `freeMovementHexes` set alongside `availableMoveHexes`.
 
 ## Files Modified
-- `src/types/game-mechanics.ts`
-- `src/hooks/useEnhancedMafiaGameState.ts`
-- `src/components/HeadquartersInfoPanel.tsx`
-- `src/pages/UltimateMafiaGame.tsx`
+- `src/hooks/useEnhancedMafiaGameState.ts` — BFS helper, selectUnit changes, moveUnit cost logic, post-move recalculation
 
