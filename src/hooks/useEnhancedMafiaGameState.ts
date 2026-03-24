@@ -588,7 +588,7 @@ const createInitialGameState = (
     alliances: [],
     ceasefires: [],
     victoryProgress: {
-      territory: { current: 0, target: 60, met: false },
+      territory: { current: 0, target: mapSize === 'small' ? 40 : mapSize === 'large' ? 80 : 60, met: false },
       economic: { current: 0, target: 50000, met: false },
       legacy: { current: 0, highestRival: 0, met: false },
       domination: { eliminated: 0, target: 4, met: false },
