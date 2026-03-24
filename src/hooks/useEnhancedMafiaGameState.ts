@@ -3047,6 +3047,47 @@ export const useEnhancedMafiaGameState = (
       // Respect: grows with territory and combat activity
       const respectGain = Math.floor(aiTerritoryCount / 4) + (aggression > 60 ? 1 : 0);
       opponent.resources.respect = Math.min(100, Math.max(0, (opponent.resources.respect || 0) + respectGain - 0.5));
+
+      // ── AI HQ ASSAULT (aggressive AI, after turn 12) ──
+      if (state.turn > 12 && (personality === 'aggressive' || personality === 'unpredictable') && Math.random() < 0.10) {
+        // Find enemy HQs adjacent to AI soldiers with high toughness
+        const aiSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
+        for (const soldier of aiSoldiers) {
+          const soldierS = state.soldierStats[soldier.id];
+          if (!soldierS || soldierS.toughness < HQ_ASSAULT_MIN_TOUGHNESS || soldierS.loyalty < HQ_ASSAULT_MIN_LOYALTY) continue;
+          const neighbors = getHexNeighbors(soldier.q, soldier.r, soldier.s);
+          for (const n of neighbors) {
+            const nTile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+            if (!nTile || !nTile.isHeadquarters || nTile.isHeadquarters === fam) continue;
+            const victimFamily = nTile.isHeadquarters;
+            if ((state.eliminatedFamilies || []).includes(victimFamily)) continue;
+            // Attempt assault
+            let chance = HQ_ASSAULT_BASE_CHANCE - HQ_DEFENSE_BONUS;
+            const adjFriendly = state.deployedUnits.filter(u => u.family === fam && u.id !== soldier.id && neighbors.some(nb => nb.q === u.q && nb.r === u.r && nb.s === u.s));
+            chance += adjFriendly.length * 0.05;
+            chance = Math.min(HQ_ASSAULT_MAX_CHANCE, Math.max(0.05, chance));
+            if (Math.random() < chance) {
+              state.eliminatedFamilies = [...(state.eliminatedFamilies || []), victimFamily];
+              state.deployedUnits = state.deployedUnits.filter(u => u.family !== victimFamily);
+              state.hexMap.forEach(t => { if (t.controllingFamily === victimFamily && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
+              state.aiOpponents = state.aiOpponents.filter(o => o.family !== victimFamily);
+              opponent.resources.money += 25000;
+              state.pendingNotifications.push({
+                type: 'warning', title: `💀 ${victimFamily.charAt(0).toUpperCase() + victimFamily.slice(1)} Eliminated!`,
+                message: `The ${fam} family destroyed the ${victimFamily} family's headquarters!`,
+              });
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'assault_hq', detail: `Eliminated the ${victimFamily} family!` });
+            } else {
+              // Failure — soldier dies
+              state.deployedUnits = state.deployedUnits.filter(u => u.id !== soldier.id);
+              delete state.soldierStats[soldier.id];
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'assault_hq_fail', detail: `Failed HQ assault on ${victimFamily}` });
+            }
+            break; // Only one attempt per turn
+          }
+          break; // Only one soldier attempts per turn
+        }
+      }
     });
 
     // ── EXECUTE PENDING AI PLANNED HITS ──
