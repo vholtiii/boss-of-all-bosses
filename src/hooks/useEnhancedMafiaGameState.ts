@@ -5123,7 +5123,9 @@ export const useEnhancedMafiaGameState = (
           };
         } else {
           // ===== SCOUTED HIT VICTORY: Standard rewards =====
-          state.resources.respect += 5;
+          // FIX #3: Write to reputation.respect (source of truth), sync to resources.respect
+          state.reputation.respect = Math.min(100, (state.reputation.respect || 0) + 5);
+          state.resources.respect = Math.round(state.reputation.respect);
           state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + 5);
           
           playerUnits.forEach(u => {
