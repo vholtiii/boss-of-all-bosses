@@ -5328,6 +5328,24 @@ export const useEnhancedMafiaGameState = (
       state.reputation.respect = Math.max(0, state.reputation.respect - config.reputationCost);
     }
 
+    // ── SUCCESS ROLL ── (was previously missing — negotiations auto-succeeded)
+    const capoPersonality = capo.personality || 'enforcer';
+    const personalityBonus = PERSONALITY_BONUSES[capoPersonality]?.[negotiationType] || 0;
+    const allBonus = PERSONALITY_BONUSES[capoPersonality]?.all || 0;
+    const influenceBonus = (state.resources.influence / 100) * 10; // up to +10%
+    const totalChance = Math.min(95, config.baseSuccess + personalityBonus + allBonus + influenceBonus);
+    const roll = Math.random() * 100;
+
+    if (roll > totalChance) {
+      // Negotiation FAILED
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'error', title: `❌ ${config.label} Failed!`,
+        message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} rejected the offer. You spent $${cost.toLocaleString()} for nothing. (${Math.round(totalChance)}% chance)`,
+      }];
+      syncLegacyUnits(state);
+      return state;
+    }
+
     switch (negotiationType as NegotiationType) {
       case 'ceasefire': {
         const duration = 3 + Math.floor(Math.random() * 3); // 3-5 turns
