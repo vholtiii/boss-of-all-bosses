@@ -1804,6 +1804,38 @@ export const useEnhancedMafiaGameState = (
       turnReport.maintenance = newState.finances.totalExpenses;
       turnReport.netIncome = newState.finances.totalProfit;
 
+      // --- BANKRUPTCY MECHANIC ---
+      if (newState.resources.money < 0) {
+        const debt = Math.abs(newState.resources.money);
+        const deserters = Math.floor(debt / 10000);
+        if (deserters > 0) {
+          const playerSoldiersBankrupt = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+          const toDesert = Math.min(deserters, playerSoldiersBankrupt.length);
+          for (let i = 0; i < toDesert; i++) {
+            const idx = Math.floor(Math.random() * playerSoldiersBankrupt.length);
+            const deserted = playerSoldiersBankrupt.splice(idx, 1)[0];
+            newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== deserted.id);
+          }
+          if (toDesert > 0) {
+            turnReport.events.push(`💸 ${toDesert} soldier${toDesert > 1 ? 's' : ''} deserted — can't afford to pay them! (Debt: $${debt.toLocaleString()})`);
+            newState.pendingNotifications.push({
+              type: 'error' as const, title: '💸 Soldiers Deserted',
+              message: `${toDesert} soldier${toDesert > 1 ? 's' : ''} left because the family is $${debt.toLocaleString()} in debt.`,
+            });
+          }
+        }
+        if (debt >= 50000) {
+          turnReport.events.push('☠️ BANKRUPTCY! The family has collapsed under $50K+ debt. Game Over.');
+          newState.pendingNotifications.push({
+            type: 'error' as const, title: '☠️ Game Over — Bankruptcy',
+            message: `The family collapsed under $${debt.toLocaleString()} in debt. The other families have divided your territory.`,
+          });
+          newState.victoryAchieved = { type: 'elimination' as VictoryType, family: 'neutral', turn: newState.turn };
+        } else if (debt >= 20000) {
+          turnReport.events.push(`⚠️ WARNING: Family is $${debt.toLocaleString()} in debt! Soldiers will desert. Bankruptcy at -$50K.`);
+        }
+      }
+
       processAITurn(newState, turnReport);
       processWeather(newState);
       processEvents(newState);
