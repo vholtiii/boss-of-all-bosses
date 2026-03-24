@@ -4485,6 +4485,7 @@ export const useEnhancedMafiaGameState = (
               type: 'error' as const, title: '⚔️ Soldier Killed in Battle',
               message: `Your soldier was killed in the failed attack on ${tile.district}.`,
             }];
+            state.combatLog = [...(state.combatLog || []), `⚔️ Soldier killed in failed attack on ${tile.district}`];
           }
         }
         // Wound capos in defeat
