@@ -4978,6 +4978,25 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
+      // Check safe passage
+      const hasSafePassage = (state.safePassagePacts || []).some(
+        (p: SafePassagePact) => p.active && p.targetFamily === tile.controllingFamily
+      );
+      if (hasSafePassage) {
+        state.safePassagePacts = (state.safePassagePacts || []).map((p: SafePassagePact) =>
+          p.active && p.targetFamily === tile.controllingFamily ? { ...p, active: false } : p
+        ).filter((p: SafePassagePact) => p.active);
+        syncRespect(state, Math.max(0, state.reputation.respect - 15));
+        state.reputation.reputation = Math.max(0, state.reputation.reputation - 10);
+        if (state.reputation.familyRelationships[tile.controllingFamily] !== undefined) {
+          state.reputation.familyRelationships[tile.controllingFamily] -= 25;
+        }
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'error', title: '🛤️ Safe Passage Violated!',
+          message: `You attacked during safe passage! -15 respect, -10 reputation. The ${tile.controllingFamily} family will remember this.`,
+        }];
+      }
+
       // Gather participants: selected unit + units on target hex
       const selectedUnitId = action.selectedUnitId;
       const playerUnitsOnHex = state.deployedUnits.filter(u => 
