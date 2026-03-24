@@ -574,7 +574,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             <div className="flex items-center gap-1 bg-background/80 rounded-lg px-2 py-1 border border-noir-light">
               <span className="text-[10px] text-muted-foreground mr-1">📋 {gameState.tacticalActionsRemaining}/{gameState.maxTacticalActions}</span>
               {([
-                { action: 'scout' as const, label: '👁️ Scout', tip: 'Select a soldier, click adjacent enemy hex to reveal unit count & business info for 3 turns.' },
+                { action: 'scout' as const, label: '👁️ Scout', tip: 'Select a soldier or capo, click an enemy hex to scout. Soldiers: 1 hex, Capos: 2 hexes.' },
                 { action: 'fortify' as const, label: '🛡️ Fortify', tip: 'Click a unit to fortify it (+25% defense, persists until it moves).' },
                 { action: 'escort' as const, label: '🚗 Escort', tip: 'Call a soldier to your capo\'s location. Select a soldier, then click a capo.' },
                 { action: 'safehouse' as const, label: '🏠 Safehouse', tip: 'Select a capo on your territory to set up a secondary deploy point (5 turns).' },
@@ -616,7 +616,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             {/* Tactical action description panel */}
             <div className="bg-background/80 rounded-lg px-3 py-2 border border-noir-light text-xs text-muted-foreground max-w-md">
               {gameState.selectedMoveAction === 'scout' && (
-                <p><span className="text-foreground font-semibold">👁️ Scout:</span> Select a soldier, then click an adjacent enemy hex to reveal unit count and fortification status for 3 turns.</p>
+                <p><span className="text-foreground font-semibold">👁️ Scout:</span> Select a soldier or capo, then click an enemy hex to reveal intel for 3 turns. Soldiers scout 1 hex away, Capos scout up to 2 hexes away.</p>
               )}
               {gameState.selectedMoveAction === 'fortify' && (
                 <p><span className="text-foreground font-semibold">🛡️ Fortify:</span> Click any unit to fortify it — grants +25% defense and 50% casualty reduction. Persists until the unit moves.</p>

@@ -870,9 +870,10 @@ export const useEnhancedMafiaGameState = (
 
       // Tactical phase: only tactical actions (scout, fortify, safehouse, escort) — no regular movement
       if (prev.turnPhase === 'move') {
-        if (moveAction === 'scout' && unitType === 'soldier') {
+        if (moveAction === 'scout' && (unitType === 'soldier' || unitType === 'capo')) {
           if (prev.tacticalActionsRemaining <= 0) return prev;
-          const neighbors = getHexNeighbors(unit.q, unit.r, unit.s);
+          const scoutRange = unitType === 'capo' ? 2 : 1;
+          const neighbors = scoutRange === 1 ? getHexNeighbors(unit.q, unit.r, unit.s) : getHexesInRange(unit.q, unit.r, unit.s, scoutRange);
           const scoutableHexes = neighbors.filter(h => {
             const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
             if (!tile) return false;
@@ -978,7 +979,7 @@ export const useEnhancedMafiaGameState = (
       const moveAction = prev.selectedMoveAction || 'move';
 
       // Handle scout action (tactical phase only)
-      if (prev.turnPhase === 'move' && moveAction === 'scout' && unit.type === 'soldier') {
+      if (prev.turnPhase === 'move' && moveAction === 'scout' && (unit.type === 'soldier' || unit.type === 'capo')) {
         if (prev.tacticalActionsRemaining <= 0) return prev;
         const result = processScout(prev, unit, targetLocation);
         return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
