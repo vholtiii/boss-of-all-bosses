@@ -2417,8 +2417,6 @@ export const useEnhancedMafiaGameState = (
           const hasRecruitIntel = (state.activeBribes || []).some(b => b.tier === 'police_captain' || b.tier === 'police_chief');
           if (hasRecruitIntel) {
             turnReport.aiActions.push({ family: fam, action: 'recruit', detail: `Recruited ${toRecruit} soldier(s)` });
-          } else {
-            turnReport.aiActions.push({ family: fam, action: 'recruit', detail: 'Bolstered their forces' });
           }
         }
       }
