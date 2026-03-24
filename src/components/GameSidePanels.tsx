@@ -475,8 +475,8 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             onPromote={(unitId) => onAction({ type: 'promote_capo', unitId })}
             onHighlightSoldier={(unitId) => {
               const unit = gameState.deployedUnits.find(u => u.id === unitId);
-              if (unit) {
-                onAction({ type: 'select_unit', unitType: unit.type, hex: { q: unit.q, r: unit.r, s: unit.s } });
+              if (unit && onSelectUnit) {
+                onSelectUnit(unit.type, { q: unit.q, r: unit.r, s: unit.s });
               }
             }}
           />
