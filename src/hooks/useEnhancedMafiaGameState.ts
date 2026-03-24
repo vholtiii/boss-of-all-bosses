@@ -2471,6 +2471,10 @@ export const useEnhancedMafiaGameState = (
       const aggression = opponent.strategy.aggressionLevel || 50;
       const cooperation = opponent.strategy.cooperationTendency || 50;
 
+      // AI action budget — matches player constraints
+      let aiActionsRemaining = 2 + (opponent.resources.respect >= 50 && (opponent.resources as any).influence >= 50 ? 1 : 0);
+      let aiTacticalRemaining = 3;
+
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
       for (const unit of aiUnits) {
         let movesLeft = Math.min(unit.movesRemaining, unit.type === 'soldier' ? (2 + alertBonus) : 3);
