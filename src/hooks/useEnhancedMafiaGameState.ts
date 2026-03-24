@@ -5559,8 +5559,7 @@ export const useEnhancedMafiaGameState = (
 
     // Reputation cost
     if (config.reputationCost > 0) {
-      state.reputation.respect = Math.max(0, state.reputation.respect - config.reputationCost);
-      state.resources.respect = Math.round(state.reputation.respect);
+      syncRespect(state, Math.max(0, state.reputation.respect - config.reputationCost));
     }
 
     // ── SUCCESS ROLL ──
