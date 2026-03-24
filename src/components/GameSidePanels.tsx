@@ -52,7 +52,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
 }) => {
   const phase = turnPhase || gameState.turnPhase || 'action';
   const actionsLocked = phase === 'deploy' || phase === 'move';
-  const [openSection, setOpenSection] = useState<string>('actions');
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['actions']));
   const { resources, reputation, policeHeat, legalStatus } = gameState;
 
   // Compute respect-based recruitment discount (mirrors logic in useEnhancedMafiaGameState)
@@ -68,7 +68,11 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
   const canRecruit = playerTerritoryCount >= RECRUIT_TERRITORY_REQUIREMENT;
   const isTacticalPhase = phase === 'move';
 
-  const toggle = (id: string) => setOpenSection(prev => (prev === id ? '' : id));
+  const toggle = (id: string) => setOpenSections(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   return (
     <ScrollArea className="h-full">
@@ -119,7 +123,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Strategic Actions"
           icon={<Swords className="h-4 w-4" />}
-          isOpen={openSection === 'actions'}
+          isOpen={openSections.has('actions')}
           onToggle={() => toggle('actions')}
           phaseLocked={actionsLocked}
         >
@@ -149,7 +153,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Economy"
           icon={<TrendingUp className="h-4 w-4" />}
-          isOpen={openSection === 'economy'}
+          isOpen={openSections.has('economy')}
           onToggle={() => toggle('economy')}
           phaseLocked={actionsLocked}
         >
@@ -220,7 +224,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Recruitment & Tactical"
           icon={<Users className="h-4 w-4" />}
-          isOpen={openSection === 'recruitment'}
+          isOpen={openSections.has('recruitment')}
           onToggle={() => toggle('recruitment')}
           phaseLocked={!isTacticalPhase}
         >
@@ -348,7 +352,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Defense & Law"
           icon={<Gavel className="h-4 w-4" />}
-          isOpen={openSection === 'defense'}
+          isOpen={openSections.has('defense')}
           onToggle={() => toggle('defense')}
           phaseLocked={actionsLocked}
         >
@@ -430,7 +434,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Corruption"
           icon={<Gavel className="h-4 w-4" />}
-          isOpen={openSection === 'corruption'}
+          isOpen={openSections.has('corruption')}
           onToggle={() => toggle('corruption')}
           phaseLocked={actionsLocked}
         >
@@ -452,7 +456,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title={`Hitmen (${gameState.hitmanContracts?.length || 0}/3)`}
           icon={<Crosshair className="h-4 w-4" />}
-          isOpen={openSection === 'hitmen'}
+          isOpen={openSections.has('hitmen')}
           onToggle={() => toggle('hitmen')}
           phaseLocked={actionsLocked}
         >
@@ -474,7 +478,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title={`Capo Promotion (${gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'capo').length}/${3})`}
           icon={<Crown className="h-4 w-4" />}
-          isOpen={openSection === 'capo_promotion'}
+          isOpen={openSections.has('capo_promotion')}
           onToggle={() => toggle('capo_promotion')}
         >
           <CapoPromotionPanel
@@ -501,7 +505,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="District Control"
           icon={<Building2 className="h-4 w-4" />}
-          isOpen={openSection === 'district_control'}
+          isOpen={openSections.has('district_control')}
           onToggle={() => toggle('district_control')}
         >
           <div className="space-y-1.5">
@@ -850,7 +854,7 @@ const CollapsibleSection: React.FC<{
     >
       {icon}
       <span className="flex-1">{title}</span>
-      {phaseLocked && <span className="text-[9px] text-muted-foreground font-normal">🔒</span>}
+      {phaseLocked && <span className="text-[9px] text-muted-foreground font-normal italic">({title.includes('Recruit') || title.includes('Tactical') ? 'Move Phase' : 'Action Phase'})</span>}
       {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
     </button>
     <AnimatePresence>
