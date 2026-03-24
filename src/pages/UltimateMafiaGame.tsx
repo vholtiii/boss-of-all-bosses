@@ -519,7 +519,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           size="sm"
           onClick={() => advancePhase()}
           disabled={gameState.turnPhase === 'waiting'}
-          className="font-medium"
+          className={cn("font-medium", gameState.turnPhase !== 'waiting' && gameState.turnPhase !== 'action' && "animate-pulse")}
           variant={gameState.turnPhase === 'action' ? 'default' : 'outline'}
         >
           <SkipForward className="h-4 w-4 mr-2" />
