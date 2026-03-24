@@ -23,7 +23,7 @@ import {
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType, NegotiationScope, PERSONALITY_BONUSES,
   NEGOTIATION_TYPES, NEGOTIATION_REFUND_RATE, ShareProfitsPact, SafePassagePact,
   ScoutedHex, Safehouse, MoveAction, PlannedHit,
-  FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
+  FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, FortifiedHex, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
   SAFEHOUSE_COST, SAFEHOUSE_DEFENSE_BONUS, SAFEHOUSE_CAPTURE_BOUNTY, SAFEHOUSE_CAPTURE_INTEL_DURATION, SAFEHOUSE_TERRITORY_THRESHOLD, MAX_SAFEHOUSES,
   PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_FAIL_REPUTATION, PLAN_HIT_FAIL_LOYALTY,
   PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN,
@@ -58,6 +58,13 @@ const syncRespect = (state: any, value: number) => {
   state.reputation.respect = value;
   state.resources.respect = Math.round(value);
 };
+
+// ============ HEX FORTIFICATION HELPERS ============
+const isHexFortified = (fortifiedHexes: FortifiedHex[], q: number, r: number, s: number, family: string): boolean =>
+  (fortifiedHexes || []).some(f => f.q === q && f.r === r && f.s === s && f.family === family);
+
+const isHexFortifiedAny = (fortifiedHexes: FortifiedHex[], q: number, r: number, s: number): boolean =>
+  (fortifiedHexes || []).some(f => f.q === q && f.r === r && f.s === s);
 
 // ============ DIFFICULTY SYSTEM ============
 export type Difficulty = 'easy' | 'normal' | 'hard';
@@ -99,6 +106,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   activeDistrictBonuses: [...(state.activeDistrictBonuses || [])],
   scoutedHexes: [...(state.scoutedHexes || [])],
   safehouses: (state.safehouses || []).map(s => ({ ...s })),
+  fortifiedHexes: (state.fortifiedHexes || []).map(f => ({ ...f })),
   activeBribes: (state.activeBribes || []).map(b => ({ ...b })),
   plannedHit: state.plannedHit ? { ...state.plannedHit } : null,
   planHitCooldownUntil: state.planHitCooldownUntil || 0,
@@ -147,7 +155,7 @@ export interface DeployedUnit {
   level: number;
   name?: string;
   personality?: CapoPersonality;
-  fortified?: boolean;
+  fortified?: boolean; // DEPRECATED — use fortifiedHexes on game state instead
   escortingSoldierIds?: string[]; // capo only — IDs of soldiers being escorted
   recruited?: boolean; // true = locally recruited (loyal), false/undefined = mercenary (bought)
   pendingDefection?: boolean; // set by Internal Betrayal event — resolved in endTurn
@@ -247,6 +255,7 @@ export interface EnhancedMafiaGameState {
   // Move phase systems
   scoutedHexes: ScoutedHex[];
   safehouses: Safehouse[];
+  fortifiedHexes: FortifiedHex[];
   plannedHit: PlannedHit | null;
   planHitCooldownUntil: number;
   selectedMoveAction: MoveAction;
@@ -617,6 +626,7 @@ const createInitialGameState = (
     pendingNotifications: [],
     scoutedHexes: [],
     safehouses: [],
+    fortifiedHexes: [],
     plannedHit: null,
     planHitCooldownUntil: 0,
     selectedMoveAction: 'move' as MoveAction,
@@ -998,17 +1008,15 @@ export const useEnhancedMafiaGameState = (
 
         if (moveAction === 'fortify') {
           if (prev.tacticalActionsRemaining <= 0) return prev;
-          if (unit.fortified) return prev; // Already fortified
-          const newUnits = [...prev.deployedUnits];
-          const fIdx = newUnits.findIndex(u => u.id === unit.id);
-          newUnits[fIdx] = { ...unit, fortified: true, movesRemaining: 0 };
+          if (isHexFortified(prev.fortifiedHexes || [], unit.q, unit.r, unit.s, prev.playerFamily)) return prev; // Hex already fortified
           return {
-            ...prev, deployedUnits: newUnits,
+            ...prev,
+            fortifiedHexes: [...(prev.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: prev.playerFamily, fortifiedOnTurn: prev.turn }],
             selectedUnitId: null, availableMoveHexes: [],
             tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
             pendingNotifications: [...prev.pendingNotifications, {
-              type: 'info' as const, title: '🛡️ Unit Fortified',
-              message: `${unit.type === 'capo' ? unit.name || 'Capo' : 'Soldier'} is fortified (+${FORTIFY_DEFENSE_BONUS}% defense, persists until movement).`,
+              type: 'info' as const, title: '🛡️ Hex Fortified',
+              message: `Defenses built at this position (+${FORTIFY_DEFENSE_BONUS}% defense for all units here).`,
             }],
           };
         }
@@ -1201,7 +1209,7 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      const updatedUnit = { ...unit, q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: remainingMoves, fortified: false };
+      const updatedUnit = { ...unit, q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: remainingMoves };
       newUnits[unitIdx] = updatedUnit;
 
       // Handle escort: move escorted soldiers along with capo (works in any move action during deploy phase)
@@ -1209,7 +1217,7 @@ export const useEnhancedMafiaGameState = (
         unit.escortingSoldierIds.forEach(soldierIdToEscort => {
           const sIdx = newUnits.findIndex(u => u.id === soldierIdToEscort);
           if (sIdx !== -1) {
-            newUnits[sIdx] = { ...newUnits[sIdx], q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0, fortified: false };
+            newUnits[sIdx] = { ...newUnits[sIdx], q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0 };
           }
         });
         // Auto-detach soldiers at destination
@@ -1327,28 +1335,25 @@ export const useEnhancedMafiaGameState = (
     });
   }, []);
 
-  // ============ FORTIFY UNIT ============
+  // ============ FORTIFY HEX ============
   const fortifyUnit = useCallback(() => {
     setGameState(prev => {
       if (prev.turnPhase !== 'move') return prev;
       if (prev.tacticalActionsRemaining <= 0) return prev;
       if (!prev.selectedUnitId) return prev;
-      const unitIdx = prev.deployedUnits.findIndex(u => u.id === prev.selectedUnitId);
-      if (unitIdx === -1) return prev;
-      const unit = prev.deployedUnits[unitIdx];
+      const unit = prev.deployedUnits.find(u => u.id === prev.selectedUnitId);
+      if (!unit) return prev;
       if (unit.family !== prev.playerFamily) return prev;
-      if (unit.fortified) return prev; // Already fortified, don't waste action
-
-      const newUnits = [...prev.deployedUnits];
-      newUnits[unitIdx] = { ...unit, fortified: true, movesRemaining: 0 };
+      if (isHexFortified(prev.fortifiedHexes || [], unit.q, unit.r, unit.s, prev.playerFamily)) return prev;
 
       return {
-        ...prev, deployedUnits: newUnits,
+        ...prev,
+        fortifiedHexes: [...(prev.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: prev.playerFamily, fortifiedOnTurn: prev.turn }],
         selectedUnitId: null, availableMoveHexes: [],
         tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
         pendingNotifications: [...prev.pendingNotifications, {
-          type: 'info' as const, title: '🛡️ Unit Fortified',
-          message: `${unit.type === 'capo' ? unit.name || 'Capo' : 'Soldier'} is fortified (+${FORTIFY_DEFENSE_BONUS}% defense).`,
+          type: 'info' as const, title: '🛡️ Hex Fortified',
+          message: `Defenses built at this position (+${FORTIFY_DEFENSE_BONUS}% defense for all units here).`,
         }],
       };
     });
@@ -1800,7 +1805,6 @@ export const useEnhancedMafiaGameState = (
               movesRemaining: 0,
               maxMoves: 2,
               level: 1,
-              fortified: false,
             });
             if (!newState.soldierStats[h.unitId]) {
               newState.soldierStats[h.unitId] = {
@@ -1902,6 +1906,20 @@ export const useEnhancedMafiaGameState = (
         maxMoves: u.type === 'capo' ? 3 : u.maxMoves,
         escortingSoldierIds: undefined,
       }));
+
+      // --- Hex fortification abandonment tick ---
+      newState.fortifiedHexes = (newState.fortifiedHexes || []).filter(f => {
+        const hasUnits = newState.deployedUnits.some(u => u.family === f.family && u.q === f.q && u.r === f.r && u.s === f.s);
+        if (hasUnits) {
+          f.abandonedSinceTurn = undefined; // Reset — units are present
+          return true;
+        }
+        if (!f.abandonedSinceTurn) {
+          f.abandonedSinceTurn = newState.turn; // Start counting
+          return true;
+        }
+        return (newState.turn - f.abandonedSinceTurn) < FORTIFY_ABANDON_TURNS; // Remove if abandoned too long
+      });
 
       // --- Training increment & individual soldier loyalty (per-turn) ---
       const maintenanceUnpaid = (() => {
@@ -2361,7 +2379,7 @@ export const useEnhancedMafiaGameState = (
             const tHex = newState.hexMap.find(t => t.q === targetUnit.q && t.r === targetUnit.r && t.s === targetUnit.s);
             const isAtHQ = tHex?.isHeadquarters === targetUnit.family;
             const isAtSafehouse = (newState.safehouses || []).some(s => targetUnit.q === s.q && targetUnit.r === s.r && targetUnit.s === s.s);
-            const isFort = targetUnit.fortified;
+            const isFort = isHexFortified(newState.fortifiedHexes || [], targetUnit.q, targetUnit.r, targetUnit.s, targetUnit.family);
             let successRate = HITMAN_BASE_SUCCESS;
             if (isAtHQ) successRate = HITMAN_HQ_SUCCESS;
             else if (isAtSafehouse) successRate = HITMAN_SAFEHOUSE_SUCCESS;
@@ -2935,12 +2953,12 @@ export const useEnhancedMafiaGameState = (
             }
           }
 
-          // Alert: fortify chance
-          if (isAlerted && !unit.fortified && Math.random() < 0.3 && aiTacticalRemaining > 0) {
-            unit.fortified = true;
+          // Alert: fortify chance (hex-based)
+          if (isAlerted && !isHexFortified(state.fortifiedHexes || [], unit.q, unit.r, unit.s, fam) && Math.random() < 0.3 && aiTacticalRemaining > 0) {
+            state.fortifiedHexes = [...(state.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: fam, fortifiedOnTurn: state.turn }];
             unit.movesRemaining = 0;
             aiTacticalRemaining--;
-            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'fortify', detail: `Fortified a unit (alert mode)` });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'fortify', detail: `Fortified a hex (alert mode)` });
             continue;
           }
 
@@ -2993,7 +3011,8 @@ export const useEnhancedMafiaGameState = (
                 enemyUnitsHere.forEach(eu => {
                   // Capos cannot be killed in regular combat — only wounded
                   if (eu.type === 'capo') {
-                    const woundChance = eu.fortified ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
+                    const isDefHexFort = isHexFortified(state.fortifiedHexes || [], eu.q, eu.r, eu.s, eu.family);
+                    const woundChance = isDefHexFort ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
                     if (Math.random() < woundChance) {
                       // Wound the capo instead of killing
                       if (state.soldierStats[eu.id]) {
@@ -3014,7 +3033,8 @@ export const useEnhancedMafiaGameState = (
                     return; // capo survives either way
                   }
                   // Fortified defenders also get protection
-                  const killChance = eu.fortified ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
+                  const isDefHexFort2 = isHexFortified(state.fortifiedHexes || [], eu.q, eu.r, eu.s, eu.family);
+                  const killChance = isDefHexFort2 ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
                   if (Math.random() < killChance) {
                     const idx = state.deployedUnits.indexOf(eu);
                     if (idx !== -1) {
@@ -3039,6 +3059,8 @@ export const useEnhancedMafiaGameState = (
                 if (remainingEnemies.length === 0) {
                   const prevOwner = tile.controllingFamily;
                   tile.controllingFamily = 'neutral' as any;
+                  // Destroy fortification on captured hex
+                  state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === target.q && f.r === target.r && f.s === target.s));
                   // Check if any safehouse was on this hex (player's)
                   const shIdx = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
                   if (shIdx !== -1) {
@@ -3450,6 +3472,7 @@ export const useEnhancedMafiaGameState = (
               state.eliminatedFamilies = [...(state.eliminatedFamilies || []), victimFamily];
               state.deployedUnits = state.deployedUnits.filter(u => u.family !== victimFamily);
               state.hexMap.forEach(t => { if (t.controllingFamily === victimFamily && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
+              state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => f.family !== victimFamily);
               state.aiOpponents = state.aiOpponents.filter(o => o.family !== victimFamily);
               opponent.resources.money += 25000;
               state.pendingNotifications.push({
@@ -4103,7 +4126,7 @@ export const useEnhancedMafiaGameState = (
           const targetHex = newState.hexMap.find(t => t.q === targetUnit.q && t.r === targetUnit.r && t.s === targetUnit.s);
           const isAtHQ = targetHex?.isHeadquarters === targetUnit.family;
           const isAtSafehouse = newState.safehouses.some(s => targetUnit.q === s.q && targetUnit.r === s.r && targetUnit.s === s.s);
-          const isFortified = targetUnit.fortified;
+          const isFortified = isHexFortified(newState.fortifiedHexes || [], targetUnit.q, targetUnit.r, targetUnit.s, targetUnit.family);
           
           let duration = HITMAN_OPEN_TURNS;
           if (isAtHQ) duration = HITMAN_HQ_TURNS;
@@ -4360,7 +4383,7 @@ export const useEnhancedMafiaGameState = (
             unit.r = hq.r;
             unit.s = hq.s;
             unit.movesRemaining = 0;
-            unit.fortified = false;
+            // (hex fortification stays on the hex, unit just moves to HQ)
             // Loyalty bonus
             const stats = newState.soldierStats[sid];
             if (stats) {
@@ -4810,6 +4833,7 @@ export const useEnhancedMafiaGameState = (
       state.eliminatedFamilies = [...(state.eliminatedFamilies || []), targetFamily];
       state.deployedUnits = state.deployedUnits.filter(u => u.family !== targetFamily);
       state.hexMap.forEach(t => { if (t.controllingFamily === targetFamily && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
+      state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => f.family !== targetFamily);
       state.aiOpponents = state.aiOpponents.filter(o => o.family !== targetFamily);
       state.flippedSoldiers = (state.flippedSoldiers || []).filter(f => f.family !== targetFamily);
       state.resources.money += 25000;
@@ -5049,9 +5073,9 @@ export const useEnhancedMafiaGameState = (
         chance -= BLIND_HIT_PENALTY;
       }
       
-      // Fortification modifiers
-      const fortifiedDefenders = enemyUnits.filter(u => u.fortified);
-      if (fortifiedDefenders.length > 0) {
+      // Fortification modifiers (hex-based)
+      const defenderHexFortified = isHexFortified(state.fortifiedHexes || [], targetQ, targetR, targetS, tile.controllingFamily);
+      if (defenderHexFortified) {
         chance -= FORTIFY_DEFENSE_BONUS / 100;
       }
       // Safehouse defense bonus for defenders
@@ -5059,8 +5083,10 @@ export const useEnhancedMafiaGameState = (
       if (isDefenderSafehouse) {
         chance -= SAFEHOUSE_DEFENSE_BONUS / 100;
       }
-      const fortifiedAttackers = playerUnits.filter(u => u.fortified);
-      if (fortifiedAttackers.length > 0) {
+      // Attacker bonus: attacking FROM a fortified hex
+      const attackerUnit = playerUnits[0];
+      const attackerHexFortified = attackerUnit && isHexFortified(state.fortifiedHexes || [], attackerUnit.q, attackerUnit.r, attackerUnit.s, state.playerFamily);
+      if (attackerHexFortified) {
         chance += FORTIFY_DEFENSE_BONUS / 200;
       }
       
@@ -5137,6 +5163,8 @@ export const useEnhancedMafiaGameState = (
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         });
         tile.controllingFamily = 'neutral'; // Hit clears enemy control — player must Claim next turn
+        // Destroy fortification on captured hex
+        state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === targetQ && f.r === targetR && f.s === targetS));
         
         // Check if enemy had a safehouse on this hex → player gets bounty + intel
         // (AI safehouses are tracked per-AI; for now we check if any AI opponent has a safehouse here)
@@ -5264,8 +5292,10 @@ export const useEnhancedMafiaGameState = (
         for (let i = 0; i < shuffled.length && removed < casualties; i++) {
           const unit = shuffled[i];
           if (alreadyRemoved.has(unit.id)) continue;
-          if (unit.fortified && Math.random() < 0.5) {
-            const substitute = shuffled.find((u, j) => j > i && !u.fortified && !alreadyRemoved.has(u.id));
+          // Hex-based fortify casualty re-roll: units on fortified hex get 50% save
+          const unitOnFortifiedHex = isHexFortified(state.fortifiedHexes || [], unit.q, unit.r, unit.s, state.playerFamily);
+          if (unitOnFortifiedHex && Math.random() < 0.5) {
+            const substitute = shuffled.find((u, j) => j > i && !isHexFortified(state.fortifiedHexes || [], u.q, u.r, u.s, state.playerFamily) && !alreadyRemoved.has(u.id));
             if (substitute) {
               alreadyRemoved.add(substitute.id);
               const idx = state.deployedUnits.indexOf(substitute);
@@ -5766,7 +5796,8 @@ export const useEnhancedMafiaGameState = (
       }
       return { ...p, turnsRemaining: remaining };
     }).filter(p => p.active);
-  };
+};
+
 
 
   const clearNotifications = useCallback(() => {
