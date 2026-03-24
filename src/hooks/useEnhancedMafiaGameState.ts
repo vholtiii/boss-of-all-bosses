@@ -3282,7 +3282,6 @@ export const useEnhancedMafiaGameState = (
           
           // Fire notification if detected
           if (detectedVia) {
-            const { INTEL_SOURCE_LABELS } = require('@/types/game-mechanics');
             const sourceInfo = INTEL_SOURCE_LABELS[detectedVia];
             state.pendingNotifications.push({
               type: 'warning' as const,
