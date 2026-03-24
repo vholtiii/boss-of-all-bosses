@@ -52,7 +52,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
 }) => {
   const phase = turnPhase || gameState.turnPhase || 'action';
   const actionsLocked = phase === 'deploy' || phase === 'move';
-  const [openSection, setOpenSection] = useState<string>('actions');
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['actions']));
   const { resources, reputation, policeHeat, legalStatus } = gameState;
 
   // Compute respect-based recruitment discount (mirrors logic in useEnhancedMafiaGameState)
