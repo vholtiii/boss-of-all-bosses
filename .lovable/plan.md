@@ -1,34 +1,26 @@
 
 
-# Allow Extortion of Store Fronts (Legal Businesses)
+# Fix Scout Mechanics + Boss Panel Scrolling
 
-## Problem
-The Extort action menu only appears on hexes with **illegal** businesses. Line 441 in `EnhancedMafiaHexGrid.tsx` checks `!tile.business.isLegal`, so store fronts (which are `isLegal: true`) can never be extorted. This blocks a core mafia mechanic — protection rackets on legitimate businesses.
+## Issues Found
 
-## Changes
+### 1. Capo 2-hex scout range broken — `processScout` (line 1167)
+The unit selection code correctly shows 2-hex range targets for capos (line 883: `scoutRange = unitType === 'capo' ? 2 : 1`). But `processScout` at line 1167 hard-checks `if (dist !== 1) return prev;` — silently rejecting any target beyond 1 hex. Capos can see the highlighted hexes but clicking them does nothing.
 
-### 1. `src/components/EnhancedMafiaHexGrid.tsx` (~line 441-447)
-Change the extortion eligibility check from requiring an illegal business to requiring **any completed business**:
-
+**Fix**: Change the distance check to respect capo range:
 ```typescript
-// Before
-const hasIllegalBusiness = !!tile.business && !tile.business.isLegal;
-const canExtort = hasIllegalBusiness && (...)
-
-// After
-const hasAnyBusiness = !!tile.business && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
-const canExtort = hasAnyBusiness && (...)
+const maxRange = unit.type === 'capo' ? 2 : 1;
+if (dist < 1 || dist > maxRange) return prev;
 ```
 
-Also update the disabled reason at line 462 from `'No illegal business'` to `'No business on hex'`.
+### 2. Boss panel scroll area too small + potentially blocked
+The deployed units list has `max-h-32` (128px ≈ 3 items) and businesses `max-h-36` (144px). With many units this is very cramped. The parent `motion.div` has `overflow-hidden` which may clip the scrollbar.
 
-### 2. `src/components/EnhancedMafiaHexGrid.tsx` (~line 467)
-Update the claim reason from `'Has business (extort instead)'` to keep it accurate — this is still correct since any business hex should use extort.
-
-### 3. Auto-extortion in `src/hooks/useEnhancedMafiaGameState.ts` (~lines 1073, 1439)
-Capo auto-extortion currently only triggers on illegal businesses (`!tile.business.isLegal`). Extend it to also auto-extort legal businesses on neutral territory, with a slightly lower payout for legal businesses (they're less lucrative as extortion targets).
+**Fix**:
+- Increase scroll areas: units to `max-h-48`, businesses to `max-h-48`
+- The outer HQ panel already has `max-h-[calc(100vh-2rem)] overflow-y-auto` (line 143), so the whole panel scrolls if content exceeds viewport — this is fine
 
 ## Files Modified
-- `src/components/EnhancedMafiaHexGrid.tsx` — allow extort on any hex with a completed business
-- `src/hooks/useEnhancedMafiaGameState.ts` — extend capo auto-extortion to legal businesses
+- `src/hooks/useEnhancedMafiaGameState.ts` — fix capo scout range check in `processScout`
+- `src/components/HeadquartersInfoPanel.tsx` — increase scroll area heights for boss overview lists
 
