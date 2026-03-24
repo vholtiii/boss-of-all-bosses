@@ -264,6 +264,12 @@ export interface EnhancedMafiaGameState {
   aiBounties: AIBounty[];
   aiPlannedHits: AIPlannedHit[];
   combatLog: string[];
+  activeDistrictBonuses: Array<{
+    district: string;
+    family: string;
+    bonusType: string;
+    description: string;
+  }>;
 
   turnReport: TurnReport | null;
   lastCombatResult?: {
