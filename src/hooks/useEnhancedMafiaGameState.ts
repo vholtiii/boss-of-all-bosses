@@ -5165,7 +5165,7 @@ export const useEnhancedMafiaGameState = (
         // ============ DEFEAT — no fortify protection (attackers got overrun), capos wounded only ============
         const defeatKillable = playerUnits.filter(u => u.type !== 'capo');
         const defeatCapos = playerUnits.filter(u => u.type === 'capo');
-        const defeatCasualties = Math.max(1, Math.floor(defeatKillable.length * 0.4));
+        const defeatCasualties = Math.min(defeatKillable.length, Math.max(1, Math.floor(defeatKillable.length * 0.4)));
         const defeatShuffled = [...defeatKillable].sort(() => Math.random() - 0.5);
         for (let i = 0; i < defeatCasualties && i < defeatShuffled.length; i++) {
           const idx = state.deployedUnits.indexOf(defeatShuffled[i]);
