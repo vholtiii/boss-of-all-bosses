@@ -2897,7 +2897,17 @@ export const useEnhancedMafiaGameState = (
             turnsRemaining: AI_PLAN_HIT_DURATION,
             plannedOnTurn: state.turn,
           });
-          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'plan_hit', detail: `Planned a hit against a player capo` });
+          // Gate plan hit intel behind fog-of-war
+          if (turnReport) {
+            const targetUnit = state.deployedUnits.find(u => u.id === target.id);
+            const hasHitIntel = targetUnit && (
+              state.scoutedHexes.some(s => s.q === targetUnit.q && s.r === targetUnit.r && s.s === targetUnit.s) ||
+              (state.activeBribes || []).some(b => b.tier === 'police_captain' || b.tier === 'police_chief')
+            );
+            if (hasHitIntel) {
+              turnReport.aiActions.push({ family: fam, action: 'plan_hit', detail: `Planned a hit against a player capo` });
+            }
+          }
         }
       }
     });
