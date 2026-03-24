@@ -756,8 +756,25 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     return null;
                   })()}
 
-                  {/* Plan Hit mode — step 2: highlight scouted enemy hexes */}
+                  {/* Plan Hit mode — step 2: highlight scouted enemy hexes + planner hex */}
                   {planHitMode && planHitStep === 'selectTarget' && (() => {
+                    // Highlight planner's hex with gold pulsing outline
+                    if (planHitPlannerId) {
+                      const plannerUnit = (gameState?.deployedUnits || []).find((u: DeployedUnit) => u.id === planHitPlannerId);
+                      if (plannerUnit && plannerUnit.q === tile.q && plannerUnit.r === tile.r && plannerUnit.s === tile.s) {
+                        return (
+                          <polygon
+                            points={getHexPoints(x, y, baseHexRadius + 4)}
+                            fill="none"
+                            stroke="#F59E0B"
+                            strokeWidth="3"
+                            opacity="0.9"
+                            strokeDasharray="8,4"
+                            className="pointer-events-none animate-pulse"
+                          />
+                        );
+                      }
+                    }
                     const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== playerFamily;
                     const isScouted = scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
                     if (isEnemy && isScouted) {
