@@ -449,10 +449,11 @@ const HQ_POSITIONS: Record<string, {q:number;r:number;s:number;district:HexTile[
 const createInitialGameState = (
   family: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo' = 'gambino',
   startingResources?: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number },
-  difficulty: Difficulty = 'normal'
+  difficulty: Difficulty = 'normal',
+  providedSeed?: number
 ): EnhancedMafiaGameState => {
   const mapRadius = 10;
-  const mapSeed = Math.floor(Math.random() * 4294967296);
+  const mapSeed = providedSeed ?? Math.floor(Math.random() * 4294967296);
   const diffMods = DIFFICULTY_MODIFIERS[difficulty];
   let hexMap = generateHexMap(mapRadius, mapSeed);
 
@@ -710,10 +711,11 @@ function buildLegacyTerritories(hexMap: HexTile[]): EnhancedMafiaGameState['terr
 export const useEnhancedMafiaGameState = (
   initialFamily?: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo',
   startingResources?: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number },
-  difficulty?: Difficulty
+  difficulty?: Difficulty,
+  seed?: number
 ) => {
   const [gameState, setGameState] = useState<EnhancedMafiaGameState>(() => 
-    createInitialGameState(initialFamily || 'gambino', startingResources, difficulty || 'normal')
+    createInitialGameState(initialFamily || 'gambino', startingResources, difficulty || 'normal', seed)
   );
 
   // ============ SYNC LEGACY UNITS FROM DEPLOYED UNITS ============
@@ -1949,6 +1951,7 @@ export const useEnhancedMafiaGameState = (
           // Game over — player loses all territory
           newState.hexMap.forEach(t => { if (t.controllingFamily === newState.playerFamily && !t.isHeadquarters) t.controllingFamily = 'neutral'; });
           newState.deployedUnits = newState.deployedUnits.filter(u => u.family !== newState.playerFamily);
+          newState.gameOver = { type: 'bankruptcy' as any, turn: newState.turn };
         } else if (debt >= 20000) {
           turnReport.events.push(`⚠️ WARNING: Family is $${debt.toLocaleString()} in debt! Soldiers will desert. Bankruptcy at -$50K.`);
         }

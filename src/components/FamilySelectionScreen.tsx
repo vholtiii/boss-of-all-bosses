@@ -39,7 +39,7 @@ const families: FamilyInfo[] = [
       { label: 'Influence', icon: <Crown className="h-3.5 w-3.5" />, value: 4 },
     ],
     bonuses: ['+25% combat power', '+10% territory income', '+15% intimidation'],
-    startingResources: { money: 60000, soldiers: 6, influence: 15, politicalPower: 40, respect: 30 },
+    startingResources: { money: 60000, soldiers: 4, influence: 15, politicalPower: 40, respect: 30 },
   },
   {
     id: 'genovese',
@@ -54,7 +54,7 @@ const families: FamilyInfo[] = [
       { label: 'Stealth', icon: <Eye className="h-3.5 w-3.5" />, value: 5 },
     ],
     bonuses: ['+30% business income', '+20% laundering efficiency', '+25% business upgrade discount'],
-    startingResources: { money: 45000, soldiers: 6, influence: 10, politicalPower: 25, respect: 20 },
+    startingResources: { money: 45000, soldiers: 4, influence: 10, politicalPower: 25, respect: 20 },
   },
   {
     id: 'lucchese',
@@ -69,7 +69,7 @@ const families: FamilyInfo[] = [
       { label: 'Trade', icon: <Shield className="h-3.5 w-3.5" />, value: 5 },
     ],
     bonuses: ['+25% hit success rate', '+15% heat reduction', '+20% intelligence gathering'],
-    startingResources: { money: 70000, soldiers: 4, influence: 12, politicalPower: 20, respect: 15 },
+    startingResources: { money: 70000, soldiers: 3, influence: 12, politicalPower: 20, respect: 15 },
   },
   {
     id: 'bonanno',
@@ -84,7 +84,7 @@ const families: FamilyInfo[] = [
       { label: 'Loyalty', icon: <Users className="h-3.5 w-3.5" />, value: 5 },
     ],
     bonuses: ['+20% extortion income', '+25% intimidation power', '+15% fear generation'],
-    startingResources: { money: 40000, soldiers: 5, influence: 8, politicalPower: 15, respect: 35 },
+    startingResources: { money: 40000, soldiers: 3, influence: 8, politicalPower: 15, respect: 35 },
   },
   {
     id: 'colombo',
@@ -98,7 +98,7 @@ const families: FamilyInfo[] = [
       { label: 'Economy', icon: <DollarSign className="h-3.5 w-3.5" />, value: 2 },
       { label: 'Fear', icon: <Crown className="h-3.5 w-3.5" />, value: 4 },
     ],
-    bonuses: ['+20% all income', '-15% recruitment cost', '+10% reputation gain'],
+    bonuses: ['+20% combat power', '-15% recruitment cost', '+15% fear generation'],
     startingResources: { money: 35000, soldiers: 3, influence: 18, politicalPower: 10, respect: 25 },
   },
 ];
@@ -119,12 +119,13 @@ const StatBar: React.FC<{ value: number; color: string }> = ({ value, color }) =
 );
 
 interface Props {
-  onSelectFamily: (familyId: FamilyId, resources: FamilyInfo['startingResources'], difficulty: 'easy' | 'normal' | 'hard') => void;
+  onSelectFamily: (familyId: FamilyId, resources: FamilyInfo['startingResources'], difficulty: 'easy' | 'normal' | 'hard', seed?: number) => void;
 }
 
 const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const [selectedFamily, setSelectedFamily] = useState<FamilyId | null>(null);
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
+  const [seedInput, setSeedInput] = useState('');
 
   const activeFamily = families.find(f => f.id === selectedFamily);
 
@@ -184,6 +185,18 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         </div>
       </motion.div>
 
+      {/* Map Seed Input */}
+      <div className="flex items-center justify-center gap-2 mb-6">
+        <label className="text-xs text-muted-foreground font-source">Map Seed:</label>
+        <input
+          type="text"
+          value={seedInput}
+          onChange={(e) => setSeedInput(e.target.value.replace(/[^0-9]/g, ''))}
+          placeholder="Random"
+          className="w-32 px-3 py-1.5 rounded-lg border border-border/50 bg-card/80 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+        />
+      </div>
+
       {/* Family cards — horizontal row */}
       <div className="flex flex-wrap justify-center gap-3 max-w-5xl mb-10">
         {families.map((family, i) => {
@@ -196,7 +209,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
               transition={{ delay: 0.15 + i * 0.08, duration: 0.4 }}
               onClick={() => setSelectedFamily(family.id)}
               className={cn(
-                'w-[170px] cursor-pointer rounded-xl border-2 p-4 transition-all duration-200 relative',
+                'w-[150px] cursor-pointer rounded-xl border-2 p-4 transition-all duration-200 relative',
                 'bg-card/80 backdrop-blur-sm',
                 isSelected
                   ? 'scale-[1.03] shadow-xl'
@@ -315,7 +328,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
             </div>
 
             <Button
-              onClick={() => onSelectFamily(activeFamily.id, activeFamily.startingResources, difficulty)}
+              onClick={() => onSelectFamily(activeFamily.id, activeFamily.startingResources, difficulty, seedInput ? parseInt(seedInput) : undefined)}
               className="w-full font-playfair font-bold text-base py-5 transition-all duration-200"
               style={{
                 backgroundColor: activeFamily.color,
