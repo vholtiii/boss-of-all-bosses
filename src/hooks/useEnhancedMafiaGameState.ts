@@ -3913,6 +3913,58 @@ export const useEnhancedMafiaGameState = (
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
         }
+        case 'call_sitdown': {
+          // Boss action — does NOT consume action budget
+          const hq = newState.headquarters[newState.playerFamily];
+          if (!hq) return newState;
+          if (newState.turnPhase !== 'action') {
+            newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'Sitdown can only be called during the Action phase.' });
+            return newState;
+          }
+          if (newState.sitdownCooldownUntil > newState.turn) {
+            newState.pendingNotifications.push({ type: 'error', title: 'Cooldown', message: `Sitdown available in ${newState.sitdownCooldownUntil - newState.turn} turns.` });
+            return newState;
+          }
+          if (newState.resources.money < SITDOWN_COST) {
+            newState.pendingNotifications.push({ type: 'error', title: 'Not Enough Money', message: `Sitdown costs $${SITDOWN_COST.toLocaleString()}.` });
+            return newState;
+          }
+          const soldierIds: string[] = action.soldierIds || [];
+          if (soldierIds.length === 0) {
+            newState.pendingNotifications.push({ type: 'error', title: 'No Soldiers Selected', message: 'Select at least one soldier to recall.' });
+            return newState;
+          }
+          let recalled = 0;
+          for (const sid of soldierIds) {
+            const unit = newState.deployedUnits.find(u => u.id === sid && u.family === newState.playerFamily);
+            if (!unit) continue;
+            if (unit.q === hq.q && unit.r === hq.r && unit.s === hq.s) continue; // already at HQ
+            unit.q = hq.q;
+            unit.r = hq.r;
+            unit.s = hq.s;
+            unit.movesRemaining = 0;
+            unit.fortified = false;
+            // Loyalty bonus
+            const stats = newState.soldierStats[sid];
+            if (stats) {
+              const cap = unit.type === 'capo' ? 99 : 80;
+              stats.loyalty = Math.min(cap, stats.loyalty + SITDOWN_LOYALTY_BONUS);
+            }
+            recalled++;
+          }
+          if (recalled === 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: 'No Units Moved', message: 'Selected soldiers are already at HQ.' });
+            return newState;
+          }
+          newState.resources.money -= SITDOWN_COST;
+          newState.sitdownCooldownUntil = newState.turn + SITDOWN_COOLDOWN;
+          newState.pendingNotifications.push({
+            type: 'success',
+            title: '📋 Sitdown Called',
+            message: `${recalled} unit(s) recalled to HQ. +${SITDOWN_LOYALTY_BONUS} loyalty each. HQ defense strengthened.`,
+          });
+          return newState;
+        }
         default:
           return newState;
       }
