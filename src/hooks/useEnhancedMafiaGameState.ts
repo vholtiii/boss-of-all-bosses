@@ -4395,6 +4395,130 @@ export const useEnhancedMafiaGameState = (
     return state;
   };
 
+  // ============ HQ ASSAULT (action phase) ============
+  const processHQAssault = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
+    const { targetQ, targetR, targetS, selectedUnitId } = action;
+    const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
+    if (!tile || !tile.isHeadquarters) return state;
+    const targetFamily = tile.isHeadquarters;
+    if (targetFamily === state.playerFamily) return state;
+    if ((state.eliminatedFamilies || []).includes(targetFamily)) return state;
+
+    const attacker = state.deployedUnits.find(u => u.id === selectedUnitId);
+    if (!attacker || attacker.type !== 'soldier' || attacker.family !== state.playerFamily) return state;
+    const dist = hexDistance(attacker, { q: targetQ, r: targetR, s: targetS });
+    if (dist !== 1) {
+      state.pendingNotifications = [...state.pendingNotifications, { type: 'warning', title: '⚠️ Not Adjacent', message: 'Your soldier must be adjacent to the HQ.' }];
+      return state;
+    }
+
+    const stats = state.soldierStats[attacker.id];
+    if (!stats || stats.toughness < HQ_ASSAULT_MIN_TOUGHNESS || stats.loyalty < HQ_ASSAULT_MIN_LOYALTY) {
+      state.pendingNotifications = [...state.pendingNotifications, { type: 'warning', title: '⚠️ Not Ready', message: `Soldier needs Toughness ≥ ${HQ_ASSAULT_MIN_TOUGHNESS} and Loyalty ≥ ${HQ_ASSAULT_MIN_LOYALTY}.` }];
+      return state;
+    }
+
+    let chance = HQ_ASSAULT_BASE_CHANCE - HQ_DEFENSE_BONUS;
+    const hqNeighbors = getHexNeighbors(targetQ, targetR, targetS);
+    const friendlyAdjacent = state.deployedUnits.filter(u =>
+      u.family === state.playerFamily && u.id !== attacker.id &&
+      hqNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s)
+    );
+    chance += friendlyAdjacent.length * 0.05;
+    const bonuses = FAMILY_BONUSES[state.playerFamily] || FAMILY_BONUSES.gambino;
+    chance += bonuses.combatBonus / 100 * 0.1;
+    const flippedCount = (state.flippedSoldiers || []).filter(f => f.family === targetFamily).length;
+    chance += flippedCount * 0.10;
+    chance = Math.min(HQ_ASSAULT_MAX_CHANCE, Math.max(0.05, chance));
+
+    if (Math.random() < chance) {
+      state.eliminatedFamilies = [...(state.eliminatedFamilies || []), targetFamily];
+      state.deployedUnits = state.deployedUnits.filter(u => u.family !== targetFamily);
+      state.hexMap.forEach(t => { if (t.controllingFamily === targetFamily && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
+      state.aiOpponents = state.aiOpponents.filter(o => o.family !== targetFamily);
+      state.flippedSoldiers = (state.flippedSoldiers || []).filter(f => f.family !== targetFamily);
+      state.resources.money += 25000;
+      state.reputation.respect = Math.min(100, state.reputation.respect + 30);
+      state.reputation.fear = Math.min(100, state.reputation.fear + 40);
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'success', title: '💀 Family Eliminated!',
+        message: `The ${targetFamily.charAt(0).toUpperCase() + targetFamily.slice(1)} family has been destroyed! +$25,000, +30 Respect, +40 Fear.`,
+      }];
+      state.lastCombatResult = { q: targetQ, r: targetR, s: targetS, success: true, type: 'hit', title: `${targetFamily.toUpperCase()} ELIMINATED`, details: 'HQ Assault successful!', timestamp: Date.now() };
+    } else {
+      state.deployedUnits = state.deployedUnits.filter(u => u.id !== attacker.id);
+      delete state.soldierStats[attacker.id];
+      friendlyAdjacent.forEach(u => { const uStats = state.soldierStats[u.id]; if (uStats) uStats.loyalty = Math.max(0, uStats.loyalty - 30); });
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'error', title: '💀 Assault Failed!',
+        message: `The HQ assault failed! Your soldier was killed and nearby units lost 30 loyalty.`,
+      }];
+      state.lastCombatResult = { q: targetQ, r: targetR, s: targetS, success: false, type: 'hit', title: 'ASSAULT FAILED', details: 'HQ defenses held', timestamp: Date.now() };
+    }
+    syncLegacyUnits(state);
+    updateVictoryProgress(state);
+    return state;
+  };
+
+  // ============ FLIP SOLDIER (action phase) ============
+  const processFlipSoldier = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
+    const { targetQ, targetR, targetS } = action;
+    const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
+    if (!tile || !tile.isHeadquarters) return state;
+    const targetFamily = tile.isHeadquarters;
+    if (targetFamily === state.playerFamily) return state;
+
+    if (state.resources.money < FLIP_SOLDIER_COST) {
+      state.pendingNotifications = [...state.pendingNotifications, { type: 'warning', title: '💰 Not Enough Money', message: `Flipping costs $${FLIP_SOLDIER_COST.toLocaleString()}.` }];
+      return state;
+    }
+
+    const hqNeighbors = getHexNeighbors(targetQ, targetR, targetS);
+    const hasAdjacentUnit = state.deployedUnits.some(u => u.family === state.playerFamily && hqNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s));
+    if (!hasAdjacentUnit) {
+      state.pendingNotifications = [...state.pendingNotifications, { type: 'warning', title: '⚠️ No Unit Adjacent', message: 'Need a unit adjacent to enemy HQ.' }];
+      return state;
+    }
+
+    const enemySoldiersNearHQ = state.deployedUnits.filter(u =>
+      u.family === targetFamily && u.type === 'soldier' && hexDistance(u, { q: targetQ, r: targetR, s: targetS }) <= 1
+    );
+    const flippableTargets = enemySoldiersNearHQ.filter(u => {
+      const uStats = state.soldierStats[u.id];
+      return uStats && uStats.loyalty > 60 && !(state.flippedSoldiers || []).some(f => f.unitId === u.id);
+    });
+
+    if (flippableTargets.length === 0) {
+      state.pendingNotifications = [...state.pendingNotifications, { type: 'warning', title: '⚠️ No Targets', message: 'No eligible soldiers near enemy HQ.' }];
+      return state;
+    }
+
+    state.resources.money -= FLIP_SOLDIER_COST;
+    const target = flippableTargets[Math.floor(Math.random() * flippableTargets.length)];
+    const targetStats = state.soldierStats[target.id]!;
+
+    let chance = FLIP_SOLDIER_BASE_CHANCE;
+    if (targetStats.loyalty >= 60 && targetStats.loyalty <= 70) chance += 0.10;
+    const playerInfluence = state.resources.influence || 0;
+    if (playerInfluence > 50) chance += (playerInfluence - 50) * 0.005;
+    const schemerAdjacent = state.deployedUnits.some(u =>
+      u.family === state.playerFamily && u.type === 'capo' && u.personality === 'schemer' &&
+      hqNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s)
+    );
+    if (schemerAdjacent) chance += 0.10;
+    chance = Math.min(0.70, Math.max(0.05, chance));
+
+    if (Math.random() < chance) {
+      state.flippedSoldiers = [...(state.flippedSoldiers || []), { unitId: target.id, family: targetFamily, flippedByFamily: state.playerFamily, hqQ: targetQ, hqR: targetR, hqS: targetS }];
+      state.pendingNotifications = [...state.pendingNotifications, { type: 'success', title: '🐀 Soldier Flipped!', message: `A ${targetFamily} soldier has been turned! HQ defense -10%.` }];
+    } else {
+      state.resources.influence = Math.max(0, (state.resources.influence || 0) - FLIP_SOLDIER_FAIL_INFLUENCE_LOSS);
+      targetStats.loyalty = Math.min(100, targetStats.loyalty + 10);
+      state.pendingNotifications = [...state.pendingNotifications, { type: 'error', title: '🚨 Flip Failed!', message: `Attempt discovered! -${FLIP_SOLDIER_FAIL_INFLUENCE_LOSS} Influence. Target loyalty +10.` }];
+    }
+    return state;
+  };
+
   // ============ ESTABLISH SAFEHOUSE (action phase) ============
   const processEstablishSafehouse = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
     const { targetQ, targetR, targetS } = action;
