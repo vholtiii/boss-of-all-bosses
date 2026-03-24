@@ -3860,6 +3860,16 @@ export const useEnhancedMafiaGameState = (
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
         }
+        case 'assault_hq': {
+          const result = processHQAssault(newState, action);
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
+        case 'flip_soldier': {
+          const result = processFlipSoldier(newState, action);
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
         default:
           return newState;
       }
