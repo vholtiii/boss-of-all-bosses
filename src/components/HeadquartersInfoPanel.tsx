@@ -70,6 +70,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   headquarters,
   units,
   businesses,
+  finances,
   onClose,
   onSelectUnitFromHeadquarters,
   movementPhase = false,
