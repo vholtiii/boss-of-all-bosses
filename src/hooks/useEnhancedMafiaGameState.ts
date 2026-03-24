@@ -1663,8 +1663,12 @@ export const useEnhancedMafiaGameState = (
       newState.maxTacticalActions = TACTICAL_ACTIONS_PER_TURN;
 
       // Reset moves and escort for new turn (fortified persists until unit moves)
+      // Restore wounded capo maxMoves back to 3 (wound is 1-turn penalty)
       newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
-        ...u, movesRemaining: u.maxMoves, escortingSoldierIds: undefined,
+        ...u,
+        movesRemaining: u.type === 'capo' ? 3 : u.maxMoves,
+        maxMoves: u.type === 'capo' ? 3 : u.maxMoves,
+        escortingSoldierIds: undefined,
       }));
 
       // --- Training increment & individual soldier loyalty (per-turn) ---
