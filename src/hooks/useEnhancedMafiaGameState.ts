@@ -225,6 +225,9 @@ export interface EnhancedMafiaGameState {
   activeBribes: BribeContract[];
   alliances: AlliancePact[];
   ceasefires: CeasefirePact[];
+  shareProfitsPacts: ShareProfitsPact[];
+  safePassagePacts: SafePassagePact[];
+  negotiationUsedThisTurn: boolean;
   victoryProgress: VictoryProgress;
   victoryType: VictoryType;
   familyBonuses: FamilyBonuses;
