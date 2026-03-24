@@ -5489,17 +5489,17 @@ export const useEnhancedMafiaGameState = (
 
     // Separate cooldowns for Boss and Capo
     const isFamily = isBossNegotiation;
-    if (isFamily && state.bossNegotiationUsedThisTurn) {
+    if (isFamily && (state.bossNegotiationCooldown || 0) > 0) {
       state.pendingNotifications = [...state.pendingNotifications, {
         type: 'warning', title: '⏳ Boss Negotiation Cooldown',
-        message: 'The Boss has already negotiated this turn.',
+        message: `The Boss must wait ${state.bossNegotiationCooldown} more turn(s) before negotiating again.`,
       }];
       return state;
     }
-    if (!isFamily && state.capoNegotiationUsedThisTurn) {
+    if (!isFamily && (state.capoNegotiationCooldown || 0) > 0) {
       state.pendingNotifications = [...state.pendingNotifications, {
         type: 'warning', title: '⏳ Capo Negotiation Cooldown',
-        message: 'A Capo has already negotiated this turn.',
+        message: `A Capo must wait ${state.capoNegotiationCooldown} more turn(s) before negotiating again.`,
       }];
       return state;
     }
