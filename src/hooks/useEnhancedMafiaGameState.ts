@@ -3263,7 +3263,9 @@ export const useEnhancedMafiaGameState = (
           if (newState.tacticalActionsRemaining <= 0) return newState;
           const respectDiscount = (newState.reputation.respect / 100) * 0.3;
           const cost = Math.floor(SOLDIER_COST * (1 - discount) * (1 - respectDiscount));
-          if (newState.resources.money >= cost) {
+          // District control bonus: Bronx -$500 recruit discount
+          const bronxDiscount = hasPlayerDistrictBonus(newState, 'recruit_discount') ? 500 : 0;
+          const finalCost = Math.max(100, cost - bronxDiscount);
             newState.resources.money -= cost;
             newState.resources.soldiers += 1;
             newState.tacticalActionsRemaining -= 1;
