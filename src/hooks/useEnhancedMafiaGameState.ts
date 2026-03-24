@@ -1001,17 +1001,59 @@ export const useEnhancedMafiaGameState = (
       }
 
       // Deploy phase: regular movement — soldiers CAN move onto enemy hexes
-      const range = unitType === 'soldier' ? 1 : Math.min(5, unit.movesRemaining);
-      const candidateHexes = unitType === 'soldier' 
-        ? getHexNeighbors(unit.q, unit.r, unit.s)
-        : getHexesInRange(unit.q, unit.r, unit.s, range);
-      
-      const validHexes = candidateHexes.filter(h => {
-        const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
-        if (!tile) return false;
-        if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
-        return true;
-      });
+      if (unitType === 'capo') {
+        // Capo movement unchanged — fly up to 5 hexes
+        const range = Math.min(5, unit.movesRemaining);
+        const candidateHexes = getHexesInRange(unit.q, unit.r, unit.s, range);
+        const validHexes = candidateHexes.filter(h => {
+          const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+          if (!tile) return false;
+          if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+          return true;
+        });
+        return { ...prev, selectedUnitId: unit.id, availableMoveHexes: validHexes, deployMode: null, availableDeployHexes: [] };
+      }
+
+      // Soldier movement: free within connected territory + normal adjacent for venturing out
+      const hexKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
+      const connectedSet = getConnectedTerritory(prev.hexMap, prev.playerFamily);
+      const unitKey = hexKey(unit.q, unit.r, unit.s);
+      const isOnConnected = connectedSet.has(unitKey);
+
+      let validHexes: Array<{q:number;r:number;s:number}> = [];
+
+      if (isOnConnected) {
+        // Show all connected territory hexes as free moves
+        connectedSet.forEach(k => {
+          const [q, r, s] = k.split(',').map(Number);
+          if (k !== unitKey) {
+            const tile = prev.hexMap.find(t => t.q === q && t.r === r && t.s === s);
+            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily)) {
+              validHexes.push({ q, r, s });
+            }
+          }
+        });
+        // Also add normal adjacent hexes for venturing out (unclaimed/enemy)
+        const adjacentHexes = getHexNeighbors(unit.q, unit.r, unit.s);
+        for (const h of adjacentHexes) {
+          const hk = hexKey(h.q, h.r, h.s);
+          if (!connectedSet.has(hk)) {
+            const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily)) {
+              validHexes.push(h);
+            }
+          }
+        }
+      } else {
+        // Not on connected territory — normal 1-hex adjacent only
+        const candidateHexes = getHexNeighbors(unit.q, unit.r, unit.s);
+        validHexes = candidateHexes.filter(h => {
+          const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+          if (!tile) return false;
+          if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+          return true;
+        });
+      }
 
       return { ...prev, selectedUnitId: unit.id, availableMoveHexes: validHexes, deployMode: null, availableDeployHexes: [] };
     });
