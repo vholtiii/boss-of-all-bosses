@@ -810,6 +810,10 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
           movementPhase={gameState.movementPhase}
           playerFamily={gameState.playerFamily}
+          deployedUnits={gameState.deployedUnits || []}
+          hexMap={gameState.hexMap || []}
+          bossHighlightHex={bossHighlightHex}
+          onBossHighlightHex={setBossHighlightHex}
         />
       )}
 
