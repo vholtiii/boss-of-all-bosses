@@ -1,31 +1,29 @@
 
 
-# Fix: Separate Negotiation Cooldowns for Boss and Capo
-
-## Current Problem
-`negotiationUsedThisTurn` is a single boolean — if the Boss negotiates, the Capo can't, and vice versa. The user wants each to have their own independent cooldown.
+# Change Negotiation Cooldown: 1 per 2 Turns
 
 ## Change
+Replace boolean cooldown flags with numeric counters that track remaining cooldown turns.
 
 ### `src/hooks/useEnhancedMafiaGameState.ts`
-- Replace `negotiationUsedThisTurn: boolean` with two flags:
-  - `bossNegotiationUsedThisTurn: boolean`
-  - `capoNegotiationUsedThisTurn: boolean`
-- Reset both to `false` in `advanceToNextTurn`
-- In `processNegotiation`: check/set the appropriate flag based on negotiation scope (`'family'` → boss flag, `'territory'` → capo flag)
-
-### `src/components/NegotiationDialog.tsx`
-- Update cooldown prop to accept the relevant flag (boss or capo) based on current `scope`
-
-### `src/components/HeadquartersInfoPanel.tsx`
-- Pass `bossNegotiationUsedThisTurn` for disabling Boss diplomacy buttons
+- Replace `bossNegotiationUsedThisTurn: boolean` → `bossNegotiationCooldown: number` (0 = ready, >0 = turns remaining)
+- Replace `capoNegotiationUsedThisTurn: boolean` → `capoNegotiationCooldown: number`
+- Init both to `0` in initial state and deep copy
+- In `advanceToNextTurn`: decrement each by 1 (min 0) instead of resetting to false
+- In `processNegotiation`: check `> 0` to block, set to `2` after use (cooldown lasts current + next turn)
 
 ### `src/pages/UltimateMafiaGame.tsx`
-- Pass the correct cooldown flag to `NegotiationDialog` based on whether scope is `'family'` or `'territory'`
+- Pass `(gameState as any).bossNegotiationCooldown > 0` / `capoNegotiationCooldown > 0` as `negotiationUsedThisTurn` prop
+
+### `src/components/NegotiationDialog.tsx`
+- Update cooldown message to say "Wait 1 more turn" (no code logic change needed, just text)
+
+### `src/components/HeadquartersInfoPanel.tsx`
+- Update prop to use `bossNegotiationCooldown > 0`
 
 ## Files Modified
 - `src/hooks/useEnhancedMafiaGameState.ts`
+- `src/pages/UltimateMafiaGame.tsx`
 - `src/components/NegotiationDialog.tsx`
 - `src/components/HeadquartersInfoPanel.tsx`
-- `src/pages/UltimateMafiaGame.tsx`
 
