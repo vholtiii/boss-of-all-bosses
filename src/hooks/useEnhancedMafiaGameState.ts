@@ -740,6 +740,7 @@ export const useEnhancedMafiaGameState = (
     // Notify on first victory
     if (state.victoryType && !prevVictory) {
       const labels: Record<string, string> = {
+        domination: 'Total Domination — All rival families have been eliminated!',
         territory: `Territory Domination — You control ${TERRITORY_TARGET}+ hexes!`,
         economic: `Economic Empire — $${ECONOMIC_TARGET.toLocaleString()}+ monthly income achieved!`,
         legacy: 'Legacy of Power — Your reputation surpasses all rivals by 25%!',
