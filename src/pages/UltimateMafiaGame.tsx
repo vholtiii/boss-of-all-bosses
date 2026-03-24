@@ -161,11 +161,13 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       setPlanHitMode(false);
       setPlanHitStep('selectSoldier');
       setPlanHitPlannerId(null);
+      setShowPlanHitSoldierMenu(false);
       return;
     }
     if (action.type === 'plan_hit_select_soldier') {
       setPlanHitPlannerId(action.unitId);
       setPlanHitStep('selectTarget');
+      setShowPlanHitSoldierMenu(false);
       return;
     }
     if (action.type === 'plan_hit') {
