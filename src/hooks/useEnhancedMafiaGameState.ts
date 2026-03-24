@@ -5272,8 +5272,10 @@ export const useEnhancedMafiaGameState = (
         for (let i = 0; i < shuffled.length && removed < casualties; i++) {
           const unit = shuffled[i];
           if (alreadyRemoved.has(unit.id)) continue;
-          if (unit.fortified && Math.random() < 0.5) {
-            const substitute = shuffled.find((u, j) => j > i && !u.fortified && !alreadyRemoved.has(u.id));
+          // Hex-based fortify casualty re-roll: units on fortified hex get 50% save
+          const unitOnFortifiedHex = isHexFortified(state.fortifiedHexes || [], unit.q, unit.r, unit.s, state.playerFamily);
+          if (unitOnFortifiedHex && Math.random() < 0.5) {
+            const substitute = shuffled.find((u, j) => j > i && !isHexFortified(state.fortifiedHexes || [], u.q, u.r, u.s, state.playerFamily) && !alreadyRemoved.has(u.id));
             if (substitute) {
               alreadyRemoved.add(substitute.id);
               const idx = state.deployedUnits.indexOf(substitute);
