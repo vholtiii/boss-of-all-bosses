@@ -2721,7 +2721,7 @@ export const useEnhancedMafiaGameState = (
             });
             state.soldierStats[newId] = {
               loyalty: 40 + Math.floor(Math.random() * 30), training: 0,
-              hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
+              hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
             };
             // Only capos auto-claim neutral territory on deploy (matches player rules)
             const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
