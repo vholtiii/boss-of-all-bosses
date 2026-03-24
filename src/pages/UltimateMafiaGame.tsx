@@ -469,6 +469,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         </motion.h1>
         <div className="h-6 w-px bg-noir-light" />
         <span className="text-sm text-muted-foreground font-source">Enhanced Underworld</span>
+        {(gameState as any).mapSeed && (
+          <span className="text-[10px] text-muted-foreground/50 font-mono">Seed: {(gameState as any).mapSeed}</span>
+        )}
       </div>
       
       {/* Center - Game Status */}
