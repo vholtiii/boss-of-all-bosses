@@ -625,16 +625,6 @@ const createInitialGameState = (
     tacticalActionsRemaining: TACTICAL_ACTIONS_PER_TURN,
     maxTacticalActions: TACTICAL_ACTIONS_PER_TURN,
     
-    combat: {
-      territoryBattles: [],
-      soldierTraining: {
-        level: 1,
-        equipment: { weapons: 'basic', armor: 'none', vehicles: 'none', cost: 0, effectiveness: 0 },
-        specialization: 'enforcer', experience: 0,
-      },
-      combatModifiers: [],
-    },
-    
     economy: {
       marketConditions: [
         { type: 'stable', sector: 'legal', modifier: 0, duration: 5, description: 'Legal businesses operating normally' },
