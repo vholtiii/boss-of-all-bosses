@@ -125,6 +125,7 @@ interface Props {
 const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const [selectedFamily, setSelectedFamily] = useState<FamilyId | null>(null);
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
+  const [seedInput, setSeedInput] = useState('');
 
   const activeFamily = families.find(f => f.id === selectedFamily);
 
