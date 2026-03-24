@@ -177,6 +177,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return segs;
   }, [hexMap]);
 
+  // District background tint colors (subtle, for region identification)
+  const districtTints: Record<string, string> = {
+    'Little Italy': 'rgba(255, 180, 100, 0.12)',
+    'Bronx': 'rgba(255, 100, 100, 0.10)',
+    'Brooklyn': 'rgba(100, 160, 255, 0.10)',
+    'Queens': 'rgba(100, 255, 160, 0.10)',
+    'Manhattan': 'rgba(255, 215, 0, 0.10)',
+    'Staten Island': 'rgba(200, 130, 255, 0.10)',
+  };
+
   // District abbreviations for hex labels
   const districtAbbreviations: Record<string, string> = {
     'Little Italy': 'LI',
