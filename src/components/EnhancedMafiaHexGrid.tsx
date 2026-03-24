@@ -915,9 +915,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   y1={seg.y1}
                   x2={seg.x2}
                   y2={seg.y2}
-                  stroke="rgba(255, 255, 255, 0.4)"
-                  strokeWidth="2"
-                  strokeDasharray="4,3"
+                  stroke="rgba(255, 220, 120, 0.6)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
                 />
               ))}
             </g>
