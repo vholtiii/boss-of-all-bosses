@@ -2784,10 +2784,11 @@ export const useEnhancedMafiaGameState = (
       const aggression = opponent.strategy.aggressionLevel || 50;
       const cooperation = opponent.strategy.cooperationTendency || 50;
 
-      // AI action budget — boosted in early game (turns 1-8) for faster expansion
+      // AI action budget — boosted in early game (turns 1-8) for faster expansion, scaled by map size
       const earlyGameBonus = state.turn <= 8 ? 2 : 0;
-      let aiActionsRemaining = 2 + (opponent.resources.influence >= 50 ? 1 : 0) + earlyGameBonus;
-      let aiTacticalRemaining = 3 + earlyGameBonus;
+      const mapActionBonus = state.mapSize === 'small' ? -1 : state.mapSize === 'large' ? 1 : 0;
+      let aiActionsRemaining = Math.max(1, 2 + (opponent.resources.influence >= 50 ? 1 : 0) + earlyGameBonus + mapActionBonus);
+      let aiTacticalRemaining = Math.max(2, 3 + earlyGameBonus + mapActionBonus);
 
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
       for (const unit of aiUnits) {
