@@ -376,15 +376,18 @@ const generateHexMap = (radius: number, seed?: number): HexTile[] => {
   const tiles: HexTile[] = [];
   const rng = mulberry32(seed ?? Math.floor(Math.random() * 4294967296));
   
+  const threshold = Math.ceil(radius * 0.4);
+  const threshold2 = Math.ceil(radius * 0.3);
+  
   const getDistrict = (q: number, r: number): HexTile['district'] => {
-    if (q <= -4 && r >= 3) return 'Little Italy';
-    if (q >= 3 && r <= -4) return 'Manhattan';
-    if (q >= 3 && r >= 3) return 'Staten Island';
-    if (q <= -4 && r <= -4) return 'Queens';
-    if (r >= 3) return 'Brooklyn';
-    if (r <= -4) return 'Bronx';
-    if (q >= 3) return 'Manhattan';
-    if (q <= -4) return 'Queens';
+    if (q <= -threshold && r >= threshold2) return 'Little Italy';
+    if (q >= threshold2 && r <= -threshold) return 'Manhattan';
+    if (q >= threshold2 && r >= threshold2) return 'Staten Island';
+    if (q <= -threshold && r <= -threshold) return 'Queens';
+    if (r >= threshold2) return 'Brooklyn';
+    if (r <= -threshold) return 'Bronx';
+    if (q >= threshold2) return 'Manhattan';
+    if (q <= -threshold) return 'Queens';
     return 'Brooklyn';
   };
 
