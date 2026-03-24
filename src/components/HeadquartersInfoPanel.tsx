@@ -61,6 +61,7 @@ interface HeadquartersInfoPanelProps {
   currentTurn?: number;
   sitdownCooldownUntil?: number;
   onCallSitdown?: (soldierIds: string[]) => void;
+  detectedThreats?: Array<{ family: string; targetUnitId: string; turnsRemaining: number; detectedVia: string; detectedOnTurn: number }>;
 }
 
 const familyColors: Record<string, string> = {
