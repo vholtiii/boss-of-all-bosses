@@ -5331,7 +5331,8 @@ export const useEnhancedMafiaGameState = (
         const moneyGain = Math.floor(baseMoneyGain * respectPayoutMultiplier);
         const respectGain = isEnemy ? 3 : 5;
         state.resources.money += moneyGain;
-        state.resources.respect += respectGain;
+        state.reputation.respect = Math.min(100, state.reputation.respect + respectGain);
+        state.resources.respect = Math.round(state.reputation.respect);
         
         allPlayerUnits.forEach(u => {
           if (state.soldierStats[u.id]) {
