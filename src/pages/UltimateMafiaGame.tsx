@@ -866,6 +866,68 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         open={showTurnSummary}
         onClose={() => setShowTurnSummary(false)}
       />
+
+      {/* Plan Hit Soldier Picker Modal */}
+      <AnimatePresence>
+        {showPlanHitSoldierMenu && (() => {
+          const eligibleSoldiers = (gameState.deployedUnits || []).filter(
+            (u: any) => u.family === gameState.playerFamily && u.type === 'soldier'
+          );
+          const hexMap = gameState.hexMap || [];
+          return (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+              onClick={() => handleAction({ type: 'cancel_plan_hit_mode' })}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-card border border-border rounded-lg shadow-2xl p-5 w-[340px] max-h-[70vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-bold text-foreground mb-1">🎯 Select a Soldier for the Hit</h3>
+                <p className="text-xs text-muted-foreground mb-4">Choose which soldier will plan the assassination</p>
+                {eligibleSoldiers.length === 0 ? (
+                  <p className="text-sm text-destructive">No soldiers deployed. Deploy a soldier first.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {eligibleSoldiers.map((soldier: any) => {
+                      const hex = hexMap.find((h: any) => h.q === soldier.q && h.r === soldier.r && h.s === soldier.s);
+                      const district = hex?.district || 'Unknown';
+                      return (
+                        <button
+                          key={soldier.id}
+                          className="w-full flex items-center gap-3 p-3 rounded-md border border-border bg-background hover:bg-accent hover:border-primary transition-colors text-left"
+                          onClick={() => handleAction({ type: 'plan_hit_select_soldier', unitId: soldier.id })}
+                        >
+                          <div className="text-2xl">🔫</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold text-foreground truncate">{soldier.name || 'Soldier'}</div>
+                            <div className="text-xs text-muted-foreground">{district} · {soldier.movesRemaining} moves left</div>
+                          </div>
+                          <Badge variant="outline" className="text-xs shrink-0">Select</Badge>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full mt-4"
+                  onClick={() => handleAction({ type: 'cancel_plan_hit_mode' })}
+                >
+                  Cancel
+                </Button>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
     </>
   );
 };
