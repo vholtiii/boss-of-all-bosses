@@ -21,7 +21,7 @@ import {
   HITMAN_MAX_LIFETIME, HITMAN_REFUND_RATE, HITMAN_ALERT_DURATION,
   MAX_CAPOS, CAPO_PROMOTION_COST, CAPO_PROMOTION_REQUIREMENTS,
   SOLDIER_LOYALTY_CAP, CAPO_LOYALTY_CAP,
-  FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType,
+  FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType, PERSONALITY_BONUSES,
   NEGOTIATION_TYPES,
   ScoutedHex, Safehouse, MoveAction, PlannedHit,
   FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
@@ -4954,7 +4954,7 @@ export const useEnhancedMafiaGameState = (
           const idx = state.deployedUnits.indexOf(eu);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         });
-        tile.controllingFamily = null; // Hit clears enemy control — player must Claim next turn
+        tile.controllingFamily = 'neutral'; // Hit clears enemy control — player must Claim next turn
         
         // Check if enemy had a safehouse on this hex → player gets bounty + intel
         // (AI safehouses are tracked per-AI; for now we check if any AI opponent has a safehouse here)
@@ -5326,6 +5326,24 @@ export const useEnhancedMafiaGameState = (
     // Reputation cost
     if (config.reputationCost > 0) {
       state.reputation.respect = Math.max(0, state.reputation.respect - config.reputationCost);
+    }
+
+    // ── SUCCESS ROLL ── (was previously missing — negotiations auto-succeeded)
+    const capoPersonality = capo.personality || 'enforcer';
+    const personalityBonus = PERSONALITY_BONUSES[capoPersonality]?.[negotiationType] || 0;
+    const allBonus = PERSONALITY_BONUSES[capoPersonality]?.all || 0;
+    const influenceBonus = (state.resources.influence / 100) * 10; // up to +10%
+    const totalChance = Math.min(95, config.baseSuccess + personalityBonus + allBonus + influenceBonus);
+    const roll = Math.random() * 100;
+
+    if (roll > totalChance) {
+      // Negotiation FAILED
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'error', title: `❌ ${config.label} Failed!`,
+        message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} rejected the offer. You spent $${cost.toLocaleString()} for nothing. (${Math.round(totalChance)}% chance)`,
+      }];
+      syncLegacyUnits(state);
+      return state;
     }
 
     switch (negotiationType as NegotiationType) {

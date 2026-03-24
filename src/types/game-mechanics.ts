@@ -244,11 +244,11 @@ export const HITMAN_ALERT_DURATION = 5;
 export const MAX_CAPOS = 3;
 export const CAPO_PROMOTION_COST = 10000;
 export const CAPO_PROMOTION_REQUIREMENTS = {
-  minVictories: 5,       // victories on SoldierStats (max 5)
-  minLoyalty: 80,         // loyalty on SoldierStats (soldier cap)
-  minTraining: 3,        // training on SoldierStats (0-3 scale)
-  minToughness: 5,       // toughness on SoldierStats (0-5)
-  minRacketeering: 5,    // racketeering on SoldierStats (0-5)
+  minVictories: 3,       // victories on SoldierStats (max 5)
+  minLoyalty: 60,         // loyalty on SoldierStats (soldier cap 80)
+  minTraining: 2,        // training on SoldierStats (0-3 scale)
+  minToughness: 3,       // toughness on SoldierStats (0-5)
+  minRacketeering: 3,    // racketeering on SoldierStats (0-5)
 };
 
 // Hitman promotion requirements (legacy — kept for reference)
