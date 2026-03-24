@@ -1334,28 +1334,25 @@ const isHexFortifiedAny = (fortifiedHexes: FortifiedHex[], q: number, r: number,
     });
   }, []);
 
-  // ============ FORTIFY UNIT ============
+  // ============ FORTIFY HEX ============
   const fortifyUnit = useCallback(() => {
     setGameState(prev => {
       if (prev.turnPhase !== 'move') return prev;
       if (prev.tacticalActionsRemaining <= 0) return prev;
       if (!prev.selectedUnitId) return prev;
-      const unitIdx = prev.deployedUnits.findIndex(u => u.id === prev.selectedUnitId);
-      if (unitIdx === -1) return prev;
-      const unit = prev.deployedUnits[unitIdx];
+      const unit = prev.deployedUnits.find(u => u.id === prev.selectedUnitId);
+      if (!unit) return prev;
       if (unit.family !== prev.playerFamily) return prev;
-      if (unit.fortified) return prev; // Already fortified, don't waste action
-
-      const newUnits = [...prev.deployedUnits];
-      newUnits[unitIdx] = { ...unit, fortified: true, movesRemaining: 0 };
+      if (isHexFortified(prev.fortifiedHexes || [], unit.q, unit.r, unit.s, prev.playerFamily)) return prev;
 
       return {
-        ...prev, deployedUnits: newUnits,
+        ...prev,
+        fortifiedHexes: [...(prev.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: prev.playerFamily, fortifiedOnTurn: prev.turn }],
         selectedUnitId: null, availableMoveHexes: [],
         tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
         pendingNotifications: [...prev.pendingNotifications, {
-          type: 'info' as const, title: '🛡️ Unit Fortified',
-          message: `${unit.type === 'capo' ? unit.name || 'Capo' : 'Soldier'} is fortified (+${FORTIFY_DEFENSE_BONUS}% defense).`,
+          type: 'info' as const, title: '🛡️ Hex Fortified',
+          message: `Defenses built at this position (+${FORTIFY_DEFENSE_BONUS}% defense for all units here).`,
         }],
       };
     });
