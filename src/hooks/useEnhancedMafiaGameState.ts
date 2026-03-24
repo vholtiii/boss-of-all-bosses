@@ -1179,6 +1179,8 @@ export const useEnhancedMafiaGameState = (
   const processScout = (prev: EnhancedMafiaGameState, unit: DeployedUnit, targetLocation: { q: number; r: number; s: number }): EnhancedMafiaGameState => {
     const tile = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
     if (!tile) return prev;
+    // Block scouting HQ hexes
+    if (tile.isHeadquarters) return prev;
     const dist = hexDistance(unit, targetLocation);
     const maxScoutRange = unit.type === 'capo' ? 2 : 1;
     if (dist < 1 || dist > maxScoutRange) return prev;
