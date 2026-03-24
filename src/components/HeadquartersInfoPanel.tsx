@@ -307,7 +307,47 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
             </div>
           )}
 
-          {/* Units Section */}
+          {/* Active Threats — Player Only */}
+          {isPlayerFamily && detectedThreats && detectedThreats.length > 0 && (
+            <div className="space-y-1.5">
+              <h3 className="text-sm font-semibold text-destructive font-playfair flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                ⚠️ Active Threats
+              </h3>
+              {detectedThreats.map((threat, i) => {
+                const sourceLabels: Record<string, string> = {
+                  scout: '🕵️ Street Scout',
+                  bribe_captain: '👮 Police Captain',
+                  bribe_chief: '🏛️ Police Chief',
+                  bribe_mayor: '🏛️ Mayor\'s Office',
+                };
+                const targetUnit = deployedUnits.find((u: any) => u.id === threat.targetUnitId);
+                const targetName = targetUnit ? (targetUnit.name || `Capo ${threat.targetUnitId.slice(0, 4)}`) : 'Unknown';
+                const isUrgent = threat.turnsRemaining <= 1;
+                return (
+                  <div
+                    key={i}
+                    className={`rounded-lg p-2 text-[11px] border ${
+                      isUrgent
+                        ? 'bg-red-500/20 border-red-500/40 text-red-300'
+                        : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
+                    }`}
+                  >
+                    <div className="font-bold capitalize">
+                      {threat.family} → {targetName}
+                    </div>
+                    <div className="text-[10px] opacity-80">
+                      {threat.turnsRemaining} turn{threat.turnsRemaining !== 1 ? 's' : ''} until execution
+                    </div>
+                    <div className="text-[10px] opacity-60 italic">
+                      Source: {sourceLabels[threat.detectedVia] || 'Unknown'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <div className="space-y-2">
             <h3 className="text-sm font-semibold text-mafia-gold font-playfair flex items-center gap-2">
               <Users className="h-4 w-4" />
