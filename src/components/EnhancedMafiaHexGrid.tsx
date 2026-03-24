@@ -587,7 +587,24 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       <div className="absolute inset-0 flex items-center justify-center">
         <svg width="100%" height="100%" viewBox={viewBox} className="overflow-visible">
           <g transform={`scale(${zoom})`}>
-            {hexMap.map(tile => {
+            {/* District background tint layer */}
+            <g className="pointer-events-none">
+              {hexMap.map(tile => {
+                const { x, y } = getHexPosition(tile.q, tile.r);
+                const tint = districtTints[tile.district];
+                if (!tint) return null;
+                return (
+                  <polygon
+                    key={`tint-${tile.q},${tile.r},${tile.s}`}
+                    points={getHexPoints(x, y, baseHexRadius)}
+                    fill={tint}
+                    stroke="none"
+                  />
+                );
+              })}
+            </g>
+
+
               const { x, y } = getHexPosition(tile.q, tile.r);
               const key = `${tile.q},${tile.r},${tile.s}`;
               const unitsHere = unitsByHex.get(key) || [];
