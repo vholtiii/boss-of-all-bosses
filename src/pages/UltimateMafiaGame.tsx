@@ -932,7 +932,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onCallSitdown={(soldierIds) => handleAction({ type: 'call_sitdown', soldierIds })}
             detectedThreats={isPlayerHQ ? ((gameState as any).aiPlannedHits || []).filter((h: any) => h.detectedVia) : []}
             onBossNegotiate={isPlayerHQ ? (targetFamily) => handleAction({ type: 'open_boss_negotiate', targetFamily }) : undefined}
-            negotiationUsedThisTurn={(gameState as any).bossNegotiationUsedThisTurn || false}
+negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
             activePacts={isPlayerHQ ? {
               ceasefires: (gameState as any).ceasefires || [],
               alliances: (gameState as any).alliances || [],
