@@ -5531,9 +5531,9 @@ export const useEnhancedMafiaGameState = (
 
     state.resources.money -= cost;
     if (isFamily) {
-      state.bossNegotiationUsedThisTurn = true;
+      state.bossNegotiationCooldown = 2;
     } else {
-      state.capoNegotiationUsedThisTurn = true;
+      state.capoNegotiationCooldown = 2;
     }
 
     // Reputation cost
