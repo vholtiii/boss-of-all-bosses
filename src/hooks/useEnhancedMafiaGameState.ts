@@ -2477,6 +2477,7 @@ export const useEnhancedMafiaGameState = (
 
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
       for (const unit of aiUnits) {
+        if (aiTacticalRemaining <= 0) break; // No more tactical actions
         let movesLeft = Math.min(unit.movesRemaining, unit.type === 'soldier' ? (2 + alertBonus) : 3);
         while (movesLeft > 0) {
           const neighbors = unit.type === 'soldier'
