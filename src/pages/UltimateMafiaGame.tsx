@@ -135,6 +135,11 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     targetR: number;
     targetS: number;
     capoId: string;
+    scope: 'territory';
+  } | {
+    open: boolean;
+    scope: 'family';
+    targetFamily: string;
   } | null>(null);
 
   // Plan Hit mode — 2-step: select soldier, then select target hex+unit
