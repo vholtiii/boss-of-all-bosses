@@ -98,7 +98,7 @@ const families: FamilyInfo[] = [
       { label: 'Economy', icon: <DollarSign className="h-3.5 w-3.5" />, value: 2 },
       { label: 'Fear', icon: <Crown className="h-3.5 w-3.5" />, value: 4 },
     ],
-    bonuses: ['+20% all income', '-15% recruitment cost', '+10% reputation gain'],
+    bonuses: ['+20% combat power', '-15% recruitment cost', '+15% fear generation'],
     startingResources: { money: 35000, soldiers: 3, influence: 18, politicalPower: 10, respect: 25 },
   },
 ];
