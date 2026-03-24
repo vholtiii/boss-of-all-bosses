@@ -123,7 +123,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Strategic Actions"
           icon={<Swords className="h-4 w-4" />}
-          isOpen={openSections.has('actions'}
+          isOpen={openSections.has('actions')}
           onToggle={() => toggle('actions')}
           phaseLocked={actionsLocked}
         >
@@ -153,7 +153,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Economy"
           icon={<TrendingUp className="h-4 w-4" />}
-          isOpen={openSections.has('economy'}
+          isOpen={openSections.has('economy')}
           onToggle={() => toggle('economy')}
           phaseLocked={actionsLocked}
         >
@@ -224,7 +224,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Recruitment & Tactical"
           icon={<Users className="h-4 w-4" />}
-          isOpen={openSections.has('recruitment'}
+          isOpen={openSections.has('recruitment')}
           onToggle={() => toggle('recruitment')}
           phaseLocked={!isTacticalPhase}
         >
@@ -352,7 +352,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Defense & Law"
           icon={<Gavel className="h-4 w-4" />}
-          isOpen={openSections.has('defense'}
+          isOpen={openSections.has('defense')}
           onToggle={() => toggle('defense')}
           phaseLocked={actionsLocked}
         >
@@ -434,7 +434,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="Corruption"
           icon={<Gavel className="h-4 w-4" />}
-          isOpen={openSections.has('corruption'}
+          isOpen={openSections.has('corruption')}
           onToggle={() => toggle('corruption')}
           phaseLocked={actionsLocked}
         >
@@ -456,7 +456,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title={`Hitmen (${gameState.hitmanContracts?.length || 0}/3)`}
           icon={<Crosshair className="h-4 w-4" />}
-          isOpen={openSections.has('hitmen'}
+          isOpen={openSections.has('hitmen')}
           onToggle={() => toggle('hitmen')}
           phaseLocked={actionsLocked}
         >
@@ -478,7 +478,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title={`Capo Promotion (${gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'capo').length}/${3})`}
           icon={<Crown className="h-4 w-4" />}
-          isOpen={openSections.has('capo_promotion'}
+          isOpen={openSections.has('capo_promotion')}
           onToggle={() => toggle('capo_promotion')}
         >
           <CapoPromotionPanel
@@ -505,7 +505,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         <CollapsibleSection
           title="District Control"
           icon={<Building2 className="h-4 w-4" />}
-          isOpen={openSections.has('district_control'}
+          isOpen={openSections.has('district_control')}
           onToggle={() => toggle('district_control')}
         >
           <div className="space-y-1.5">
@@ -636,7 +636,7 @@ export const RightSidePanel: React.FC<{
           <CollapsibleSection
             title={`Events (${gameState.events.length})`}
             icon={<AlertTriangle className="h-4 w-4 text-primary" />}
-            isOpen={openSections.has('events'}
+            isOpen={openSections.has('events')}
             onToggle={() => toggle('events')}
           >
             <div className="space-y-2">
@@ -667,7 +667,7 @@ export const RightSidePanel: React.FC<{
         <CollapsibleSection
           title="Rival Families"
           icon={<Skull className="h-4 w-4" />}
-          isOpen={openSections.has('rivals'}
+          isOpen={openSections.has('rivals')}
           onToggle={() => toggle('rivals')}
         >
           <div className="space-y-2">
@@ -738,7 +738,7 @@ export const RightSidePanel: React.FC<{
           <CollapsibleSection
             title={`Businesses (${gameState.businesses.length})`}
             icon={<Building2 className="h-4 w-4" />}
-            isOpen={openSections.has('businesses'}
+            isOpen={openSections.has('businesses')}
             onToggle={() => toggle('businesses')}
           >
             <div className="space-y-1">
