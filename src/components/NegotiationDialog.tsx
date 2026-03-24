@@ -5,44 +5,57 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   NegotiationType, NegotiationConfig, NEGOTIATION_TYPES, PERSONALITY_BONUSES, PERSONALITY_LABELS,
-  CapoPersonality, AllianceCondition,
+  CapoPersonality, AllianceCondition, NegotiationScope, NEGOTIATION_REFUND_RATE,
 } from '@/types/game-mechanics';
 
 interface NegotiationDialogProps {
   open: boolean;
   onClose: () => void;
   onNegotiate: (type: NegotiationType, extraData?: any) => void;
-  capoName: string;
-  capoPersonality: CapoPersonality;
+  scope: NegotiationScope;
+  capoName?: string;
+  capoPersonality?: CapoPersonality;
   enemyFamily: string;
   playerReputation: number;
   playerMoney: number;
-  enemyStrength: number; // number of enemy units on hex
+  enemyStrength: number;
   hexIncome: number;
+  negotiationUsedThisTurn: boolean;
+  // For boss negotiation — choose target family
+  availableEnemyFamilies?: string[];
+  onSelectTargetFamily?: (family: string) => void;
 }
 
 const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
-  open, onClose, onNegotiate, capoName, capoPersonality, enemyFamily,
-  playerReputation, playerMoney, enemyStrength, hexIncome,
+  open, onClose, onNegotiate, scope, capoName, capoPersonality,
+  enemyFamily, playerReputation, playerMoney, enemyStrength, hexIncome,
+  negotiationUsedThisTurn, availableEnemyFamilies, onSelectTargetFamily,
 }) => {
   const [selectedType, setSelectedType] = useState<NegotiationType | null>(null);
   const [rolling, setRolling] = useState(false);
   const [rollResult, setRollResult] = useState<{ success: boolean; roll: number; needed: number } | null>(null);
   const [displayNumber, setDisplayNumber] = useState(50);
   const [allianceCondition, setAllianceCondition] = useState<AllianceCondition['type']>('no_attack_family');
+  const [selectedTargetFamily, setSelectedTargetFamily] = useState<string>(enemyFamily);
 
-  const personalityInfo = PERSONALITY_LABELS[capoPersonality];
-  const personalityBonuses = PERSONALITY_BONUSES[capoPersonality];
+  const personality = capoPersonality || 'diplomat';
+  const personalityInfo = PERSONALITY_LABELS[personality];
+  const personalityBonuses = PERSONALITY_BONUSES[personality];
+
+  // Filter negotiation types by scope
+  const filteredTypes = NEGOTIATION_TYPES.filter(n => n.scope === scope);
 
   const getSuccessChance = useCallback((type: NegotiationType) => {
     const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
     let chance = config.baseSuccess;
-    chance += personalityBonuses[type] || 0;
-    chance += personalityBonuses.all || 0;
+    if (scope === 'territory') {
+      chance += personalityBonuses[type] || 0;
+      chance += personalityBonuses.all || 0;
+    }
     chance += Math.floor(playerReputation / 5);
     if (type === 'bribe_territory') chance -= enemyStrength * 5;
     return Math.max(5, Math.min(95, chance));
-  }, [personalityBonuses, playerReputation, enemyStrength]);
+  }, [personalityBonuses, playerReputation, enemyStrength, scope]);
 
   const getCost = useCallback((type: NegotiationType) => {
     const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
@@ -59,7 +72,6 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
     setRolling(true);
     setRollResult(null);
 
-    // Animate rolling numbers
     let count = 0;
     const interval = setInterval(() => {
       setDisplayNumber(Math.floor(Math.random() * 100) + 1);
@@ -76,45 +88,82 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
 
   const handleConfirm = useCallback(() => {
     if (!rollResult || !selectedType) return;
-    if (rollResult.success) {
-      const extraData: any = {};
-      if (selectedType === 'alliance') {
-        extraData.condition = { type: allianceCondition, target: enemyFamily, violated: false };
-      }
-      onNegotiate(selectedType, extraData);
+    const extraData: any = {};
+    if (selectedType === 'alliance') {
+      extraData.condition = { type: allianceCondition, target: selectedTargetFamily, violated: false };
     }
+    // Always call onNegotiate — backend handles success/failure
+    onNegotiate(selectedType, extraData);
     onClose();
-  }, [rollResult, selectedType, allianceCondition, enemyFamily, onNegotiate, onClose]);
+  }, [rollResult, selectedType, allianceCondition, selectedTargetFamily, onNegotiate, onClose]);
 
-  // Reset state when dialog opens
   useEffect(() => {
     if (open) {
       setSelectedType(null);
       setRolling(false);
       setRollResult(null);
       setDisplayNumber(50);
+      setSelectedTargetFamily(enemyFamily);
     }
-  }, [open]);
+  }, [open, enemyFamily]);
+
+  const scopeLabel = scope === 'family' ? '🏛️ Boss Diplomacy' : '📍 Capo Negotiation';
+  const targetName = selectedTargetFamily.charAt(0).toUpperCase() + selectedTargetFamily.slice(1);
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-lg bg-noir-dark/95 border-primary/30 text-foreground">
         <DialogHeader>
           <DialogTitle className="text-mafia-gold font-playfair text-xl">
-            🤝 Negotiate — {enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} Territory
+            {scope === 'family' ? '🏛️ Boss Diplomacy' : '🤝 Negotiate'} — {targetName} Territory
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            <span className="font-semibold text-foreground">{capoName}</span>{' '}
-            <Badge variant="outline" className="text-xs ml-1">
-              {personalityInfo.icon} {personalityInfo.label}
-            </Badge>
+            {scope === 'territory' && capoName && (
+              <>
+                <span className="font-semibold text-foreground">{capoName}</span>{' '}
+                <Badge variant="outline" className="text-xs ml-1">
+                  {personalityInfo.icon} {personalityInfo.label}
+                </Badge>
+              </>
+            )}
+            {scope === 'family' && (
+              <span className="text-foreground">The Boss sends word from Headquarters</span>
+            )}
           </DialogDescription>
         </DialogHeader>
 
+        {/* Cooldown notice */}
+        {negotiationUsedThisTurn && (
+          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-center">
+            <p className="text-sm font-semibold text-destructive">⏳ Already Negotiated This Turn</p>
+            <p className="text-xs text-muted-foreground mt-1">Only 1 negotiation attempt per turn (Boss + Capo combined).</p>
+          </div>
+        )}
+
+        {/* Boss family selector */}
+        {scope === 'family' && availableEnemyFamilies && availableEnemyFamilies.length > 1 && !selectedType && (
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Target Family:</p>
+            <div className="flex gap-2">
+              {availableEnemyFamilies.map(fam => (
+                <Button
+                  key={fam}
+                  size="sm"
+                  variant={selectedTargetFamily === fam ? 'default' : 'outline'}
+                  onClick={() => setSelectedTargetFamily(fam)}
+                  className="text-xs capitalize"
+                >
+                  {fam}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Negotiation options */}
-        {!selectedType && (
+        {!selectedType && !negotiationUsedThisTurn && (
           <div className="space-y-2 mt-2">
-            {NEGOTIATION_TYPES.map(config => {
+            {filteredTypes.map(config => {
               const chance = getSuccessChance(config.type);
               const cost = getCost(config.type);
               const canAfford = playerMoney >= cost;
@@ -138,14 +187,22 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm">{config.icon} {config.label}</span>
+                    <span className="font-bold text-sm">
+                      {config.icon} {config.label}
+                      <Badge variant="outline" className="text-[9px] ml-2 h-4">
+                        {config.scope === 'family' ? '🏛️ Family' : '📍 Territory'}
+                      </Badge>
+                    </span>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className="text-xs">{chance}% chance</Badge>
                       <Badge variant="outline" className="text-xs text-green-400">${cost.toLocaleString()}</Badge>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{config.description}</p>
-                  {personalityBonuses[config.type] > 0 && (
+                  <p className="text-[10px] text-muted-foreground/70 mt-0.5 italic">
+                    50% refund on failure
+                  </p>
+                  {scope === 'territory' && personalityBonuses[config.type] > 0 && (
                     <p className="text-xs text-primary mt-1">
                       {personalityInfo.icon} +{personalityBonuses[config.type]}% from {personalityInfo.label}
                     </p>
@@ -161,7 +218,7 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
           <div className="space-y-3 mt-2">
             <p className="text-sm font-semibold">Choose a condition for the pact:</p>
             {([
-              { type: 'no_attack_family' as const, label: `Don't attack ${enemyFamily}`, icon: '🛡️' },
+              { type: 'no_attack_family' as const, label: `Don't attack ${targetName}`, icon: '🛡️' },
               { type: 'no_expand_district' as const, label: `Don't expand into their district`, icon: '🚫' },
               { type: 'share_income' as const, label: 'Share border income (10%)', icon: '💰' },
             ]).map(cond => (
@@ -213,8 +270,8 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
                   Rolled {rollResult.roll} — needed ≤{rollResult.needed}
                 </p>
                 {!rollResult.success && (
-                  <p className="text-xs text-red-400/80">
-                    The {enemyFamily} family rejected your offer. Your Capo may be expelled.
+                  <p className="text-xs text-amber-400/80">
+                    50% of your payment will be refunded.
                   </p>
                 )}
                 <Button onClick={handleConfirm} className="mt-3">
