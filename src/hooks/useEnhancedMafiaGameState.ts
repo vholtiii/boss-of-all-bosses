@@ -5169,12 +5169,12 @@ export const useEnhancedMafiaGameState = (
           state.resources.respect = Math.round(state.reputation.respect);
           state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + BLIND_HIT_FEAR);
           
-          // Max out the initiating soldier's stats
+          // Boost the initiating soldier's stats (bounded, not maxed)
           playerUnits.forEach(u => {
             if (state.soldierStats[u.id]) {
-              state.soldierStats[u.id].toughness = 5;
-              state.soldierStats[u.id].loyalty = Math.min(SOLDIER_LOYALTY_CAP, 80);
-              state.soldierStats[u.id].victories = 5;
+              state.soldierStats[u.id].toughness = Math.min(5, (state.soldierStats[u.id].toughness || 1) + 3);
+              state.soldierStats[u.id].victories = Math.min(5, (state.soldierStats[u.id].victories || 0) + 2);
+              state.soldierStats[u.id].loyalty = Math.min(SOLDIER_LOYALTY_CAP, (state.soldierStats[u.id].loyalty || 50) + 15);
               state.soldierStats[u.id].hits += 1;
             }
           });
