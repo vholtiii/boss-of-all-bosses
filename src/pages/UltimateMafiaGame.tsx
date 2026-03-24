@@ -214,6 +214,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   // Close headquarters panel
   const closeHeadquartersPanel = useCallback(() => {
     setSelectedHeadquarters(null);
+    setBossHighlightHex(null);
   }, []);
   // notifyTerritoryCaptured and notifyReputationChange already destructured above
 
