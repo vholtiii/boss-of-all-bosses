@@ -231,8 +231,8 @@ export interface EnhancedMafiaGameState {
   ceasefires: CeasefirePact[];
   shareProfitsPacts: ShareProfitsPact[];
   safePassagePacts: SafePassagePact[];
-  bossNegotiationUsedThisTurn: boolean;
-  capoNegotiationUsedThisTurn: boolean;
+  bossNegotiationCooldown: number;
+  capoNegotiationCooldown: number;
   victoryProgress: VictoryProgress;
   victoryType: VictoryType;
   familyBonuses: FamilyBonuses;
