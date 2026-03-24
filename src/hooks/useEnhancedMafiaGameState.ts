@@ -4366,7 +4366,7 @@ export const useEnhancedMafiaGameState = (
             unit.r = hq.r;
             unit.s = hq.s;
             unit.movesRemaining = 0;
-            unit.fortified = false;
+            // (hex fortification stays on the hex, unit just moves to HQ)
             // Loyalty bonus
             const stats = newState.soldierStats[sid];
             if (stats) {
