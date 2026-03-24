@@ -34,7 +34,7 @@ interface HeadquartersInfoPanelProps {
     boss: { q: number; r: number; s: number; id: string };
   };
   businesses: any[];
-  finances?: { totalIncome: number; totalExpenses: number; legalProfit: number; illegalProfit: number; totalProfit: number; dirtyMoney: number; cleanMoney: number; legalCosts: number };
+  finances?: { totalIncome: number; totalExpenses: number; legalProfit: number; illegalProfit: number; totalProfit: number; dirtyMoney: number; cleanMoney: number; legalCosts: number; soldierMaintenance?: number; communityUpkeep?: number; arrestPenalty?: number; heatPenalty?: number };
   onClose: () => void;
   onSelectUnitFromHeadquarters?: (unitType: 'soldier' | 'capo', family: string) => void;
   movementPhase?: boolean;
