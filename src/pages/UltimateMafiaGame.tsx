@@ -272,7 +272,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       id: 'actions',
       label: 'Actions',
       icon: <Swords className="h-4 w-4" />,
-      content: <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} />
+      content: <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} onSelectUnit={selectUnit} />
     },
     {
       id: 'intel',
@@ -453,7 +453,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   }
 
   const leftSidebar = (
-    <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} />
+    <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} onSelectUnit={selectUnit} />
   );
 
   const rightSidebar = (
