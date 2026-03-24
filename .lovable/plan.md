@@ -1,34 +1,45 @@
 
-# HQ Assault & Domination Victory — Implemented
 
-## Features Added
+# Boss Action: Call a Sitdown
 
-### Assault HQ
-- Soldiers (toughness ≥ 4, loyalty ≥ 70) can assault enemy HQ from adjacent hex
-- Base 15% success, -30% HQ defense, +5% per friendly adjacent, +10% per flipped soldier
-- Max 50% chance cap
-- Success: family eliminated, all units/territory wiped, +$25K, +30 respect, +40 fear
-- Failure: soldier killed, adjacent allies -30 loyalty, no heat penalty
+## Concept
+The Boss can召集 all or selected soldiers back to HQ instantly, regardless of map position. This is a strategic defensive action — more units at HQ = stronger defense against HQ assaults (aligns with existing HQ defense mechanics).
 
-### Flip Soldier
-- $5,000 to attempt turning enemy soldier near their HQ (loyalty > 60)
-- Base 25% success, +10% if loyalty 60-70, +5% per 10 influence above 50, +10% schemer capo bonus
-- Success: soldier flipped (HQ defense -10%), enemy unaware
-- Failure: -15 influence, target loyalty +10, attempt discovered
+## Rules
+- **Available during**: Action phase only, player HQ panel (Boss card)
+- **Cooldown**: Once every 5 turns (powerful action)
+- **Cost**: $2,000 (meeting expenses)
+- **Selection**: Modal lets player choose "All Soldiers" or pick individual soldiers via checkboxes
+- **Effect**: Selected soldiers are teleported to HQ hex instantly
+- **Stacking override**: HQ hex is exempt from the 2-unit stacking limit (it's invulnerable and already holds hidden units)
+- **Defense bonus**: Each soldier at HQ adds +5% to HQ assault defense (stacks with existing -30% HQ defense)
+- **Loyalty bonus**: All recalled soldiers gain +5 loyalty (Boss shows care)
+- **Tradeoff**: Recalled soldiers lose any fortification status and cannot act again this turn
 
-### HQ Protection
-- HQ hexes cannot be scouted, claimed, or extorted
-- Normal hit/sabotage/negotiate blocked on HQ hexes
+## Changes
 
-### Domination Victory
-- Eliminate all 4 rival families → win
-- Tracked in VictoryTracker with skull icon
+### 1. `src/types/game-mechanics.ts`
+Add constants: `SITDOWN_COST = 2000`, `SITDOWN_COOLDOWN = 5`, `SITDOWN_LOYALTY_BONUS = 5`, `SITDOWN_DEFENSE_PER_SOLDIER = 5`
 
-### AI Behavior
-- Aggressive/unpredictable AI attempts HQ assaults after turn 12 (10% chance/turn)
+### 2. `src/hooks/useEnhancedMafiaGameState.ts`
+- Add `sitdownCooldownUntil: number` to game state (init 0)
+- Add `'call_sitdown'` action handler: validates cooldown/cost/phase, moves selected soldier IDs to HQ coords, applies loyalty bonus, sets cooldown
+- Does NOT consume action budget (Boss action, not soldier action)
+
+### 3. `src/components/HeadquartersInfoPanel.tsx`
+- Add "📋 Call a Sitdown" button below the Boss card (visible during action phase, player family only)
+- Shows cooldown timer if on cooldown
+- On click: opens inline selection UI listing all deployed soldiers (not at HQ) with checkboxes + "Select All" toggle
+- "Confirm Sitdown" button triggers the action
+- Pass new `onCallSitdown` callback prop and `turnPhase`/`sitdownCooldownUntil`/`currentTurn` props
+
+### 4. `src/pages/UltimateMafiaGame.tsx`
+- Wire `onCallSitdown` prop to `performAction({ type: 'call_sitdown', soldierIds: [...] })`
+- Pass `turnPhase`, `sitdownCooldownUntil`, `currentTurn` to HeadquartersInfoPanel
 
 ## Files Modified
-- `src/types/game-mechanics.ts` — constants, FlippedSoldier interface, VictoryProgress update
-- `src/hooks/useEnhancedMafiaGameState.ts` — processHQAssault, processFlipSoldier, AI assault logic, HQ scout block
-- `src/components/EnhancedMafiaHexGrid.tsx` — assault/flip UI buttons, HQ action blocking
-- `src/components/VictoryTracker.tsx` — domination victory row
+- `src/types/game-mechanics.ts`
+- `src/hooks/useEnhancedMafiaGameState.ts`
+- `src/components/HeadquartersInfoPanel.tsx`
+- `src/pages/UltimateMafiaGame.tsx`
+
