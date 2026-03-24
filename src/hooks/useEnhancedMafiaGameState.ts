@@ -5074,7 +5074,8 @@ export const useEnhancedMafiaGameState = (
         
         if (!isScouted) {
           // ===== BLIND HIT VICTORY: Enhanced rewards =====
-          state.resources.respect += BLIND_HIT_RESPECT;
+          state.reputation.respect = Math.min(100, state.reputation.respect + BLIND_HIT_RESPECT);
+          state.resources.respect = Math.round(state.reputation.respect);
           state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + BLIND_HIT_FEAR);
           
           // Max out the initiating soldier's stats
@@ -5331,7 +5332,8 @@ export const useEnhancedMafiaGameState = (
         const moneyGain = Math.floor(baseMoneyGain * respectPayoutMultiplier);
         const respectGain = isEnemy ? 3 : 5;
         state.resources.money += moneyGain;
-        state.resources.respect += respectGain;
+        state.reputation.respect = Math.min(100, state.reputation.respect + respectGain);
+        state.resources.respect = Math.round(state.reputation.respect);
         
         allPlayerUnits.forEach(u => {
           if (state.soldierStats[u.id]) {
