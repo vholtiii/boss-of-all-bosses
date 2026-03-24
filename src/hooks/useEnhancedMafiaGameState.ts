@@ -4686,6 +4686,10 @@ export const useEnhancedMafiaGameState = (
       // Neutral: 90% success, claims territory. Enemy: 50% success, steals income only.
       let chance = isNeutral ? 0.9 : 0.5;
       chance += state.familyBonuses.extortion / 100;
+      // District control bonus: Queens +10% extortion success
+      if (hasPlayerDistrictBonus(state, 'extortion')) {
+        chance += 0.10;
+      }
       chance -= state.policeHeat.level / 1000;
       chance += (state.resources.influence / 100) * 0.15;
       if (tile.district === 'Manhattan') {
