@@ -1,38 +1,71 @@
 
 
-# Fix: Tactical Actions Should Work Action-First
+# Fix: Unit Loss Notifications + Capo Combat Protection
 
-## Problem
-The tactical action buttons (Scout, Fortify, Escort, Safehouse) are **disabled** when no unit is selected, showing messages like "Select a soldier first". But the user expects to click the action first, then select a unit on the board — which is the more intuitive flow.
+## Problems Found
 
-The backend already supports this: `selectUnit` reads `selectedMoveAction` from state and branches accordingly (scout → show scoutable hexes, fortify → instant fortify, etc.). So if the user clicks "Scout" first (setting `selectedMoveAction='scout'`), then clicks a soldier on the map, it works correctly.
+### 1. No notification when AI kills player units
+In the AI combat loop (line 2489-2495), when AI kills a player unit, the unit is silently spliced from `deployedUnits`. The notification at line 2532-2537 only says "attacked your units" — it does NOT report which specific units died or how many. If a capo or soldier is killed, the player gets no "Unit Lost" alert.
 
-The problem is purely in the **button disabling logic** in `UltimateMafiaGame.tsx` (lines 583-600): it computes a `reason` like "Select a soldier first" and then disables the button, preventing the action-first flow.
+### 2. Capos die just as easily as soldiers
+In both AI combat (line 2489-2495) and player combat casualties (line 4314-4365), capos are in the same casualty pool as soldiers with no protection. A 70% kill chance applies equally to capos and soldiers during AI attacks.
 
-## Fix — `src/pages/UltimateMafiaGame.tsx`
+### 3. AI kills capos in regular combat — should require Plan Hit
+Capos are elite units (expensive, limited to 3). They should only be killable via Plan Hit, not random combat rolls.
 
-**1. Remove the unit-selection requirement from the disabled logic** (lines 583-600)
+## Plan
 
-The buttons should only be disabled when `tacticalActionsRemaining <= 0`. The "Select a soldier" / "Select a capo" text should become **instructional hints** shown *after* the button is clicked (i.e., when `selectedMoveAction === action`), not blocking reasons.
+### A. Capo Combat Immunity (both player and AI)
 
-Change the logic so:
-- `isDisabled` is only true when `noTactical` (no tactical actions remaining)
-- The `reason` text ("Select a soldier first", etc.) becomes the **description panel text** shown below the buttons when that action is active, rather than a tooltip that blocks clicking
-- Keep the existing description panel (lines 629-644) which already explains what to do for each action
+**Rule**: Capos cannot be killed in regular combat. They can only be eliminated by:
+- A **Plan Hit** specifically targeting them
+- A **Hitman contract** targeting them
 
-**2. Update the hover tooltip to show only real blocking reasons**
+In all combat casualty code, skip capos from the kill pool:
 
-When disabled (`noTactical`), the tooltip shows "No tactical actions left". When enabled but active, the description panel below already instructs the player on what to do next.
+1. **AI combat loop** (line 2489-2495): Filter `enemyUnitsHere` to exclude capos before kill rolls
+2. **Player hit victory casualties** (line 4314-4350): Filter shuffled pool to exclude capos
+3. **Player hit defeat casualties** (line 4353-4365): Filter shuffled pool to exclude capos
 
-**3. Clear selectedUnitId when switching tactical actions**
+When a capo would have been killed, instead apply a **wound penalty**: -1 move next turn, -10 loyalty. Push a notification: "Your capo narrowly escaped — wounded and shaken."
 
-Add a `setMoveAction` wrapper or modify the onClick to also clear `selectedUnitId` when switching between tactical modes, so stale unit selections don't confuse the flow. This can be done by calling the existing state setter.
+### B. Per-Unit Loss Notifications for AI Attacks
 
-## Summary of Changes
-- Lines 583-600: Simplify — only disable when `noTactical`, remove unit-check reasons from disabled logic
-- Lines 608-609: Update disabled prop to just `noTactical`
-- Lines 616-620: Remove or simplify the reason tooltip (only show for `noTactical`)
+In the AI combat loop (line 2489-2495), after each player unit is killed, push a specific notification:
+
+```
+type: 'error'
+title: '💀 Soldier Killed!'
+message: 'Your soldier was killed by the {family} in {district}!'
+```
+
+For capos (now wounded instead of killed):
+```
+type: 'warning'  
+title: '🩸 Capo Wounded!'
+message: 'Your capo was wounded by the {family} in {district}. -1 move, -10 loyalty.'
+```
+
+### C. AI Plan Hit Capability
+
+Since capos can now only die to Plan Hits, give AI the ability to plan hits against player capos:
+- AI with `aggressive` or `opportunistic` personality has a 15% chance per turn to initiate a planned hit against a player capo
+- Stored as `aiPlannedHits: { family: string, targetUnitId: string, turnsRemaining: number }[]`
+- Executes after 2 turns with 40-60% success rate
+- On success: capo is killed, player gets a dramatic notification
+- On failure: player gets a warning notification that an assassination attempt was foiled
+
+### D. New Constants — `src/types/game-mechanics.ts`
+```
+CAPO_WOUND_LOYALTY_PENALTY = 10
+CAPO_WOUND_MOVE_PENALTY = 1
+AI_PLAN_HIT_CHANCE = 0.15
+AI_PLAN_HIT_SUCCESS_RATE = 0.5
+AI_PLAN_HIT_DURATION = 2
+```
 
 ## Files Modified
-- `src/pages/UltimateMafiaGame.tsx` — simplify tactical button disabled logic to allow action-first flow
+- `src/types/game-mechanics.ts` — new constants
+- `src/hooks/useEnhancedMafiaGameState.ts` — capo immunity in all combat paths, per-unit loss notifications, AI planned hit system, wound mechanic
+- `src/components/GameSidePanels.tsx` — show active AI assassination warnings (if intel detected)
 
