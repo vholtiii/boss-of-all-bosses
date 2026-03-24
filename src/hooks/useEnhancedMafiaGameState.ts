@@ -2314,7 +2314,14 @@ export const useEnhancedMafiaGameState = (
         const toRecruit = Math.min(wantToRecruit, canAfford, 3 + alertBonus);
         opponent.resources.soldiers += toRecruit;
         opponent.resources.money -= toRecruit * SOLDIER_COST;
-        if (toRecruit > 0 && turnReport) turnReport.aiActions.push({ family: fam, action: 'recruit', detail: `Recruited ${toRecruit} soldier(s)` });
+        if (toRecruit > 0 && turnReport) {
+          const hasRecruitIntel = (state.activeBribes || []).some(b => b.tier === 'police_captain' || b.tier === 'police_chief');
+          if (hasRecruitIntel) {
+            turnReport.aiActions.push({ family: fam, action: 'recruit', detail: `Recruited ${toRecruit} soldier(s)` });
+          } else {
+            turnReport.aiActions.push({ family: fam, action: 'recruit', detail: 'Bolstered their forces' });
+          }
+        }
       }
 
       // ── DEPLOY ──
@@ -2729,7 +2736,15 @@ export const useEnhancedMafiaGameState = (
             createdTurn: state.turn,
           });
           opponent.resources.money -= SAFEHOUSE_COST;
-          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'safehouse', detail: `Established a safehouse in ${bestHex.district}` });
+          if (turnReport) {
+            const hasIntel = state.scoutedHexes.some(s => s.q === bestHex.q && s.r === bestHex.r && s.s === bestHex.s) ||
+              (state.activeBribes || []).some(b => b.tier === 'police_captain' || b.tier === 'police_chief');
+            if (hasIntel) {
+              turnReport.aiActions.push({ family: fam, action: 'safehouse', detail: `Established a safehouse in ${bestHex.district}` });
+            } else {
+              turnReport.aiActions.push({ family: fam, action: 'unknown', detail: 'Expanded operations in an unknown area' });
+            }
+          }
         }
       }
 
