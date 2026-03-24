@@ -5642,6 +5642,15 @@ export const useEnhancedMafiaGameState = (
           turnFormed: state.turn,
           active: true,
         }];
+        // Cancel any pending AI hits from this family
+        const cancelledCeasefire = (state.aiPlannedHits || []).filter(h => h.family === enemyFamily);
+        if (cancelledCeasefire.length > 0) {
+          state.aiPlannedHits = state.aiPlannedHits.filter(h => h.family !== enemyFamily);
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'info', title: '🕊️ Hit Called Off',
+            message: `The ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} family called off a planned hit — ceasefire agreement honored.`,
+          }];
+        }
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '🤝 Ceasefire Agreed!',
           message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} won't attack for ${duration} turns. -${config.reputationCost} respect.`,
