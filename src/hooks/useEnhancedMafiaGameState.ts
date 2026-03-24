@@ -4454,6 +4454,7 @@ export const useEnhancedMafiaGameState = (
               type: 'error' as const, title: '⚔️ Soldier Lost in Combat',
               message: `Your soldier fell during the assault on ${tile.district}.`,
             }];
+            state.combatLog = [...(state.combatLog || []), `⚔️ Soldier lost during assault on ${tile.district}`];
           }
           removed++;
         }
