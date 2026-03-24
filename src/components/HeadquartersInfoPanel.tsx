@@ -34,6 +34,7 @@ interface HeadquartersInfoPanelProps {
     boss: { q: number; r: number; s: number; id: string };
   };
   businesses: any[];
+  finances?: { totalIncome: number; totalExpenses: number; legalProfit: number; illegalProfit: number; totalProfit: number; dirtyMoney: number; cleanMoney: number; legalCosts: number };
   onClose: () => void;
   onSelectUnitFromHeadquarters?: (unitType: 'soldier' | 'capo', family: string) => void;
   movementPhase?: boolean;
@@ -69,6 +70,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   headquarters,
   units,
   businesses,
+  finances,
   onClose,
   onSelectUnitFromHeadquarters,
   movementPhase = false,
@@ -99,15 +101,19 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
 
   const familyBusinesses = businesses.filter(business => business.family === family);
   
-  const legalProfits = familyBusinesses
+  // Use actual game finances when available, fall back to legacy calculation
+  const legalProfits = finances?.legalProfit ?? familyBusinesses
     .filter(business => business.isLegal)
     .reduce((total: number, business: any) => total + business.income, 0);
     
-  const illegalProfits = familyBusinesses
+  const illegalProfits = finances?.illegalProfit ?? familyBusinesses
     .filter(business => !business.isLegal)
     .reduce((total: number, business: any) => total + business.income, 0);
     
-  const totalProfits = legalProfits + illegalProfits;
+  const totalProfits = finances?.totalProfit ?? (legalProfits + illegalProfits);
+  const totalExpenses = finances?.totalExpenses ?? 0;
+  const dirtyMoney = finances?.dirtyMoney ?? 0;
+  const cleanMoney = finances?.cleanMoney ?? 0;
   
   const soldiersAtHQ = units.soldiers.filter(soldier => 
     soldier.q === headquarters.q && soldier.r === headquarters.r && soldier.s === headquarters.s
@@ -205,11 +211,27 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
             </div>
             
             <div className="bg-mafia-gold/10 border border-mafia-gold/20 rounded-lg p-2">
-              <div className="text-xs text-mafia-gold font-medium">Total Profits</div>
+              <div className="text-xs text-mafia-gold font-medium">Net Income/Turn</div>
               <div className="text-base font-bold text-mafia-gold">
                 ${totalProfits.toLocaleString()}
               </div>
             </div>
+            {finances && (
+              <div className="grid grid-cols-3 gap-1.5">
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-1.5">
+                  <div className="text-[10px] text-orange-400 font-medium">Expenses</div>
+                  <div className="text-xs font-bold text-orange-400">${totalExpenses.toLocaleString()}</div>
+                </div>
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-1.5">
+                  <div className="text-[10px] text-yellow-400 font-medium">Dirty $</div>
+                  <div className="text-xs font-bold text-yellow-400">${dirtyMoney.toLocaleString()}</div>
+                </div>
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-1.5">
+                  <div className="text-[10px] text-emerald-400 font-medium">Clean $</div>
+                  <div className="text-xs font-bold text-emerald-400">${cleanMoney.toLocaleString()}</div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Units Section */}
