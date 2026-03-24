@@ -3317,6 +3317,9 @@ export const useEnhancedMafiaGameState = (
             let chance = HQ_ASSAULT_BASE_CHANCE - HQ_DEFENSE_BONUS;
             const adjFriendly = state.deployedUnits.filter(u => u.family === fam && u.id !== soldier.id && neighbors.some(nb => nb.q === u.q && nb.r === u.r && nb.s === u.s));
             chance += adjFriendly.length * 0.05;
+            // Flipped soldier bonus
+            const flippedCount = (state.flippedSoldiers || []).filter(f => f.family === victimFamily).length;
+            chance += flippedCount * 0.10;
             chance = Math.min(HQ_ASSAULT_MAX_CHANCE, Math.max(0.05, chance));
             if (Math.random() < chance) {
               state.eliminatedFamilies = [...(state.eliminatedFamilies || []), victimFamily];
