@@ -856,27 +856,44 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       </ResponsiveLayout>
 
       {/* Headquarters Info Panel */}
-      {selectedHeadquarters && (
-        <HeadquartersInfoPanel
-          family={selectedHeadquarters.family}
-          headquarters={selectedHeadquarters.headquarters}
-          units={selectedHeadquarters.units}
-          businesses={gameState.businesses || []}
-          finances={gameState.finances}
-          onClose={closeHeadquartersPanel}
-          onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
-          movementPhase={gameState.movementPhase}
-          playerFamily={gameState.playerFamily}
-          deployedUnits={gameState.deployedUnits || []}
-          hexMap={gameState.hexMap || []}
-          bossHighlightHex={bossHighlightHex}
-          onBossHighlightHex={setBossHighlightHex}
-          turnPhase={gameState.turnPhase}
-          currentTurn={gameState.turn}
-          sitdownCooldownUntil={(gameState as any).sitdownCooldownUntil || 0}
-          onCallSitdown={(soldierIds) => handleAction({ type: 'call_sitdown', soldierIds })}
-        />
-      )}
+      {selectedHeadquarters && (() => {
+        const hqFamily = selectedHeadquarters.family;
+        const isPlayerHQ = hqFamily === gameState.playerFamily;
+        const hexBusinesses = (gameState.hexMap || [])
+          .filter((tile: any) => tile.controllingFamily === hqFamily && tile.business)
+          .map((tile: any) => ({
+            q: tile.q, r: tile.r, s: tile.s,
+            district: tile.district || 'Unknown',
+            businessType: tile.business.type || tile.business.businessType || 'Business',
+            income: tile.business.income || 0,
+            isLegal: tile.business.isLegal !== false,
+            isExtorted: tile.business.isExtorted === true,
+          }));
+        const territoryCount = (gameState.hexMap || []).filter((tile: any) => tile.controllingFamily === hqFamily).length;
+        return (
+          <HeadquartersInfoPanel
+            family={hqFamily}
+            headquarters={selectedHeadquarters.headquarters}
+            units={selectedHeadquarters.units}
+            hexBusinesses={hexBusinesses}
+            finances={isPlayerHQ ? gameState.finances : undefined}
+            totalMoney={isPlayerHQ ? gameState.resources?.money : undefined}
+            territoryCount={territoryCount}
+            onClose={closeHeadquartersPanel}
+            onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
+            movementPhase={gameState.movementPhase}
+            playerFamily={gameState.playerFamily}
+            deployedUnits={gameState.deployedUnits || []}
+            hexMap={gameState.hexMap || []}
+            bossHighlightHex={bossHighlightHex}
+            onBossHighlightHex={setBossHighlightHex}
+            turnPhase={gameState.turnPhase}
+            currentTurn={gameState.turn}
+            sitdownCooldownUntil={(gameState as any).sitdownCooldownUntil || 0}
+            onCallSitdown={(soldierIds) => handleAction({ type: 'call_sitdown', soldierIds })}
+          />
+        );
+      })()}
 
       {/* Negotiation Dialog */}
       {negotiationState && (() => {
