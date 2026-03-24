@@ -393,6 +393,121 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Call a Sitdown — Boss Action */}
+            {isPlayerFamily && onCallSitdown && (
+              (() => {
+                const onCooldown = sitdownCooldownUntil > currentTurn;
+                const cooldownLeft = sitdownCooldownUntil - currentTurn;
+                const isActionPhase = turnPhase === 'action';
+                const awayUnits = (deployedUnits || []).filter((u: any) =>
+                  u.family === family &&
+                  !(u.q === headquarters.q && u.r === headquarters.r && u.s === headquarters.s)
+                );
+                const canOpen = isActionPhase && !onCooldown && awayUnits.length > 0;
+
+                return (
+                  <div className="mt-2 space-y-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs h-8 border-mafia-gold/30 text-mafia-gold hover:bg-mafia-gold/10"
+                      disabled={!canOpen && !sitdownOpen}
+                      onClick={() => {
+                        if (sitdownOpen) {
+                          setSitdownOpen(false);
+                          setSelectedSitdownIds([]);
+                        } else {
+                          setSitdownOpen(true);
+                          setSelectedSitdownIds([]);
+                        }
+                      }}
+                    >
+                      📋 Call a Sitdown {onCooldown ? `(${cooldownLeft} turns)` : `($${SITDOWN_COST.toLocaleString()})`}
+                    </Button>
+
+                    {!isActionPhase && !sitdownOpen && (
+                      <p className="text-[10px] text-muted-foreground italic text-center">Available during Action phase</p>
+                    )}
+
+                    <AnimatePresence>
+                      {sitdownOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="bg-muted/20 border border-border/50 rounded-lg p-2 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-medium text-foreground">Select soldiers to recall</span>
+                              <button
+                                className="text-[10px] text-mafia-gold hover:underline"
+                                onClick={() => {
+                                  if (selectedSitdownIds.length === awayUnits.length) {
+                                    setSelectedSitdownIds([]);
+                                  } else {
+                                    setSelectedSitdownIds(awayUnits.map((u: any) => u.id));
+                                  }
+                                }}
+                              >
+                                {selectedSitdownIds.length === awayUnits.length ? 'Deselect All' : 'Select All'}
+                              </button>
+                            </div>
+                            <ScrollArea className="max-h-32">
+                              <div className="space-y-1">
+                                {awayUnits.map((unit: any) => {
+                                  const district = (() => {
+                                    const hex = hexMap.find((h: any) => h.q === unit.q && h.r === unit.r && h.s === unit.s);
+                                    return hex?.district || '???';
+                                  })();
+                                  const checked = selectedSitdownIds.includes(unit.id);
+                                  return (
+                                    <label
+                                      key={unit.id}
+                                      className="flex items-center gap-2 px-2 py-1 rounded bg-background/50 border border-border/30 cursor-pointer hover:bg-accent/30 text-xs"
+                                    >
+                                      <Checkbox
+                                        checked={checked}
+                                        onCheckedChange={(v) => {
+                                          if (v) setSelectedSitdownIds(prev => [...prev, unit.id]);
+                                          else setSelectedSitdownIds(prev => prev.filter(id => id !== unit.id));
+                                        }}
+                                      />
+                                      <span className="text-sm">{unit.type === 'soldier' ? '🔫' : '⚡'}</span>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-medium text-foreground truncate">{unit.name || (unit.type === 'soldier' ? 'Soldier' : 'Capo')}</div>
+                                        <div className="text-[10px] text-muted-foreground">{district}</div>
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </ScrollArea>
+                            <div className="text-[10px] text-muted-foreground">
+                              +{SITDOWN_DEFENSE_PER_SOLDIER}% HQ defense per soldier at HQ
+                            </div>
+                            <Button
+                              size="sm"
+                              className="w-full text-xs h-7 bg-mafia-gold text-background hover:bg-mafia-gold/80"
+                              disabled={selectedSitdownIds.length === 0}
+                              onClick={() => {
+                                onCallSitdown(selectedSitdownIds);
+                                setSitdownOpen(false);
+                                setSelectedSitdownIds([]);
+                              }}
+                            >
+                              Confirm Sitdown ({selectedSitdownIds.length} unit{selectedSitdownIds.length !== 1 ? 's' : ''})
+                            </Button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })()
+            )}
           </div>
 
           {/* Business Count */}
