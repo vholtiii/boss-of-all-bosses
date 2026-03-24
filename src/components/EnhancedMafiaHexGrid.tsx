@@ -115,6 +115,35 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return map;
   }, [deployedUnits]);
 
+  // Keyboard zoom shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        switch (event.key) {
+          case '=': case '+': event.preventDefault(); setZoom(prev => Math.min(prev + 0.1, 2.5)); break;
+          case '-': event.preventDefault(); setZoom(prev => Math.max(prev - 0.1, 0.3)); break;
+          case '0': event.preventDefault(); setZoom(1); break;
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const getHexPosition = (q: number, r: number) => ({
+    x: hexWidth * (3/4) * q,
+    y: hexHeight * (r + q/2),
+  });
+
+  const getHexPoints = (cx: number, cy: number, radius: number) => {
+    const points = [];
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 3) * i;
+      points.push(`${cx + radius * Math.cos(angle)},${cy + radius * Math.sin(angle)}`);
+    }
+    return points.join(' ');
+  };
+
   // Compute district boundary segments for border outlines
   const districtBorderSegments = useMemo(() => {
     const dirs = [
@@ -147,35 +176,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     });
     return segs;
   }, [hexMap]);
-
-  // Keyboard zoom shortcuts
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.metaKey) {
-        switch (event.key) {
-          case '=': case '+': event.preventDefault(); setZoom(prev => Math.min(prev + 0.1, 2.5)); break;
-          case '-': event.preventDefault(); setZoom(prev => Math.max(prev - 0.1, 0.3)); break;
-          case '0': event.preventDefault(); setZoom(1); break;
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  const getHexPosition = (q: number, r: number) => ({
-    x: hexWidth * (3/4) * q,
-    y: hexHeight * (r + q/2),
-  });
-
-  const getHexPoints = (cx: number, cy: number, radius: number) => {
-    const points = [];
-    for (let i = 0; i < 6; i++) {
-      const angle = (Math.PI / 3) * i;
-      points.push(`${cx + radius * Math.cos(angle)},${cy + radius * Math.sin(angle)}`);
-    }
-    return points.join(' ');
-  };
 
   // District abbreviations for hex labels
   const districtAbbreviations: Record<string, string> = {
