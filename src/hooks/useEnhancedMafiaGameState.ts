@@ -3335,7 +3335,7 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'success' as const,
               title: '🏘️ Local Recruited',
-              message: `A loyal local joins the family for $${cost2.toLocaleString()}. Loyalty +2. Good at claiming & extortion.`,
+              message: `A loyal local joins the family for $${finalCost2.toLocaleString()}. Loyalty +2.${bronxDiscount2 > 0 ? ' (Bronx discount applied)' : ''}`,
             }];
           }
           return newState;
