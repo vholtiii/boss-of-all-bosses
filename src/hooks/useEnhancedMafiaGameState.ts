@@ -441,12 +441,28 @@ const generateHexMap = (radius: number, seed?: number): HexTile[] => {
   return tiles;
 };
 
-const HQ_POSITIONS: Record<string, {q:number;r:number;s:number;district:HexTile['district']}> = {
-  gambino:  { q: -8, r:  8, s: 0,  district: 'Little Italy' },
-  genovese: { q:  8, r: -8, s: 0,  district: 'Manhattan' },
-  lucchese: { q: -8, r: -1, s: 9,  district: 'Queens' },
-  bonanno:  { q:  7, r:  3, s: -10, district: 'Staten Island' },
-  colombo:  { q:  0, r: -9, s: 9,  district: 'Bronx' },
+const HQ_POSITIONS_BY_SIZE: Record<string, Record<string, {q:number;r:number;s:number;district:HexTile['district']}>> = {
+  small: {
+    gambino:  { q: -5, r:  5, s: 0,  district: 'Little Italy' },
+    genovese: { q:  5, r: -5, s: 0,  district: 'Manhattan' },
+    lucchese: { q: -5, r: -1, s: 6,  district: 'Queens' },
+    bonanno:  { q:  5, r:  2, s: -7, district: 'Staten Island' },
+    colombo:  { q:  0, r: -6, s: 6,  district: 'Bronx' },
+  },
+  medium: {
+    gambino:  { q: -8, r:  8, s: 0,  district: 'Little Italy' },
+    genovese: { q:  8, r: -8, s: 0,  district: 'Manhattan' },
+    lucchese: { q: -8, r: -1, s: 9,  district: 'Queens' },
+    bonanno:  { q:  7, r:  3, s: -10, district: 'Staten Island' },
+    colombo:  { q:  0, r: -9, s: 9,  district: 'Bronx' },
+  },
+  large: {
+    gambino:  { q: -11, r: 11, s: 0,  district: 'Little Italy' },
+    genovese: { q:  11, r: -11, s: 0, district: 'Manhattan' },
+    lucchese: { q: -11, r: -1, s: 12, district: 'Queens' },
+    bonanno:  { q:  10, r:  3, s: -13, district: 'Staten Island' },
+    colombo:  { q:   0, r: -12, s: 12, district: 'Bronx' },
+  },
 };
 
 // ============ INITIAL STATE ============
