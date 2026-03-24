@@ -1,25 +1,32 @@
 
 
-# Deselect Soldier by Clicking Outside the Map
+# Bribe Intel: Reveal Soldier Positions & Hit Intel for Captain/Chief/Mayor
 
 ## Problem
-Once a soldier is selected/highlighted (via map click or Capo Promotion panel), there's no way to deselect without clicking the same soldier again. Clicking outside the map should clear the selection.
+Currently, `police_captain`, `police_chief`, and `mayor` bribes only provide turn report intel (recruitment numbers, safehouses, planned hits). They do **not** reveal enemy soldier positions on the map — that uses a legacy `bribedOfficials` system that's disconnected from `activeBribes`.
 
-## Solution
-Add a click handler on the main game container (outside the hex grid) that clears `selectedUnitId` when the click target is not inside the map SVG.
+## What Changes
 
-### `src/pages/UltimateMafiaGame.tsx`
-- Add a `deselectUnit` callback that sets `selectedUnitId: null, availableMoveHexes: []` via `handleAction({ type: 'deselect_unit' })`
-- Add an `onClick` handler on the outermost game container div that calls `deselectUnit()`, but use `e.stopPropagation()` on the hex grid's container to prevent the deselect from firing when clicking the map itself
+### Map Fog of War — `src/components/EnhancedMafiaHexGrid.tsx`
+- In `isHexRevealed()` (line 95-107): Add a check for `activeBribes` with tier `police_captain`, `police_chief`, or `mayor` targeting the hex's controlling family
+- If any such bribe is active and targets that family → reveal the hex (shows soldier types, counts, fortification, safehouses)
+- `police_chief` and `mayor` reveal **all** rival hexes (not just the targeted family), since they have broader reach
 
-### `src/hooks/useEnhancedMafiaGameState.ts`
-- Add `deselect_unit` case in the action handler (~line 3844+ area) that returns `{ ...state, selectedUnitId: null, availableMoveHexes: [], deployMode: null, availableDeployHexes: [] }`
+### Turn Report Intel — `src/hooks/useEnhancedMafiaGameState.ts`
+- Already works for recruitment, safehouses, and planned hits — no change needed there
+- Add: when `police_captain`+ bribe is active against a family, show that family's **soldier deployment movements** in the turn report (AI deploy/move actions)
+- In AI movement/deploy sections (~lines 2700-2800), add intel gating similar to existing recruitment intel
 
-### `src/components/EnhancedMafiaHexGrid.tsx`
-- Add `onClick={e => e.stopPropagation()}` on the outermost wrapper div so map clicks don't bubble up to the deselect handler
+### Bribe Descriptions — `src/types/game-mechanics.ts`
+- Update `police_captain` description: `'20% economic pressure + reveals target family positions & intel'`
+- Update `police_chief` description: `'+50% intel on target rival + reveals all rival positions'`
+- Update `mayor` description: `'Shut down rival territory + full map intel'`
+
+### Corruption Panel — `src/components/CorruptionPanel.tsx`
+- No structural changes needed — descriptions auto-update from `BRIBE_TIERS`
 
 ## Files Modified
-- `src/hooks/useEnhancedMafiaGameState.ts` — add `deselect_unit` action
-- `src/pages/UltimateMafiaGame.tsx` — add click-outside handler on game container
-- `src/components/EnhancedMafiaHexGrid.tsx` — stop propagation on map wrapper
+- `src/components/EnhancedMafiaHexGrid.tsx` — fog of war reveal via `activeBribes`
+- `src/hooks/useEnhancedMafiaGameState.ts` — AI movement intel in turn reports
+- `src/types/game-mechanics.ts` — updated bribe descriptions
 
