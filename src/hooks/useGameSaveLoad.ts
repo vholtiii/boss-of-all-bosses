@@ -63,7 +63,7 @@ export const useGameSaveLoad = () => {
         gameState: saveData.gameState,
         saveDate: saveData.saveDate,
         playerName: saveData.playerName,
-        message: 'Game loaded successfully' 
+        message: `Game loaded successfully${versionWarning}` 
       };
     } catch (error) {
       console.error('Failed to load game:', error);

@@ -1949,6 +1949,7 @@ export const useEnhancedMafiaGameState = (
           // Game over — player loses all territory
           newState.hexMap.forEach(t => { if (t.controllingFamily === newState.playerFamily && !t.isHeadquarters) t.controllingFamily = 'neutral'; });
           newState.deployedUnits = newState.deployedUnits.filter(u => u.family !== newState.playerFamily);
+          newState.gameOver = { type: 'bankruptcy' as any, turn: newState.turn };
         } else if (debt >= 20000) {
           turnReport.events.push(`⚠️ WARNING: Family is $${debt.toLocaleString()} in debt! Soldiers will desert. Bankruptcy at -$50K.`);
         }
