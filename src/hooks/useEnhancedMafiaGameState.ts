@@ -2085,6 +2085,76 @@ export const useEnhancedMafiaGameState = (
     });
   }, []);
 
+  // ============ DISTRICT CONTROL BONUSES ============
+  const DISTRICT_CONTROL_THRESHOLD = 0.6;
+  const DISTRICT_BONUSES: Record<string, { bonusType: string; description: string }> = {
+    'Manhattan': { bonusType: 'income', description: '+20% business income in Manhattan' },
+    'Little Italy': { bonusType: 'loyalty', description: '+15% loyalty retention' },
+    'Brooklyn': { bonusType: 'heat', description: '-3 heat/turn' },
+    'Bronx': { bonusType: 'recruit_discount', description: '$500 off recruitment' },
+    'Queens': { bonusType: 'extortion', description: '+10% extortion success' },
+    'Staten Island': { bonusType: 'respect', description: '+2 respect/turn' },
+  };
+
+  const computeDistrictBonuses = (state: EnhancedMafiaGameState, turnReport?: TurnReport) => {
+    const districts = ['Manhattan', 'Little Italy', 'Brooklyn', 'Bronx', 'Queens', 'Staten Island'];
+    const prevBonuses = [...(state.activeDistrictBonuses || [])];
+    const newBonuses: typeof state.activeDistrictBonuses = [];
+
+    districts.forEach(district => {
+      const districtHexes = state.hexMap.filter(t => t.district === district);
+      if (districtHexes.length === 0) return;
+      
+      // Count per family
+      const familyCounts: Record<string, number> = {};
+      districtHexes.forEach(t => {
+        if (t.controllingFamily !== 'neutral') {
+          familyCounts[t.controllingFamily] = (familyCounts[t.controllingFamily] || 0) + 1;
+        }
+      });
+
+      const total = districtHexes.length;
+      Object.entries(familyCounts).forEach(([family, count]) => {
+        if (count / total >= DISTRICT_CONTROL_THRESHOLD) {
+          const bonusDef = DISTRICT_BONUSES[district];
+          if (bonusDef) {
+            newBonuses.push({ district, family, ...bonusDef });
+          }
+        }
+      });
+    });
+
+    // Detect gained/lost bonuses for player notifications
+    const playerFamily = state.playerFamily;
+    const prevPlayerBonuses = prevBonuses.filter(b => b.family === playerFamily);
+    const newPlayerBonuses = newBonuses.filter(b => b.family === playerFamily);
+
+    newPlayerBonuses.forEach(nb => {
+      if (!prevPlayerBonuses.some(pb => pb.district === nb.district)) {
+        state.pendingNotifications.push({
+          type: 'success', title: `🏰 District Control: ${nb.district}`,
+          message: nb.description,
+        });
+        if (turnReport) turnReport.events.push(`🏰 Gained control of ${nb.district}: ${nb.description}`);
+      }
+    });
+    prevPlayerBonuses.forEach(pb => {
+      if (!newPlayerBonuses.some(nb => nb.district === pb.district)) {
+        state.pendingNotifications.push({
+          type: 'warning', title: `⚠️ Lost Control: ${pb.district}`,
+          message: `You no longer control 60% of ${pb.district}. Bonus lost.`,
+        });
+        if (turnReport) turnReport.events.push(`⚠️ Lost control of ${pb.district} — bonus removed`);
+      }
+    });
+
+    state.activeDistrictBonuses = newBonuses;
+  };
+
+  const hasPlayerDistrictBonus = (state: EnhancedMafiaGameState, bonusType: string): boolean => {
+    return (state.activeDistrictBonuses || []).some(b => b.family === state.playerFamily && b.bonusType === bonusType);
+  };
+
   // ============ ECONOMY (with family bonuses) ============
   const processEconomy = (state: EnhancedMafiaGameState) => {
     let income = 0;
