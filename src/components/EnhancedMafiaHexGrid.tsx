@@ -177,6 +177,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return segs;
   }, [hexMap]);
 
+  // District background tint colors (subtle, for region identification)
+  const districtTints: Record<string, string> = {
+    'Little Italy': 'rgba(255, 180, 100, 0.12)',
+    'Bronx': 'rgba(255, 100, 100, 0.10)',
+    'Brooklyn': 'rgba(100, 160, 255, 0.10)',
+    'Queens': 'rgba(100, 255, 160, 0.10)',
+    'Manhattan': 'rgba(255, 215, 0, 0.10)',
+    'Staten Island': 'rgba(200, 130, 255, 0.10)',
+  };
+
   // District abbreviations for hex labels
   const districtAbbreviations: Record<string, string> = {
     'Little Italy': 'LI',
@@ -577,6 +587,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       <div className="absolute inset-0 flex items-center justify-center">
         <svg width="100%" height="100%" viewBox={viewBox} className="overflow-visible">
           <g transform={`scale(${zoom})`}>
+            {/* District background tint layer */}
+            <g className="pointer-events-none">
+              {hexMap.map(tile => {
+                const { x, y } = getHexPosition(tile.q, tile.r);
+                const tint = districtTints[tile.district];
+                if (!tint) return null;
+                return (
+                  <polygon
+                    key={`tint-${tile.q},${tile.r},${tile.s}`}
+                    points={getHexPoints(x, y, baseHexRadius)}
+                    fill={tint}
+                    stroke="none"
+                  />
+                );
+              })}
+            </g>
+
             {hexMap.map(tile => {
               const { x, y } = getHexPosition(tile.q, tile.r);
               const key = `${tile.q},${tile.r},${tile.s}`;
@@ -888,9 +915,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   y1={seg.y1}
                   x2={seg.x2}
                   y2={seg.y2}
-                  stroke="rgba(255, 255, 255, 0.4)"
-                  strokeWidth="2"
-                  strokeDasharray="4,3"
+                  stroke="rgba(255, 220, 120, 0.6)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
                 />
               ))}
             </g>
