@@ -157,6 +157,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         targetR: action.targetR,
         targetS: action.targetS,
         capoId: action.capoId,
+        scope: 'territory',
+      });
+      return;
+    }
+    if (action.type === 'open_boss_negotiate') {
+      setNegotiationState({
+        open: true,
+        scope: 'family',
+        targetFamily: action.targetFamily || '',
       });
       return;
     }
