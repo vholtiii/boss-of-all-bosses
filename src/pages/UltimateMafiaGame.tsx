@@ -372,7 +372,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="text-center p-8"
+          className="text-center p-8 max-w-lg"
         >
           <motion.h1
             initial={{ y: -50, opacity: 0 }}
@@ -394,11 +394,30 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.7, duration: 0.6 }}
-            className="text-xl text-foreground mb-8"
+            className="text-xl text-foreground mb-4"
           >
-            You have successfully dominated New York's underworld with advanced tactics.<br/>
-            The Five Families now bow to your superior strategy and power.
+            You have successfully dominated New York's underworld with advanced tactics.
           </motion.p>
+          {/* Post-game stats */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.9 }}
+            className="grid grid-cols-2 gap-3 mb-6 text-left bg-card/80 rounded-lg p-4 border border-border"
+          >
+            <div className="text-xs text-muted-foreground">Turns Played</div>
+            <div className="text-xs font-bold text-foreground">{gameState.turn}</div>
+            <div className="text-xs text-muted-foreground">Territory Controlled</div>
+            <div className="text-xs font-bold text-foreground">{gameState.hexMap.filter(h => h.controllingFamily === gameState.playerFamily).length} hexes</div>
+            <div className="text-xs text-muted-foreground">Soldiers Remaining</div>
+            <div className="text-xs font-bold text-foreground">{gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'soldier').length}</div>
+            <div className="text-xs text-muted-foreground">Families Eliminated</div>
+            <div className="text-xs font-bold text-foreground">{(gameState as any).eliminatedFamilies?.length || 0}/4</div>
+            <div className="text-xs text-muted-foreground">Final Wealth</div>
+            <div className="text-xs font-bold text-foreground">${gameState.resources.money.toLocaleString()}</div>
+            <div className="text-xs text-muted-foreground">Respect</div>
+            <div className="text-xs font-bold text-foreground">{gameState.resources.respect}%</div>
+          </motion.div>
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
