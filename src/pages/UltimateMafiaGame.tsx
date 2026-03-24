@@ -932,7 +932,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onCallSitdown={(soldierIds) => handleAction({ type: 'call_sitdown', soldierIds })}
             detectedThreats={isPlayerHQ ? ((gameState as any).aiPlannedHits || []).filter((h: any) => h.detectedVia) : []}
             onBossNegotiate={isPlayerHQ ? (targetFamily) => handleAction({ type: 'open_boss_negotiate', targetFamily }) : undefined}
-            negotiationUsedThisTurn={(gameState as any).negotiationUsedThisTurn || false}
+            negotiationUsedThisTurn={(gameState as any).bossNegotiationUsedThisTurn || false}
             activePacts={isPlayerHQ ? {
               ceasefires: (gameState as any).ceasefires || [],
               alliances: (gameState as any).alliances || [],
@@ -957,7 +957,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               open={negotiationState.open}
               onClose={() => setNegotiationState(null)}
               scope="territory"
-              negotiationUsedThisTurn={(gameState as any).negotiationUsedThisTurn || false}
+              negotiationUsedThisTurn={(gameState as any).capoNegotiationUsedThisTurn || false}
               onNegotiate={(type, extraData) => {
                 performAction({
                   type: 'negotiate',
@@ -988,7 +988,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               open={negotiationState.open}
               onClose={() => setNegotiationState(null)}
               scope="family"
-              negotiationUsedThisTurn={(gameState as any).negotiationUsedThisTurn || false}
+              negotiationUsedThisTurn={(gameState as any).bossNegotiationUsedThisTurn || false}
               onNegotiate={(type, extraData) => {
                 performAction({
                   type: 'boss_negotiate',
