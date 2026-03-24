@@ -813,6 +813,19 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     );
                   })()}
 
+                  {/* Boss highlight hex — gold pulsing ring */}
+                  {bossHighlightHex && bossHighlightHex.q === tile.q && bossHighlightHex.r === tile.r && bossHighlightHex.s === tile.s && (
+                    <polygon
+                      points={getHexPoints(x, y, baseHexRadius + 5)}
+                      fill="none"
+                      stroke="#D4AF37"
+                      strokeWidth="3"
+                      opacity="0.9"
+                      strokeDasharray="8,4"
+                      className="pointer-events-none animate-pulse"
+                    />
+                  )}
+
                   {/* Player territory gold outer glow */}
                   {isPlayerTerritory && !tile.isHeadquarters && (
                     <polygon
