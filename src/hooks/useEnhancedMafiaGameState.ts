@@ -3248,6 +3248,58 @@ export const useEnhancedMafiaGameState = (
       const respectGain = Math.floor(aiTerritoryCount / 4) + (aggression > 60 ? 1 : 0);
       opponent.resources.respect = Math.min(100, Math.max(0, (opponent.resources.respect || 0) + respectGain - 0.5));
 
+      // ── AI FLIP SOLDIER (weaken enemy HQ defenses) ──
+      if (state.turn > 8 && opponent.resources.money >= FLIP_SOLDIER_COST && Math.random() < (personality === 'aggressive' ? 0.25 : personality === 'opportunistic' ? 0.20 : 0.12)) {
+        // Find enemy HQs and look for soldiers near them to flip
+        const otherFamilies = [state.playerFamily, ...state.aiOpponents.filter(o => o.family !== fam).map(o => o.family)];
+        let flipped = false;
+        for (const victimFamily of otherFamilies) {
+          if ((state.eliminatedFamilies || []).includes(victimFamily)) continue;
+          const victimHQ = state.headquarters[victimFamily as keyof typeof state.headquarters];
+          if (!victimHQ) continue;
+          const hqNeighbors = getHexNeighbors(victimHQ.q, victimHQ.r, victimHQ.s);
+          // AI must have a unit adjacent to victim HQ
+          const aiHasPresence = state.deployedUnits.some(u => u.family === fam && hqNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s));
+          if (!aiHasPresence) continue;
+          // Find flippable enemy soldiers near their own HQ
+          const enemySoldiersNearHQ = state.deployedUnits.filter(u =>
+            u.family === victimFamily && u.type === 'soldier' &&
+            (u.q === victimHQ.q && u.r === victimHQ.r && u.s === victimHQ.s ||
+             hqNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s))
+          );
+          const flippableTargets = enemySoldiersNearHQ.filter(u => {
+            const uStats = state.soldierStats[u.id];
+            return uStats && uStats.loyalty < 80 && !(state.flippedSoldiers || []).some(f => f.unitId === u.id);
+          });
+          if (flippableTargets.length === 0) continue;
+          // Attempt flip
+          const target = flippableTargets[Math.floor(Math.random() * flippableTargets.length)];
+          const tStats = state.soldierStats[target.id];
+          opponent.resources.money -= FLIP_SOLDIER_COST;
+          let chance = FLIP_SOLDIER_BASE_CHANCE;
+          if (tStats && tStats.loyalty < 60) chance += 0.15;
+          if (tStats && tStats.loyalty > 70) chance -= 0.10;
+          chance = Math.min(0.60, Math.max(0.05, chance));
+          if (Math.random() < chance) {
+            state.flippedSoldiers = [...(state.flippedSoldiers || []), { unitId: target.id, family: victimFamily, flippedByFamily: fam, hqQ: victimHQ.q, hqR: victimHQ.r, hqS: victimHQ.s }];
+            if (victimFamily === state.playerFamily) {
+              state.pendingNotifications.push({ type: 'warning', title: '🐀 Soldier Compromised!', message: `The ${fam} family has flipped one of your soldiers near HQ! Your HQ defense is weakened.` });
+            }
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'flip_soldier', detail: `Flipped a ${victimFamily} soldier near their HQ` });
+          } else {
+            // Failed — AI loses influence
+            opponent.resources.influence = Math.max(0, opponent.resources.influence - FLIP_SOLDIER_FAIL_INFLUENCE_LOSS);
+            if (tStats) tStats.loyalty = Math.min(80, tStats.loyalty + 10);
+            if (victimFamily === state.playerFamily) {
+              state.pendingNotifications.push({ type: 'info', title: '🛡️ Flip Attempt Foiled', message: `The ${fam} family tried to turn one of your soldiers — but failed! Soldier loyalty increased.` });
+            }
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'flip_soldier_fail', detail: `Failed to flip a ${victimFamily} soldier` });
+          }
+          flipped = true;
+          break;
+        }
+      }
+
       // ── AI HQ ASSAULT (aggressive AI, after turn 12) ──
       if (state.turn > 12 && (personality === 'aggressive' || personality === 'unpredictable') && Math.random() < 0.10) {
         // Find enemy HQs adjacent to AI soldiers with high toughness
@@ -3265,6 +3317,9 @@ export const useEnhancedMafiaGameState = (
             let chance = HQ_ASSAULT_BASE_CHANCE - HQ_DEFENSE_BONUS;
             const adjFriendly = state.deployedUnits.filter(u => u.family === fam && u.id !== soldier.id && neighbors.some(nb => nb.q === u.q && nb.r === u.r && nb.s === u.s));
             chance += adjFriendly.length * 0.05;
+            // Flipped soldier bonus
+            const flippedCount = (state.flippedSoldiers || []).filter(f => f.family === victimFamily).length;
+            chance += flippedCount * 0.10;
             chance = Math.min(HQ_ASSAULT_MAX_CHANCE, Math.max(0.05, chance));
             if (Math.random() < chance) {
               state.eliminatedFamilies = [...(state.eliminatedFamilies || []), victimFamily];
