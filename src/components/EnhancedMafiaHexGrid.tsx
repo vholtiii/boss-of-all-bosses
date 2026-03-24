@@ -604,7 +604,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               })}
             </g>
 
-
+            {hexMap.map(tile => {
               const { x, y } = getHexPosition(tile.q, tile.r);
               const key = `${tile.q},${tile.r},${tile.s}`;
               const unitsHere = unitsByHex.get(key) || [];
