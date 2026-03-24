@@ -27,6 +27,7 @@ interface EnhancedMafiaHexGridProps {
   onPlanHitSelect?: (q: number, r: number, s: number, targetUnitId: string) => void;
   onPlanHitSelectSoldier?: (unitId: string) => void;
   onCancelPlanHit?: () => void;
+  bossHighlightHex?: { q: number; r: number; s: number } | null;
 }
 
 const familyColors: Record<string, string> = {
