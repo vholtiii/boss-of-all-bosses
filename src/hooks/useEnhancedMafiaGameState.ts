@@ -616,6 +616,7 @@ const createInitialGameState = (
     hiddenUnits: [],
     aiBounties: [],
     aiPlannedHits: [],
+    combatLog: [],
     
     selectedTerritory: null,
     activeEvent: null,
