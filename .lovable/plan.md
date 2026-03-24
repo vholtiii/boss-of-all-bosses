@@ -1,20 +1,25 @@
 
 
-# Fix: Soldier Card Click → Map Highlight in Capo Promotion
+# Deselect Soldier by Clicking Outside the Map
 
 ## Problem
-The `onHighlightSoldier` callback dispatches `onAction({ type: 'select_unit', ... })`, but **no such action type exists** in the game state reducer. Unit selection is handled by a separate `selectUnit` function that lives in `UltimateMafiaGame.tsx` — it's passed to the hex grid as `onSelectUnit` but never passed to `LeftSidePanel`.
+Once a soldier is selected/highlighted (via map click or Capo Promotion panel), there's no way to deselect without clicking the same soldier again. Clicking outside the map should clear the selection.
 
-## Fix
+## Solution
+Add a click handler on the main game container (outside the hex grid) that clears `selectedUnitId` when the click target is not inside the map SVG.
 
 ### `src/pages/UltimateMafiaGame.tsx`
-- Pass `selectUnit` to `LeftSidePanel` as a new prop `onSelectUnit={selectUnit}` (in both desktop and mobile renders, ~lines 456 and 275)
+- Add a `deselectUnit` callback that sets `selectedUnitId: null, availableMoveHexes: []` via `handleAction({ type: 'deselect_unit' })`
+- Add an `onClick` handler on the outermost game container div that calls `deselectUnit()`, but use `e.stopPropagation()` on the hex grid's container to prevent the deselect from firing when clicking the map itself
 
-### `src/components/GameSidePanels.tsx`
-- Add `onSelectUnit` prop to `LeftSidePanel` component signature
-- In the `onHighlightSoldier` callback (~line 475-480), replace `onAction({ type: 'select_unit', ... })` with `onSelectUnit(unit.type, { q: unit.q, r: unit.r, s: unit.s })`
+### `src/hooks/useEnhancedMafiaGameState.ts`
+- Add `deselect_unit` case in the action handler (~line 3844+ area) that returns `{ ...state, selectedUnitId: null, availableMoveHexes: [], deployMode: null, availableDeployHexes: [] }`
+
+### `src/components/EnhancedMafiaHexGrid.tsx`
+- Add `onClick={e => e.stopPropagation()}` on the outermost wrapper div so map clicks don't bubble up to the deselect handler
 
 ## Files Modified
-- `src/pages/UltimateMafiaGame.tsx` — pass `selectUnit` prop
-- `src/components/GameSidePanels.tsx` — accept and use `onSelectUnit` prop
+- `src/hooks/useEnhancedMafiaGameState.ts` — add `deselect_unit` action
+- `src/pages/UltimateMafiaGame.tsx` — add click-outside handler on game container
+- `src/components/EnhancedMafiaHexGrid.tsx` — stop propagation on map wrapper
 
