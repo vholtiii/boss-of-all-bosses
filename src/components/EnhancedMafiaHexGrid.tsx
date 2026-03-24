@@ -27,6 +27,7 @@ interface EnhancedMafiaHexGridProps {
   onPlanHitSelect?: (q: number, r: number, s: number, targetUnitId: string) => void;
   onPlanHitSelectSoldier?: (unitId: string) => void;
   onCancelPlanHit?: () => void;
+  bossHighlightHex?: { q: number; r: number; s: number } | null;
 }
 
 const familyColors: Record<string, string> = {
@@ -50,7 +51,8 @@ const businessIcons: Record<string, string> = {
 const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({ 
   width, height, onBusinessClick, selectedBusiness, playerFamily,
   gameState, onAction, onSelectUnit, onMoveUnit, onSelectHeadquarters,
-  onSelectUnitFromHeadquarters, onDeployUnit, planHitMode, planHitStep, planHitPlannerId, onPlanHitSelect, onPlanHitSelectSoldier, onCancelPlanHit
+  onSelectUnitFromHeadquarters, onDeployUnit, planHitMode, planHitStep, planHitPlannerId, onPlanHitSelect, onPlanHitSelectSoldier, onCancelPlanHit,
+  bossHighlightHex
 }) => {
   const [zoom, setZoom] = useState(1);
   const [showSoldiers, setShowSoldiers] = useState(true);
@@ -810,6 +812,19 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       </g>
                     );
                   })()}
+
+                  {/* Boss highlight hex — gold pulsing ring */}
+                  {bossHighlightHex && bossHighlightHex.q === tile.q && bossHighlightHex.r === tile.r && bossHighlightHex.s === tile.s && (
+                    <polygon
+                      points={getHexPoints(x, y, baseHexRadius + 5)}
+                      fill="none"
+                      stroke="#D4AF37"
+                      strokeWidth="3"
+                      opacity="0.9"
+                      strokeDasharray="8,4"
+                      className="pointer-events-none animate-pulse"
+                    />
+                  )}
 
                   {/* Player territory gold outer glow */}
                   {isPlayerTerritory && !tile.isHeadquarters && (

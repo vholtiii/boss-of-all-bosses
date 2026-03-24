@@ -185,6 +185,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const [showSettings, setShowSettings] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showTurnSummary, setShowTurnSummary] = useState(false);
+  const [bossHighlightHex, setBossHighlightHex] = useState<{ q: number; r: number; s: number } | null>(null);
   const [selectedHeadquarters, setSelectedHeadquarters] = useState<{
     family: string;
     headquarters: any;
@@ -213,6 +214,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   // Close headquarters panel
   const closeHeadquartersPanel = useCallback(() => {
     setSelectedHeadquarters(null);
+    setBossHighlightHex(null);
   }, []);
   // notifyTerritoryCaptured and notifyReputationChange already destructured above
 
@@ -260,6 +262,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onPlanHitSelect={(q, r, s, targetUnitId) => handleAction({ type: 'plan_hit', plannerUnitId: planHitPlannerId, targetUnitId })}
             onPlanHitSelectSoldier={(unitId) => handleAction({ type: 'plan_hit_select_soldier', unitId })}
             onCancelPlanHit={() => handleAction({ type: 'cancel_plan_hit_mode' })}
+            bossHighlightHex={bossHighlightHex}
           />
         </div>
       )
@@ -755,6 +758,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onPlanHitSelect={(q, r, s, targetUnitId) => handleAction({ type: 'plan_hit', plannerUnitId: planHitPlannerId, targetUnitId })}
             onPlanHitSelectSoldier={(unitId) => handleAction({ type: 'plan_hit_select_soldier', unitId })}
             onCancelPlanHit={() => handleAction({ type: 'cancel_plan_hit_mode' })}
+            bossHighlightHex={bossHighlightHex}
           />
     </div>
   );
@@ -807,6 +811,10 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
           movementPhase={gameState.movementPhase}
           playerFamily={gameState.playerFamily}
+          deployedUnits={gameState.deployedUnits || []}
+          hexMap={gameState.hexMap || []}
+          bossHighlightHex={bossHighlightHex}
+          onBossHighlightHex={setBossHighlightHex}
         />
       )}
 
