@@ -1,40 +1,53 @@
 
 
-# Refine HQ Menu — Accurate, Complete, Up-to-Date Information
+# Intel Alerts: Planned Hits & Assassination Warnings via Scout/Bribe
 
-## Problems Found
-
-1. **Businesses list uses legacy `gameState.businesses[]` array** — always empty since businesses are on hex tiles. The Boss Overview shows "Businesses (0)" and the bottom "Controlled Businesses" count is always 0.
-
-2. **No total money balance shown** — the HQ panel shows income/expenses/dirty/clean but never shows the player's actual current cash balance (`resources.money`).
-
-3. **Business income per-tile shown in Boss Overview uses legacy `biz.income`** — even if businesses were passed correctly, the income displayed per business would come from the legacy object, not the hex tile's computed income.
-
-4. **Rival HQ click shows player finances** — `finances` is always the player's finances object, but the panel shows it for any family clicked (including rivals). Rival HQs should show rival-relevant info (soldier count, territory count) but NOT player finances.
-
-5. **Territory count missing** — no display of how many hexes the family controls.
-
-6. **Extorted businesses not distinguished** — hex businesses include both owned and extorted, but the panel doesn't differentiate.
+## Current State
+- AI planned hits (`aiPlannedHits[]`) exist but the warning in `GameSidePanels` (line 297) shows **unconditionally** — no intel requirement
+- Turn report intel is gated behind scouted hexes / active bribes, but lacks detail about source
+- HQ panel has no threat intel section at all
+- No notifications fire when intel is first discovered
 
 ## Changes
 
-### `src/pages/UltimateMafiaGame.tsx`
-- Build a `hexBusinesses` array from `gameState.hexMap` tiles where `controllingFamily === family && tile.business` exists — include `q, r, s, district, businessType, income, isLegal, isExtorted`
-- Pass this as a new `hexBusinesses` prop instead of relying on legacy `businesses`
-- Pass `totalMoney={gameState.resources.money}` prop
-- Pass `territoryCount` (count of hexes controlled by this family)
-- Only pass `finances` when the selected family is the player's family
+### 1. Add Intel Source Tracking to `AIPlannedHit`
 
-### `src/components/HeadquartersInfoPanel.tsx`
-- Add props: `hexBusinesses`, `totalMoney`, `territoryCount`
-- **Financial Overview**: Add "Cash on Hand" box showing `totalMoney` (player only)
-- **Businesses section** (Boss Overview): Use `hexBusinesses` instead of `familyBusinesses` from legacy array. Show business type, district, income, legal/illegal badge, and extorted badge
-- **Controlled Businesses count**: Use `hexBusinesses.length`
-- **Territory count**: Add a territory hex count display
-- **Rival HQ**: Hide financial details (income/expenses/dirty/clean) for rival families. Show only unit counts, territory count, and business count
-- Remove legacy `businesses` prop and all fallback calculations from legacy array
+**`src/types/game-mechanics.ts`**
+- Extend `AIPlannedHit` interface with optional `detectedVia?: 'scout' | 'bribe_captain' | 'bribe_chief' | 'bribe_mayor'` and `detectedOnTurn?: number`
+
+### 2. Tag Intel Source When Detecting Planned Hits
+
+**`src/hooks/useEnhancedMafiaGameState.ts`**
+- When AI plans a hit (~line 3254), check intel conditions (scouted hex or active bribe) right there
+- If detected, set `detectedVia` on the hit object with the appropriate source
+- Also check on each subsequent turn (in the planned hit processing loop) — if a previously undetected hit becomes visible due to new scouting/bribe, tag it then
+- Fire a `pendingNotification` when a hit is first detected: flavor text varies by source:
+  - Scout: "🔫 Street Intel: Your soldier in [district] overheard the [Family] planning a hit on your capo"
+  - Captain bribe: "🔫 Police Tip: Captain says the [Family] have contracted a hit on one of your capos"  
+  - Chief/Mayor: "🔫 High-Level Intel: Sources confirm the [Family] are moving on your capo"
+
+### 3. Gate the Side Panel Warning Behind Intel
+
+**`src/components/GameSidePanels.tsx`** (~line 297)
+- Filter `aiPlannedHits` to only show hits where `detectedVia` is set
+- Show the intel source per hit: "Source: Street scout" / "Source: Police captain" / etc.
+- Show which family is planning the hit and turns remaining
+
+### 4. Add Threat Intel Section to HQ Panel
+
+**`src/components/HeadquartersInfoPanel.tsx`**
+- Add new prop `aiPlannedHits?: AIPlannedHit[]` (filtered to detected ones only)
+- Add a "⚠️ Active Threats" section (player HQ only) showing:
+  - Each detected planned hit with: attacking family, target capo name, turns until execution, intel source with flavor text
+  - Visual urgency (red for 1 turn remaining, yellow for 2+)
+
+**`src/pages/UltimateMafiaGame.tsx`**
+- Pass filtered `aiPlannedHits` (only detected ones) to `HeadquartersInfoPanel`
 
 ## Files Modified
-- `src/pages/UltimateMafiaGame.tsx` — build hex business list, pass new props
-- `src/components/HeadquartersInfoPanel.tsx` — use hex businesses, add cash balance, territory count, hide finances for rivals
+- `src/types/game-mechanics.ts` — extend `AIPlannedHit` interface
+- `src/hooks/useEnhancedMafiaGameState.ts` — intel detection logic + notifications
+- `src/components/GameSidePanels.tsx` — gate warning behind intel, show source
+- `src/components/HeadquartersInfoPanel.tsx` — add Active Threats section
+- `src/pages/UltimateMafiaGame.tsx` — pass threat intel to HQ panel
 
