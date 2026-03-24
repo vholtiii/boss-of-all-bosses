@@ -544,6 +544,7 @@ const createInitialGameState = (
     },
     flippedSoldiers: [],
     eliminatedFamilies: [],
+    sitdownCooldownUntil: 0,
     victoryType: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
