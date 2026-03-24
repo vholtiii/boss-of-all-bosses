@@ -2601,6 +2601,18 @@ export const useEnhancedMafiaGameState = (
         income += tileIncome;
       }
     });
+
+    // Share Profits pact income — earn 30% of target hex's income
+    let shareProfitsIncome = 0;
+    (state.shareProfitsPacts || []).filter(p => p.active).forEach(pact => {
+      const pactTile = state.hexMap.find(t => t.q === pact.hexQ && t.r === pact.hexR && t.s === pact.hexS);
+      if (pactTile?.business) {
+        const pactIncome = Math.floor(pactTile.business.income * pact.incomeShare);
+        shareProfitsIncome += pactIncome;
+      }
+    });
+    income += shareProfitsIncome;
+    illegalIncome += shareProfitsIncome; // Treat shared profits as illegal income
     
     // Soldier maintenance — $600/soldier per turn (deployed only, undeployed are free)
     const playerSoldiers = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier');
