@@ -4302,6 +4302,11 @@ export const useEnhancedMafiaGameState = (
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
         }
+        case 'boss_negotiate': {
+          const result = processNegotiation(newState, { ...action, isBossNegotiation: true });
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
         case 'assault_hq': {
           const result = processHQAssault(newState, action);
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
