@@ -2939,12 +2939,12 @@ export const useEnhancedMafiaGameState = (
             }
           }
 
-          // Alert: fortify chance
-          if (isAlerted && !unit.fortified && Math.random() < 0.3 && aiTacticalRemaining > 0) {
-            unit.fortified = true;
+          // Alert: fortify chance (hex-based)
+          if (isAlerted && !isHexFortified(state.fortifiedHexes || [], unit.q, unit.r, unit.s, fam) && Math.random() < 0.3 && aiTacticalRemaining > 0) {
+            state.fortifiedHexes = [...(state.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: fam, fortifiedOnTurn: state.turn }];
             unit.movesRemaining = 0;
             aiTacticalRemaining--;
-            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'fortify', detail: `Fortified a unit (alert mode)` });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'fortify', detail: `Fortified a hex (alert mode)` });
             continue;
           }
 
