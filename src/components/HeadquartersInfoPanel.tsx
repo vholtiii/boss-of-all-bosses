@@ -62,6 +62,15 @@ interface HeadquartersInfoPanelProps {
   sitdownCooldownUntil?: number;
   onCallSitdown?: (soldierIds: string[]) => void;
   detectedThreats?: Array<{ family: string; targetUnitId: string; turnsRemaining: number; detectedVia: string; detectedOnTurn: number }>;
+  onBossNegotiate?: (targetFamily: string) => void;
+  negotiationUsedThisTurn?: boolean;
+  activePacts?: {
+    ceasefires: Array<{ id: string; family: string; turnsRemaining: number; active: boolean }>;
+    alliances: Array<{ id: string; alliedFamily: string; turnsRemaining: number; active: boolean; conditions: Array<{ type: string }> }>;
+    shareProfits: Array<{ id: string; targetFamily: string; turnsRemaining: number; active: boolean; hexQ: number; hexR: number; hexS: number }>;
+    safePassages: Array<{ id: string; targetFamily: string; turnsRemaining: number; active: boolean }>;
+  };
+  enemyFamilies?: string[];
 }
 
 const familyColors: Record<string, string> = {
