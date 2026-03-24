@@ -880,59 +880,20 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             })}
 
             {/* District boundary outlines */}
-            {(() => {
-              const directions = [
-                { dq: 1, dr: 0, ds: -1 },
-                { dq: 1, dr: -1, ds: 0 },
-                { dq: 0, dr: -1, ds: 1 },
-                { dq: -1, dr: 0, ds: 1 },
-                { dq: -1, dr: 1, ds: 0 },
-                { dq: 0, dr: 1, ds: -1 },
-              ];
-
-              const hexDistrictMap = new Map<string, string>();
-              hexMap.forEach(t => hexDistrictMap.set(`${t.q},${t.r},${t.s}`, t.district));
-
-              const segments: { x1: number; y1: number; x2: number; y2: number }[] = [];
-
-              hexMap.forEach(tile => {
-                const { x: cx, y: cy } = getHexPosition(tile.q, tile.r);
-                directions.forEach((dir, edgeIndex) => {
-                  const nq = tile.q + dir.dq;
-                  const nr = tile.r + dir.dr;
-                  const ns = tile.s + dir.ds;
-                  const neighborDistrict = hexDistrictMap.get(`${nq},${nr},${ns}`);
-
-                  if (neighborDistrict !== tile.district) {
-                    const angle1 = (Math.PI / 3) * edgeIndex;
-                    const angle2 = (Math.PI / 3) * ((edgeIndex + 1) % 6);
-                    segments.push({
-                      x1: cx + baseHexRadius * Math.cos(angle1),
-                      y1: cy + baseHexRadius * Math.sin(angle1),
-                      x2: cx + baseHexRadius * Math.cos(angle2),
-                      y2: cy + baseHexRadius * Math.sin(angle2),
-                    });
-                  }
-                });
-              });
-
-              return (
-                <g className="pointer-events-none">
-                  {segments.map((seg, i) => (
-                    <line
-                      key={`district-border-${i}`}
-                      x1={seg.x1}
-                      y1={seg.y1}
-                      x2={seg.x2}
-                      y2={seg.y2}
-                      stroke="rgba(255, 255, 255, 0.4)"
-                      strokeWidth="2"
-                      strokeDasharray="4,3"
-                    />
-                  ))}
-                </g>
-              );
-            })()}
+            <g className="pointer-events-none">
+              {districtBorderSegments.map((seg, i) => (
+                <line
+                  key={`district-border-${i}`}
+                  x1={seg.x1}
+                  y1={seg.y1}
+                  x2={seg.x2}
+                  y2={seg.y2}
+                  stroke="rgba(255, 255, 255, 0.4)"
+                  strokeWidth="2"
+                  strokeDasharray="4,3"
+                />
+              ))}
+            </g>
 
             {/* District name labels */}
             {(() => {
