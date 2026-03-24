@@ -2365,7 +2365,7 @@ export const useEnhancedMafiaGameState = (
             const tHex = newState.hexMap.find(t => t.q === targetUnit.q && t.r === targetUnit.r && t.s === targetUnit.s);
             const isAtHQ = tHex?.isHeadquarters === targetUnit.family;
             const isAtSafehouse = (newState.safehouses || []).some(s => targetUnit.q === s.q && targetUnit.r === s.r && targetUnit.s === s.s);
-            const isFort = targetUnit.fortified;
+            const isFort = isHexFortified(newState.fortifiedHexes || [], targetUnit.q, targetUnit.r, targetUnit.s, targetUnit.family);
             let successRate = HITMAN_BASE_SUCCESS;
             if (isAtHQ) successRate = HITMAN_HQ_SUCCESS;
             else if (isAtSafehouse) successRate = HITMAN_SAFEHOUSE_SUCCESS;
