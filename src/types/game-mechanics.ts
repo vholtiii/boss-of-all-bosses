@@ -310,6 +310,16 @@ export interface Safehouse {
 export type MoveAction = 'move' | 'scout' | 'fortify' | 'escort' | 'safehouse';
 
 export const FORTIFY_DEFENSE_BONUS = 25; // +25% defense
+export const FORTIFY_ABANDON_TURNS = 3; // turns with no friendly units before fortification crumbles
+
+export interface FortifiedHex {
+  q: number;
+  r: number;
+  s: number;
+  family: string;
+  fortifiedOnTurn: number;
+  abandonedSinceTurn?: number; // turn when last friendly unit left (undefined = occupied)
+}
 export const FORTIFY_CASUALTY_REDUCTION = 50; // -50% casualties when fortified
 export const SCOUT_DURATION = 3; // turns
 export const SCOUT_INTEL_BONUS = 15; // +15% hit success on scouted hexes (fresh)
