@@ -1907,6 +1907,20 @@ export const useEnhancedMafiaGameState = (
         escortingSoldierIds: undefined,
       }));
 
+      // --- Hex fortification abandonment tick ---
+      newState.fortifiedHexes = (newState.fortifiedHexes || []).filter(f => {
+        const hasUnits = newState.deployedUnits.some(u => u.family === f.family && u.q === f.q && u.r === f.r && u.s === f.s);
+        if (hasUnits) {
+          f.abandonedSinceTurn = undefined; // Reset — units are present
+          return true;
+        }
+        if (!f.abandonedSinceTurn) {
+          f.abandonedSinceTurn = newState.turn; // Start counting
+          return true;
+        }
+        return (newState.turn - f.abandonedSinceTurn) < FORTIFY_ABANDON_TURNS; // Remove if abandoned too long
+      });
+
       // --- Training increment & individual soldier loyalty (per-turn) ---
       const maintenanceUnpaid = (() => {
         const pSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
