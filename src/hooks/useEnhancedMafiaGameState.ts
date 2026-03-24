@@ -768,7 +768,7 @@ export const useEnhancedMafiaGameState = (
 
   // ============ VICTORY CHECK ============
   const updateVictoryProgress = (state: EnhancedMafiaGameState) => {
-    const TERRITORY_TARGET = 60;
+    const TERRITORY_TARGET = state.mapSize === 'small' ? 40 : state.mapSize === 'large' ? 80 : 60;
     const ECONOMIC_TARGET = 50000;
     const LEGACY_MIN_TURN = 15;
     const LEGACY_MARGIN = 1.25; // Must exceed rival by 25%
