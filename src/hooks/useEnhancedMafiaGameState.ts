@@ -1253,7 +1253,9 @@ export const useEnhancedMafiaGameState = (
       // Apply capo extortion bonuses
       let newResources = prev.resources;
       if (bonusMoney > 0) {
-        newResources = { ...prev.resources, money: prev.resources.money + bonusMoney, respect: prev.resources.respect + bonusRespect };
+        newResources = { ...prev.resources, money: prev.resources.money + bonusMoney, respect: Math.min(100, prev.resources.respect + bonusRespect) };
+        // Sync reputation.respect to match
+        prev.reputation.respect = newResources.respect;
       }
 
       let newAvailableMoves: Array<{q:number;r:number;s:number}> = [];
