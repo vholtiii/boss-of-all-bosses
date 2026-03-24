@@ -282,8 +282,12 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     },
   ];
 
-  // RICO Game Over
-  if (gameState.gameOver?.type === 'rico') {
+  // RICO or Bankruptcy Game Over
+  if (gameState.gameOver?.type === 'rico' || (gameState.gameOver as any)?.type === 'bankruptcy') {
+    const isRICO = gameState.gameOver?.type === 'rico';
+    const playerTerritoryCount = gameState.hexMap.filter(h => h.controllingFamily === gameState.playerFamily).length;
+    const playerSoldierCount = gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'soldier').length;
+    const eliminatedCount = (gameState as any).eliminatedFamilies?.length || 0;
     return (
       <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
         <motion.div
@@ -298,7 +302,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             transition={{ delay: 0.3 }}
             className="text-6xl mb-4"
           >
-            🚨
+            {isRICO ? '🚨' : '💸'}
           </motion.div>
           <motion.h1
             initial={{ y: -30, opacity: 0 }}
@@ -306,7 +310,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             transition={{ delay: 0.5 }}
             className="text-4xl font-bold text-destructive mb-4 font-playfair"
           >
-            RICO INDICTMENT
+            {isRICO ? 'RICO INDICTMENT' : 'BANKRUPTCY'}
           </motion.h1>
           <motion.p
             initial={{ y: 20, opacity: 0 }}
@@ -314,16 +318,35 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             transition={{ delay: 0.7 }}
             className="text-lg text-muted-foreground mb-6"
           >
-            The federal government has dismantled your criminal empire after 5 consecutive turns at critical heat.
-            Your entire organization has been indicted under the RICO Act.
+            {isRICO
+              ? 'The federal government has dismantled your criminal empire after 5 consecutive turns at critical heat.'
+              : 'Your family collapsed under crushing debt. The other families have divided your territory.'}
           </motion.p>
+          {/* Post-game stats */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.9 }}
+            className="grid grid-cols-2 gap-3 mb-6 text-left bg-card/80 rounded-lg p-4 border border-border"
+          >
+            <div className="text-xs text-muted-foreground">Turns Survived</div>
+            <div className="text-xs font-bold text-foreground">{gameState.gameOver?.turn || gameState.turn}</div>
+            <div className="text-xs text-muted-foreground">Territory Held</div>
+            <div className="text-xs font-bold text-foreground">{playerTerritoryCount} hexes</div>
+            <div className="text-xs text-muted-foreground">Soldiers Remaining</div>
+            <div className="text-xs font-bold text-foreground">{playerSoldierCount}</div>
+            <div className="text-xs text-muted-foreground">Families Eliminated</div>
+            <div className="text-xs font-bold text-foreground">{eliminatedCount}/4</div>
+            <div className="text-xs text-muted-foreground">Final Wealth</div>
+            <div className="text-xs font-bold text-foreground">${gameState.resources.money.toLocaleString()}</div>
+          </motion.div>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1 }}
           >
             <Badge variant="destructive" className="text-xl px-6 py-3 font-playfair">
-              GAME OVER — Turn {gameState.gameOver.turn}
+              GAME OVER — Turn {gameState.gameOver?.turn || gameState.turn}
             </Badge>
           </motion.div>
           <motion.div
