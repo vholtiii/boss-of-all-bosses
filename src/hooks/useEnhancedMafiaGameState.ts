@@ -4970,7 +4970,7 @@ export const useEnhancedMafiaGameState = (
         }
         if (hasCeasefire) {
           state.ceasefires = state.ceasefires.filter(c => !(c.active && c.family === tile.controllingFamily));
-          state.reputation.respect = Math.max(0, state.reputation.respect - 15);
+          syncRespect(state, Math.max(0, state.reputation.respect - 15));
           state.pendingNotifications = [...state.pendingNotifications, {
             type: 'warning', title: '⚠️ Ceasefire Violated!',
             message: `You broke the ceasefire! -15 respect.`,
