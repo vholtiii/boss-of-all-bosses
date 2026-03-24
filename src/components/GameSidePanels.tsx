@@ -659,7 +659,7 @@ export const RightSidePanel: React.FC<{
                   <span className="text-sm font-bold capitalize text-foreground">{opponent.family}</span>
                   <Badge variant="outline" className="text-[10px] h-5">{opponent.personality}</Badge>
                 </div>
-                <div className="grid grid-cols-3 gap-1 text-center">
+                <div className="grid grid-cols-2 gap-1 text-center">
                   <div>
                     <p className="text-xs text-muted-foreground">Money</p>
                     <p className="text-xs font-medium text-foreground">${(opponent.resources.money / 1000).toFixed(0)}K</p>
@@ -667,6 +667,10 @@ export const RightSidePanel: React.FC<{
                   <div>
                     <p className="text-xs text-muted-foreground">Soldiers</p>
                     <p className="text-xs font-medium text-foreground">{opponent.resources.soldiers + (gameState.deployedUnits || []).filter((u: any) => u.family === opponent.family).length}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Respect</p>
+                    <p className="text-xs font-medium text-foreground">{opponent.resources.respect ?? 0}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Influence</p>

@@ -115,6 +115,7 @@ export interface AIOpponent {
     money: number;
     soldiers: number;
     influence: number;
+    respect: number;
   };
   strategy: AIStrategy;
   relationships: {

@@ -577,7 +577,7 @@ const createInitialGameState = (
         otherFamilies.forEach(x => { relationships[x] = Math.floor(Math.random() * 40) - 20; });
         return {
           family: f, personality: p.personality,
-          resources: { money: 35000 + Math.floor(Math.random() * 15000), soldiers: 2, influence: 8 + Math.floor(Math.random() * 8) },
+          resources: { money: 35000 + Math.floor(Math.random() * 15000), soldiers: 2, influence: 8 + Math.floor(Math.random() * 8), respect: 15 + Math.floor(Math.random() * 10) },
           strategy: { primaryGoal: p.primaryGoal, riskTolerance: p.riskTolerance, aggressionLevel: p.aggressionLevel, cooperationTendency: p.cooperationTendency, focusAreas: p.focusAreas },
           relationships, lastAction: null, nextAction: null,
         };
