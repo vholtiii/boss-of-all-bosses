@@ -195,6 +195,7 @@ export interface CeasefirePact {
 // ============ RECRUITMENT COSTS ============
 export const SOLDIER_COST = 1500;  // Mercenary (buy) cost
 export const LOCAL_SOLDIER_COST = 300;  // Recruited (loyal) cost
+export const SOLDIER_MAINTENANCE = 600;  // Per-turn upkeep per soldier
 export const RECRUIT_TERRITORY_REQUIREMENT = 10;  // Hexes needed to recruit locally
 export const CAPO_COST = 1500;
 export const MAX_HITMEN = 3;

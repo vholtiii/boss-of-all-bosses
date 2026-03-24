@@ -15,7 +15,7 @@ import { ViolentAction } from '@/types/reputation';
 import {
   SoldierStats, HitmanContract, BribeContract, BribeTier, VictoryProgress, VictoryType,
   FAMILY_BONUSES, BRIBE_TIERS, DOC_BUSINESS_TYPES,
-  SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, MAX_HITMEN,
+  SOLDIER_COST, LOCAL_SOLDIER_COST, SOLDIER_MAINTENANCE, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, MAX_HITMEN,
   HITMAN_CONTRACT_COST, HITMAN_BASE_SUCCESS, HITMAN_FORTIFIED_SUCCESS, HITMAN_SAFEHOUSE_SUCCESS, HITMAN_HQ_SUCCESS,
   HITMAN_OPEN_TURNS, HITMAN_FORTIFIED_TURNS, HITMAN_SAFEHOUSE_TURNS, HITMAN_HQ_TURNS,
   HITMAN_MAX_LIFETIME, HITMAN_REFUND_RATE, HITMAN_ALERT_DURATION,
@@ -1316,7 +1316,6 @@ export const useEnhancedMafiaGameState = (
   }, []);
 
 
-  // ============ DEPLOY FROM HQ ============
   const selectHeadquarters = useCallback((family: string) => {}, []);
 
   const selectUnitFromHeadquarters = useCallback((unitType: 'soldier' | 'capo', family: string) => {
@@ -1695,8 +1694,8 @@ export const useEnhancedMafiaGameState = (
       // --- Training increment & individual soldier loyalty (per-turn) ---
       const maintenanceUnpaid = (() => {
         const pSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
-        let maint = pSoldiers.length * SOLDIER_COST;
-        maint += newState.resources.soldiers * SOLDIER_COST;
+        let maint = pSoldiers.length * SOLDIER_MAINTENANCE;
+        maint += newState.resources.soldiers * SOLDIER_MAINTENANCE;
         return newState.resources.money < maint;
       })();
 
@@ -1772,6 +1771,40 @@ export const useEnhancedMafiaGameState = (
       turnReport.maintenance = newState.finances.totalExpenses;
       turnReport.netIncome = newState.finances.totalProfit;
 
+      // --- BANKRUPTCY MECHANIC ---
+      if (newState.resources.money < 0) {
+        const debt = Math.abs(newState.resources.money);
+        const deserters = Math.floor(debt / 10000);
+        if (deserters > 0) {
+          const playerSoldiersBankrupt = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+          const toDesert = Math.min(deserters, playerSoldiersBankrupt.length);
+          for (let i = 0; i < toDesert; i++) {
+            const idx = Math.floor(Math.random() * playerSoldiersBankrupt.length);
+            const deserted = playerSoldiersBankrupt.splice(idx, 1)[0];
+            newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== deserted.id);
+          }
+          if (toDesert > 0) {
+            turnReport.events.push(`💸 ${toDesert} soldier${toDesert > 1 ? 's' : ''} deserted — can't afford to pay them! (Debt: $${debt.toLocaleString()})`);
+            newState.pendingNotifications.push({
+              type: 'error' as const, title: '💸 Soldiers Deserted',
+              message: `${toDesert} soldier${toDesert > 1 ? 's' : ''} left because the family is $${debt.toLocaleString()} in debt.`,
+            });
+          }
+        }
+        if (debt >= 50000) {
+          turnReport.events.push('☠️ BANKRUPTCY! The family has collapsed under $50K+ debt. Game Over.');
+          newState.pendingNotifications.push({
+            type: 'error' as const, title: '☠️ Game Over — Bankruptcy',
+            message: `The family collapsed under $${debt.toLocaleString()} in debt. The other families have divided your territory.`,
+          });
+          // Game over — player loses all territory
+          newState.hexMap.forEach(t => { if (t.controllingFamily === newState.playerFamily && !t.isHeadquarters) t.controllingFamily = 'neutral'; });
+          newState.deployedUnits = newState.deployedUnits.filter(u => u.family !== newState.playerFamily);
+        } else if (debt >= 20000) {
+          turnReport.events.push(`⚠️ WARNING: Family is $${debt.toLocaleString()} in debt! Soldiers will desert. Bankruptcy at -$50K.`);
+        }
+      }
+
       processAITurn(newState, turnReport);
       processWeather(newState);
       processEvents(newState);
@@ -1812,7 +1845,7 @@ export const useEnhancedMafiaGameState = (
         
         // Can't afford soldier maintenance?
         const playerSoldiersForMaint = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
-        const totalMaint = playerSoldiersForMaint.length * SOLDIER_COST + newState.resources.soldiers * SOLDIER_COST;
+        const totalMaint = playerSoldiersForMaint.length * SOLDIER_MAINTENANCE + newState.resources.soldiers * SOLDIER_MAINTENANCE;
         if (newState.resources.money < totalMaint) loyaltyDelta -= 5;
         
         newState.reputation.loyalty = Math.min(100, Math.max(0, newState.reputation.loyalty + loyaltyDelta));
@@ -2261,13 +2294,13 @@ export const useEnhancedMafiaGameState = (
       }
     });
     
-    // Soldier maintenance — $500/soldier base
+    // Soldier maintenance — $600/soldier per turn
     const playerSoldiers = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier');
     let maintenance = 0;
     playerSoldiers.forEach(s => {
-      maintenance += SOLDIER_COST;
+      maintenance += SOLDIER_MAINTENANCE;
     });
-    maintenance += state.resources.soldiers * SOLDIER_COST; // undeployed pool
+    maintenance += state.resources.soldiers * SOLDIER_MAINTENANCE; // undeployed pool
 
     // Community upkeep — $150/turn for each empty claimed hex (neighborhood expenses)
     const communityHexCount = (state.hexMap || []).filter(tile =>
@@ -2474,9 +2507,10 @@ export const useEnhancedMafiaGameState = (
       const aggression = opponent.strategy.aggressionLevel || 50;
       const cooperation = opponent.strategy.cooperationTendency || 50;
 
-      // AI action budget — matches player constraints (AI lacks respect stat, use influence as proxy)
-      let aiActionsRemaining = 2 + (opponent.resources.influence >= 50 ? 1 : 0);
-      let aiTacticalRemaining = 3;
+      // AI action budget — boosted in early game (turns 1-8) for faster expansion
+      const earlyGameBonus = state.turn <= 8 ? 2 : 0;
+      let aiActionsRemaining = 2 + (opponent.resources.influence >= 50 ? 1 : 0) + earlyGameBonus;
+      let aiTacticalRemaining = 3 + earlyGameBonus;
 
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
       for (const unit of aiUnits) {
