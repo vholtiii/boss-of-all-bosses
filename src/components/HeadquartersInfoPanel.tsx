@@ -279,7 +279,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                       {deployedUnitsList.length === 0 ? (
                         <div className="text-[10px] text-muted-foreground italic px-1">No units deployed</div>
                       ) : (
-                        <ScrollArea className="max-h-32">
+                        <ScrollArea className="max-h-48">
                           <div className="space-y-1">
                             {deployedUnitsList.map((unit: any) => {
                               const district = getDistrictForHex(unit.q, unit.r, unit.s);
