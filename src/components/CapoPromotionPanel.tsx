@@ -17,6 +17,7 @@ interface CapoPromotionPanelProps {
   hitmanIds: string[];
   money: number;
   onPromote: (unitId: string) => void;
+  onHighlightSoldier?: (unitId: string) => void;
 }
 
 const Req: React.FC<{ met: boolean; label: string }> = ({ met, label }) => (
