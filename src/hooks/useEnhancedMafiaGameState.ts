@@ -4954,7 +4954,7 @@ export const useEnhancedMafiaGameState = (
           const idx = state.deployedUnits.indexOf(eu);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         });
-        tile.controllingFamily = null; // Hit clears enemy control — player must Claim next turn
+        tile.controllingFamily = 'neutral'; // Hit clears enemy control — player must Claim next turn
         
         // Check if enemy had a safehouse on this hex → player gets bounty + intel
         // (AI safehouses are tracked per-AI; for now we check if any AI opponent has a safehouse here)
