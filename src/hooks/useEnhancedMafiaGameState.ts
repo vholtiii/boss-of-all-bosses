@@ -4707,9 +4707,10 @@ export const useEnhancedMafiaGameState = (
     const enemySoldiersNearHQ = state.deployedUnits.filter(u =>
       u.family === targetFamily && u.type === 'soldier' && hexDistance(u, { q: targetQ, r: targetR, s: targetS }) <= 1
     );
+    // FIX #6: Any soldier with loyalty < 80 can be targeted (low loyalty = easier to flip)
     const flippableTargets = enemySoldiersNearHQ.filter(u => {
       const uStats = state.soldierStats[u.id];
-      return uStats && uStats.loyalty > 60 && !(state.flippedSoldiers || []).some(f => f.unitId === u.id);
+      return uStats && uStats.loyalty < 80 && !(state.flippedSoldiers || []).some(f => f.unitId === u.id);
     });
 
     if (flippableTargets.length === 0) {
