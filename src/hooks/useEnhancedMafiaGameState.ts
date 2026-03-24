@@ -4503,7 +4503,7 @@ export const useEnhancedMafiaGameState = (
             if (newState.familyControl[rivalFamily] !== undefined) {
               newState.familyControl[rivalFamily] = Math.max(0, newState.familyControl[rivalFamily] - 5);
               newState.familyControl[newState.playerFamily as keyof typeof newState.familyControl] += 2;
-              newState.resources.respect += 3;
+              syncRespect(newState, Math.min(100, newState.resources.respect + 3));
             }
           }
           break;
