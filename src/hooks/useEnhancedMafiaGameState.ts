@@ -5469,16 +5469,44 @@ export const useEnhancedMafiaGameState = (
       if (!a.active) return a;
       const remaining = a.turnsRemaining - 1;
 
-      // Check conditions
+      // Check conditions — scan hex map for violations
       a.conditions.forEach(cond => {
         if (cond.violated) return;
         if (cond.type === 'no_attack_family') {
-          // Check if player attacked ally this turn (we can't retroactively check, but if relationship dropped significantly)
-          // Simple: if any ally territory was taken by player this turn, condition violated
+          // Check if any combat log entry this turn shows player attacking the allied family
+          const attackedAlly = (state.combatLog || []).some(
+            (log: string) => log.includes(a.alliedFamily) && (log.includes('attack') || log.includes('hit') || log.includes('assault'))
+          );
+          if (attackedAlly) {
+            cond.violated = true;
+            state.reputation.respect = Math.max(0, state.reputation.respect - 15);
+            state.resources.respect = Math.round(state.reputation.respect);
+            state.pendingNotifications = [...state.pendingNotifications, {
+              type: 'error', title: '⚠️ Alliance Violated!',
+              message: `You attacked ${a.alliedFamily} — alliance broken! -15 respect.`,
+            }];
+            a.active = false;
+            a.turnsRemaining = 0;
+          }
         }
-        if (cond.type === 'no_expand_district') {
-          // Check if player expanded into the target district
-          // For simplicity we don't enforce this retroactively here
+        if (cond.type === 'no_expand_district' && cond.target) {
+          // Check if player claimed new hexes in the restricted district
+          const playerHexesInDistrict = Object.values(state.hexMap).filter(
+            (t: any) => t.controllingFamily === state.playerFamily && t.district === cond.target
+          ).length;
+          const prevCount = (cond as any)._prevCount || 0;
+          if (playerHexesInDistrict > prevCount) {
+            cond.violated = true;
+            state.reputation.respect = Math.max(0, state.reputation.respect - 10);
+            state.resources.respect = Math.round(state.reputation.respect);
+            state.pendingNotifications = [...state.pendingNotifications, {
+              type: 'error', title: '⚠️ Alliance Violated!',
+              message: `You expanded into ${cond.target} — alliance with ${a.alliedFamily} broken! -10 respect.`,
+            }];
+            a.active = false;
+            a.turnsRemaining = 0;
+          }
+          (cond as any)._prevCount = playerHexesInDistrict;
         }
       });
 
