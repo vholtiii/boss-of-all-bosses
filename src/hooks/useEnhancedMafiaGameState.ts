@@ -2449,9 +2449,13 @@ export const useEnhancedMafiaGameState = (
               loyalty: 40 + Math.floor(Math.random() * 30), training: 0,
               hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
             };
+            // Only capos auto-claim neutral territory on deploy (matches player rules)
             const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
-            if (tile && (tile.controllingFamily === 'neutral' || tile.controllingFamily === fam) && !tile.isHeadquarters) {
-              tile.controllingFamily = fam;
+            if (tile && tile.controllingFamily === fam && !tile.isHeadquarters) {
+              // Already owned, fine
+            } else if (tile && tile.controllingFamily === 'neutral' && !tile.isHeadquarters) {
+              // Soldiers do NOT auto-claim neutral hexes (only capos do)
+              // Don't set controllingFamily here for soldiers
             }
             soldiersToPlace--;
             placed = true;
@@ -2467,8 +2471,13 @@ export const useEnhancedMafiaGameState = (
       const aggression = opponent.strategy.aggressionLevel || 50;
       const cooperation = opponent.strategy.cooperationTendency || 50;
 
+      // AI action budget — matches player constraints (AI lacks respect stat, use influence as proxy)
+      let aiActionsRemaining = 2 + (opponent.resources.influence >= 50 ? 1 : 0);
+      let aiTacticalRemaining = 3;
+
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
       for (const unit of aiUnits) {
+        if (aiTacticalRemaining <= 0) break; // No more tactical actions
         let movesLeft = Math.min(unit.movesRemaining, unit.type === 'soldier' ? (2 + alertBonus) : 3);
         while (movesLeft > 0) {
           const neighbors = unit.type === 'soldier'
@@ -2477,6 +2486,9 @@ export const useEnhancedMafiaGameState = (
           const validMoves = neighbors.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
             if (!tile || tile.isHeadquarters) return false;
+            // Hex stacking limit: max 2 friendly units per hex
+            const friendlyUnitsHere = state.deployedUnits.filter(u => u.family === fam && u.q === n.q && u.r === n.r && u.s === n.s);
+            if (friendlyUnitsHere.length >= 2) return false;
             if (tile.controllingFamily === fam) return true;
             const nNeighbors = getHexNeighbors(n.q, n.r, n.s);
             return nNeighbors.some(nn => {
@@ -2568,15 +2580,19 @@ export const useEnhancedMafiaGameState = (
           }
 
           // Alert: fortify chance
-          if (isAlerted && !unit.fortified && Math.random() < 0.3) {
+          if (isAlerted && !unit.fortified && Math.random() < 0.3 && aiTacticalRemaining > 0) {
             unit.fortified = true;
             unit.movesRemaining = 0;
+            aiTacticalRemaining--;
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'fortify', detail: `Fortified a unit (alert mode)` });
             continue;
           }
 
           if (targetPool.length === 0) targetPool = validMoves;
           const target = targetPool[Math.floor(Math.random() * targetPool.length)];
+          
+          // Save original position — only commit move after combat resolution
+          const origQ = unit.q, origR = unit.r, origS = unit.s;
           unit.q = target.q;
           unit.r = target.r;
           unit.s = target.s;
@@ -2586,6 +2602,7 @@ export const useEnhancedMafiaGameState = (
           const moveCost = isCommunityHex ? 2 : 1;
           unit.movesRemaining = Math.max(0, unit.movesRemaining - moveCost);
           movesLeft = Math.max(0, movesLeft - moveCost);
+          aiTacticalRemaining--;
 
           const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
           if (tile && !tile.isHeadquarters) {
@@ -2594,6 +2611,12 @@ export const useEnhancedMafiaGameState = (
               u.family !== fam && u.q === target.q && u.r === target.r && u.s === target.s
             );
             if (enemyUnitsHere.length > 0) {
+              // Combat costs an action point
+              if (aiActionsRemaining <= 0) {
+                // No action budget left — revert position and skip
+                unit.q = origQ; unit.r = origR; unit.s = origS;
+                break;
+              }
               const aiStrength = state.deployedUnits.filter(u => u.family === fam && u.q === target.q && u.r === target.r && u.s === target.s).length;
 
               // Personality-driven combat willingness (replaces flat 0.4)
@@ -2607,6 +2630,7 @@ export const useEnhancedMafiaGameState = (
               }
 
               if (aiStrength >= enemyUnitsHere.length || Math.random() < combatWillingness) {
+                aiActionsRemaining--; // Deduct action point for combat
                 // Safehouse defense bonus: defenders on safehouse hex are harder to kill
                 const isTargetSafehouse = state.safehouses.some(s => s.q === target.q && s.r === target.r && s.s === target.s);
                 const baseKillChance = isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) : 0.7;
@@ -2673,12 +2697,13 @@ export const useEnhancedMafiaGameState = (
                     // Bounty to capturing AI family
                     const captorOpponent = state.aiOpponents.find(o => o.family === fam);
                     if (captorOpponent) captorOpponent.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
-                    // Intel: scout all of former owner's hexes for 1 turn (AI benefit tracked internally)
                     if (prevOwner === state.playerFamily) {
-                      // AI gets intel on player — boost their targeting for 1 turn via existing alert mechanism
                       state.aiAlertState[fam] = Math.max(state.aiAlertState[fam] || 0, SAFEHOUSE_CAPTURE_INTEL_DURATION);
                     }
                   }
+                } else {
+                  // Combat didn't clear the hex — revert AI unit position
+                  unit.q = origQ; unit.r = origR; unit.s = origS;
                 }
                 if (Math.random() < 0.3) {
                   const aiHere = state.deployedUnits.filter(u => u.family === fam && u.q === target.q && u.r === target.r && u.s === target.s);
@@ -2702,27 +2727,44 @@ export const useEnhancedMafiaGameState = (
                   const victimFams = [...new Set(aiVictims.map(u => u.family))];
                   turnReport.aiActions.push({ family: fam, action: 'ai_combat', detail: `Fought ${victimFams.join(', ')} in ${tile.district}` });
                 }
+              } else {
+                // AI declined to fight — revert position
+                unit.q = origQ; unit.r = origR; unit.s = origS;
               }
               break;
             } else {
+              // No enemies on hex — handle territory claiming
               if (tile.controllingFamily !== fam) {
                 const prevOwner = tile.controllingFamily;
-                tile.controllingFamily = fam;
-                if (prevOwner === state.playerFamily && turnReport) {
-                  turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
+                const isNeutral = prevOwner === 'neutral';
+                
+                if (isNeutral) {
+                  // Neutral hex: capos auto-claim (matches player rules), soldiers don't
+                  if (unit.type === 'capo') {
+                    tile.controllingFamily = fam;
+                  }
+                } else {
+                  // Enemy territory with no defenders: requires an action point to claim
+                  if (aiActionsRemaining > 0) {
+                    aiActionsRemaining--;
+                    tile.controllingFamily = fam;
+                    if (prevOwner === state.playerFamily && turnReport) {
+                      turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
+                    }
+                  }
+                  // No action budget? Can't claim — just occupying the hex
                 }
+                
                 const shIdx2 = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
-                if (shIdx2 !== -1) {
+                if (shIdx2 !== -1 && tile.controllingFamily === fam) {
                   state.safehouses.splice(shIdx2, 1);
                   if (prevOwner === state.playerFamily) {
-                    // Player captures AI safehouse → bounty + intel
                     state.pendingNotifications.push({
                       type: 'error' as const,
                       title: '🏠 Safehouse Destroyed',
                       message: `The ${fam} family captured your territory and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()}.`,
                     });
                   }
-                  // Bounty to capturing AI
                   const captorOpp2 = state.aiOpponents.find(o => o.family === fam);
                   if (captorOpp2) captorOpp2.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
                 }
@@ -2856,7 +2898,17 @@ export const useEnhancedMafiaGameState = (
             turnsRemaining: AI_PLAN_HIT_DURATION,
             plannedOnTurn: state.turn,
           });
-          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'plan_hit', detail: `Planned a hit against a player capo` });
+          // Gate plan hit intel behind fog-of-war
+          if (turnReport) {
+            const targetUnit = state.deployedUnits.find(u => u.id === target.id);
+            const hasHitIntel = targetUnit && (
+              state.scoutedHexes.some(s => s.q === targetUnit.q && s.r === targetUnit.r && s.s === targetUnit.s) ||
+              (state.activeBribes || []).some(b => b.tier === 'police_captain' || b.tier === 'police_chief')
+            );
+            if (hasHitIntel) {
+              turnReport.aiActions.push({ family: fam, action: 'plan_hit', detail: `Planned a hit against a player capo` });
+            }
+          }
         }
       }
     });
