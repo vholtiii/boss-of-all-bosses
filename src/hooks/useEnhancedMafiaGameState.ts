@@ -1139,8 +1139,8 @@ export const useEnhancedMafiaGameState = (
       const newUnits = [...prev.deployedUnits];
       let remainingMoves = unit.movesRemaining - moveCost;
 
-      // Zone of control: if soldier moves adjacent to enemy, movement ends (not on free moves)
-      if (unit.type === 'soldier' && !isFreeMove) {
+      // FIX #5: Zone of control applies even on free moves — free movement skips COST but not ZoC
+      if (unit.type === 'soldier') {
         if (isAdjacentToEnemy(targetLocation.q, targetLocation.r, targetLocation.s, prev.hexMap, prev.deployedUnits, prev.playerFamily)) {
           remainingMoves = 0;
         }
