@@ -1,57 +1,40 @@
 
 
-# Fix 11 Game Bugs (Excluding Capo Auto-Claim)
+# Refine HQ Menu — Accurate, Complete, Up-to-Date Information
 
-## Bugs to Fix
+## Problems Found
 
-### CRITICAL
+1. **Businesses list uses legacy `gameState.businesses[]` array** — always empty since businesses are on hex tiles. The Boss Overview shows "Businesses (0)" and the bottom "Controlled Businesses" count is always 0.
 
-**1. Dirty Money Accumulates Forever / Clean Money Goes Negative**
-- `processEconomy()` line 2611: `dirtyMoney` only ever increases
-- Fix: Track dirty money as a **ratio** of total illegal income earned vs laundered, not an ever-growing accumulator. Each turn, set `dirtyMoney = illegalIncome` (current turn's dirty income only). `cleanMoney = money - dirtyMoney` stays correct.
-- Remove line 4381 in launder action: `resources.money += amountToLaunder` — this double-counts income since `processEconomy` already added illegal income to money.
+2. **No total money balance shown** — the HQ panel shows income/expenses/dirty/clean but never shows the player's actual current cash balance (`resources.money`).
 
-**2. Legacy `performBusinessAction` System Conflicts with Hex Businesses**
-- The entire `performBusinessAction` function (lines 4261-4538) operates on `state.businesses[]` which is disconnected from hex-based businesses.
-- Fix: Gut the business-building/upgrade/extort/collect/launder cases from `performBusinessAction`. Keep only lawyer and legacy bribe actions (hire_lawyer, fire_lawyer). The hex-based `build_business` in `performAction` is the real system.
-- Remove lines 4514-4534: the finance recalculation that overwrites `processEconomy` results.
+3. **Business income per-tile shown in Boss Overview uses legacy `biz.income`** — even if businesses were passed correctly, the income displayed per business would come from the legacy object, not the hex tile's computed income.
 
-**3. Legacy Bribe System Conflicts with `activeBribes`**
-- `performBusinessAction.bribe_official` (lines 4446-4481) uses `policeHeat.bribedOfficials` while the corruption panel uses `activeBribes`.
-- Fix: Remove `bribe_official` and `stop_bribe` cases from `performBusinessAction`. Remove the `policeHeat.bribedOfficials` permission checks for illegal businesses (lines 4281-4297) — these should check `activeBribes` instead, or be removed since hex-based build already handles this.
+4. **Rival HQ click shows player finances** — `finances` is always the player's finances object, but the panel shows it for any family clicked (including rivals). Rival HQs should show rival-relevant info (soldier count, territory count) but NOT player finances.
 
-### HIGH
+5. **Territory count missing** — no display of how many hexes the family controls.
 
-**5. HQ Stacking Limit Not Enforced on Recruitment/Sitdown**
-- Mercenary hire (line 3791) and local recruit (line 3836) deploy directly to HQ with no stacking check. Sitdown (line 4229) teleports unlimited units to HQ.
-- Fix: HQ is special — allow higher stacking (e.g., unlimited at HQ since it's the base). Document this as intentional, OR add a generous cap (e.g., 6 units at HQ). Given game design docs say "Each soldier at HQ: +5% HQ assault defense", unlimited HQ stacking seems intentional. **No code change — just document it.**
+6. **Extorted businesses not distinguished** — hex businesses include both owned and extorted, but the panel doesn't differentiate.
 
-**6. AI Soldier Recruitment Cap Formula Backwards**
-- Line 2682: `Math.min(8 + ..., 3 + turn/2 + ...)` — the `Math.min` means cap never exceeds 8.
-- Fix: Change to `Math.max` so early game is capped low (3 + turn/2) and late game can go higher (8+).
+## Changes
 
-**7. Defeat Casualties Message Wrong When No Killable Units**
-- Line 5320: `Math.max(1, ...)` reports 1 casualty even when 0 killable soldiers exist.
-- Fix: `const defeatCasualties = Math.min(Math.max(1, Math.floor(defeatKillable.length * 0.4)), defeatKillable.length);`
+### `src/pages/UltimateMafiaGame.tsx`
+- Build a `hexBusinesses` array from `gameState.hexMap` tiles where `controllingFamily === family && tile.business` exists — include `q, r, s, district, businessType, income, isLegal, isExtorted`
+- Pass this as a new `hexBusinesses` prop instead of relying on legacy `businesses`
+- Pass `totalMoney={gameState.resources.money}` prop
+- Pass `territoryCount` (count of hexes controlled by this family)
+- Only pass `finances` when the selected family is the player's family
 
-**8. Extortion Grants Stats to ALL Units on Hex**
-- Lines 5442-5458: `allPlayerUnits.forEach(...)` gives rewards to every unit.
-- Fix: Only grant stat rewards to the **first soldier** (or first capo if no soldiers). Pick one acting unit.
-
-### MEDIUM
-
-**9. Finance Overwrite After Business Actions** — Fixed by removing legacy recalc in fix #2.
-
-**10. Alliance Conditions Never Enforced**
-- Lines 5624-5633: Placeholder comments, no actual checks.
-- Fix: Track territory changes during action phase. In `processPacts`, check if player took territory from ally (`no_attack_family`) or expanded into restricted district (`no_expand_district`). If violated, break alliance + reputation penalty.
-
-**11. Sabotage Sets `tile.business = null` Instead of `undefined`**
-- Line 4705: `tile.business = null as any`
-- Fix: `tile.business = undefined`
-
-**12. Community Hex Move Cost — AI Only** — This is arguably intentional (AI penalty for crossing player territory). Skip fix, document as feature.
+### `src/components/HeadquartersInfoPanel.tsx`
+- Add props: `hexBusinesses`, `totalMoney`, `territoryCount`
+- **Financial Overview**: Add "Cash on Hand" box showing `totalMoney` (player only)
+- **Businesses section** (Boss Overview): Use `hexBusinesses` instead of `familyBusinesses` from legacy array. Show business type, district, income, legal/illegal badge, and extorted badge
+- **Controlled Businesses count**: Use `hexBusinesses.length`
+- **Territory count**: Add a territory hex count display
+- **Rival HQ**: Hide financial details (income/expenses/dirty/clean) for rival families. Show only unit counts, territory count, and business count
+- Remove legacy `businesses` prop and all fallback calculations from legacy array
 
 ## Files Modified
-- `src/hooks/useEnhancedMafiaGameState.ts` — all fixes
+- `src/pages/UltimateMafiaGame.tsx` — build hex business list, pass new props
+- `src/components/HeadquartersInfoPanel.tsx` — use hex businesses, add cash balance, territory count, hide finances for rivals
 
