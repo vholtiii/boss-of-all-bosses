@@ -1695,8 +1695,8 @@ export const useEnhancedMafiaGameState = (
       // --- Training increment & individual soldier loyalty (per-turn) ---
       const maintenanceUnpaid = (() => {
         const pSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
-        let maint = pSoldiers.length * SOLDIER_COST;
-        maint += newState.resources.soldiers * SOLDIER_COST;
+        let maint = pSoldiers.length * SOLDIER_MAINTENANCE;
+        maint += newState.resources.soldiers * SOLDIER_MAINTENANCE;
         return newState.resources.money < maint;
       })();
 
