@@ -57,7 +57,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [zoom, setZoom] = useState(1);
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
-  const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; negotiateCapoId?: string; reasons?: Record<string, string> } | null>(null);
+  const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; canAssaultHQ?: boolean; canFlipSoldier?: boolean; negotiateCapoId?: string; reasons?: Record<string, string> } | null>(null);
   const [planHitUnitMenu, setPlanHitUnitMenu] = useState<{ tile: HexTile; enemyUnits: DeployedUnit[] } | null>(null);
   const [expandedHQKey, setExpandedHQKey] = useState<string | null>(null);
   const [combatOverlay, setCombatOverlay] = useState<{
@@ -440,16 +440,26 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         const unitOnTargetHex = selectedUnit.q === tile.q && selectedUnit.r === tile.r && selectedUnit.s === tile.s;
         const hasCompletedBusiness = !!tile.business && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
         
-        const canHit = isEnemy && (isSoldier || isCapo);
+        const isEnemyHQ = !!tile.isHeadquarters && tile.isHeadquarters !== playerFamily;
+        
+        // Block all normal actions on HQ hexes
+        const canHit = isEnemy && (isSoldier || isCapo) && !tile.isHeadquarters;
         const canExtort = hasCompletedBusiness && (
           (isSoldier && unitOnTargetHex) || 
-          (isCapo && (unitOnTargetHex || true)) // Capo can extort from adjacent (already validated as valid target)
-        ) && (isNeutral || isEnemy);
-        const canClaim = isNeutral && isSoldier && !tile.business;
-        const canNegotiate = isEnemy && isCapo;
-        const canSabotage = isEnemy && isSoldier && !!tile.business;
+          (isCapo && (unitOnTargetHex || true))
+        ) && (isNeutral || isEnemy) && !tile.isHeadquarters;
+        const canClaim = isNeutral && isSoldier && !tile.business && !tile.isHeadquarters;
+        const canNegotiate = isEnemy && isCapo && !tile.isHeadquarters;
+        const canSabotage = isEnemy && isSoldier && !!tile.business && !tile.isHeadquarters;
         const canSafehouse = isOwned && !tile.isHeadquarters;
         const negotiateCapoId = isCapo ? selectedUnit.id : undefined;
+        
+        // HQ Assault: soldier adjacent to enemy HQ
+        const isAdjacentToHQ = isEnemyHQ && isSoldier && !unitOnTargetHex;
+        const soldierStats = gameState?.soldierStats?.[selectedUnit.id];
+        const meetsToughness = soldierStats && soldierStats.toughness >= 4 && soldierStats.loyalty >= 70;
+        const canAssaultHQ = isAdjacentToHQ && meetsToughness;
+        const canFlipSoldier = isEnemyHQ && isAdjacentToHQ;
         
         // Compute reasons for disabled actions (contextually relevant only)
         const reasons: Record<string, string> = {};
@@ -479,18 +489,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         if (!canSafehouse && isOwned && tile.isHeadquarters) {
           reasons.safehouse = 'Cannot use HQ';
         }
+        if (isEnemyHQ && !canAssaultHQ) {
+          if (!isSoldier) reasons.assault_hq = 'Need a soldier';
+          else if (unitOnTargetHex) reasons.assault_hq = 'Must be adjacent, not on HQ';
+          else if (!meetsToughness) reasons.assault_hq = `Need Tough ≥ 4, Loyalty ≥ 70`;
+        }
         
         // Filter out empty reasons
         Object.keys(reasons).forEach(k => { if (!reasons[k]) delete reasons[k]; });
         
-        const hasAnyAction = canHit || canExtort || canClaim || canNegotiate || canSabotage || canSafehouse;
+        const hasAnyAction = canHit || canExtort || canClaim || canNegotiate || canSabotage || canSafehouse || canAssaultHQ || canFlipSoldier;
         const hasAnyReason = Object.keys(reasons).length > 0;
         
         if (hasAnyAction || hasAnyReason) {
           if (actionMenu && actionMenu.tile.q === tile.q && actionMenu.tile.r === tile.r) {
             setActionMenu(null);
           } else {
-            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, negotiateCapoId, reasons });
+            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, canAssaultHQ, canFlipSoldier, negotiateCapoId, reasons });
           }
           return;
         }
@@ -979,7 +994,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             {actionMenu && (() => {
               const { x, y } = getHexPosition(actionMenu.tile.q, actionMenu.tile.r);
               const menuWidth = 150;
-              const activeCount = [actionMenu.canHit, actionMenu.canExtort, actionMenu.canClaim, actionMenu.canNegotiate, actionMenu.canSabotage, actionMenu.canSafehouse].filter(Boolean).length;
+              const activeCount = [actionMenu.canHit, actionMenu.canExtort, actionMenu.canClaim, actionMenu.canNegotiate, actionMenu.canSabotage, actionMenu.canSafehouse, actionMenu.canAssaultHQ, actionMenu.canFlipSoldier].filter(Boolean).length;
               const disabledCount = Object.keys(actionMenu.reasons || {}).length;
               const totalItems = activeCount + disabledCount;
               const menuHeight = totalItems * 38 + 30;
@@ -1124,6 +1139,43 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       </button>
                     ) : reasons.safehouse ? (
                       <DisabledAction icon="🏠" label="Safehouse" reason={reasons.safehouse} />
+                    ) : null}
+                    {actionMenu.canAssaultHQ ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAction) onAction({
+                            type: 'assault_hq',
+                            targetQ: actionMenu.tile.q,
+                            targetR: actionMenu.tile.r,
+                            targetS: actionMenu.tile.s,
+                            selectedUnitId: gameState?.selectedUnitId,
+                          });
+                          setActionMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-destructive hover:bg-destructive/80 text-destructive-foreground text-xs font-bold transition-colors"
+                      >
+                        💀 Assault HQ
+                      </button>
+                    ) : reasons.assault_hq ? (
+                      <DisabledAction icon="💀" label="Assault HQ" reason={reasons.assault_hq} />
+                    ) : null}
+                    {actionMenu.canFlipSoldier ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onAction) onAction({
+                            type: 'flip_soldier',
+                            targetQ: actionMenu.tile.q,
+                            targetR: actionMenu.tile.r,
+                            targetS: actionMenu.tile.s,
+                          });
+                          setActionMenu(null);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-muted hover:bg-muted/80 text-foreground text-xs font-bold transition-colors"
+                      >
+                        🐀 Flip Soldier ($5K)
+                      </button>
                     ) : null}
                   </div>
                 </foreignObject>

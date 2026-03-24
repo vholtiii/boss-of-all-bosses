@@ -55,9 +55,29 @@ export interface VictoryProgress {
   territory: { current: number; target: number; met: boolean };
   economic: { current: number; target: number; met: boolean };
   legacy: { current: number; highestRival: number; met: boolean };
+  domination: { eliminated: number; target: number; met: boolean };
 }
 
-export type VictoryType = 'territory' | 'economic' | 'legacy' | null;
+export type VictoryType = 'territory' | 'economic' | 'legacy' | 'domination' | null;
+
+// ============ HQ ASSAULT & FLIP SOLDIER ============
+export const HQ_ASSAULT_BASE_CHANCE = 0.15;
+export const HQ_DEFENSE_BONUS = 0.30;
+export const HQ_ASSAULT_MAX_CHANCE = 0.50;
+export const HQ_ASSAULT_MIN_TOUGHNESS = 4;
+export const HQ_ASSAULT_MIN_LOYALTY = 70;
+export const FLIP_SOLDIER_COST = 5000;
+export const FLIP_SOLDIER_BASE_CHANCE = 0.25;
+export const FLIP_SOLDIER_FAIL_INFLUENCE_LOSS = 15;
+
+export interface FlippedSoldier {
+  unitId: string;
+  family: string; // the family that was flipped (target family)
+  flippedByFamily: string; // the family that did the flipping
+  hqQ: number;
+  hqR: number;
+  hqS: number;
+}
 
 // ============ FAMILY BONUSES ============
 export interface FamilyBonuses {

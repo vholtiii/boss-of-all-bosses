@@ -2,7 +2,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { Trophy, MapPin, DollarSign, Crown } from 'lucide-react';
+import { Trophy, MapPin, DollarSign, Crown, Skull } from 'lucide-react';
 import { VictoryProgress } from '@/types/game-mechanics';
 
 interface VictoryTrackerProps {
@@ -37,6 +37,15 @@ const VictoryTracker: React.FC<VictoryTrackerProps> = ({ progress }) => {
       target: progress.legacy.highestRival,
       met: progress.legacy.met,
       display: `${progress.legacy.current} vs ${progress.legacy.highestRival}`,
+    },
+    {
+      key: 'domination',
+      label: 'Domination',
+      icon: <Skull className="h-3 w-3" />,
+      current: progress.domination.eliminated,
+      target: progress.domination.target,
+      met: progress.domination.met,
+      display: `${progress.domination.eliminated}/${progress.domination.target} eliminated`,
     },
   ];
 
