@@ -258,11 +258,9 @@ export interface EnhancedMafiaGameState {
   maxTacticalActions: number;
   
   // Enhanced systems
-  combat: CombatSystem;
   economy: EconomySystem;
   aiOpponents: AIOpponent[];
   events: GameEvent[];
-  missions?: never[];
   weather: WeatherSystem;
   technology: TechnologySystem;
   seasonalEvents: SeasonalEvent[];
