@@ -1517,6 +1517,12 @@ export const useEnhancedMafiaGameState = (
         territoriesGained: [],
       };
 
+      // Flush mid-turn combat log into turn report events
+      if (newState.combatLog && newState.combatLog.length > 0) {
+        turnReport.events.push(...newState.combatLog);
+        newState.combatLog = [];
+      }
+
       // Reset to deploy phase for next turn
       newState.turnPhase = 'deploy';
       newState.movementPhase = true;
