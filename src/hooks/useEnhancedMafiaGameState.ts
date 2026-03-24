@@ -731,7 +731,8 @@ export const useEnhancedMafiaGameState = (
     };
 
     const prevVictory = state.victoryType;
-    if (state.victoryProgress.territory.met) state.victoryType = 'territory';
+    if (state.victoryProgress.domination.met) state.victoryType = 'domination';
+    else if (state.victoryProgress.territory.met) state.victoryType = 'territory';
     else if (state.victoryProgress.economic.met) state.victoryType = 'economic';
     else if (state.victoryProgress.legacy.met) state.victoryType = 'legacy';
     else state.victoryType = null;
