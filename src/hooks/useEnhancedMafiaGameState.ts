@@ -1216,7 +1216,7 @@ const isHexFortifiedAny = (fortifiedHexes: FortifiedHex[], q: number, r: number,
         unit.escortingSoldierIds.forEach(soldierIdToEscort => {
           const sIdx = newUnits.findIndex(u => u.id === soldierIdToEscort);
           if (sIdx !== -1) {
-            newUnits[sIdx] = { ...newUnits[sIdx], q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0, fortified: false };
+            newUnits[sIdx] = { ...newUnits[sIdx], q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0 };
           }
         });
         // Auto-detach soldiers at destination
