@@ -3401,6 +3401,38 @@ export const useEnhancedMafiaGameState = (
       }
     });
 
+    // ── RE-CHECK UNDETECTED PLANNED HITS FOR NEW INTEL ──
+    if (state.aiPlannedHits && state.aiPlannedHits.length > 0) {
+      const activeBribes = (state.activeBribes || []).filter(b => b.active);
+      for (const hit of state.aiPlannedHits) {
+        if (hit.detectedVia) continue; // already detected
+        
+        const targetUnit = state.deployedUnits.find(u => u.id === hit.targetUnitId);
+        let detectedVia: IntelSource | undefined;
+        
+        if (activeBribes.find(b => b.tier === 'mayor')) {
+          detectedVia = 'bribe_mayor';
+        } else if (activeBribes.find(b => b.tier === 'police_chief')) {
+          detectedVia = 'bribe_chief';
+        } else if (activeBribes.find(b => b.tier === 'police_captain' && (b.targetFamily === hit.family || !b.targetFamily))) {
+          detectedVia = 'bribe_captain';
+        } else if (targetUnit && state.scoutedHexes.some(s => s.q === targetUnit.q && s.r === targetUnit.r && s.s === targetUnit.s)) {
+          detectedVia = 'scout';
+        }
+        
+        if (detectedVia) {
+          hit.detectedVia = detectedVia;
+          hit.detectedOnTurn = state.turn;
+          const sourceInfo = INTEL_SOURCE_LABELS[detectedVia];
+          state.pendingNotifications.push({
+            type: 'warning' as const,
+            title: '🔫 Hit Intel Discovered!',
+            message: `${sourceInfo.flavorPrefix} the ${hit.family} family has a hit planned on your capo!`,
+          });
+        }
+      }
+    }
+
     // ── EXECUTE PENDING AI PLANNED HITS ──
     if (state.aiPlannedHits && state.aiPlannedHits.length > 0) {
       const remaining: typeof state.aiPlannedHits = [];
