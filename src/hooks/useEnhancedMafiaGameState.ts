@@ -41,6 +41,7 @@ import {
   HQ_ASSAULT_BASE_CHANCE, HQ_DEFENSE_BONUS, HQ_ASSAULT_MAX_CHANCE, HQ_ASSAULT_MIN_TOUGHNESS, HQ_ASSAULT_MIN_LOYALTY,
   FLIP_SOLDIER_COST, FLIP_SOLDIER_BASE_CHANCE, FLIP_SOLDIER_FAIL_INFLUENCE_LOSS,
   SITDOWN_COST, SITDOWN_COOLDOWN, SITDOWN_LOYALTY_BONUS, SITDOWN_DEFENSE_PER_SOLDIER,
+  CLAIM_TOUGHNESS_GAIN,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -499,7 +500,7 @@ const createInitialGameState = (
       });
       soldierStats[id] = {
         loyalty: 50, training: 0,
-        hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
+        hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
       };
     }
     const capoNames: Record<string, string> = {
@@ -1562,7 +1563,7 @@ export const useEnhancedMafiaGameState = (
           });
           newSoldierStats[newId] = {
             loyalty: 50, training: 0,
-            hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
+            hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
           };
           newResources.soldiers -= 1;
         } else {
@@ -1744,7 +1745,7 @@ export const useEnhancedMafiaGameState = (
             if (!newState.soldierStats[h.unitId]) {
               newState.soldierStats[h.unitId] = {
                 loyalty: 50, training: 0, hits: 0, extortions: 0,
-                victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
+                victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
               };
             }
           }
@@ -2720,7 +2721,7 @@ export const useEnhancedMafiaGameState = (
             });
             state.soldierStats[newId] = {
               loyalty: 40 + Math.floor(Math.random() * 30), training: 0,
-              hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
+              hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
             };
             // Only capos auto-claim neutral territory on deploy (matches player rules)
             const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
@@ -3783,7 +3784,7 @@ export const useEnhancedMafiaGameState = (
               }];
               newState.soldierStats[newId] = {
                 loyalty: 50, training: 0,
-                hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
+                hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
               };
             }
             newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -3828,7 +3829,7 @@ export const useEnhancedMafiaGameState = (
               }];
               newState.soldierStats[newId] = {
                 loyalty: 65, training: 0,
-                hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
+                hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
               };
             }
             newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -4752,9 +4753,24 @@ export const useEnhancedMafiaGameState = (
     state.reputation.streetInfluence = Math.min(100, state.reputation.streetInfluence + influenceGain);
 
     const claimBonus = hasRecruitedSoldier ? ' (Recruit bonus!)' : '';
+    // Toughness progress for the claiming soldier
+    let toughnessMsg = '';
+    const claimingSoldier = soldierToMove || playerUnitsOnHex.find(u => u.type === 'soldier');
+    if (claimingSoldier && state.soldierStats[claimingSoldier.id]) {
+      const sStats = state.soldierStats[claimingSoldier.id];
+      if (sStats.toughness < 5) {
+        sStats.toughnessProgress = (sStats.toughnessProgress || 0) + CLAIM_TOUGHNESS_GAIN;
+        if (sStats.toughnessProgress >= 1.0) {
+          sStats.toughness = Math.min(5, sStats.toughness + 1);
+          sStats.toughnessProgress -= 1.0;
+          toughnessMsg = ` 💪 Soldier toughness increased to ${sStats.toughness}!`;
+        }
+      }
+    }
+
     state.pendingNotifications = [...state.pendingNotifications, {
       type: 'success' as const, title: '🏴 Territory Claimed!',
-      message: `Your family takes ${tile.district} under its wing.${claimBonus} (+${respectGain} Respect, +${influenceGain} Influence)`,
+      message: `Your family takes ${tile.district} under its wing.${claimBonus} (+${respectGain} Respect, +${influenceGain} Influence)${toughnessMsg}`,
     }];
 
     syncLegacyUnits(state);
