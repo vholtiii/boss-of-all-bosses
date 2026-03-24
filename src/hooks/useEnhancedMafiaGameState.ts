@@ -334,6 +334,30 @@ const hexNeighborDirections = [
 const getHexNeighbors = (q:number,r:number,s:number) =>
   hexNeighborDirections.map(d => ({q:q+d.q, r:r+d.r, s:s+d.s}));
 
+// BFS: returns all player-owned hexes connected to HQ via owned territory
+const getConnectedTerritory = (hexMap: HexTile[], playerFamily: string): Set<string> => {
+  const hqTile = hexMap.find(t => t.isHeadquarters === playerFamily);
+  if (!hqTile) return new Set();
+  const key = (q: number, r: number, s: number) => `${q},${r},${s}`;
+  const visited = new Set<string>();
+  const queue: Array<{q:number;r:number;s:number}> = [{ q: hqTile.q, r: hqTile.r, s: hqTile.s }];
+  visited.add(key(hqTile.q, hqTile.r, hqTile.s));
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    const neighbors = getHexNeighbors(cur.q, cur.r, cur.s);
+    for (const n of neighbors) {
+      const nKey = key(n.q, n.r, n.s);
+      if (visited.has(nKey)) continue;
+      const tile = hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+      if (tile && (tile.controllingFamily === playerFamily || tile.isHeadquarters === playerFamily)) {
+        visited.add(nKey);
+        queue.push(n);
+      }
+    }
+  }
+  return visited;
+};
+
 const getHexesInRange = (q:number, r:number, s:number, range:number) => {
   const results: Array<{q:number;r:number;s:number}> = [];
   for (let dq = -range; dq <= range; dq++) {
