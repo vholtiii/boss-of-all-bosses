@@ -1,26 +1,23 @@
 
 
-# Claiming Territory Increases Toughness
+# Capo Promotion: Available Any Phase, No Action Cost
 
-## Change from Previous Plan
-- Toughness gain per claim: **0.25** instead of 0.2 (every **4 claims** = +1 toughness)
-
-## Mechanics
-- Each territory claim gives the claiming soldier +0.25 `toughnessProgress`
-- When progress ≥ 1.0 → toughness +1 (cap 5), reset overflow
-- 4 claims = +1 toughness, 20 claims = max toughness from claiming alone
+## Current Behavior
+- Capo promotion panel is **locked during Deploy phase** (`phaseLocked={actionsLocked}`)
+- Only accessible during Action phase
+- Implicitly tied to the action budget
 
 ## Changes
 
-### `src/types/game-mechanics.ts`
-- Add `toughnessProgress: number` to `SoldierStats`
-- Add constant `CLAIM_TOUGHNESS_GAIN = 0.25`
+### `src/components/GameSidePanels.tsx` (~lines 460-480)
+- Remove `phaseLocked={actionsLocked}` from the Capo Promotion `CollapsibleSection`
+- Remove the `actionsLocked` conditional that shows "🔒 Unlock in Action phase" — always render `CapoPromotionPanel` regardless of phase
 
-### `src/hooks/useEnhancedMafiaGameState.ts`
-- Initialize `toughnessProgress: 0` in all soldier stat creation blocks
-- In claim territory logic: add 0.25 to claiming soldier's `toughnessProgress`, increment `toughness` when progress ≥ 1.0 (capped at 5)
+### `src/hooks/useEnhancedMafiaGameState.ts` (~lines 3844-3892)
+- In the `promote_capo` case: **do not decrement `actionsRemaining`** (confirm it doesn't already — it appears it doesn't, but verify no action budget check blocks it)
+- Remove any phase gate if present (the action handler should work in any phase)
 
 ## Files Modified
-- `src/types/game-mechanics.ts`
-- `src/hooks/useEnhancedMafiaGameState.ts`
+- `src/components/GameSidePanels.tsx` — unlock promotion panel in all phases
+- `src/hooks/useEnhancedMafiaGameState.ts` — ensure no action cost on promotion
 
