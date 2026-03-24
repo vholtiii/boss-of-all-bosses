@@ -891,6 +891,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             currentTurn={gameState.turn}
             sitdownCooldownUntil={(gameState as any).sitdownCooldownUntil || 0}
             onCallSitdown={(soldierIds) => handleAction({ type: 'call_sitdown', soldierIds })}
+            detectedThreats={isPlayerHQ ? ((gameState as any).aiPlannedHits || []).filter((h: any) => h.detectedVia) : []}
           />
         );
       })()}
