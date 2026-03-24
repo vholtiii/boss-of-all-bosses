@@ -262,6 +262,7 @@ export interface EnhancedMafiaGameState {
   hiddenUnits: HiddenUnit[];
   aiBounties: AIBounty[];
   aiPlannedHits: AIPlannedHit[];
+  combatLog: string[];
 
   turnReport: TurnReport | null;
   lastCombatResult?: {
