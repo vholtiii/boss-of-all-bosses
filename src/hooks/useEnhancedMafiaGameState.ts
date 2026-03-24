@@ -1120,14 +1120,27 @@ export const useEnhancedMafiaGameState = (
         return prev;
       }
 
-      const moveCost = 1;
+      // Free movement check: both origin and target in connected territory = 0 cost
+      const hexKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
+      let moveCost = 1;
+      let isFreeMove = false;
+      if (unit.type === 'soldier') {
+        const connectedSet = getConnectedTerritory(prev.hexMap, prev.playerFamily);
+        const originKey = hexKey(unit.q, unit.r, unit.s);
+        const targetKey = hexKey(targetLocation.q, targetLocation.r, targetLocation.s);
+        if (connectedSet.has(originKey) && connectedSet.has(targetKey)) {
+          moveCost = 0;
+          isFreeMove = true;
+        }
+      }
+
       if (unit.movesRemaining < moveCost) return prev;
 
       const newUnits = [...prev.deployedUnits];
       let remainingMoves = unit.movesRemaining - moveCost;
 
-      // Zone of control: if soldier moves adjacent to enemy, movement ends
-      if (unit.type === 'soldier') {
+      // Zone of control: if soldier moves adjacent to enemy, movement ends (not on free moves)
+      if (unit.type === 'soldier' && !isFreeMove) {
         if (isAdjacentToEnemy(targetLocation.q, targetLocation.r, targetLocation.s, prev.hexMap, prev.deployedUnits, prev.playerFamily)) {
           remainingMoves = 0;
         }
