@@ -1070,16 +1070,17 @@ export const useEnhancedMafiaGameState = (
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
           if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters && unit.type === 'capo') {
-            const hasIllegalBusiness = tile.business && !tile.business.isLegal && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
-            if (hasIllegalBusiness) {
-              // Capo auto-extorts illegal business on arrival
+            const hasCompletedBusiness = tile.business && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
+            if (hasCompletedBusiness) {
+              // Capo auto-extorts any completed business on arrival (legal pays less)
               const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
-              bonusMoney = Math.floor(3000 * respectPayoutMult);
-              bonusRespect = 5;
+              const basePayout = tile.business.isLegal ? 1500 : 3000;
+              bonusMoney = Math.floor(basePayout * respectPayoutMult);
+              bonusRespect = tile.business.isLegal ? 3 : 5;
               autoExtortNotification = {
                 type: 'success' as const,
                 title: '💰 Capo Auto-Extortion!',
-                message: `${unit.name || 'Your Capo'} extorted the illegal business on arrival! +$${bonusMoney.toLocaleString()}, +5 respect.`,
+                message: `${unit.name || 'Your Capo'} set up a protection racket on the ${tile.business.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
               };
             } else {
               // Capo auto-claims empty/legal territory — no money bonus
@@ -1436,15 +1437,16 @@ export const useEnhancedMafiaGameState = (
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
           if (unitType === 'capo' && tile.controllingFamily === 'neutral' && !tile.isHeadquarters) {
-            const hasIllegalBusiness = tile.business && !tile.business.isLegal && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
-            if (hasIllegalBusiness) {
+            const hasCompletedBusiness = tile.business && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
+            if (hasCompletedBusiness) {
               const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
-              bonusMoney = Math.floor(3000 * respectPayoutMult);
-              bonusRespect = 5;
+              const basePayout = tile.business.isLegal ? 1500 : 3000;
+              bonusMoney = Math.floor(basePayout * respectPayoutMult);
+              bonusRespect = tile.business.isLegal ? 3 : 5;
               autoExtortNotification = {
                 type: 'success' as const,
                 title: '💰 Capo Auto-Extortion!',
-                message: `${deployedUnit?.name || 'Your Capo'} extorted the illegal business on deployment! +$${bonusMoney.toLocaleString()}, +5 respect.`,
+                message: `${deployedUnit?.name || 'Your Capo'} set up a protection racket on the ${tile.business.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
               };
             } else {
               autoExtortNotification = {

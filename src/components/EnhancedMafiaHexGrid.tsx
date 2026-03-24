@@ -438,10 +438,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         
         // Soldiers can only extort on their own hex; Capos can extort adjacent hexes
         const unitOnTargetHex = selectedUnit.q === tile.q && selectedUnit.r === tile.r && selectedUnit.s === tile.s;
-        const hasIllegalBusiness = !!tile.business && !tile.business.isLegal;
+        const hasCompletedBusiness = !!tile.business && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
         
         const canHit = isEnemy && (isSoldier || isCapo);
-        const canExtort = hasIllegalBusiness && (
+        const canExtort = hasCompletedBusiness && (
           (isSoldier && unitOnTargetHex) || 
           (isCapo && (unitOnTargetHex || true)) // Capo can extort from adjacent (already validated as valid target)
         ) && (isNeutral || isEnemy);
@@ -459,8 +459,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           reasons.hit = noActions ? 'No actions left' : (!isSoldier && !isCapo) ? 'Need soldier or capo' : '';
         }
         if (!canExtort) {
-          if (!hasIllegalBusiness && (isNeutral || isEnemy) && tile.business) reasons.extort = 'No illegal business';
-          else if (hasIllegalBusiness && isSoldier && !unitOnTargetHex) reasons.extort = 'Soldier must be on hex';
+          if (!hasCompletedBusiness && (isNeutral || isEnemy) && tile.business) reasons.extort = 'Business under construction';
+          else if (!hasCompletedBusiness && (isNeutral || isEnemy)) reasons.extort = 'No business on hex';
+          else if (hasCompletedBusiness && isSoldier && !unitOnTargetHex) reasons.extort = 'Soldier must be on hex';
           else if (noActions) reasons.extort = 'No actions left';
         }
         if (!canClaim && isNeutral) {
