@@ -711,10 +711,11 @@ function buildLegacyTerritories(hexMap: HexTile[]): EnhancedMafiaGameState['terr
 export const useEnhancedMafiaGameState = (
   initialFamily?: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo',
   startingResources?: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number },
-  difficulty?: Difficulty
+  difficulty?: Difficulty,
+  seed?: number
 ) => {
   const [gameState, setGameState] = useState<EnhancedMafiaGameState>(() => 
-    createInitialGameState(initialFamily || 'gambino', startingResources, difficulty || 'normal')
+    createInitialGameState(initialFamily || 'gambino', startingResources, difficulty || 'normal', seed)
   );
 
   // ============ SYNC LEGACY UNITS FROM DEPLOYED UNITS ============
