@@ -2997,7 +2997,8 @@ export const useEnhancedMafiaGameState = (
                 enemyUnitsHere.forEach(eu => {
                   // Capos cannot be killed in regular combat — only wounded
                   if (eu.type === 'capo') {
-                    const woundChance = eu.fortified ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
+                    const isDefHexFort = isHexFortified(state.fortifiedHexes || [], eu.q, eu.r, eu.s, eu.family);
+                    const woundChance = isDefHexFort ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
                     if (Math.random() < woundChance) {
                       // Wound the capo instead of killing
                       if (state.soldierStats[eu.id]) {
