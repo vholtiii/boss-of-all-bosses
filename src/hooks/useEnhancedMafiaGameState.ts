@@ -334,6 +334,30 @@ const hexNeighborDirections = [
 const getHexNeighbors = (q:number,r:number,s:number) =>
   hexNeighborDirections.map(d => ({q:q+d.q, r:r+d.r, s:s+d.s}));
 
+// BFS: returns all player-owned hexes connected to HQ via owned territory
+const getConnectedTerritory = (hexMap: HexTile[], playerFamily: string): Set<string> => {
+  const hqTile = hexMap.find(t => t.isHeadquarters === playerFamily);
+  if (!hqTile) return new Set();
+  const key = (q: number, r: number, s: number) => `${q},${r},${s}`;
+  const visited = new Set<string>();
+  const queue: Array<{q:number;r:number;s:number}> = [{ q: hqTile.q, r: hqTile.r, s: hqTile.s }];
+  visited.add(key(hqTile.q, hqTile.r, hqTile.s));
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    const neighbors = getHexNeighbors(cur.q, cur.r, cur.s);
+    for (const n of neighbors) {
+      const nKey = key(n.q, n.r, n.s);
+      if (visited.has(nKey)) continue;
+      const tile = hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+      if (tile && (tile.controllingFamily === playerFamily || tile.isHeadquarters === playerFamily)) {
+        visited.add(nKey);
+        queue.push(n);
+      }
+    }
+  }
+  return visited;
+};
+
 const getHexesInRange = (q:number, r:number, s:number, range:number) => {
   const results: Array<{q:number;r:number;s:number}> = [];
   for (let dq = -range; dq <= range; dq++) {
@@ -977,17 +1001,59 @@ export const useEnhancedMafiaGameState = (
       }
 
       // Deploy phase: regular movement — soldiers CAN move onto enemy hexes
-      const range = unitType === 'soldier' ? 1 : Math.min(5, unit.movesRemaining);
-      const candidateHexes = unitType === 'soldier' 
-        ? getHexNeighbors(unit.q, unit.r, unit.s)
-        : getHexesInRange(unit.q, unit.r, unit.s, range);
-      
-      const validHexes = candidateHexes.filter(h => {
-        const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
-        if (!tile) return false;
-        if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
-        return true;
-      });
+      if (unitType === 'capo') {
+        // Capo movement unchanged — fly up to 5 hexes
+        const range = Math.min(5, unit.movesRemaining);
+        const candidateHexes = getHexesInRange(unit.q, unit.r, unit.s, range);
+        const validHexes = candidateHexes.filter(h => {
+          const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+          if (!tile) return false;
+          if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+          return true;
+        });
+        return { ...prev, selectedUnitId: unit.id, availableMoveHexes: validHexes, deployMode: null, availableDeployHexes: [] };
+      }
+
+      // Soldier movement: free within connected territory + normal adjacent for venturing out
+      const hexKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
+      const connectedSet = getConnectedTerritory(prev.hexMap, prev.playerFamily);
+      const unitKey = hexKey(unit.q, unit.r, unit.s);
+      const isOnConnected = connectedSet.has(unitKey);
+
+      let validHexes: Array<{q:number;r:number;s:number}> = [];
+
+      if (isOnConnected) {
+        // Show all connected territory hexes as free moves
+        connectedSet.forEach(k => {
+          const [q, r, s] = k.split(',').map(Number);
+          if (k !== unitKey) {
+            const tile = prev.hexMap.find(t => t.q === q && t.r === r && t.s === s);
+            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily)) {
+              validHexes.push({ q, r, s });
+            }
+          }
+        });
+        // Also add normal adjacent hexes for venturing out (unclaimed/enemy)
+        const adjacentHexes = getHexNeighbors(unit.q, unit.r, unit.s);
+        for (const h of adjacentHexes) {
+          const hk = hexKey(h.q, h.r, h.s);
+          if (!connectedSet.has(hk)) {
+            const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily)) {
+              validHexes.push(h);
+            }
+          }
+        }
+      } else {
+        // Not on connected territory — normal 1-hex adjacent only
+        const candidateHexes = getHexNeighbors(unit.q, unit.r, unit.s);
+        validHexes = candidateHexes.filter(h => {
+          const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+          if (!tile) return false;
+          if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+          return true;
+        });
+      }
 
       return { ...prev, selectedUnitId: unit.id, availableMoveHexes: validHexes, deployMode: null, availableDeployHexes: [] };
     });
@@ -1054,14 +1120,27 @@ export const useEnhancedMafiaGameState = (
         return prev;
       }
 
-      const moveCost = 1;
+      // Free movement check: both origin and target in connected territory = 0 cost
+      const hexKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
+      let moveCost = 1;
+      let isFreeMove = false;
+      if (unit.type === 'soldier') {
+        const connectedSet = getConnectedTerritory(prev.hexMap, prev.playerFamily);
+        const originKey = hexKey(unit.q, unit.r, unit.s);
+        const targetKey = hexKey(targetLocation.q, targetLocation.r, targetLocation.s);
+        if (connectedSet.has(originKey) && connectedSet.has(targetKey)) {
+          moveCost = 0;
+          isFreeMove = true;
+        }
+      }
+
       if (unit.movesRemaining < moveCost) return prev;
 
       const newUnits = [...prev.deployedUnits];
       let remainingMoves = unit.movesRemaining - moveCost;
 
-      // Zone of control: if soldier moves adjacent to enemy, movement ends
-      if (unit.type === 'soldier') {
+      // Zone of control: if soldier moves adjacent to enemy, movement ends (not on free moves)
+      if (unit.type === 'soldier' && !isFreeMove) {
         if (isAdjacentToEnemy(targetLocation.q, targetLocation.r, targetLocation.s, prev.hexMap, prev.deployedUnits, prev.playerFamily)) {
           remainingMoves = 0;
         }
@@ -1123,17 +1202,56 @@ export const useEnhancedMafiaGameState = (
       }
 
       let newAvailableMoves: Array<{q:number;r:number;s:number}> = [];
-      if (updatedUnit.movesRemaining > 0) {
-        const range = updatedUnit.type === 'soldier' ? 1 : Math.min(5, updatedUnit.movesRemaining);
-        const candidates = updatedUnit.type === 'soldier'
-          ? getHexNeighbors(updatedUnit.q, updatedUnit.r, updatedUnit.s)
-          : getHexesInRange(updatedUnit.q, updatedUnit.r, updatedUnit.s, range);
-        newAvailableMoves = candidates.filter(h => {
-          const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
-          if (!tile) return false;
-          if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
-          return true;
-        });
+      // After free move or if moves remain, recalculate available hexes
+      if (updatedUnit.movesRemaining > 0 || isFreeMove) {
+        if (updatedUnit.type === 'capo') {
+          const range = Math.min(5, updatedUnit.movesRemaining);
+          const candidates = getHexesInRange(updatedUnit.q, updatedUnit.r, updatedUnit.s, range);
+          newAvailableMoves = candidates.filter(h => {
+            const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+            if (!tile) return false;
+            if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+            return true;
+          });
+        } else {
+          // Soldier: recalculate with connected territory logic
+          const connectedSetPost = getConnectedTerritory(newHexMap, prev.playerFamily);
+          const updKey = hexKey(updatedUnit.q, updatedUnit.r, updatedUnit.s);
+          const isOnConnectedPost = connectedSetPost.has(updKey);
+
+          if (isOnConnectedPost) {
+            // Show connected territory + adjacent for venturing out
+            connectedSetPost.forEach(k => {
+              if (k !== updKey) {
+                const [q, r, s] = k.split(',').map(Number);
+                const tile = newHexMap.find(t => t.q === q && t.r === r && t.s === s);
+                if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily)) {
+                  newAvailableMoves.push({ q, r, s });
+                }
+              }
+            });
+            if (updatedUnit.movesRemaining > 0) {
+              const adjacentHexes = getHexNeighbors(updatedUnit.q, updatedUnit.r, updatedUnit.s);
+              for (const h of adjacentHexes) {
+                const hk = hexKey(h.q, h.r, h.s);
+                if (!connectedSetPost.has(hk)) {
+                  const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+                  if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily)) {
+                    newAvailableMoves.push(h);
+                  }
+                }
+              }
+            }
+          } else if (updatedUnit.movesRemaining > 0) {
+            const candidates = getHexNeighbors(updatedUnit.q, updatedUnit.r, updatedUnit.s);
+            newAvailableMoves = candidates.filter(h => {
+              const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+              if (!tile) return false;
+              if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+              return true;
+            });
+          }
+        }
       }
 
       const notifications = autoExtortNotification 
