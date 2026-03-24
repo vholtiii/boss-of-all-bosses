@@ -1,36 +1,34 @@
 
+# HQ Assault & Domination Victory — Implemented
 
-# Respect & Influence Benefits + Rival Panel Enhancement
+## Features Added
 
-## Part 1: Answer — Current Benefits
+### Assault HQ
+- Soldiers (toughness ≥ 4, loyalty ≥ 70) can assault enemy HQ from adjacent hex
+- Base 15% success, -30% HQ defense, +5% per friendly adjacent, +10% per flipped soldier
+- Max 50% chance cap
+- Success: family eliminated, all units/territory wiped, +$25K, +30 respect, +40 fear
+- Failure: soldier killed, adjacent allies -30 loyalty, no heat penalty
 
-**Respect** (0–100):
-- **Extortion payout multiplier**: 0.5x at 0 respect → 1.5x at 100 respect
-- **Recruitment discount**: Up to 30% off soldier costs at 100 respect
-- **+1 bonus action per turn** when both respect ≥ 50 AND influence ≥ 50
+### Flip Soldier
+- $5,000 to attempt turning enemy soldier near their HQ (loyalty > 60)
+- Base 25% success, +10% if loyalty 60-70, +5% per 10 influence above 50, +10% schemer capo bonus
+- Success: soldier flipped (HQ defense -10%), enemy unaware
+- Failure: -15 influence, target loyalty +10, attempt discovered
 
-**Influence** (0–100):
-- **Extortion success bonus**: Up to +15%
-- **Bribe success bonus**: Up to +12%
-- **+1 bonus action per turn** when both influence ≥ 50 AND respect ≥ 50
-- Gained passively: +1 per 3 hexes controlled
+### HQ Protection
+- HQ hexes cannot be scouted, claimed, or extorted
+- Normal hit/sabotage/negotiate blocked on HQ hexes
 
-## Part 2: Add Respect + Influence to Rival Families Panel
+### Domination Victory
+- Eliminate all 4 rival families → win
+- Tracked in VictoryTracker with skull icon
 
-### `src/types/enhanced-mechanics.ts`
-Add `respect: number` to the `AIOpponent.resources` interface.
-
-### `src/hooks/useEnhancedMafiaGameState.ts`
-- Initialize AI `resources.respect` to 20 (starting value)
-- Grow AI respect each turn based on territory and combat (similar to player formula)
-
-### `src/components/GameSidePanels.tsx` (~lines 662-675)
-Change the rival family info grid from 3 columns to a 2x2 grid showing:
-- Money | Soldiers
-- Respect | Influence
+### AI Behavior
+- Aggressive/unpredictable AI attempts HQ assaults after turn 12 (10% chance/turn)
 
 ## Files Modified
-- `src/types/enhanced-mechanics.ts`
-- `src/hooks/useEnhancedMafiaGameState.ts`
-- `src/components/GameSidePanels.tsx`
-
+- `src/types/game-mechanics.ts` — constants, FlippedSoldier interface, VictoryProgress update
+- `src/hooks/useEnhancedMafiaGameState.ts` — processHQAssault, processFlipSoldier, AI assault logic, HQ scout block
+- `src/components/EnhancedMafiaHexGrid.tsx` — assault/flip UI buttons, HQ action blocking
+- `src/components/VictoryTracker.tsx` — domination victory row
