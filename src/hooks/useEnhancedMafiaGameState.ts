@@ -722,10 +722,12 @@ export const useEnhancedMafiaGameState = (
 
     const legacyMet = state.turn > LEGACY_MIN_TURN && highestRival > 0 && playerRep >= highestRival * LEGACY_MARGIN;
 
+    const eliminatedCount = (state.eliminatedFamilies || []).length;
     state.victoryProgress = {
       territory: { current: playerHexes, target: TERRITORY_TARGET, met: playerHexes >= TERRITORY_TARGET },
       economic: { current: income, target: ECONOMIC_TARGET, met: income >= ECONOMIC_TARGET },
       legacy: { current: playerRep, highestRival, met: legacyMet },
+      domination: { eliminated: eliminatedCount, target: 4, met: eliminatedCount >= 4 },
     };
 
     const prevVictory = state.victoryType;
