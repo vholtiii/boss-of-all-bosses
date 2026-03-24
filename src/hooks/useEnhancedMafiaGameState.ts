@@ -2055,8 +2055,18 @@ export const useEnhancedMafiaGameState = (
       const respectDecay = 0.5;
       newState.reputation.respect = Math.min(100, Math.max(0, newState.reputation.respect + respectGain - respectDecay));
       
+      // District control bonus: Staten Island +2 respect/turn
+      if (hasPlayerDistrictBonus(newState, 'respect')) {
+        newState.reputation.respect = Math.min(100, newState.reputation.respect + 2);
+      }
+      
       // --- Heat decay (after arrests) ---
-      newState.policeHeat.level = Math.max(0, newState.policeHeat.level - newState.policeHeat.reductionPerTurn);
+      let heatReduction = newState.policeHeat.reductionPerTurn;
+      // District control bonus: Brooklyn -3 heat/turn
+      if (hasPlayerDistrictBonus(newState, 'heat')) {
+        heatReduction += 3;
+      }
+      newState.policeHeat.level = Math.max(0, newState.policeHeat.level - heatReduction);
       
       // Compute turn report deltas
       const afterPlayerHexes = new Set(
