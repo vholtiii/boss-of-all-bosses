@@ -2540,6 +2540,10 @@ export const useEnhancedMafiaGameState = (
                           title: '💀 Soldier Killed!',
                           message: `Your soldier was killed by the ${fam} family in ${tile.district || 'unknown territory'}!`,
                         });
+                        if (turnReport) {
+                          turnReport.events.push(`💀 Soldier killed by the ${fam} family in ${tile.district || 'unknown territory'}`);
+                          turnReport.resourceDeltas.soldiers--;
+                        }
                       }
                     }
                   }
