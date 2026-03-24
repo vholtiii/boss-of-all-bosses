@@ -86,6 +86,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   aiBounties: [...(state.aiBounties || [])],
   aiPlannedHits: (state.aiPlannedHits || []).map(h => ({ ...h })),
   combatLog: [...(state.combatLog || [])],
+  activeDistrictBonuses: [...(state.activeDistrictBonuses || [])],
   scoutedHexes: [...(state.scoutedHexes || [])],
   safehouses: (state.safehouses || []).map(s => ({ ...s })),
   activeBribes: (state.activeBribes || []).map(b => ({ ...b })),
@@ -264,6 +265,12 @@ export interface EnhancedMafiaGameState {
   aiBounties: AIBounty[];
   aiPlannedHits: AIPlannedHit[];
   combatLog: string[];
+  activeDistrictBonuses: Array<{
+    district: string;
+    family: string;
+    bonusType: string;
+    description: string;
+  }>;
 
   turnReport: TurnReport | null;
   lastCombatResult?: {
@@ -618,6 +625,7 @@ const createInitialGameState = (
     aiBounties: [],
     aiPlannedHits: [],
     combatLog: [],
+    activeDistrictBonuses: [],
     
     selectedTerritory: null,
     activeEvent: null,
@@ -1755,6 +1763,7 @@ export const useEnhancedMafiaGameState = (
       const seasons = ['spring', 'summer', 'fall', 'winter'] as const;
       newState.season = seasons[Math.floor((newState.turn - 1) / 3) % 4];
       
+      computeDistrictBonuses(newState, turnReport);
       processEconomy(newState);
       turnReport.income = newState.finances.totalIncome;
       turnReport.maintenance = newState.finances.totalExpenses;
@@ -1775,6 +1784,11 @@ export const useEnhancedMafiaGameState = (
       // --- Dynamic Loyalty Calculation ---
       {
         let loyaltyDelta = 0.5; // baseline recovery
+        
+        // District control bonus: Little Italy +15% loyalty retention (reduce decay)
+        if (hasPlayerDistrictBonus(newState, 'loyalty')) {
+          loyaltyDelta += 0.5; // extra baseline = less net decay
+        }
         
         // +0.5 per successful extortion this turn (check turn report events)
         const extortionCount = turnReport.events.filter(e => e.toLowerCase().includes('extort')).length;
@@ -2046,8 +2060,18 @@ export const useEnhancedMafiaGameState = (
       const respectDecay = 0.5;
       newState.reputation.respect = Math.min(100, Math.max(0, newState.reputation.respect + respectGain - respectDecay));
       
+      // District control bonus: Staten Island +2 respect/turn
+      if (hasPlayerDistrictBonus(newState, 'respect')) {
+        newState.reputation.respect = Math.min(100, newState.reputation.respect + 2);
+      }
+      
       // --- Heat decay (after arrests) ---
-      newState.policeHeat.level = Math.max(0, newState.policeHeat.level - newState.policeHeat.reductionPerTurn);
+      let heatReduction = newState.policeHeat.reductionPerTurn;
+      // District control bonus: Brooklyn -3 heat/turn
+      if (hasPlayerDistrictBonus(newState, 'heat')) {
+        heatReduction += 3;
+      }
+      newState.policeHeat.level = Math.max(0, newState.policeHeat.level - heatReduction);
       
       // Compute turn report deltas
       const afterPlayerHexes = new Set(
@@ -2076,6 +2100,76 @@ export const useEnhancedMafiaGameState = (
       return newState;
     });
   }, []);
+
+  // ============ DISTRICT CONTROL BONUSES ============
+  const DISTRICT_CONTROL_THRESHOLD = 0.6;
+  const DISTRICT_BONUSES: Record<string, { bonusType: string; description: string }> = {
+    'Manhattan': { bonusType: 'income', description: '+20% business income in Manhattan' },
+    'Little Italy': { bonusType: 'loyalty', description: '+15% loyalty retention' },
+    'Brooklyn': { bonusType: 'heat', description: '-3 heat/turn' },
+    'Bronx': { bonusType: 'recruit_discount', description: '$500 off recruitment' },
+    'Queens': { bonusType: 'extortion', description: '+10% extortion success' },
+    'Staten Island': { bonusType: 'respect', description: '+2 respect/turn' },
+  };
+
+  const computeDistrictBonuses = (state: EnhancedMafiaGameState, turnReport?: TurnReport) => {
+    const districts = ['Manhattan', 'Little Italy', 'Brooklyn', 'Bronx', 'Queens', 'Staten Island'];
+    const prevBonuses = [...(state.activeDistrictBonuses || [])];
+    const newBonuses: typeof state.activeDistrictBonuses = [];
+
+    districts.forEach(district => {
+      const districtHexes = state.hexMap.filter(t => t.district === district);
+      if (districtHexes.length === 0) return;
+      
+      // Count per family
+      const familyCounts: Record<string, number> = {};
+      districtHexes.forEach(t => {
+        if (t.controllingFamily !== 'neutral') {
+          familyCounts[t.controllingFamily] = (familyCounts[t.controllingFamily] || 0) + 1;
+        }
+      });
+
+      const total = districtHexes.length;
+      Object.entries(familyCounts).forEach(([family, count]) => {
+        if (count / total >= DISTRICT_CONTROL_THRESHOLD) {
+          const bonusDef = DISTRICT_BONUSES[district];
+          if (bonusDef) {
+            newBonuses.push({ district, family, ...bonusDef });
+          }
+        }
+      });
+    });
+
+    // Detect gained/lost bonuses for player notifications
+    const playerFamily = state.playerFamily;
+    const prevPlayerBonuses = prevBonuses.filter(b => b.family === playerFamily);
+    const newPlayerBonuses = newBonuses.filter(b => b.family === playerFamily);
+
+    newPlayerBonuses.forEach(nb => {
+      if (!prevPlayerBonuses.some(pb => pb.district === nb.district)) {
+        state.pendingNotifications.push({
+          type: 'success', title: `🏰 District Control: ${nb.district}`,
+          message: nb.description,
+        });
+        if (turnReport) turnReport.events.push(`🏰 Gained control of ${nb.district}: ${nb.description}`);
+      }
+    });
+    prevPlayerBonuses.forEach(pb => {
+      if (!newPlayerBonuses.some(nb => nb.district === pb.district)) {
+        state.pendingNotifications.push({
+          type: 'warning', title: `⚠️ Lost Control: ${pb.district}`,
+          message: `You no longer control 60% of ${pb.district}. Bonus lost.`,
+        });
+        if (turnReport) turnReport.events.push(`⚠️ Lost control of ${pb.district} — bonus removed`);
+      }
+    });
+
+    state.activeDistrictBonuses = newBonuses;
+  };
+
+  const hasPlayerDistrictBonus = (state: EnhancedMafiaGameState, bonusType: string): boolean => {
+    return (state.activeDistrictBonuses || []).some(b => b.family === state.playerFamily && b.bonusType === bonusType);
+  };
 
   // ============ ECONOMY (with family bonuses) ============
   const processEconomy = (state: EnhancedMafiaGameState) => {
@@ -2154,6 +2248,11 @@ export const useEnhancedMafiaGameState = (
         if (bonuses.businessIncome > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.businessIncome / 100));
         if (bonuses.territoryIncome > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.territoryIncome / 100));
         if (bonuses.income > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.income / 100));
+        
+        // District control bonus: Manhattan +20% income
+        if (tile.district === 'Manhattan' && hasPlayerDistrictBonus(state, 'income')) {
+          tileIncome = Math.floor(tileIncome * 1.2);
+        }
         
         income += tileIncome;
       }
@@ -3164,8 +3263,11 @@ export const useEnhancedMafiaGameState = (
           if (newState.tacticalActionsRemaining <= 0) return newState;
           const respectDiscount = (newState.reputation.respect / 100) * 0.3;
           const cost = Math.floor(SOLDIER_COST * (1 - discount) * (1 - respectDiscount));
-          if (newState.resources.money >= cost) {
-            newState.resources.money -= cost;
+          // District control bonus: Bronx -$500 recruit discount
+          const bronxDiscount = hasPlayerDistrictBonus(newState, 'recruit_discount') ? 500 : 0;
+          const finalCost = Math.max(100, cost - bronxDiscount);
+          if (newState.resources.money >= finalCost) {
+            newState.resources.money -= finalCost;
             newState.resources.soldiers += 1;
             newState.tacticalActionsRemaining -= 1;
             // Mercenary loyalty penalty
@@ -3188,7 +3290,7 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'info' as const,
               title: '💰 Mercenary Hired',
-              message: `A hired gun joins the family for $${cost.toLocaleString()}. Loyalty -3 (outsider).${respectDiscount > 0.01 ? ` Respect saved $${(Math.floor(SOLDIER_COST * (1 - discount)) - cost).toLocaleString()}.` : ''}`,
+              message: `A hired gun joins the family for $${finalCost.toLocaleString()}. Loyalty -3 (outsider).${bronxDiscount > 0 ? ' (Bronx discount applied)' : ''}${respectDiscount > 0.01 ? ` Respect saved $${(Math.floor(SOLDIER_COST * (1 - discount)) - cost).toLocaleString()}.` : ''}`,
             }];
           }
           return newState;
@@ -3207,8 +3309,10 @@ export const useEnhancedMafiaGameState = (
           }
           const respectDiscount2 = (newState.reputation.respect / 100) * 0.3;
           const cost2 = Math.floor(LOCAL_SOLDIER_COST * (1 - discount) * (1 - respectDiscount2));
-          if (newState.resources.money >= cost2) {
-            newState.resources.money -= cost2;
+          const bronxDiscount2 = hasPlayerDistrictBonus(newState, 'recruit_discount') ? 500 : 0;
+          const finalCost2 = Math.max(100, cost2 - bronxDiscount2);
+          if (newState.resources.money >= finalCost2) {
+            newState.resources.money -= finalCost2;
             newState.resources.soldiers += 1;
             newState.tacticalActionsRemaining -= 1;
             // Loyal recruit boosts loyalty
@@ -3231,7 +3335,7 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'success' as const,
               title: '🏘️ Local Recruited',
-              message: `A loyal local joins the family for $${cost2.toLocaleString()}. Loyalty +2. Good at claiming & extortion.`,
+              message: `A loyal local joins the family for $${finalCost2.toLocaleString()}. Loyalty +2.${bronxDiscount2 > 0 ? ' (Bronx discount applied)' : ''}`,
             }];
           }
           return newState;
@@ -4587,6 +4691,10 @@ export const useEnhancedMafiaGameState = (
       // Neutral: 90% success, claims territory. Enemy: 50% success, steals income only.
       let chance = isNeutral ? 0.9 : 0.5;
       chance += state.familyBonuses.extortion / 100;
+      // District control bonus: Queens +10% extortion success
+      if (hasPlayerDistrictBonus(state, 'extortion')) {
+        chance += 0.10;
+      }
       chance -= state.policeHeat.level / 1000;
       chance += (state.resources.influence / 100) * 0.15;
       if (tile.district === 'Manhattan') {
