@@ -1164,7 +1164,8 @@ export const useEnhancedMafiaGameState = (
     const tile = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
     if (!tile) return prev;
     const dist = hexDistance(unit, targetLocation);
-    if (dist !== 1) return prev;
+    const maxScoutRange = unit.type === 'capo' ? 2 : 1;
+    if (dist < 1 || dist > maxScoutRange) return prev;
 
     const enemyUnitsOnHex = prev.deployedUnits.filter(u => 
       u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s &&

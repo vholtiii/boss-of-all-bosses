@@ -339,7 +339,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                       {familyBusinesses.length === 0 ? (
                         <div className="text-[10px] text-muted-foreground italic px-1">No businesses owned</div>
                       ) : (
-                        <ScrollArea className="max-h-36">
+                        <ScrollArea className="max-h-48">
                           <div className="space-y-1">
                             {familyBusinesses.map((biz: any, idx: number) => {
                               const highlighted = isHexHighlighted(biz.q, biz.r, biz.s);
