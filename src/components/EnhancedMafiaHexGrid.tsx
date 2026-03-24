@@ -816,20 +816,17 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     return null;
                   })()}
 
-                  {/* Fortified units indicator */}
+                  {/* Fortified hex indicator */}
                   {(() => {
-                    const fortifiedHere = (gameState?.deployedUnits || []).filter((u: DeployedUnit) => 
-                      u.fortified && u.family === gameState?.playerFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s
+                    const fortifiedHexes = gameState?.fortifiedHexes || [];
+                    const isPlayerFortified = fortifiedHexes.some((f: any) => 
+                      f.family === gameState?.playerFamily && f.q === tile.q && f.r === tile.r && f.s === tile.s
                     );
-                    if (fortifiedHere.length === 0) return null;
-                    const count = fortifiedHere.length;
+                    if (!isPlayerFortified) return null;
                     return (
                       <g className="pointer-events-none">
-                        <circle cx={x} cy={y - baseHexRadius * 0.7} r={count > 1 ? 10 : 8} fill="#10B981" stroke="#ffffff" strokeWidth="1" />
+                        <circle cx={x} cy={y - baseHexRadius * 0.7} r={8} fill="#10B981" stroke="#ffffff" strokeWidth="1" />
                         <text x={x} y={y - baseHexRadius * 0.7 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🛡️</text>
-                        {count > 1 && (
-                          <text x={x + 8} y={y - baseHexRadius * 0.7 - 2} textAnchor="middle" fontSize="7" fontWeight="bold" fill="#ffffff" className="select-none">{count}</text>
-                        )}
                       </g>
                     );
                   })()}
