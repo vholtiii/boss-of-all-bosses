@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
+import { SITDOWN_COST, SITDOWN_DEFENSE_PER_SOLDIER } from '@/types/game-mechanics';
 import { 
   DollarSign, 
   Users, 
@@ -40,6 +42,10 @@ interface HeadquartersInfoPanelProps {
   hexMap?: any[];
   bossHighlightHex?: { q: number; r: number; s: number } | null;
   onBossHighlightHex?: (hex: { q: number; r: number; s: number } | null) => void;
+  turnPhase?: string;
+  currentTurn?: number;
+  sitdownCooldownUntil?: number;
+  onCallSitdown?: (soldierIds: string[]) => void;
 }
 
 const familyColors: Record<string, string> = {
