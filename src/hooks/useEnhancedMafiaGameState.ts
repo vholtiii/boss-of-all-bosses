@@ -1797,7 +1797,9 @@ export const useEnhancedMafiaGameState = (
             type: 'error' as const, title: '☠️ Game Over — Bankruptcy',
             message: `The family collapsed under $${debt.toLocaleString()} in debt. The other families have divided your territory.`,
           });
-          newState.victoryType = 'elimination';
+          // Game over — player loses all territory
+          newState.hexMap.forEach(t => { if (t.controllingFamily === newState.playerFamily && !t.isHeadquarters) t.controllingFamily = 'neutral'; });
+          newState.deployedUnits = newState.deployedUnits.filter(u => u.family !== newState.playerFamily);
         } else if (debt >= 20000) {
           turnReport.events.push(`⚠️ WARNING: Family is $${debt.toLocaleString()} in debt! Soldiers will desert. Bankruptcy at -$50K.`);
         }
