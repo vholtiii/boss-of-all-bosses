@@ -735,10 +735,11 @@ export const useEnhancedMafiaGameState = (
   initialFamily?: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo',
   startingResources?: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number },
   difficulty?: Difficulty,
-  seed?: number
+  seed?: number,
+  mapSize?: 'small' | 'medium' | 'large'
 ) => {
   const [gameState, setGameState] = useState<EnhancedMafiaGameState>(() => 
-    createInitialGameState(initialFamily || 'gambino', startingResources, difficulty || 'normal', seed)
+    createInitialGameState(initialFamily || 'gambino', startingResources, difficulty || 'normal', seed, mapSize || 'medium')
   );
 
   // ============ SYNC LEGACY UNITS FROM DEPLOYED UNITS ============
