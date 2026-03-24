@@ -39,6 +39,7 @@ interface GameConfig {
   family: FamilyId;
   resources: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number };
   difficulty: 'easy' | 'normal' | 'hard';
+  seed?: number;
 }
 
 const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = ({ config, onExitToMenu }) => {
