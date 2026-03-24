@@ -207,7 +207,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                     src={bossIcon}
                     alt="The Boss"
                     className="w-8 h-8 object-contain"
-                    style={{ mixBlendMode: 'multiply', filter: 'invert(1) brightness(1.5) sepia(1) saturate(3) hue-rotate(15deg)' }}
+                    style={{ mixBlendMode: 'multiply' }}
                   />
                 </div>
                 <div className="flex-1">
