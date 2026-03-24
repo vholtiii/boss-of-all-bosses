@@ -2449,9 +2449,13 @@ export const useEnhancedMafiaGameState = (
               loyalty: 40 + Math.floor(Math.random() * 30), training: 0,
               hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
             };
+            // Only capos auto-claim neutral territory on deploy (matches player rules)
             const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
-            if (tile && (tile.controllingFamily === 'neutral' || tile.controllingFamily === fam) && !tile.isHeadquarters) {
-              tile.controllingFamily = fam;
+            if (tile && tile.controllingFamily === fam && !tile.isHeadquarters) {
+              // Already owned, fine
+            } else if (tile && tile.controllingFamily === 'neutral' && !tile.isHeadquarters) {
+              // Soldiers do NOT auto-claim neutral hexes (only capos do)
+              // Don't set controllingFamily here for soldiers
             }
             soldiersToPlace--;
             placed = true;
