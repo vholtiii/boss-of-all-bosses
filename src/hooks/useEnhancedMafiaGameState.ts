@@ -5439,8 +5439,7 @@ export const useEnhancedMafiaGameState = (
         const moneyGain = Math.floor(baseMoneyGain * respectPayoutMultiplier);
         const respectGain = isEnemy ? 3 : 5;
         state.resources.money += moneyGain;
-        state.reputation.respect = Math.min(100, state.reputation.respect + respectGain);
-        state.resources.respect = Math.round(state.reputation.respect);
+        syncRespect(state, Math.min(100, state.reputation.respect + respectGain));
         
         // Only the acting unit (first soldier, or first capo if no soldiers) gets stat rewards
         const actingSoldiers = allPlayerUnits.filter(u => u.type === 'soldier');
