@@ -1812,7 +1812,7 @@ export const useEnhancedMafiaGameState = (
         
         // Can't afford soldier maintenance?
         const playerSoldiersForMaint = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
-        const totalMaint = playerSoldiersForMaint.length * SOLDIER_COST + newState.resources.soldiers * SOLDIER_COST;
+        const totalMaint = playerSoldiersForMaint.length * SOLDIER_MAINTENANCE + newState.resources.soldiers * SOLDIER_MAINTENANCE;
         if (newState.resources.money < totalMaint) loyaltyDelta -= 5;
         
         newState.reputation.loyalty = Math.min(100, Math.max(0, newState.reputation.loyalty + loyaltyDelta));
