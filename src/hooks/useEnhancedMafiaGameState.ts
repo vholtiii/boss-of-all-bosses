@@ -5648,6 +5648,7 @@ export const useEnhancedMafiaGameState = (
     moveUnit,
     endMovementPhase,
     advancePhase,
+    skipToActionPhase,
     selectHeadquarters,
     selectUnitFromHeadquarters,
     deployUnit,
