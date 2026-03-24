@@ -185,6 +185,18 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         </div>
       </motion.div>
 
+      {/* Map Seed Input */}
+      <div className="flex items-center justify-center gap-2 mb-6">
+        <label className="text-xs text-muted-foreground font-source">Map Seed:</label>
+        <input
+          type="text"
+          value={seedInput}
+          onChange={(e) => setSeedInput(e.target.value.replace(/[^0-9]/g, ''))}
+          placeholder="Random"
+          className="w-32 px-3 py-1.5 rounded-lg border border-border/50 bg-card/80 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+        />
+      </div>
+
       {/* Family cards — horizontal row */}
       <div className="flex flex-wrap justify-center gap-3 max-w-5xl mb-10">
         {families.map((family, i) => {
