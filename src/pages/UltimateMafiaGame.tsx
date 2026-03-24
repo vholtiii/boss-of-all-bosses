@@ -262,6 +262,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onPlanHitSelect={(q, r, s, targetUnitId) => handleAction({ type: 'plan_hit', plannerUnitId: planHitPlannerId, targetUnitId })}
             onPlanHitSelectSoldier={(unitId) => handleAction({ type: 'plan_hit_select_soldier', unitId })}
             onCancelPlanHit={() => handleAction({ type: 'cancel_plan_hit_mode' })}
+            bossHighlightHex={bossHighlightHex}
           />
         </div>
       )
