@@ -957,7 +957,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               open={negotiationState.open}
               onClose={() => setNegotiationState(null)}
               scope="territory"
-              negotiationUsedThisTurn={(gameState as any).capoNegotiationUsedThisTurn || false}
+              negotiationUsedThisTurn={((gameState as any).capoNegotiationCooldown || 0) > 0}
               onNegotiate={(type, extraData) => {
                 performAction({
                   type: 'negotiate',
