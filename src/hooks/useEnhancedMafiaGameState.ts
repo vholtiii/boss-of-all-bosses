@@ -5726,8 +5726,7 @@ export const useEnhancedMafiaGameState = (
           const prevCount = (cond as any)._prevCount || 0;
           if (playerHexesInDistrict > prevCount) {
             cond.violated = true;
-            state.reputation.respect = Math.max(0, state.reputation.respect - 10);
-            state.resources.respect = Math.round(state.reputation.respect);
+            syncRespect(state, Math.max(0, state.reputation.respect - 10));
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'error', title: '⚠️ Alliance Violated!',
               message: `You expanded into ${cond.target} — alliance with ${a.alliedFamily} broken! -10 respect.`,
