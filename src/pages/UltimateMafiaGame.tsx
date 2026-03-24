@@ -988,7 +988,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               open={negotiationState.open}
               onClose={() => setNegotiationState(null)}
               scope="family"
-              negotiationUsedThisTurn={(gameState as any).negotiationUsedThisTurn || false}
+              negotiationUsedThisTurn={(gameState as any).bossNegotiationUsedThisTurn || false}
               onNegotiate={(type, extraData) => {
                 performAction({
                   type: 'boss_negotiate',
