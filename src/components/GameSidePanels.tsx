@@ -738,7 +738,7 @@ export const RightSidePanel: React.FC<{
           <CollapsibleSection
             title={`Businesses (${gameState.businesses.length})`}
             icon={<Building2 className="h-4 w-4" />}
-            isOpen={openSections.has('businesses')}
+            isOpen={openSection === 'businesses'}
             onToggle={() => toggle('businesses')}
           >
             <div className="space-y-1">
