@@ -17,6 +17,7 @@ interface CapoPromotionPanelProps {
   hitmanIds: string[];
   money: number;
   onPromote: (unitId: string) => void;
+  onHighlightSoldier?: (unitId: string) => void;
 }
 
 const Req: React.FC<{ met: boolean; label: string }> = ({ met, label }) => (
@@ -29,7 +30,7 @@ const Req: React.FC<{ met: boolean; label: string }> = ({ met, label }) => (
 );
 
 const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
-  capoCount, soldierStats, deployedSoldierIds, hitmanIds, money, onPromote,
+  capoCount, soldierStats, deployedSoldierIds, hitmanIds, money, onPromote, onHighlightSoldier,
 }) => {
   const canAfford = money >= CAPO_PROMOTION_COST;
   const hasSlot = capoCount < MAX_CAPOS;
@@ -89,11 +90,12 @@ const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
             .map(s => (
               <div
                 key={s.id}
-                className={`rounded-lg border p-2.5 ${
+                className={`rounded-lg border p-2.5 cursor-pointer transition-colors hover:border-primary/50 ${
                   s.eligible
                     ? 'border-primary/30 bg-primary/5'
                     : 'border-border bg-card'
                 }`}
+                onClick={() => onHighlightSoldier?.(s.id)}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs font-medium text-foreground flex items-center gap-1">
