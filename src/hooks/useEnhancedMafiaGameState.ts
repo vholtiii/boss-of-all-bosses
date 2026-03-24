@@ -1804,7 +1804,6 @@ const isHexFortifiedAny = (fortifiedHexes: FortifiedHex[], q: number, r: number,
               movesRemaining: 0,
               maxMoves: 2,
               level: 1,
-              fortified: false,
             });
             if (!newState.soldierStats[h.unitId]) {
               newState.soldierStats[h.unitId] = {
