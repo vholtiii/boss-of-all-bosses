@@ -3059,6 +3059,8 @@ export const useEnhancedMafiaGameState = (
                 if (remainingEnemies.length === 0) {
                   const prevOwner = tile.controllingFamily;
                   tile.controllingFamily = 'neutral' as any;
+                  // Destroy fortification on captured hex
+                  state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === target.q && f.r === target.r && f.s === target.s));
                   // Check if any safehouse was on this hex (player's)
                   const shIdx = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
                   if (shIdx !== -1) {
