@@ -110,6 +110,10 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   sitdownCooldownUntil = 0,
   onCallSitdown,
   detectedThreats = [],
+  onBossNegotiate,
+  negotiationUsedThisTurn = false,
+  activePacts,
+  enemyFamilies = [],
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const [bossExpanded, setBossExpanded] = useState(false);
