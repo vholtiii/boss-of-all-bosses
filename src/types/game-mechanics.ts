@@ -168,19 +168,21 @@ export const DOC_BUSINESS_TYPES: DocBusinessConfig[] = [
 export type CapoPersonality = 'diplomat' | 'enforcer' | 'schemer';
 
 export const PERSONALITY_BONUSES: Record<CapoPersonality, Record<string, number>> = {
-  diplomat:  { ceasefire: 20, bribe_territory: 5,  alliance: 10, all: 0  },
-  enforcer:  { ceasefire: 0,  bribe_territory: 15, alliance: 0,  all: 0  },
-  schemer:   { ceasefire: 0,  bribe_territory: 0,  alliance: 15, all: 10 },
+  diplomat:  { ceasefire: 20, bribe_territory: 5,  alliance: 10, share_profits: 15, safe_passage: 10, all: 0  },
+  enforcer:  { ceasefire: 0,  bribe_territory: 15, alliance: 0,  share_profits: 0,  safe_passage: 5,  all: 0  },
+  schemer:   { ceasefire: 0,  bribe_territory: 0,  alliance: 15, share_profits: 10, safe_passage: 15, all: 10 },
 };
 
 export const PERSONALITY_LABELS: Record<CapoPersonality, { label: string; icon: string; description: string }> = {
-  diplomat:  { label: 'Diplomat',  icon: '🕊️', description: '+20% Ceasefire, +10% Alliance' },
-  enforcer:  { label: 'Enforcer',  icon: '💪', description: '+15% Bribe for Territory' },
-  schemer:   { label: 'Schemer',   icon: '🧠', description: '+15% Alliance, +10% all negotiations' },
+  diplomat:  { label: 'Diplomat',  icon: '🕊️', description: '+20% Ceasefire, +15% Share Profits, +10% Alliance/Safe Passage' },
+  enforcer:  { label: 'Enforcer',  icon: '💪', description: '+15% Bribe for Territory, +5% Safe Passage' },
+  schemer:   { label: 'Schemer',   icon: '🧠', description: '+15% Alliance/Safe Passage, +10% Share Profits, +10% all' },
 };
 
 // ============ NEGOTIATION TYPES ============
-export type NegotiationType = 'ceasefire' | 'bribe_territory' | 'alliance';
+export type NegotiationType = 'ceasefire' | 'bribe_territory' | 'alliance' | 'share_profits' | 'safe_passage';
+
+export type NegotiationScope = 'family' | 'territory';
 
 export interface NegotiationConfig {
   type: NegotiationType;
@@ -190,13 +192,18 @@ export interface NegotiationConfig {
   baseSuccess: number; // 0-100
   baseCost: number;
   reputationCost: number;
+  scope: NegotiationScope;
 }
 
 export const NEGOTIATION_TYPES: NegotiationConfig[] = [
-  { type: 'ceasefire', label: 'Ceasefire Pact', icon: '🤝', description: 'Both families stop attacking each other for 3-5 turns. Costs reputation.', baseSuccess: 50, baseCost: 3000, reputationCost: 5 },
-  { type: 'bribe_territory', label: 'Bribe for Territory', icon: '💵', description: 'Pay to peacefully claim this hex. Cost scales with enemy strength.', baseSuccess: 40, baseCost: 8000, reputationCost: 0 },
-  { type: 'alliance', label: 'Form Alliance', icon: '⚖️', description: 'Conditional pact with shared defense. Breaking conditions has severe penalties.', baseSuccess: 30, baseCost: 5000, reputationCost: 0 },
+  { type: 'ceasefire', label: 'Ceasefire Pact', icon: '🤝', description: 'Both families stop attacking each other for 3-5 turns. Costs reputation.', baseSuccess: 50, baseCost: 8000, reputationCost: 5, scope: 'family' },
+  { type: 'alliance', label: 'Form Alliance', icon: '⚖️', description: 'Conditional pact with shared defense. Breaking conditions has severe penalties.', baseSuccess: 30, baseCost: 5000, reputationCost: 0, scope: 'family' },
+  { type: 'bribe_territory', label: 'Bribe for Territory', icon: '💵', description: 'Pay to peacefully claim this hex. Cost scales with enemy strength.', baseSuccess: 40, baseCost: 8000, reputationCost: 0, scope: 'territory' },
+  { type: 'share_profits', label: 'Share Profits', icon: '💰', description: 'Don\'t take the hex — earn 30% of its income each turn for 5 turns.', baseSuccess: 55, baseCost: 3000, reputationCost: 0, scope: 'territory' },
+  { type: 'safe_passage', label: 'Safe Passage', icon: '🛤️', description: 'Buy 3 turns of free movement through this family\'s territory without combat.', baseSuccess: 60, baseCost: 2000, reputationCost: 0, scope: 'territory' },
 ];
+
+export const NEGOTIATION_REFUND_RATE = 0.5; // 50% refund on failure
 
 // ============ ALLIANCE & CEASEFIRE DATA ============
 export interface AllianceCondition {
@@ -217,6 +224,26 @@ export interface AlliancePact {
 export interface CeasefirePact {
   id: string;
   family: string;
+  turnsRemaining: number;
+  turnFormed: number;
+  active: boolean;
+}
+
+export interface ShareProfitsPact {
+  id: string;
+  targetFamily: string;
+  hexQ: number;
+  hexR: number;
+  hexS: number;
+  incomeShare: number; // 0.3 = 30%
+  turnsRemaining: number;
+  turnFormed: number;
+  active: boolean;
+}
+
+export interface SafePassagePact {
+  id: string;
+  targetFamily: string;
   turnsRemaining: number;
   turnFormed: number;
   active: boolean;
