@@ -54,6 +54,12 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+// ============ SYNC HELPER ============
+const syncRespect = (state: any, value: number) => {
+  state.reputation.respect = value;
+  state.resources.respect = Math.round(value);
+};
+
 // ============ DIFFICULTY SYSTEM ============
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
@@ -2332,7 +2338,7 @@ export const useEnhancedMafiaGameState = (
         newState.reputation.respect = Math.min(100, newState.reputation.respect + 2);
       }
       // FIX #3: Sync resources.respect with reputation.respect (single source of truth)
-      newState.resources.respect = Math.round(newState.reputation.respect);
+      syncRespect(newState, newState.reputation.respect);
       
       // --- Heat decay (after arrests) ---
       let heatReduction = newState.policeHeat.reductionPerTurn;
@@ -4952,7 +4958,7 @@ export const useEnhancedMafiaGameState = (
           state.alliances = state.alliances.map(a => 
             a.active && a.alliedFamily === tile.controllingFamily ? { ...a, active: false } : a
           ).filter(a => a.active);
-          state.reputation.respect = Math.max(0, state.reputation.respect - 25);
+          syncRespect(state, Math.max(0, state.reputation.respect - 25));
           state.reputation.reputation = Math.max(0, state.reputation.reputation - 15);
           if (state.reputation.familyRelationships[tile.controllingFamily] !== undefined) {
             state.reputation.familyRelationships[tile.controllingFamily] -= 40;
@@ -4964,12 +4970,31 @@ export const useEnhancedMafiaGameState = (
         }
         if (hasCeasefire) {
           state.ceasefires = state.ceasefires.filter(c => !(c.active && c.family === tile.controllingFamily));
-          state.reputation.respect = Math.max(0, state.reputation.respect - 15);
+          syncRespect(state, Math.max(0, state.reputation.respect - 15));
           state.pendingNotifications = [...state.pendingNotifications, {
             type: 'warning', title: '⚠️ Ceasefire Violated!',
             message: `You broke the ceasefire! -15 respect.`,
           }];
         }
+      }
+
+      // Check safe passage
+      const hasSafePassage = (state.safePassagePacts || []).some(
+        (p: SafePassagePact) => p.active && p.targetFamily === tile.controllingFamily
+      );
+      if (hasSafePassage) {
+        state.safePassagePacts = (state.safePassagePacts || []).map((p: SafePassagePact) =>
+          p.active && p.targetFamily === tile.controllingFamily ? { ...p, active: false } : p
+        ).filter((p: SafePassagePact) => p.active);
+        syncRespect(state, Math.max(0, state.reputation.respect - 15));
+        state.reputation.reputation = Math.max(0, state.reputation.reputation - 10);
+        if (state.reputation.familyRelationships[tile.controllingFamily] !== undefined) {
+          state.reputation.familyRelationships[tile.controllingFamily] -= 25;
+        }
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'error', title: '🛤️ Safe Passage Violated!',
+          message: `You attacked during safe passage! -15 respect, -10 reputation. The ${tile.controllingFamily} family will remember this.`,
+        }];
       }
 
       // Gather participants: selected unit + units on target hex
@@ -5159,16 +5184,15 @@ export const useEnhancedMafiaGameState = (
         
         if (!isScouted) {
           // ===== BLIND HIT VICTORY: Enhanced rewards =====
-          state.reputation.respect = Math.min(100, state.reputation.respect + BLIND_HIT_RESPECT);
-          state.resources.respect = Math.round(state.reputation.respect);
+          syncRespect(state, Math.min(100, state.reputation.respect + BLIND_HIT_RESPECT));
           state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + BLIND_HIT_FEAR);
           
-          // Max out the initiating soldier's stats
+          // Boost the initiating soldier's stats (bounded, not maxed)
           playerUnits.forEach(u => {
             if (state.soldierStats[u.id]) {
-              state.soldierStats[u.id].toughness = 5;
-              state.soldierStats[u.id].loyalty = Math.min(SOLDIER_LOYALTY_CAP, 80);
-              state.soldierStats[u.id].victories = 5;
+              state.soldierStats[u.id].toughness = Math.min(5, (state.soldierStats[u.id].toughness || 1) + 3);
+              state.soldierStats[u.id].victories = Math.min(5, (state.soldierStats[u.id].victories || 0) + 2);
+              state.soldierStats[u.id].loyalty = Math.min(SOLDIER_LOYALTY_CAP, (state.soldierStats[u.id].loyalty || 50) + 15);
               state.soldierStats[u.id].hits += 1;
             }
           });
@@ -5199,7 +5223,7 @@ export const useEnhancedMafiaGameState = (
             }];
           }
           
-          const hitDetails = `+${BLIND_HIT_RESPECT} respect, +${BLIND_HIT_FEAR} fear, soldier stats maxed!`;
+          const hitDetails = `+${BLIND_HIT_RESPECT} respect, +${BLIND_HIT_FEAR} fear, soldier stats boosted!`;
           state.lastCombatResult = {
             q: targetQ, r: targetR, s: targetS,
             success: true, type: 'hit',
@@ -5209,9 +5233,7 @@ export const useEnhancedMafiaGameState = (
           };
         } else {
           // ===== SCOUTED HIT VICTORY: Standard rewards =====
-          // FIX #3: Write to reputation.respect (source of truth), sync to resources.respect
-          state.reputation.respect = Math.min(100, (state.reputation.respect || 0) + 5);
-          state.resources.respect = Math.round(state.reputation.respect);
+          syncRespect(state, Math.min(100, (state.reputation.respect || 0) + 5));
           state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + 5);
           
           playerUnits.forEach(u => {
@@ -5417,8 +5439,7 @@ export const useEnhancedMafiaGameState = (
         const moneyGain = Math.floor(baseMoneyGain * respectPayoutMultiplier);
         const respectGain = isEnemy ? 3 : 5;
         state.resources.money += moneyGain;
-        state.reputation.respect = Math.min(100, state.reputation.respect + respectGain);
-        state.resources.respect = Math.round(state.reputation.respect);
+        syncRespect(state, Math.min(100, state.reputation.respect + respectGain));
         
         // Only the acting unit (first soldier, or first capo if no soldiers) gets stat rewards
         const actingSoldiers = allPlayerUnits.filter(u => u.type === 'soldier');
@@ -5538,8 +5559,7 @@ export const useEnhancedMafiaGameState = (
 
     // Reputation cost
     if (config.reputationCost > 0) {
-      state.reputation.respect = Math.max(0, state.reputation.respect - config.reputationCost);
-      state.resources.respect = Math.round(state.reputation.respect);
+      syncRespect(state, Math.max(0, state.reputation.respect - config.reputationCost));
     }
 
     // ── SUCCESS ROLL ──
@@ -5689,8 +5709,7 @@ export const useEnhancedMafiaGameState = (
           );
           if (attackedAlly) {
             cond.violated = true;
-            state.reputation.respect = Math.max(0, state.reputation.respect - 15);
-            state.resources.respect = Math.round(state.reputation.respect);
+            syncRespect(state, Math.max(0, state.reputation.respect - 15));
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'error', title: '⚠️ Alliance Violated!',
               message: `You attacked ${a.alliedFamily} — alliance broken! -15 respect.`,
@@ -5707,8 +5726,7 @@ export const useEnhancedMafiaGameState = (
           const prevCount = (cond as any)._prevCount || 0;
           if (playerHexesInDistrict > prevCount) {
             cond.violated = true;
-            state.reputation.respect = Math.max(0, state.reputation.respect - 10);
-            state.resources.respect = Math.round(state.reputation.respect);
+            syncRespect(state, Math.max(0, state.reputation.respect - 10));
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'error', title: '⚠️ Alliance Violated!',
               message: `You expanded into ${cond.target} — alliance with ${a.alliedFamily} broken! -10 respect.`,
