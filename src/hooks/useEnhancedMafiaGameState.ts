@@ -5685,6 +5685,15 @@ export const useEnhancedMafiaGameState = (
         if (state.reputation.familyRelationships[enemyFamily] !== undefined) {
           state.reputation.familyRelationships[enemyFamily] += 20;
         }
+        // Cancel any pending AI hits from this family
+        const cancelledAlliance = (state.aiPlannedHits || []).filter(h => h.family === enemyFamily);
+        if (cancelledAlliance.length > 0) {
+          state.aiPlannedHits = state.aiPlannedHits.filter(h => h.family !== enemyFamily);
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'info', title: '🕊️ Hit Called Off',
+            message: `The ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} family called off a planned hit — alliance pact honored.`,
+          }];
+        }
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '⚖️ Alliance Formed!',
           message: `Pact with ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} for ${duration} turns. Condition: ${condition.type.replace(/_/g, ' ')}.`,
