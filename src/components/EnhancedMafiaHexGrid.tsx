@@ -489,18 +489,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         if (!canSafehouse && isOwned && tile.isHeadquarters) {
           reasons.safehouse = 'Cannot use HQ';
         }
+        if (isEnemyHQ && !canAssaultHQ) {
+          if (!isSoldier) reasons.assault_hq = 'Need a soldier';
+          else if (unitOnTargetHex) reasons.assault_hq = 'Must be adjacent, not on HQ';
+          else if (!meetsToughness) reasons.assault_hq = `Need Tough ≥ 4, Loyalty ≥ 70`;
+        }
         
         // Filter out empty reasons
         Object.keys(reasons).forEach(k => { if (!reasons[k]) delete reasons[k]; });
         
-        const hasAnyAction = canHit || canExtort || canClaim || canNegotiate || canSabotage || canSafehouse;
+        const hasAnyAction = canHit || canExtort || canClaim || canNegotiate || canSabotage || canSafehouse || canAssaultHQ || canFlipSoldier;
         const hasAnyReason = Object.keys(reasons).length > 0;
         
         if (hasAnyAction || hasAnyReason) {
           if (actionMenu && actionMenu.tile.q === tile.q && actionMenu.tile.r === tile.r) {
             setActionMenu(null);
           } else {
-            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, negotiateCapoId, reasons });
+            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, canAssaultHQ, canFlipSoldier, negotiateCapoId, reasons });
           }
           return;
         }
