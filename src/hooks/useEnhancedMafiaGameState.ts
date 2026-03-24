@@ -298,6 +298,7 @@ export interface EnhancedMafiaGameState {
   // HQ Assault system
   flippedSoldiers: FlippedSoldier[];
   eliminatedFamilies: string[];
+  sitdownCooldownUntil: number;
   
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
