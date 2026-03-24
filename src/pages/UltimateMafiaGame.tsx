@@ -136,6 +136,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const [planHitMode, setPlanHitMode] = useState(false);
   const [planHitStep, setPlanHitStep] = useState<'selectSoldier' | 'selectTarget'>('selectSoldier');
   const [planHitPlannerId, setPlanHitPlannerId] = useState<string | null>(null);
+  const [showPlanHitSoldierMenu, setShowPlanHitSoldierMenu] = useState(false);
 
   // Handle action wrapper function
   const handleAction = useCallback((action: any) => {
@@ -153,6 +154,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       setPlanHitMode(true);
       setPlanHitStep('selectSoldier');
       setPlanHitPlannerId(null);
+      setShowPlanHitSoldierMenu(true);
       return;
     }
     if (action.type === 'cancel_plan_hit_mode') {
