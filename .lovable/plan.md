@@ -1,22 +1,31 @@
 
 
-# Add "Skip to Action Phase" Button
+# Fix Financial Balance — Free Undeployed Soldiers + Accurate Display Math
 
-## What
-Add a button that jumps directly from Deploy or Tactical phase to the Action phase, skipping intermediate phases. Shows only when the current phase is `deploy` or `move` (tactical).
+## Changes in `src/hooks/useEnhancedMafiaGameState.ts`
 
-## Changes
+### A. Free Undeployed Soldiers (3 removals)
+1. **Line ~1897** (loyalty check): Remove `+ newState.resources.soldiers * SOLDIER_MAINTENANCE`
+2. **Line ~2064** (loyalty delta): Remove `+ newState.resources.soldiers * SOLDIER_MAINTENANCE`
+3. **Line ~2600** (processEconomy): Remove `maintenance += state.resources.soldiers * SOLDIER_MAINTENANCE`
 
-### `src/hooks/useEnhancedMafiaGameState.ts`
-- Add `skipToActionPhase` callback that sets `turnPhase: 'action'` directly, computing the action budget (same logic as lines 840-845), resetting tactical moves, and clearing selection state
-- Export it alongside `advancePhase`
+### B. Fix Double-Counted Penalties in processEconomy (~line 2635-2660)
+- Compute `grossIncome` before any penalties
+- Compute `arrestPenaltyAmount` from `grossIncome` (not stale `state.finances.totalIncome`)
+- Compute `heatPenaltyAmount` from post-arrest illegal income
+- Set `totalIncome = grossIncome` (pre-penalty)
+- Set `totalExpenses = soldierMaintenance + communityUpkeep + arrestPenaltyAmount + heatPenaltyAmount`
+- Set `totalProfit = grossIncome - totalExpenses`
+- `resources.money += totalProfit` (same net result, transparent math)
 
-### `src/pages/UltimateMafiaGame.tsx`
-- Add a "⏭ Skip to Action" button next to the existing phase advance button
-- Only visible when `turnPhase === 'deploy' || turnPhase === 'move'`
-- Uses `variant="ghost"` and `size="sm"` to stay subtle
+### C. Store penalty amounts in finances object
+- Add `arrestPenaltyAmount` and `heatPenaltyAmount` to the finances state so HQ panel can display them accurately as expense line items
+
+## Changes in `src/components/HeadquartersInfoPanel.tsx`
+- Income header shows gross income (pre-penalty)
+- Expenses section includes arrest/heat penalties as line items — now the math adds up: `Gross Income - All Expenses = Profit`
 
 ## Files Modified
-- `src/hooks/useEnhancedMafiaGameState.ts` — add `skipToActionPhase`
-- `src/pages/UltimateMafiaGame.tsx` — render skip button
+- `src/hooks/useEnhancedMafiaGameState.ts` — maintenance fix + economy restructure
+- `src/components/HeadquartersInfoPanel.tsx` — align display with actual values
 
