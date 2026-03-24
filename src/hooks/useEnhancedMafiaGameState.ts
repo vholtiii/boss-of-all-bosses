@@ -376,15 +376,18 @@ const generateHexMap = (radius: number, seed?: number): HexTile[] => {
   const tiles: HexTile[] = [];
   const rng = mulberry32(seed ?? Math.floor(Math.random() * 4294967296));
   
+  const threshold = Math.ceil(radius * 0.4);
+  const threshold2 = Math.ceil(radius * 0.3);
+  
   const getDistrict = (q: number, r: number): HexTile['district'] => {
-    if (q <= -4 && r >= 3) return 'Little Italy';
-    if (q >= 3 && r <= -4) return 'Manhattan';
-    if (q >= 3 && r >= 3) return 'Staten Island';
-    if (q <= -4 && r <= -4) return 'Queens';
-    if (r >= 3) return 'Brooklyn';
-    if (r <= -4) return 'Bronx';
-    if (q >= 3) return 'Manhattan';
-    if (q <= -4) return 'Queens';
+    if (q <= -threshold && r >= threshold2) return 'Little Italy';
+    if (q >= threshold2 && r <= -threshold) return 'Manhattan';
+    if (q >= threshold2 && r >= threshold2) return 'Staten Island';
+    if (q <= -threshold && r <= -threshold) return 'Queens';
+    if (r >= threshold2) return 'Brooklyn';
+    if (r <= -threshold) return 'Bronx';
+    if (q >= threshold2) return 'Manhattan';
+    if (q <= -threshold) return 'Queens';
     return 'Brooklyn';
   };
 
@@ -438,12 +441,28 @@ const generateHexMap = (radius: number, seed?: number): HexTile[] => {
   return tiles;
 };
 
-const HQ_POSITIONS: Record<string, {q:number;r:number;s:number;district:HexTile['district']}> = {
-  gambino:  { q: -8, r:  8, s: 0,  district: 'Little Italy' },
-  genovese: { q:  8, r: -8, s: 0,  district: 'Manhattan' },
-  lucchese: { q: -8, r: -1, s: 9,  district: 'Queens' },
-  bonanno:  { q:  7, r:  3, s: -10, district: 'Staten Island' },
-  colombo:  { q:  0, r: -9, s: 9,  district: 'Bronx' },
+const HQ_POSITIONS_BY_SIZE: Record<string, Record<string, {q:number;r:number;s:number;district:HexTile['district']}>> = {
+  small: {
+    gambino:  { q: -5, r:  5, s: 0,  district: 'Little Italy' },
+    genovese: { q:  5, r: -5, s: 0,  district: 'Manhattan' },
+    lucchese: { q: -5, r: -1, s: 6,  district: 'Queens' },
+    bonanno:  { q:  5, r:  2, s: -7, district: 'Staten Island' },
+    colombo:  { q:  0, r: -6, s: 6,  district: 'Bronx' },
+  },
+  medium: {
+    gambino:  { q: -8, r:  8, s: 0,  district: 'Little Italy' },
+    genovese: { q:  8, r: -8, s: 0,  district: 'Manhattan' },
+    lucchese: { q: -8, r: -1, s: 9,  district: 'Queens' },
+    bonanno:  { q:  7, r:  3, s: -10, district: 'Staten Island' },
+    colombo:  { q:  0, r: -9, s: 9,  district: 'Bronx' },
+  },
+  large: {
+    gambino:  { q: -11, r: 11, s: 0,  district: 'Little Italy' },
+    genovese: { q:  11, r: -11, s: 0, district: 'Manhattan' },
+    lucchese: { q: -11, r: -1, s: 12, district: 'Queens' },
+    bonanno:  { q:  10, r:  3, s: -13, district: 'Staten Island' },
+    colombo:  { q:   0, r: -12, s: 12, district: 'Bronx' },
+  },
 };
 
 // ============ INITIAL STATE ============
@@ -451,9 +470,12 @@ const createInitialGameState = (
   family: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo' = 'gambino',
   startingResources?: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number },
   difficulty: Difficulty = 'normal',
-  providedSeed?: number
+  providedSeed?: number,
+  mapSize: 'small' | 'medium' | 'large' = 'medium'
 ): EnhancedMafiaGameState => {
-  const mapRadius = 10;
+  const MAP_RADII: Record<string, number> = { small: 7, medium: 10, large: 13 };
+  const mapRadius = MAP_RADII[mapSize] || 10;
+  const HQ_POSITIONS = HQ_POSITIONS_BY_SIZE[mapSize] || HQ_POSITIONS_BY_SIZE.medium;
   const mapSeed = providedSeed ?? Math.floor(Math.random() * 4294967296);
   const diffMods = DIFFICULTY_MODIFIERS[difficulty];
   let hexMap = generateHexMap(mapRadius, mapSeed);
@@ -713,10 +735,11 @@ export const useEnhancedMafiaGameState = (
   initialFamily?: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo',
   startingResources?: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number },
   difficulty?: Difficulty,
-  seed?: number
+  seed?: number,
+  mapSize?: 'small' | 'medium' | 'large'
 ) => {
   const [gameState, setGameState] = useState<EnhancedMafiaGameState>(() => 
-    createInitialGameState(initialFamily || 'gambino', startingResources, difficulty || 'normal', seed)
+    createInitialGameState(initialFamily || 'gambino', startingResources, difficulty || 'normal', seed, mapSize || 'medium')
   );
 
   // ============ SYNC LEGACY UNITS FROM DEPLOYED UNITS ============

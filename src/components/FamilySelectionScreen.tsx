@@ -118,13 +118,16 @@ const StatBar: React.FC<{ value: number; color: string }> = ({ value, color }) =
   </div>
 );
 
+type MapSize = 'small' | 'medium' | 'large';
+
 interface Props {
-  onSelectFamily: (familyId: FamilyId, resources: FamilyInfo['startingResources'], difficulty: 'easy' | 'normal' | 'hard', seed?: number) => void;
+  onSelectFamily: (familyId: FamilyId, resources: FamilyInfo['startingResources'], difficulty: 'easy' | 'normal' | 'hard', seed?: number, mapSize?: MapSize) => void;
 }
 
 const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const [selectedFamily, setSelectedFamily] = useState<FamilyId | null>(null);
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
+  const [mapSize, setMapSize] = useState<MapSize>('medium');
   const [seedInput, setSeedInput] = useState('');
 
   const activeFamily = families.find(f => f.id === selectedFamily);
@@ -179,6 +182,30 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 title={descs[d]}
               >
                 {labels[d]}
+              </button>
+            );
+          })}
+        </div>
+        {/* Map Size Selector */}
+        <div className="flex items-center justify-center gap-2 mt-3">
+          {(['small', 'medium', 'large'] as const).map(s => {
+            const labels = { small: '🗺️ Small', medium: '🗺️ Medium', large: '🗺️ Large' };
+            const descs = { small: '~169 hexes · Fast games', medium: '~331 hexes · Classic', large: '~547 hexes · Epic sprawl' };
+            const isActive = mapSize === s;
+            return (
+              <button
+                key={s}
+                onClick={() => setMapSize(s)}
+                className={cn(
+                  'px-4 py-2 rounded-lg border-2 text-xs font-bold uppercase tracking-wider transition-all duration-200',
+                  'bg-card/80 backdrop-blur-sm',
+                  isActive
+                    ? 'border-primary text-primary shadow-md scale-105'
+                    : 'border-border/50 text-muted-foreground hover:border-muted-foreground/50'
+                )}
+                title={descs[s]}
+              >
+                {labels[s]}
               </button>
             );
           })}
@@ -328,7 +355,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
             </div>
 
             <Button
-              onClick={() => onSelectFamily(activeFamily.id, activeFamily.startingResources, difficulty, seedInput ? parseInt(seedInput) : undefined)}
+              onClick={() => onSelectFamily(activeFamily.id, activeFamily.startingResources, difficulty, seedInput ? parseInt(seedInput) : undefined, mapSize)}
               className="w-full font-playfair font-bold text-base py-5 transition-all duration-200"
               style={{
                 backgroundColor: activeFamily.color,

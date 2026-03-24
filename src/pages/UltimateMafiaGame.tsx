@@ -35,11 +35,14 @@ import SoundSettingsDialog from '@/components/SoundSettingsDialog';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
 
+type MapSize = 'small' | 'medium' | 'large';
+
 interface GameConfig {
   family: FamilyId;
   resources: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number };
   difficulty: 'easy' | 'normal' | 'hard';
   seed?: number;
+  mapSize?: MapSize;
 }
 
 const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = ({ config, onExitToMenu }) => {
@@ -64,7 +67,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     fortifyUnit,
     setMoveAction,
     startEscort,
-  } = useEnhancedMafiaGameState(config.family, config.resources, config.difficulty, config.seed);
+  } = useEnhancedMafiaGameState(config.family, config.resources, config.difficulty, config.seed, config.mapSize);
 
   const { notifySuccess, notifyError, notifyWarning, notifyInfo, notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
   const { playSound, playSoundSequence, updateSoundConfig, soundConfig } = useSoundSystem();
@@ -1026,7 +1029,7 @@ const UltimateMafiaGame: React.FC = () => {
   if (!gameConfig) {
     return (
       <FamilySelectionScreen
-        onSelectFamily={(family, resources, difficulty, seed) => setGameConfig({ family, resources, difficulty, seed })}
+        onSelectFamily={(family, resources, difficulty, seed, mapSize) => setGameConfig({ family, resources, difficulty, seed, mapSize })}
       />
     );
   }
