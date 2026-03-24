@@ -2840,8 +2840,6 @@ export const useEnhancedMafiaGameState = (
               (state.activeBribes || []).some(b => b.tier === 'police_captain' || b.tier === 'police_chief');
             if (hasIntel) {
               turnReport.aiActions.push({ family: fam, action: 'safehouse', detail: `Established a safehouse in ${bestHex.district}` });
-            } else {
-              turnReport.aiActions.push({ family: fam, action: 'unknown', detail: 'Expanded operations in an unknown area' });
             }
           }
         }
