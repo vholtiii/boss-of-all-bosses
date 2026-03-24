@@ -1,26 +1,22 @@
 
 
-# Clarification: Current Menu Behavior Already Matches Your Request
+# Add "Skip to Action Phase" Button
 
-After reviewing the code, the left panel **already works** the way you described:
+## What
+Add a button that jumps directly from Deploy or Tactical phase to the Action phase, skipping intermediate phases. Shows only when the current phase is `deploy` or `move` (tactical).
 
-1. **Dropdowns are clickable** in any phase — clicking the section header expands it
-2. **All action items appear** when a section is expanded
-3. **Unavailable actions are greyed out** with lock icons and disabled reasons
-4. **Available actions remain normal** and clickable
+## Changes
 
-**However**, I noticed one UX issue that might be causing confusion: the section headers show a 🔒 icon when phase-locked, which could make them **look unclickable** even though they're not.
+### `src/hooks/useEnhancedMafiaGameState.ts`
+- Add `skipToActionPhase` callback that sets `turnPhase: 'action'` directly, computing the action budget (same logic as lines 840-845), resetting tactical moves, and clearing selection state
+- Export it alongside `advancePhase`
 
-## Proposed Fix
-
-### `src/components/GameSidePanels.tsx`
-
-**CollapsibleSection header** (line 853):
-- Remove the 🔒 from the section header when phase-locked — this icon makes users think the section itself can't be opened
-- Instead, add a subtle phase label like "(Action Phase)" in muted text so users know the section is for a different phase but can still browse it
-
-**Also**: Change `toggle()` to allow **multiple sections open at once** (Set-based) so users don't have to close one section to see another — this makes browsing all options easier without removing the dropdown behavior.
+### `src/pages/UltimateMafiaGame.tsx`
+- Add a "⏭ Skip to Action" button next to the existing phase advance button
+- Only visible when `turnPhase === 'deploy' || turnPhase === 'move'`
+- Uses `variant="ghost"` and `size="sm"` to stay subtle
 
 ## Files Modified
-- `src/components/GameSidePanels.tsx` — remove misleading lock on section headers, allow multi-open
+- `src/hooks/useEnhancedMafiaGameState.ts` — add `skipToActionPhase`
+- `src/pages/UltimateMafiaGame.tsx` — render skip button
 
