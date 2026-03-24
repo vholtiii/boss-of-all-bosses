@@ -5184,8 +5184,7 @@ export const useEnhancedMafiaGameState = (
         
         if (!isScouted) {
           // ===== BLIND HIT VICTORY: Enhanced rewards =====
-          state.reputation.respect = Math.min(100, state.reputation.respect + BLIND_HIT_RESPECT);
-          state.resources.respect = Math.round(state.reputation.respect);
+          syncRespect(state, Math.min(100, state.reputation.respect + BLIND_HIT_RESPECT));
           state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + BLIND_HIT_FEAR);
           
           // Boost the initiating soldier's stats (bounded, not maxed)
