@@ -2711,7 +2711,61 @@ export const useEnhancedMafiaGameState = (
           if (turnReport) turnReport.aiActions.push({ family: fam, action: 'safehouse', detail: `Established a safehouse in ${bestHex.district}` });
         }
       }
+
+      // ── AI PLAN HIT AGAINST PLAYER CAPOS ──
+      if ((personality === 'aggressive' || personality === 'opportunistic') && Math.random() < AI_PLAN_HIT_CHANCE) {
+        const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
+        const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
+        const availableTargets = playerCapos.filter(c => !alreadyTargeted.has(c.id));
+        if (availableTargets.length > 0) {
+          const target = availableTargets[Math.floor(Math.random() * availableTargets.length)];
+          state.aiPlannedHits.push({
+            family: fam,
+            targetUnitId: target.id,
+            turnsRemaining: AI_PLAN_HIT_DURATION,
+            plannedOnTurn: state.turn,
+          });
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'plan_hit', detail: `Planned a hit against a player capo` });
+        }
+      }
     });
+
+    // ── EXECUTE PENDING AI PLANNED HITS ──
+    if (state.aiPlannedHits && state.aiPlannedHits.length > 0) {
+      const remaining: typeof state.aiPlannedHits = [];
+      for (const hit of state.aiPlannedHits) {
+        hit.turnsRemaining -= 1;
+        if (hit.turnsRemaining <= 0) {
+          // Execute the hit
+          const targetUnit = state.deployedUnits.find(u => u.id === hit.targetUnitId);
+          if (targetUnit) {
+            if (Math.random() < AI_PLAN_HIT_SUCCESS_RATE) {
+              // Success — capo is killed
+              const idx = state.deployedUnits.indexOf(targetUnit);
+              if (idx !== -1) state.deployedUnits.splice(idx, 1);
+              state.pendingNotifications.push({
+                type: 'error' as const,
+                title: '💀 Capo Assassinated!',
+                message: `The ${hit.family} family executed a planned hit on your capo! They have been eliminated.`,
+              });
+              if (turnReport) turnReport.aiActions.push({ family: hit.family, action: 'assassination', detail: 'Successfully assassinated a player capo' });
+            } else {
+              // Failed — capo survives
+              state.pendingNotifications.push({
+                type: 'warning' as const,
+                title: '🔫 Assassination Foiled!',
+                message: `The ${hit.family} family attempted a planned hit on your capo, but the attempt was foiled!`,
+              });
+              if (turnReport) turnReport.aiActions.push({ family: hit.family, action: 'assassination_failed', detail: 'Failed assassination attempt on player capo' });
+            }
+          }
+          // Hit executed or target gone — don't keep
+        } else {
+          remaining.push(hit);
+        }
+      }
+      state.aiPlannedHits = remaining;
+    }
   };
 
   // ============ WEATHER ============
