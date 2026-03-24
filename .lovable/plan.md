@@ -1,89 +1,35 @@
 
 
-# Implementation Plan: Stability, Polish & Replay Value
+# Game Loss: Boss Assassination by Rival Families
 
-Implementing 7 of 8 items from the approved plan (skipping #6 — legacy economy removal).
+## Concept
+When the player has **zero soldiers deployed**, is **in debt** (money < 0), and **revenue does not exceed costs**, all 4 rival families coordinate a hit on the Boss. This is an automatic, guaranteed kill — no dice roll. The player receives a dramatic notification before the Game Over screen.
 
----
+## Trigger Conditions (checked at end of turn, after desertion/bankruptcy logic)
+All three must be true simultaneously:
+1. `deployedUnits` has **zero** player soldiers (capos don't count — no muscle left)
+2. `resources.money < 0` (in debt)
+3. Turn revenue ≤ turn costs (net income negative — no recovery path)
 
-## 1. Fix Family Selection Screen Layout + Normalize Soldiers
+This fires **before** the $50K bankruptcy check, giving it narrative priority.
 
-**File**: `src/components/FamilySelectionScreen.tsx`
+## Changes
 
-- Change card width from `w-[170px]` to `w-[150px]` so all 5 fit in one row on most screens
-- Add horizontal scroll fallback for very small screens
-- Update `startingResources.soldiers` to balanced values: Gambino 4, Genovese 4, Lucchese 3, Bonanno 3, Colombo 3
-- Realign bonus descriptions to match `FAMILY_BONUSES` in game-mechanics.ts (Colombo should show combat bonuses, not economic)
-- Add optional seed input field below difficulty selector (text input, placeholder "Random" — leave blank for random seed)
+### `src/hooks/useEnhancedMafiaGameState.ts`
+- After soldier desertion logic (~line 1943) and before the $50K bankruptcy check (~line 1945):
+  - Count remaining player soldiers
+  - If 0 soldiers AND money < 0 AND net income ≤ 0:
+    - Add turn report event: `"☠️ With no soldiers left and the family drowning in debt, the Five Families called a sitdown. The vote was unanimous."`
+    - Add pending notification: type `error`, title `"☠️ The Bosses Took You Out"`, message about all 4 families ordering the hit
+    - Wipe territory, remove all units
+    - Set `gameOver = { type: 'assassination', turn }`
 
-## 2. Game Over / Victory Screen with Stats
+### `src/pages/UltimateMafiaGame.tsx`
+- Extend the game over screen check (~line 286) to include `type === 'assassination'`
+- Show 🔫 emoji, title "THE COMMISSION HAS SPOKEN", description: "With no soldiers, no money, and no way out — the other families voted. The Boss sleeps with the fishes."
+- Same post-game stats grid as RICO/bankruptcy
 
-**File**: `src/pages/UltimateMafiaGame.tsx`
-
-- Add `bankruptcy` type to the existing game over check (lines 284-342 already handle RICO)
-- After RICO check, add a bankruptcy game over screen with the same structure: emoji, title, description, stats, "Return to Main Menu" button
-- Enhance the existing victory screen (lines 344-405) with post-game stats: turns played (`gameState.turn`), territory count, total money, soldiers remaining, families eliminated (`gameState.victoryProgress.domination.eliminated`), victory type
-- Both screens already have "Return to Main Menu" via `onExitToMenu` — keep that
-
-**File**: `src/hooks/useEnhancedMafiaGameState.ts`
-
-- In the bankruptcy block (line 1943-1951), add `newState.gameOver = { type: 'bankruptcy', turn: newState.turn }` so the UI can detect it
-- Update `gameOver` type to: `{ type: 'rico' | 'bankruptcy'; turn: number } | null`
-
-## 3. Expose Map Seed for Replayability
-
-**File**: `src/components/FamilySelectionScreen.tsx`
-
-- Add a text input for "Map Seed" below the difficulty selector (optional — empty = random)
-- Pass seed through `onSelectFamily` callback (add to interface)
-
-**File**: `src/pages/UltimateMafiaGame.tsx`
-
-- Update `GameConfig` interface to include optional `seed?: number`
-- Pass seed to `useEnhancedMafiaGameState`
-- Display current seed in the top bar (small text, e.g., "Seed: 1234567890")
-
-**File**: `src/hooks/useEnhancedMafiaGameState.ts`
-
-- Accept optional `seed` parameter in hook
-- Use provided seed instead of `Math.random()` in `createInitialGameState` if present
-
-## 4. Save/Load Version Tolerance
-
-**File**: `src/hooks/useGameSaveLoad.ts`
-
-- Change strict version check to a warning: if version differs, still return the data but add a warning message
-- Parse major version only for hard rejection (e.g., reject `0.x` saves but allow `1.x.y` variations)
-
-## 5. Realign Family Bonuses to Identity
-
-**File**: `src/types/game-mechanics.ts`
-
-- Colombo (military/attack family): Move `income: 20` to `combatBonus: 20`, add `fearGeneration: 15`, keep `recruitmentDiscount: 15`
-- Gambino (power/political): Keep as-is (combat + territory income + intimidation)
-- Genovese (business/stealth): Keep as-is (business income + laundering + upgrade)
-- Lucchese (intel/subterfuge): Keep as-is (hit success + heat reduction + intel)
-- Bonanno (defense/loyalty): Keep as-is (extortion + intimidation + fear)
-
-**File**: `src/components/FamilySelectionScreen.tsx`
-
-- Update Colombo's displayed bonuses to match: "+20% combat power", "-15% recruitment cost", "+15% fear generation"
-
-## 6. Quick Turn / Skip Phase Button
-
-**File**: `src/pages/UltimateMafiaGame.tsx`
-
-- The "Next Phase" / "End Deploy" button already exists (line 475-484). Enhance it:
-- When no units can be deployed (deploy phase) or no tactical actions remain (tactical phase), auto-highlight the skip button with a pulsing style
-- No new button needed — the existing advance phase button serves this purpose
-
-## Summary of Files Modified
-
-| File | Changes |
-|------|---------|
-| `src/components/FamilySelectionScreen.tsx` | Layout fix, soldier normalization, seed input, bonus text |
-| `src/pages/UltimateMafiaGame.tsx` | Bankruptcy game over screen, victory stats, seed display/pass-through |
-| `src/hooks/useEnhancedMafiaGameState.ts` | Bankruptcy gameOver state, seed parameter |
-| `src/hooks/useGameSaveLoad.ts` | Relax version checking |
-| `src/types/game-mechanics.ts` | Colombo bonus realignment |
+## Files Modified
+- `src/hooks/useEnhancedMafiaGameState.ts` — assassination trigger logic
+- `src/pages/UltimateMafiaGame.tsx` — assassination game over screen
 
