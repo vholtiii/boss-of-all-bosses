@@ -77,9 +77,15 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   hexMap = [],
   bossHighlightHex,
   onBossHighlightHex,
+  turnPhase,
+  currentTurn = 0,
+  sitdownCooldownUntil = 0,
+  onCallSitdown,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const [bossExpanded, setBossExpanded] = useState(false);
+  const [sitdownOpen, setSitdownOpen] = useState(false);
+  const [selectedSitdownIds, setSelectedSitdownIds] = useState<string[]>([]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
