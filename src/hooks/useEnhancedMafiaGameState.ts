@@ -2585,6 +2585,21 @@ export const useEnhancedMafiaGameState = (
       }
     }
     
+    const soldierMaintenance = (playerSoldiers.length + state.resources.soldiers) * SOLDIER_MAINTENANCE;
+
+    // Compute arrest penalty dollar amount
+    const arrestPenaltyAmount = totalProfitPenalty > 0 ? Math.floor((state.finances.totalIncome || income) * totalProfitPenalty / 100) : 0;
+
+    // Compute heat penalty dollar amount
+    let heatPenaltyAmount = 0;
+    {
+      const heat = state.policeHeat.level;
+      let hpRate = 0;
+      if (heat >= 70) hpRate = 0.25;
+      else if (heat >= 30) hpRate = 0.15;
+      if (hpRate > 0) heatPenaltyAmount = Math.floor((illegalIncome / (1 - hpRate)) * hpRate); // approximate pre-penalty illegal * rate
+    }
+
     state.lastTurnIncome = income;
     state.resources.money += income - maintenance;
     state.finances.totalIncome = income;
@@ -2595,6 +2610,10 @@ export const useEnhancedMafiaGameState = (
     state.finances.legalCosts = maintenance;
     state.finances.dirtyMoney = (state.finances.dirtyMoney || 0) + illegalIncome;
     state.finances.cleanMoney = Math.max(0, state.resources.money - (state.finances.dirtyMoney || 0));
+    state.finances.soldierMaintenance = soldierMaintenance;
+    state.finances.communityUpkeep = communityUpkeep;
+    state.finances.arrestPenalty = arrestPenaltyAmount;
+    state.finances.heatPenalty = heatPenaltyAmount;
   };
 
   // ============ PROCESS BRIBES ============

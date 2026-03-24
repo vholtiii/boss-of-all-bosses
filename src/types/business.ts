@@ -51,6 +51,10 @@ export interface BusinessFinances {
   dirtyMoney: number; // Unlaundred money from illegal activities
   cleanMoney: number; // Laundered money ready to use
   legalCosts: number; // lawyer fees and legal expenses
+  soldierMaintenance?: number;
+  communityUpkeep?: number;
+  arrestPenalty?: number;
+  heatPenalty?: number;
 }
 
 export interface PoliceHeat {

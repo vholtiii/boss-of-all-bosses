@@ -34,7 +34,7 @@ interface HeadquartersInfoPanelProps {
     boss: { q: number; r: number; s: number; id: string };
   };
   businesses: any[];
-  finances?: { totalIncome: number; totalExpenses: number; legalProfit: number; illegalProfit: number; totalProfit: number; dirtyMoney: number; cleanMoney: number; legalCosts: number };
+  finances?: { totalIncome: number; totalExpenses: number; legalProfit: number; illegalProfit: number; totalProfit: number; dirtyMoney: number; cleanMoney: number; legalCosts: number; soldierMaintenance?: number; communityUpkeep?: number; arrestPenalty?: number; heatPenalty?: number };
   onClose: () => void;
   onSelectUnitFromHeadquarters?: (unitType: 'soldier' | 'capo', family: string) => void;
   movementPhase?: boolean;
@@ -218,9 +218,34 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
             </div>
             {finances && (
               <div className="grid grid-cols-3 gap-1.5">
-                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-1.5">
-                  <div className="text-[10px] text-orange-400 font-medium">Expenses</div>
-                  <div className="text-xs font-bold text-orange-400">${totalExpenses.toLocaleString()}</div>
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-1.5 col-span-3">
+                  <div className="text-[10px] text-orange-400 font-medium mb-1">Expenses — ${totalExpenses.toLocaleString()}/turn</div>
+                  <div className="space-y-0.5">
+                    {(finances.soldierMaintenance ?? 0) > 0 && (
+                      <div className="flex justify-between text-[9px]">
+                        <span className="text-orange-300/80">🔫 Soldier Maintenance</span>
+                        <span className="text-orange-400 font-semibold">-${(finances.soldierMaintenance ?? 0).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {(finances.communityUpkeep ?? 0) > 0 && (
+                      <div className="flex justify-between text-[9px]">
+                        <span className="text-orange-300/80">🏘️ Community Upkeep</span>
+                        <span className="text-orange-400 font-semibold">-${(finances.communityUpkeep ?? 0).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {(finances.arrestPenalty ?? 0) > 0 && (
+                      <div className="flex justify-between text-[9px]">
+                        <span className="text-red-300/80">🚔 Arrest Penalties</span>
+                        <span className="text-red-400 font-semibold">-${(finances.arrestPenalty ?? 0).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {(finances.heatPenalty ?? 0) > 0 && (
+                      <div className="flex justify-between text-[9px]">
+                        <span className="text-red-300/80">🔥 Heat Penalties</span>
+                        <span className="text-red-400 font-semibold">-${(finances.heatPenalty ?? 0).toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-1.5">
                   <div className="text-[10px] text-yellow-400 font-medium">Dirty $</div>
