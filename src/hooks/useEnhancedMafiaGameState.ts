@@ -2249,6 +2249,8 @@ export const useEnhancedMafiaGameState = (
       if (hasPlayerDistrictBonus(newState, 'respect')) {
         newState.reputation.respect = Math.min(100, newState.reputation.respect + 2);
       }
+      // FIX #3: Sync resources.respect with reputation.respect (single source of truth)
+      newState.resources.respect = Math.round(newState.reputation.respect);
       
       // --- Heat decay (after arrests) ---
       let heatReduction = newState.policeHeat.reductionPerTurn;
