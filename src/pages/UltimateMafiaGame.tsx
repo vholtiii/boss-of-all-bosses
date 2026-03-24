@@ -135,6 +135,11 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     targetR: number;
     targetS: number;
     capoId: string;
+    scope: 'territory';
+  } | {
+    open: boolean;
+    scope: 'family';
+    targetFamily: string;
   } | null>(null);
 
   // Plan Hit mode — 2-step: select soldier, then select target hex+unit
@@ -152,6 +157,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         targetR: action.targetR,
         targetS: action.targetS,
         capoId: action.capoId,
+        scope: 'territory',
+      });
+      return;
+    }
+    if (action.type === 'open_boss_negotiate') {
+      setNegotiationState({
+        open: true,
+        scope: 'family',
+        targetFamily: action.targetFamily || '',
       });
       return;
     }
@@ -736,7 +750,17 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             ⚖️ {a.alliedFamily.charAt(0).toUpperCase() + a.alliedFamily.slice(1)} ({a.turnsRemaining}t)
           </span>
         ))}
-        {(!gameState.ceasefires?.length && !gameState.alliances?.length) && (
+        {(gameState as any).shareProfitsPacts?.filter((p: any) => p.active).map((p: any) => (
+          <span key={p.id} className="px-2 py-0.5 rounded-full bg-green-500/20 border border-green-500/30 text-green-400">
+            💰 {p.targetFamily.charAt(0).toUpperCase() + p.targetFamily.slice(1)} ({p.turnsRemaining}t)
+          </span>
+        ))}
+        {(gameState as any).safePassagePacts?.filter((p: any) => p.active).map((p: any) => (
+          <span key={p.id} className="px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-400">
+            🛤️ {p.targetFamily.charAt(0).toUpperCase() + p.targetFamily.slice(1)} ({p.turnsRemaining}t)
+          </span>
+        ))}
+        {(!gameState.ceasefires?.length && !gameState.alliances?.length && !(gameState as any).shareProfitsPacts?.length && !(gameState as any).safePassagePacts?.length) && (
           <span className="text-muted-foreground font-playfair italic">"Strategy Rules the Underworld"</span>
         )}
       </div>
@@ -907,42 +931,82 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             sitdownCooldownUntil={(gameState as any).sitdownCooldownUntil || 0}
             onCallSitdown={(soldierIds) => handleAction({ type: 'call_sitdown', soldierIds })}
             detectedThreats={isPlayerHQ ? ((gameState as any).aiPlannedHits || []).filter((h: any) => h.detectedVia) : []}
+            onBossNegotiate={isPlayerHQ ? (targetFamily) => handleAction({ type: 'open_boss_negotiate', targetFamily }) : undefined}
+            negotiationUsedThisTurn={(gameState as any).negotiationUsedThisTurn || false}
+            activePacts={isPlayerHQ ? {
+              ceasefires: (gameState as any).ceasefires || [],
+              alliances: (gameState as any).alliances || [],
+              shareProfits: (gameState as any).shareProfitsPacts || [],
+              safePassages: (gameState as any).safePassagePacts || [],
+            } : undefined}
+            enemyFamilies={isPlayerHQ ? gameState.aiOpponents.map((o: any) => o.family).filter((f: string) => !((gameState as any).eliminatedFamilies || []).includes(f)) : []}
           />
         );
       })()}
 
       {/* Negotiation Dialog */}
       {negotiationState && (() => {
-        const tile = gameState.hexMap.find((t: any) => t.q === negotiationState.targetQ && t.r === negotiationState.targetR && t.s === negotiationState.targetS);
-        const capo = gameState.deployedUnits.find((u: any) => u.id === negotiationState.capoId);
-        if (!tile || !capo) return null;
-        const enemyFamily = tile.controllingFamily;
-        const enemyUnitsOnHex = gameState.deployedUnits.filter((u: any) => u.family === enemyFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s);
-        return (
-          <NegotiationDialog
-            open={negotiationState.open}
-            onClose={() => setNegotiationState(null)}
-            onNegotiate={(type, extraData) => {
-              performAction({
-                type: 'negotiate',
-                negotiationType: type,
-                targetQ: negotiationState.targetQ,
-                targetR: negotiationState.targetR,
-                targetS: negotiationState.targetS,
-                capoId: negotiationState.capoId,
-                extraData,
-              });
-              setNegotiationState(null);
-            }}
-            capoName={capo.name || 'Capo'}
-            capoPersonality={capo.personality || 'diplomat'}
-            enemyFamily={enemyFamily}
-            playerReputation={gameState.reputation.respect}
-            playerMoney={gameState.resources.money}
-            enemyStrength={enemyUnitsOnHex.length}
-            hexIncome={tile.business?.income || 0}
-          />
-        );
+        if (negotiationState.scope === 'territory') {
+          const tile = gameState.hexMap.find((t: any) => t.q === negotiationState.targetQ && t.r === negotiationState.targetR && t.s === negotiationState.targetS);
+          const capo = gameState.deployedUnits.find((u: any) => u.id === negotiationState.capoId);
+          if (!tile || !capo) return null;
+          const enemyFamily = tile.controllingFamily;
+          const enemyUnitsOnHex = gameState.deployedUnits.filter((u: any) => u.family === enemyFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+          return (
+            <NegotiationDialog
+              open={negotiationState.open}
+              onClose={() => setNegotiationState(null)}
+              scope="territory"
+              negotiationUsedThisTurn={(gameState as any).negotiationUsedThisTurn || false}
+              onNegotiate={(type, extraData) => {
+                performAction({
+                  type: 'negotiate',
+                  negotiationType: type,
+                  targetQ: negotiationState.targetQ,
+                  targetR: negotiationState.targetR,
+                  targetS: negotiationState.targetS,
+                  capoId: negotiationState.capoId,
+                  extraData,
+                });
+                setNegotiationState(null);
+              }}
+              capoName={capo.name || 'Capo'}
+              capoPersonality={capo.personality || 'diplomat'}
+              enemyFamily={enemyFamily}
+              playerReputation={gameState.reputation.respect}
+              playerMoney={gameState.resources.money}
+              enemyStrength={enemyUnitsOnHex.length}
+              hexIncome={tile.business?.income || 0}
+            />
+          );
+        } else {
+          // Boss (family-level) negotiation
+          const enemyFamilies = gameState.aiOpponents.map((o: any) => o.family).filter((f: string) => !(gameState as any).eliminatedFamilies?.includes(f));
+          const targetFam = negotiationState.targetFamily || enemyFamilies[0] || '';
+          return (
+            <NegotiationDialog
+              open={negotiationState.open}
+              onClose={() => setNegotiationState(null)}
+              scope="family"
+              negotiationUsedThisTurn={(gameState as any).negotiationUsedThisTurn || false}
+              onNegotiate={(type, extraData) => {
+                performAction({
+                  type: 'boss_negotiate',
+                  negotiationType: type,
+                  targetFamily: targetFam,
+                  extraData,
+                });
+                setNegotiationState(null);
+              }}
+              enemyFamily={targetFam}
+              playerReputation={gameState.reputation.respect}
+              playerMoney={gameState.resources.money}
+              enemyStrength={0}
+              hexIncome={0}
+              availableEnemyFamilies={enemyFamilies}
+            />
+          );
+        }
       })()}
 
       {/* Sound Settings */}
