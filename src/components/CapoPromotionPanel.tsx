@@ -30,7 +30,7 @@ const Req: React.FC<{ met: boolean; label: string }> = ({ met, label }) => (
 );
 
 const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
-  capoCount, soldierStats, deployedSoldierIds, hitmanIds, money, onPromote,
+  capoCount, soldierStats, deployedSoldierIds, hitmanIds, money, onPromote, onHighlightSoldier,
 }) => {
   const canAfford = money >= CAPO_PROMOTION_COST;
   const hasSlot = capoCount < MAX_CAPOS;
