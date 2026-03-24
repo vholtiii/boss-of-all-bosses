@@ -1,26 +1,50 @@
 
 
-# Fix Scout Mechanics + Boss Panel Scrolling
+# Fix AI Claiming & Extortion — Soldiers Are Just Walking Around
 
-## Issues Found
+## Problem
+AI soldiers move onto hexes but never claim neutral territory or extort businesses because:
+1. **Line 2744-2748**: Only capos auto-claim neutral hexes on arrival. Soldiers are correctly blocked from auto-claiming (matching player rules), but there's **no follow-up step** where AI soldiers spend action points to claim or extort.
+2. **No AI extortion phase exists at all** — the only extortion logic is for player capo auto-extort on arrival. AI never explicitly runs an extort action.
 
-### 1. Capo 2-hex scout range broken — `processScout` (line 1167)
-The unit selection code correctly shows 2-hex range targets for capos (line 883: `scoutRange = unitType === 'capo' ? 2 : 1`). But `processScout` at line 1167 hard-checks `if (dist !== 1) return prev;` — silently rejecting any target beyond 1 hex. Capos can see the highlighted hexes but clicking them does nothing.
+The AI movement loop exhausts tactical actions, then jumps straight to capo deployment and promotion — skipping the "Action Phase" entirely.
 
-**Fix**: Change the distance check to respect capo range:
-```typescript
-const maxRange = unit.type === 'capo' ? 2 : 1;
-if (dist < 1 || dist > maxRange) return prev;
+## Fix — Add AI Action Phase After Movement
+
+### `src/hooks/useEnhancedMafiaGameState.ts` (~after line 2778)
+
+Insert a new **AI Action Phase** block after the movement loop, before capo deployment. This uses the `aiActionsRemaining` budget (2-3 points) that may still have remaining points.
+
+**AI Claim Logic** (soldiers on neutral unclaimed hexes):
+```
+for each AI soldier on a neutral hex they don't own:
+  if aiActionsRemaining > 0 and hex has no business:
+    claim the hex (set controllingFamily = fam)
+    aiActionsRemaining--
 ```
 
-### 2. Boss panel scroll area too small + potentially blocked
-The deployed units list has `max-h-32` (128px ≈ 3 items) and businesses `max-h-36` (144px). With many units this is very cramped. The parent `motion.div` has `overflow-hidden` which may clip the scrollbar.
+**AI Extort Logic** (units on neutral hexes with completed businesses):
+```
+for each AI unit on a neutral hex with a completed business:
+  if aiActionsRemaining > 0:
+    claim territory + collect extortion payout
+    aiActionsRemaining--
+    (same payout formula as player: legal=$1500, illegal=$3000, scaled by respect)
+```
 
-**Fix**:
-- Increase scroll areas: units to `max-h-48`, businesses to `max-h-48`
-- The outer HQ panel already has `max-h-[calc(100vh-2rem)] overflow-y-auto` (line 143), so the whole panel scrolls if content exceeds viewport — this is fine
+**AI Extort Enemy Logic** (units on/adjacent to enemy hex with business):
+```
+for each AI unit adjacent to an enemy hex with a business:
+  if aiActionsRemaining > 0 and random < personality aggression threshold:
+    attempt extortion (success chance ~50% + modifiers)
+    aiActionsRemaining--
+```
+
+### Priority order within the action phase:
+1. Extort neutral businesses (free money + territory)
+2. Claim empty neutral hexes (free territory)
+3. Extort enemy businesses (risky but profitable)
 
 ## Files Modified
-- `src/hooks/useEnhancedMafiaGameState.ts` — fix capo scout range check in `processScout`
-- `src/components/HeadquartersInfoPanel.tsx` — increase scroll area heights for boss overview lists
+- `src/hooks/useEnhancedMafiaGameState.ts` — add AI action phase with claim and extort logic after movement loop
 
