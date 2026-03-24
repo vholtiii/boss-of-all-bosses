@@ -4550,7 +4550,7 @@ export const useEnhancedMafiaGameState = (
     // Permanently destroy the business
     const destroyedType = tile.business.type;
     const destroyedIncome = tile.business.income;
-    tile.business = null as any;
+    tile.business = undefined;
 
     // Increase police heat (+15)
     state.policeHeat.level = Math.min(100, state.policeHeat.level + 15);
