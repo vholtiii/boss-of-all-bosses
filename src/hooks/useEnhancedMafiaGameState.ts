@@ -977,6 +977,12 @@ export const useEnhancedMafiaGameState = (
       );
       if (!unit) return prev;
 
+// ============ HEX FORTIFICATION HELPERS ============
+const isHexFortified = (fortifiedHexes: FortifiedHex[], q: number, r: number, s: number, family: string): boolean =>
+  (fortifiedHexes || []).some(f => f.q === q && f.r === r && f.s === s && f.family === family);
+
+const isHexFortifiedAny = (fortifiedHexes: FortifiedHex[], q: number, r: number, s: number): boolean =>
+  (fortifiedHexes || []).some(f => f.q === q && f.r === r && f.s === s);
 
       // Tactical phase: only tactical actions (scout, fortify, safehouse, escort) — no regular movement
       if (prev.turnPhase === 'move') {
