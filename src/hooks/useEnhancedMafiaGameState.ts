@@ -2777,6 +2777,78 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
+      // ── AI ACTION PHASE: CLAIM & EXTORT ──
+      // Priority 1: Extort neutral hexes with completed businesses (free money + territory)
+      const aiUnitsForActions = state.deployedUnits.filter(u => u.family === fam);
+      for (const unit of aiUnitsForActions) {
+        if (aiActionsRemaining <= 0) break;
+        const tile = state.hexMap.find(t => t.q === unit.q && t.r === unit.r && t.s === unit.s);
+        if (!tile) continue;
+        
+        if (tile.controllingFamily === 'neutral' && tile.business && 
+            (tile.business.constructionProgress === undefined || tile.business.constructionProgress >= (tile.business.constructionGoal || 3))) {
+          // Extort neutral business: claim territory + collect payout
+          tile.controllingFamily = fam;
+          const basePayout = tile.business.isLegal ? 1500 : 3000;
+          const respectMult = 0.5 + (opponent.resources.influence || 50) / 100;
+          const payout = Math.round(basePayout * respectMult);
+          opponent.resources.money += payout;
+          aiActionsRemaining--;
+          
+          // Update soldier stats
+          const stats = state.soldierStats[unit.id];
+          if (stats) {
+            stats.racketeering = Math.min(100, (stats.racketeering || 0) + 3);
+            stats.loyalty = Math.min(100, stats.loyalty + 1);
+          }
+        }
+      }
+
+      // Priority 2: Claim empty neutral hexes
+      for (const unit of aiUnitsForActions) {
+        if (aiActionsRemaining <= 0) break;
+        const tile = state.hexMap.find(t => t.q === unit.q && t.r === unit.r && t.s === unit.s);
+        if (!tile) continue;
+        
+        if (tile.controllingFamily === 'neutral' && !tile.business && !tile.isHeadquarters) {
+          tile.controllingFamily = fam;
+          aiActionsRemaining--;
+        }
+      }
+
+      // Priority 3: Extort enemy businesses (aggressive AI only)
+      const aggressionThreshold = personality === 'aggressive' ? 0.6 : personality === 'opportunistic' ? 0.4 : 0.2;
+      for (const unit of aiUnitsForActions) {
+        if (aiActionsRemaining <= 0) break;
+        const tile = state.hexMap.find(t => t.q === unit.q && t.r === unit.r && t.s === unit.s);
+        if (!tile) continue;
+        
+        // Check adjacent enemy hexes with businesses
+        const adjacentEnemyBiz = state.hexMap.filter(t => {
+          const dist = Math.max(Math.abs(t.q - unit.q), Math.abs(t.r - unit.r), Math.abs(t.s - unit.s));
+          return dist === 1 && t.controllingFamily !== fam && t.controllingFamily !== 'neutral' &&
+                 t.business && (t.business.constructionProgress === undefined || t.business.constructionProgress >= (t.business.constructionGoal || 3));
+        });
+        
+        for (const enemyTile of adjacentEnemyBiz) {
+          if (aiActionsRemaining <= 0) break;
+          if (Math.random() > aggressionThreshold) continue;
+          
+          // Attempt extortion: ~50% base chance
+          const successChance = 0.5 + (opponent.resources.influence || 50) / 1000;
+          if (Math.random() < successChance) {
+            const basePayout = enemyTile.business!.isLegal ? 1500 : 3000;
+            const payout = Math.round(basePayout * 0.7); // Enemy extortion pays less
+            opponent.resources.money += payout;
+            
+            if (enemyTile.controllingFamily === state.playerFamily && turnReport) {
+              turnReport.aiActions.push({ family: fam, action: 'extort', detail: `Extorted your business in ${enemyTile.district} for $${payout.toLocaleString()}` });
+            }
+          }
+          aiActionsRemaining--;
+        }
+      }
+
       // ── DEPLOY CAPO ──
       const caposAtHQ = state.deployedUnits.filter(u =>
         u.family === fam && u.type === 'capo' && u.q === hq.q && u.r === hq.r && u.s === hq.s
