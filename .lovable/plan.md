@@ -1,63 +1,42 @@
 
 
-# Dead Code Analysis
+# Balance & Bug Fix Plan — Simulation Findings
 
-## Findings
+## Critical Issues Found (6-turn simulation)
 
-The main game runs at `/` using `UltimateMafiaGame.tsx` with `useEnhancedMafiaGameState`. There are two legacy game versions (`/classic` and `/enhanced`) that are still routed but use an entirely separate, outdated state system. This creates a large tree of dead/orphaned code.
+### Issue 1: Player Bankruptcy by Turn 5
+Player loses $18,516/turn (costs $18,750, revenue $234). Six starting soldiers have enormous maintenance while generating almost no income. The game is unplayable without immediately extorting on turn 1.
 
-### Category 1: Legacy Pages & Their Exclusive Dependencies (largest impact)
+**Fix**: Reduce base soldier maintenance cost. Currently soldiers cost ~$3,125 each per turn — this needs to be closer to $500-800/turn so a passive player can survive 10+ turns. Check the maintenance calculation in `useEnhancedMafiaGameState.ts`.
 
-These files are only used by the old `/classic` and `/enhanced` routes — not the main game:
+### Issue 2: AI Soldier Count Shows 0 in Sidebar
+Right panel shows "Soldiers: 0" for all AI families despite them clearly having units (they fight, claim territory, earn income). This is a display bug in the rival family info section.
 
-| File | Used By | Status |
-|------|---------|--------|
-| `src/pages/Index.tsx` | `/classic` route only | Dead |
-| `src/pages/EnhancedIndex.tsx` | `/enhanced` route only | Dead |
-| `src/hooks/useMafiaGameState.ts` (817 lines) | Index + EnhancedIndex only | Dead — entirely separate state system |
-| `src/components/MafiaHexGrid.tsx` | Index only | Dead — replaced by `EnhancedMafiaHexGrid` |
-| `src/components/MafiaHud.tsx` | Index + EnhancedIndex only | Dead |
-| `src/components/BusinessManagement.tsx` | MafiaHud only | Dead |
-| `src/components/LegalSystem.tsx` | MafiaHud only | Dead |
-| `src/components/PoliceSystem.tsx` | MafiaHud only | Dead |
-| `src/components/ReputationPanel.tsx` | Index + EnhancedIndex only | Dead |
-| `src/components/IntelligencePanel.tsx` | Index + EnhancedIndex only | Dead |
+**Fix**: In `GameSidePanels.tsx` or `UltimateMafiaGame.tsx`, the soldier count being passed to the rival family display is likely reading from the wrong field or not counting deployed units.
 
-### Category 2: Standalone Unused Systems
+### Issue 3: No Bankruptcy Consequences
+Player money goes to -$32K with no penalty beyond loyalty drain. There should be consequences — soldier desertion, inability to act, or a game-over warning.
 
-| File | Status |
-|------|--------|
-| `src/systems/SoldierRecruitmentSystem.ts` | Never imported anywhere — entire class is dead |
-| `src/components/CombatInterface.tsx` | Never imported anywhere |
-| `src/components/SoldierRecruitmentInterface.tsx` | Never imported anywhere |
-| `src/components/EnhancedGameMechanics.tsx` | Never imported anywhere |
+**Fix**: Add a bankruptcy check at end-of-turn: if money < 0, random soldiers desert (1 per $10K in debt), and player gets a warning notification. If money < -$50K, game over.
 
-### Category 3: Unused Types (partial)
+### Issue 4: AI Territory Expansion Too Slow
+AI reaches only 5-7% territory by turn 6. At this rate, the 60-hex (18%) territory victory would take 30+ turns. AI needs to claim more aggressively in early turns.
 
-Many types in `src/types/enhanced-mechanics.ts` (Mission, WeatherSystem, TechnologySystem, SeasonalEvent, EconomySystem) are imported in `useEnhancedMafiaGameState` but the corresponding systems have no actual gameplay implementation — they exist as state fields but no UI or logic uses them meaningfully.
+**Fix**: Increase AI action budget or make AI prioritize claiming adjacent neutral hexes more aggressively in early game (turns 1-8). Currently AI may be spending actions suboptimally.
 
-## Proposed Cleanup
+### Issue 5: Starting Income Too Low
+$234/turn from HQ alone is negligible. Player needs immediate territory/business income to survive.
 
-### Step 1 — Remove legacy routes from `App.tsx`
-Delete the `/classic` and `/enhanced` routes and their imports.
+**Fix**: Either give player 2-3 starting territories with businesses, or significantly reduce maintenance so the player has time to expand.
 
-### Step 2 — Delete dead files (14 files, ~3000+ lines)
-- `src/pages/Index.tsx`
-- `src/pages/EnhancedIndex.tsx`
-- `src/hooks/useMafiaGameState.ts`
-- `src/components/MafiaHexGrid.tsx`
-- `src/components/MafiaHud.tsx`
-- `src/components/BusinessManagement.tsx`
-- `src/components/LegalSystem.tsx`
-- `src/components/PoliceSystem.tsx`
-- `src/components/ReputationPanel.tsx`
-- `src/components/IntelligencePanel.tsx`
-- `src/systems/SoldierRecruitmentSystem.ts`
-- `src/components/CombatInterface.tsx`
-- `src/components/SoldierRecruitmentInterface.tsx`
-- `src/components/EnhancedGameMechanics.tsx`
+## Proposed Priority Order
+1. Fix maintenance costs (game-breaking)
+2. Fix AI soldier display bug (misleading)
+3. Add bankruptcy mechanic (game integrity)
+4. Boost AI expansion rate (game pacing)
 
-### Files Modified
-- `src/App.tsx` — remove 2 route entries + 2 imports
-- 14 files deleted
+## Files to Modify
+- `src/hooks/useEnhancedMafiaGameState.ts` — maintenance calculation, bankruptcy logic, AI expansion rate
+- `src/components/GameSidePanels.tsx` — AI soldier count display
+- `src/pages/UltimateMafiaGame.tsx` — rival family data wiring
 
