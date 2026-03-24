@@ -4277,108 +4277,32 @@ export const useEnhancedMafiaGameState = (
       switch (action.type) {
         case 'build_legal':
         case 'build_illegal':
-          if (action.businessType) {
-            const hasOfficerBribe = newState.policeHeat.bribedOfficials.some((o: any) => o.permissions.includes('run_prostitution'));
-            const hasCaptainBribe = newState.policeHeat.bribedOfficials.some((o: any) => o.permissions.includes('run_gambling') || o.permissions.includes('run_loan_sharking'));
-            
-            if (action.businessType === 'prostitution' && !hasOfficerBribe) {
-              newState.pendingNotifications = [...newState.pendingNotifications, {
-                type: 'warning' as const, title: '🚫 Need Police Protection',
-                message: 'You need to bribe a police officer before running prostitution businesses.',
-              }];
-              return newState;
-            }
-            if ((action.businessType === 'gambling' || action.businessType === 'loan_sharking') && !hasCaptainBribe) {
-              newState.pendingNotifications = [...newState.pendingNotifications, {
-                type: 'warning' as const, title: '🚫 Need Police Protection',
-                message: 'You need to bribe a captain before running gambling/loan sharking businesses.',
-              }];
-              return newState;
-            }
-            
-            const costs: Record<string, number> = {
-              restaurant: 25000, laundromat: 15000, casino: 50000, construction: 40000,
-              drug_trafficking: 30000, gambling: 20000, prostitution: 15000, loan_sharking: 10000
-            };
-            
-            const cost = costs[action.businessType];
-            if (newState.resources.money >= cost) {
-              const names = businessNames[action.businessType] || ['Unknown Business'];
-              const newBusiness = {
-                id: `${action.businessType}_${Date.now()}`,
-                name: names[Math.floor(Math.random() * names.length)],
-                type: action.type === 'build_legal' ? 'legal' as const : 'illegal' as const,
-                category: action.businessType,
-                level: 1,
-                monthlyIncome: action.type === 'build_legal' ? Math.floor(cost * 0.15) : Math.floor(cost * 0.25),
-                monthlyExpenses: Math.floor(cost * 0.05),
-                launderingCapacity: action.type === 'build_legal' ? Math.floor(cost * 0.1) : 0,
-                extortionRate: 0,
-                isExtorted: false,
-                district: districts[Math.floor(Math.random() * districts.length)],
-                heatLevel: action.type === 'build_illegal' ? 15 : 5
-              };
-              
-              if (action.type === 'build_illegal') {
-                newState.policeHeat.level += Math.floor(Math.random() * 10) + 5;
-              }
-              
-              newState.businesses = [...newState.businesses, newBusiness];
-              newState.resources.money -= cost;
-              newState.resources.respect += 2;
-              
-              newState.pendingNotifications = [...newState.pendingNotifications, {
-                type: 'success' as const, title: '🏢 Business Established',
-                message: `${newBusiness.name} is now operational in ${newBusiness.district}.`,
-              }];
-            }
-          }
+          // Legacy business building removed — use hex-based build_business action instead
+          newState.pendingNotifications = [...newState.pendingNotifications, {
+            type: 'warning' as const, title: '🏢 Use Map to Build',
+            message: 'Use the Build Business action on claimed territory instead.',
+          }];
           break;
 
         case 'upgrade':
-          if (action.businessId) {
-            const business = newState.businesses.find((b: any) => b.id === action.businessId);
-            if (business && business.level < 5) {
-              const upgradeCost = business.level * 15000;
-              if (newState.resources.money >= upgradeCost) {
-                business.level += 1;
-                business.monthlyIncome = Math.floor(business.monthlyIncome * 1.4);
-                business.launderingCapacity = Math.floor(business.launderingCapacity * 1.3);
-                newState.resources.money -= upgradeCost;
-                newState.pendingNotifications = [...newState.pendingNotifications, {
-                  type: 'success' as const, title: '⬆️ Business Upgraded',
-                  message: `${business.name} upgraded to level ${business.level}.`,
-                }];
-              }
-            }
-          }
-          break;
-
         case 'extort':
-          if (action.businessId) {
-            const business = newState.businesses.find((b: any) => b.id === action.businessId);
-            if (business && !business.isExtorted) {
-              business.isExtorted = true;
-              business.extortionRate = newState.resources.respect >= 50 ? 0.5 : 0.25;
-              newState.resources.respect += 3;
-              newState.pendingNotifications = [...newState.pendingNotifications, {
-                type: 'success' as const, title: '💰 Protection Racket',
-                message: `${business.name} is now paying ${business.extortionRate * 100}% protection money.`,
-              }];
-            }
-          }
+        case 'collect':
+          // Legacy business actions removed — hex-based system handles these
           break;
 
         case 'launder': {
-          const totalLaunderingCapacity = newState.businesses
-            .filter((b: any) => b.type === 'legal')
-            .reduce((sum: number, b: any) => sum + b.launderingCapacity, 0);
-          
+          // Laundering: convert dirty money to clean via legal hex businesses
+          const legalHexBusinesses = Object.values(newState.hexMap).filter(
+            (t: any) => t.controllingFamily === newState.playerFamily && t.business?.isLegal
+          );
+          const totalLaunderingCapacity = legalHexBusinesses.reduce(
+            (sum: number, t: any) => sum + Math.floor((t.business?.income || 0) * 0.5), 0
+          );
           const amountToLaunder = Math.min(newState.finances.dirtyMoney, totalLaunderingCapacity);
           if (amountToLaunder > 0) {
             newState.finances.dirtyMoney -= amountToLaunder;
             newState.finances.cleanMoney += amountToLaunder;
-            newState.resources.money += amountToLaunder;
+            // Do NOT add to resources.money — income already added by processEconomy
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'success' as const, title: '🧺 Money Laundered',
               message: `$${amountToLaunder.toLocaleString()} has been cleaned through your legal businesses.`,
@@ -4386,28 +4310,13 @@ export const useEnhancedMafiaGameState = (
           } else {
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'warning' as const, title: '🧺 Nothing to Launder',
-              message: totalLaunderingCapacity === 0 
-                ? 'You need legal businesses to launder money.' 
+              message: totalLaunderingCapacity === 0
+                ? 'You need legal businesses on your territory to launder money.'
                 : 'No dirty money to launder.',
             }];
           }
           break;
         }
-
-        case 'collect':
-          if (action.businessId) {
-            const business = newState.businesses.find((b: any) => b.id === action.businessId);
-            if (business && business.type === 'illegal') {
-              const profit = business.monthlyIncome - business.monthlyExpenses;
-              newState.finances.dirtyMoney += profit;
-              newState.resources.respect += 1;
-              newState.pendingNotifications = [...newState.pendingNotifications, {
-                type: 'success' as const, title: '💵 Profits Collected',
-                message: `$${profit.toLocaleString()} in dirty money collected from ${business.name}.`,
-              }];
-            }
-          }
-          break;
 
         case 'hire_lawyer':
           if (action.lawyerId) {
@@ -4417,9 +4326,8 @@ export const useEnhancedMafiaGameState = (
               { id: 'prestigious_firm', name: 'Goldman & Associates', tier: 'prestigious' as const, monthlyFee: 15000, skillLevel: 85, specialties: ['tax_evasion' as const, 'money_laundering' as const, 'racketeering' as const] },
               { id: 'elite_counsel', name: 'Clarence "The Fixer" Mitchell', tier: 'elite' as const, monthlyFee: 35000, skillLevel: 95, specialties: ['murder' as const, 'drug_trafficking' as const, 'racketeering' as const, 'money_laundering' as const] }
             ];
-            
             const lawyer = availableLawyers.find(l => l.id === action.lawyerId);
-            if (lawyer && (lawyer.monthlyFee === 0 || newState.finances.legalProfit >= lawyer.monthlyFee)) {
+            if (lawyer) {
               newState.legalStatus.lawyer = lawyer;
               newState.legalStatus.totalLegalCosts = lawyer.monthlyFee;
               newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -4443,53 +4351,12 @@ export const useEnhancedMafiaGameState = (
           break;
 
         case 'bribe_official':
-          if (action.officialId) {
-            const availableOfficials = [
-              { id: 'officer_murphy', rank: 'officer' as const, name: 'Officer Murphy', monthlyBribe: 2000, heatReduction: 1, permissions: ['run_prostitution'], territory: 'Brooklyn' },
-              { id: 'sergeant_kowalski', rank: 'sergeant' as const, name: 'Sergeant Kowalski', monthlyBribe: 5000, heatReduction: 2, permissions: ['patrol_protection'], territory: 'Queens' },
-              { id: 'captain_rodriguez', rank: 'captain' as const, name: 'Captain Rodriguez', monthlyBribe: 12000, heatReduction: 4, permissions: ['run_gambling', 'run_loan_sharking'], territory: 'Manhattan' },
-              { id: 'chief_sullivan', rank: 'chief' as const, name: 'Chief Sullivan', monthlyBribe: 30000, heatReduction: 8, permissions: ['rival_intelligence'], territory: 'NYPD HQ' },
-              { id: 'mayor_thompson', rank: 'mayor' as const, name: 'Mayor Thompson', monthlyBribe: 75000, heatReduction: 15, permissions: ['shutdown_rivals'], territory: 'City Hall' }
-            ];
-            
-            const official = availableOfficials.find(o => o.id === action.officialId);
-            if (official && !newState.policeHeat.bribedOfficials.some((b: any) => b.id === official.id)) {
-              if (official.rank === 'mayor') {
-                if (newState.finances.cleanMoney >= official.monthlyBribe) {
-                  newState.finances.cleanMoney -= official.monthlyBribe;
-                  newState.policeHeat.bribedOfficials = [...newState.policeHeat.bribedOfficials, official];
-                  newState.policeHeat.reductionPerTurn += official.heatReduction;
-                  newState.resources.respect += 2;
-                }
-              } else {
-                const totalMoney = newState.finances.cleanMoney + newState.finances.dirtyMoney;
-                if (totalMoney >= official.monthlyBribe) {
-                  if (newState.finances.dirtyMoney >= official.monthlyBribe) {
-                    newState.finances.dirtyMoney -= official.monthlyBribe;
-                  } else {
-                    const remainingCost = official.monthlyBribe - newState.finances.dirtyMoney;
-                    newState.finances.dirtyMoney = 0;
-                    newState.finances.cleanMoney -= remainingCost;
-                  }
-                  newState.policeHeat.bribedOfficials = [...newState.policeHeat.bribedOfficials, official];
-                  newState.policeHeat.reductionPerTurn += official.heatReduction;
-                  newState.resources.respect += 2;
-                }
-              }
-            }
-          }
-          break;
-
         case 'stop_bribe':
-          if (action.officialId) {
-            const officialIndex = newState.policeHeat.bribedOfficials.findIndex((o: any) => o.id === action.officialId);
-            if (officialIndex !== -1) {
-              const official = newState.policeHeat.bribedOfficials[officialIndex];
-              newState.policeHeat.reductionPerTurn -= official.heatReduction;
-              newState.policeHeat.bribedOfficials = newState.policeHeat.bribedOfficials.filter((_: any, i: number) => i !== officialIndex);
-              newState.policeHeat.level += 10;
-            }
-          }
+          // Legacy bribe system removed — use Corruption panel (activeBribes) instead
+          newState.pendingNotifications = [...newState.pendingNotifications, {
+            type: 'warning' as const, title: '🚫 Use Corruption Panel',
+            message: 'Use the Corruption panel to bribe officials.',
+          }];
           break;
 
         case 'rival_info':
@@ -4500,7 +4367,8 @@ export const useEnhancedMafiaGameState = (
           break;
 
         case 'shutdown_rival':
-          if (action.rivalFamily && newState.policeHeat.bribedOfficials.some((o: any) => o.permissions.includes('shutdown_rivals'))) {
+          // Check activeBribes for mayor-tier bribe instead of legacy system
+          if (action.rivalFamily && (newState.activeBribes || []).some((b: any) => b.tier === 'mayor' && b.active)) {
             const rivalFamily = action.rivalFamily as keyof typeof newState.familyControl;
             if (newState.familyControl[rivalFamily] !== undefined) {
               newState.familyControl[rivalFamily] = Math.max(0, newState.familyControl[rivalFamily] - 5);
