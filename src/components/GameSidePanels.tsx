@@ -667,7 +667,7 @@ export const RightSidePanel: React.FC<{
         <CollapsibleSection
           title="Rival Families"
           icon={<Skull className="h-4 w-4" />}
-          isOpen={openSections.has('rivals')}
+          isOpen={openSection === 'rivals'}
           onToggle={() => toggle('rivals')}
         >
           <div className="space-y-2">
