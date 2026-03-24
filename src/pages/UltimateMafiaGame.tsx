@@ -616,7 +616,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             {/* Tactical action description panel */}
             <div className="bg-background/80 rounded-lg px-3 py-2 border border-noir-light text-xs text-muted-foreground max-w-md">
               {gameState.selectedMoveAction === 'scout' && (
-                <p><span className="text-foreground font-semibold">👁️ Scout:</span> Select a soldier, then click an adjacent enemy hex to reveal unit count and fortification status for 3 turns.</p>
+                <p><span className="text-foreground font-semibold">👁️ Scout:</span> Select a soldier or capo, then click an enemy hex to reveal intel for 3 turns. Soldiers scout 1 hex away, Capos scout up to 2 hexes away.</p>
               )}
               {gameState.selectedMoveAction === 'fortify' && (
                 <p><span className="text-foreground font-semibold">🛡️ Fortify:</span> Click any unit to fortify it — grants +25% defense and 50% casualty reduction. Persists until the unit moves.</p>

@@ -979,7 +979,7 @@ export const useEnhancedMafiaGameState = (
       const moveAction = prev.selectedMoveAction || 'move';
 
       // Handle scout action (tactical phase only)
-      if (prev.turnPhase === 'move' && moveAction === 'scout' && unit.type === 'soldier') {
+      if (prev.turnPhase === 'move' && moveAction === 'scout' && (unit.type === 'soldier' || unit.type === 'capo')) {
         if (prev.tacticalActionsRemaining <= 0) return prev;
         const result = processScout(prev, unit, targetLocation);
         return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
