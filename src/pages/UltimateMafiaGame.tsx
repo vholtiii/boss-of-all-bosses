@@ -927,36 +927,67 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
 
       {/* Negotiation Dialog */}
       {negotiationState && (() => {
-        const tile = gameState.hexMap.find((t: any) => t.q === negotiationState.targetQ && t.r === negotiationState.targetR && t.s === negotiationState.targetS);
-        const capo = gameState.deployedUnits.find((u: any) => u.id === negotiationState.capoId);
-        if (!tile || !capo) return null;
-        const enemyFamily = tile.controllingFamily;
-        const enemyUnitsOnHex = gameState.deployedUnits.filter((u: any) => u.family === enemyFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s);
-        return (
-          <NegotiationDialog
-            open={negotiationState.open}
-            onClose={() => setNegotiationState(null)}
-            onNegotiate={(type, extraData) => {
-              performAction({
-                type: 'negotiate',
-                negotiationType: type,
-                targetQ: negotiationState.targetQ,
-                targetR: negotiationState.targetR,
-                targetS: negotiationState.targetS,
-                capoId: negotiationState.capoId,
-                extraData,
-              });
-              setNegotiationState(null);
-            }}
-            capoName={capo.name || 'Capo'}
-            capoPersonality={capo.personality || 'diplomat'}
-            enemyFamily={enemyFamily}
-            playerReputation={gameState.reputation.respect}
-            playerMoney={gameState.resources.money}
-            enemyStrength={enemyUnitsOnHex.length}
-            hexIncome={tile.business?.income || 0}
-          />
-        );
+        if (negotiationState.scope === 'territory') {
+          const tile = gameState.hexMap.find((t: any) => t.q === negotiationState.targetQ && t.r === negotiationState.targetR && t.s === negotiationState.targetS);
+          const capo = gameState.deployedUnits.find((u: any) => u.id === negotiationState.capoId);
+          if (!tile || !capo) return null;
+          const enemyFamily = tile.controllingFamily;
+          const enemyUnitsOnHex = gameState.deployedUnits.filter((u: any) => u.family === enemyFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+          return (
+            <NegotiationDialog
+              open={negotiationState.open}
+              onClose={() => setNegotiationState(null)}
+              scope="territory"
+              negotiationUsedThisTurn={(gameState as any).negotiationUsedThisTurn || false}
+              onNegotiate={(type, extraData) => {
+                performAction({
+                  type: 'negotiate',
+                  negotiationType: type,
+                  targetQ: negotiationState.targetQ,
+                  targetR: negotiationState.targetR,
+                  targetS: negotiationState.targetS,
+                  capoId: negotiationState.capoId,
+                  extraData,
+                });
+                setNegotiationState(null);
+              }}
+              capoName={capo.name || 'Capo'}
+              capoPersonality={capo.personality || 'diplomat'}
+              enemyFamily={enemyFamily}
+              playerReputation={gameState.reputation.respect}
+              playerMoney={gameState.resources.money}
+              enemyStrength={enemyUnitsOnHex.length}
+              hexIncome={tile.business?.income || 0}
+            />
+          );
+        } else {
+          // Boss (family-level) negotiation
+          const enemyFamilies = gameState.aiOpponents.map((o: any) => o.family).filter((f: string) => !(gameState as any).eliminatedFamilies?.includes(f));
+          const targetFam = negotiationState.targetFamily || enemyFamilies[0] || '';
+          return (
+            <NegotiationDialog
+              open={negotiationState.open}
+              onClose={() => setNegotiationState(null)}
+              scope="family"
+              negotiationUsedThisTurn={(gameState as any).negotiationUsedThisTurn || false}
+              onNegotiate={(type, extraData) => {
+                performAction({
+                  type: 'boss_negotiate',
+                  negotiationType: type,
+                  targetFamily: targetFam,
+                  extraData,
+                });
+                setNegotiationState(null);
+              }}
+              enemyFamily={targetFam}
+              playerReputation={gameState.reputation.respect}
+              playerMoney={gameState.resources.money}
+              enemyStrength={0}
+              hexIncome={0}
+              availableEnemyFamilies={enemyFamilies}
+            />
+          );
+        }
       })()}
 
       {/* Sound Settings */}
