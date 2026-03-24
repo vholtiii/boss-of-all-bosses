@@ -3535,6 +3535,19 @@ export const useEnhancedMafiaGameState = (
       for (const hit of state.aiPlannedHits) {
         hit.turnsRemaining -= 1;
         if (hit.turnsRemaining <= 0) {
+          // Safety net: check if pact is now active (formed after hit was planned)
+          const hitCeasefire = (state.ceasefires || []).some(p => p.family === hit.family && p.active);
+          const hitAlliance = (state.alliances || []).some(p => p.alliedFamily === hit.family && p.active);
+          if (hitCeasefire || hitAlliance) {
+            const pactType = hitCeasefire ? 'ceasefire' : 'alliance';
+            state.pendingNotifications.push({
+              type: 'info' as const,
+              title: '🕊️ Hit Called Off',
+              message: `The ${hit.family} family stood down from a planned hit — ${pactType} in effect.`,
+            });
+            continue; // skip execution, don't keep
+          }
+
           // Execute the hit
           const targetUnit = state.deployedUnits.find(u => u.id === hit.targetUnitId);
           if (targetUnit) {
@@ -3557,6 +3570,13 @@ export const useEnhancedMafiaGameState = (
               });
               if (turnReport) turnReport.aiActions.push({ family: hit.family, action: 'assassination_failed', detail: 'Failed assassination attempt on player capo' });
             }
+          } else {
+            // Target unit gone — notify player
+            state.pendingNotifications.push({
+              type: 'info' as const,
+              title: '🔫 Hit Abandoned',
+              message: `The ${hit.family} family abandoned a planned hit — the target could not be found.`,
+            });
           }
           // Hit executed or target gone — don't keep
         } else {
