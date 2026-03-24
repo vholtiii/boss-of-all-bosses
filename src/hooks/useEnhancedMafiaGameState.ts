@@ -3472,6 +3472,7 @@ export const useEnhancedMafiaGameState = (
               state.eliminatedFamilies = [...(state.eliminatedFamilies || []), victimFamily];
               state.deployedUnits = state.deployedUnits.filter(u => u.family !== victimFamily);
               state.hexMap.forEach(t => { if (t.controllingFamily === victimFamily && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
+              state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => f.family !== victimFamily);
               state.aiOpponents = state.aiOpponents.filter(o => o.family !== victimFamily);
               opponent.resources.money += 25000;
               state.pendingNotifications.push({
