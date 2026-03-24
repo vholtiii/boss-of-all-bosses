@@ -750,7 +750,17 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             ⚖️ {a.alliedFamily.charAt(0).toUpperCase() + a.alliedFamily.slice(1)} ({a.turnsRemaining}t)
           </span>
         ))}
-        {(!gameState.ceasefires?.length && !gameState.alliances?.length) && (
+        {(gameState as any).shareProfitsPacts?.filter((p: any) => p.active).map((p: any) => (
+          <span key={p.id} className="px-2 py-0.5 rounded-full bg-green-500/20 border border-green-500/30 text-green-400">
+            💰 {p.targetFamily.charAt(0).toUpperCase() + p.targetFamily.slice(1)} ({p.turnsRemaining}t)
+          </span>
+        ))}
+        {(gameState as any).safePassagePacts?.filter((p: any) => p.active).map((p: any) => (
+          <span key={p.id} className="px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-400">
+            🛤️ {p.targetFamily.charAt(0).toUpperCase() + p.targetFamily.slice(1)} ({p.turnsRemaining}t)
+          </span>
+        ))}
+        {(!gameState.ceasefires?.length && !gameState.alliances?.length && !(gameState as any).shareProfitsPacts?.length && !(gameState as any).safePassagePacts?.length) && (
           <span className="text-muted-foreground font-playfair italic">"Strategy Rules the Underworld"</span>
         )}
       </div>
