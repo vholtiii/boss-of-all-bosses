@@ -2729,7 +2729,15 @@ export const useEnhancedMafiaGameState = (
             createdTurn: state.turn,
           });
           opponent.resources.money -= SAFEHOUSE_COST;
-          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'safehouse', detail: `Established a safehouse in ${bestHex.district}` });
+          if (turnReport) {
+            const hasIntel = state.scoutedHexes.some(s => s.q === bestHex.q && s.r === bestHex.r && s.s === bestHex.s) ||
+              (state.activeBribes || []).some(b => b.target === 'police_captain');
+            if (hasIntel) {
+              turnReport.aiActions.push({ family: fam, action: 'safehouse', detail: `Established a safehouse in ${bestHex.district}` });
+            } else {
+              turnReport.aiActions.push({ family: fam, action: 'unknown', detail: 'Expanded operations in an unknown area' });
+            }
+          }
         }
       }
 
