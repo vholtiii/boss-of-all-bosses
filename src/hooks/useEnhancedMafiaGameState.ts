@@ -3319,7 +3319,7 @@ export const useEnhancedMafiaGameState = (
             newState.resources.soldiers += 1;
             newState.tacticalActionsRemaining -= 1;
             // Mercenary loyalty penalty
-            newState.reputation.loyalty = Math.max(0, newState.reputation.loyalty - 3);
+            newState.reputation.loyalty = Math.max(0, newState.reputation.loyalty - 10);
             // Deploy mercenary at HQ
             const hq = newState.headquarters[newState.playerFamily];
             if (hq) {
