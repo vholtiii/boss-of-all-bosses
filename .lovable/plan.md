@@ -1,45 +1,82 @@
 
 
-# Fix All 5 Code Review Issues
+# Code Review + 3-Game Simulation Plan
 
-## 1. Delete `src/systems/CombatSystem.ts`
-Remove the entire file — 590 lines of dead code. No imports reference it anywhere.
+## Code Review — Grade: B+
 
-## 2. Fix Colombo Family Bonuses
-**File**: `src/types/game-mechanics.ts` (lines 139-145)
+### Issues Found
 
-Colombo shouldn't have `combatBonus: 20`. Per lore, Colombo is the smallest, scrappiest family — their bonuses should lean toward survival/recruitment, not raw combat power.
+**1. Respect Sync Still Broken in 4 Places** (Bug — High Priority)
+The `syncRespect` helper was added but not used everywhere. These 4 locations write to `resources.respect` or `reputation.respect` directly, causing drift:
+- **Line 1269**: Capo auto-extort in `moveUnit` — writes `resources.respect` only
+- **Line 1685**: Capo auto-extort in `deployUnit` — writes `resources.respect` only  
+- **Line 3777**: Plan Hit failure in `endTurn` — writes `resources.respect` only
+- **Line 4515**: `shutdown_rival` action — writes `resources.respect` only
+- **Line 5484**: Extortion failure — writes `reputation.respect` only (misses `resources.respect`)
 
-Change:
-- `combatBonus: 20` → `combatBonus: 0`
-- `income: 0` → `income: 20` (scrappy income generation to compensate)
-- Keep `recruitmentDiscount: 15` and `fearGeneration: 15` as-is (thematic fit)
+**2. `combat` Field is Dead Weight** (Cleanup — Medium)
+`state.combat: CombatSystem` (lines 262, 631-639) is initialized with empty data and never read or written anywhere in the codebase. All actual combat is handled inline in `processTerritoryHit`. The `CombatSystem` type from `enhanced-mechanics.ts` is only used for this dead field. Remove it from state and initial state.
 
-## 3. Enforce Safe Passage in Combat
-**File**: `src/hooks/useEnhancedMafiaGameState.ts` — `processTerritoryHit` (~line 4944)
+**3. Empty `src/systems/` Directory** (Cleanup — Low)
+The `CombatSystem.ts` file was deleted but the directory remains empty. Delete it.
 
-After the ceasefire/alliance check, add a safe passage check:
-- If `safePassagePacts` has an active pact with the target hex's controlling family, block the attack
-- If the player attacks anyway (shouldn't reach this, but safety), auto-violate: remove pact, -15 respect, -10 reputation, notify
+**4. `missions` Field Set to `never[]`** (Cleanup — Low)
+Line 266: `missions?: never[]` — this was intentionally typed as never to prevent use, but it's still initialized. Remove the field entirely.
 
-## 4. Balance Blind Hit Rewards
-**File**: `src/hooks/useEnhancedMafiaGameState.ts` (lines 5166-5174)
+**5. Capo Wound `maxMoves` Never Resets** (Bug — Medium)
+Line 5311: `capo.maxMoves = Math.max(1, (capo.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY)` permanently reduces the capo's `maxMoves`. Each wound stacks: 3→2→1. The value never resets to 3 at turn start. After 2 wounds, a capo is permanently crippled at 1 move. Fix: reset `maxMoves` to base value (3) at the start of each turn in `advancePhase`/`endTurn`, then apply any single-turn wound debuff.
 
-Replace stat-maxing with bounded boosts:
-- `toughness`: `+3` (capped at 5) — instead of setting to 5
-- `victories`: `+2` (capped at 5) — instead of setting to 5
-- `loyalty`: `+15` (capped at SOLDIER_LOYALTY_CAP) — instead of setting to 80
-- Keep `hits += 1`
+**6. No Adjacent Unit Combat Participation** (Missing Feature — Medium)
+The memory/docs mention "all units on adjacent hexes join at 90% effectiveness" but `processTerritoryHit` only counts units ON the target hex. Adjacent friendlies don't join the attack. This is a documented mechanic that's not implemented.
 
-Update notification text from "soldier stats maxed!" to "soldier stats boosted!"
+### What's Working Well
+- `syncRespect` helper exists and is used in ~8 locations correctly
+- Share Profits income is properly calculated in the economy loop (line 2614-2625)
+- Safe Passage is enforced in `processTerritoryHit` with proper violation penalties
+- Blind Hit rewards are properly bounded (+3/+2/+15, capped)
+- Pact tickdown in `processPacts` is clean and handles all 4 pact types
+- Negotiation cooldowns are properly separated (Boss vs Capo) with 2-turn decay
+- Colombo bonuses are correctly set (combatBonus: 0, income: 20)
 
-## 5. Atomic Respect Updates
+---
+
+## Plan: Fix Issues + 3-Game Simulation
+
+### Step 1: Fix Remaining Respect Sync (5 locations)
 **File**: `src/hooks/useEnhancedMafiaGameState.ts`
+- Line 1269: Replace direct `resources.respect` write with post-update sync
+- Line 1685: Same pattern
+- Line 3777: Use `syncRespect(newState, ...)` instead of raw write
+- Line 4515: Use `syncRespect(newState, ...)`
+- Line 5484: Use `syncRespect(state, ...)` instead of `state.reputation.respect = ...`
 
-Create a helper function `syncRespect(state, value)` that writes to both `state.reputation.respect` and `state.resources.respect` in one call. Replace the ~5 places where both are written manually with calls to this helper. This prevents future drift between the two values.
+### Step 2: Remove Dead `combat` Field
+- Remove `combat: CombatSystem` from `EnhancedMafiaGameState` interface (line 262)
+- Remove initialization block (lines 631-639)
+- Remove `CombatSystem` import (line 3)
+- Check if `CombatSystem` type in `enhanced-mechanics.ts` is used elsewhere — if not, leave it (other types in that file are still used)
+
+### Step 3: Fix Capo Wound Recovery
+In `advanceToNextTurn` / beginning of turn processing, reset all player capos' `maxMoves` to 3 before applying any current-turn debuffs. This ensures wounds are single-turn penalties, not permanent.
+
+### Step 4: Delete Empty `src/systems/` Directory
+Remove the empty directory.
+
+### Step 5: Remove `missions` Field
+Remove `missions?: never[]` from the interface and initial state.
+
+### Step 6: 3-Game Simulation
+Run 3 automated game simulations (fast-forward 15 turns each) via console script to verify:
+- No crashes or undefined errors
+- Economy produces correct income (including share profits)
+- Pacts tick down and expire properly
+- Respect stays in sync between both fields
+- Victory conditions evaluate correctly
+- AI turns process without errors
+
+This will be a read-only diagnostic — log output, no state mutation.
 
 ## Files Modified
-- `src/systems/CombatSystem.ts` — **deleted**
-- `src/types/game-mechanics.ts` — Colombo bonuses
-- `src/hooks/useEnhancedMafiaGameState.ts` — safe passage enforcement, blind hit balance, respect sync helper
+- `src/hooks/useEnhancedMafiaGameState.ts` — respect sync fixes, remove dead combat field, capo wound recovery, remove missions
+- `src/systems/` — delete empty directory
 
