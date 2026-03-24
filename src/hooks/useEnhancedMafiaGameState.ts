@@ -1,11 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { 
-  CombatSystem, 
   EconomySystem, 
   AIOpponent, 
   GameEvent, 
   EnhancedReputationSystem,
-  Mission,
+  
   WeatherSystem,
   TechnologySystem,
   SeasonalEvent
@@ -259,11 +258,9 @@ export interface EnhancedMafiaGameState {
   maxTacticalActions: number;
   
   // Enhanced systems
-  combat: CombatSystem;
   economy: EconomySystem;
   aiOpponents: AIOpponent[];
   events: GameEvent[];
-  missions?: never[];
   weather: WeatherSystem;
   technology: TechnologySystem;
   seasonalEvents: SeasonalEvent[];
@@ -627,16 +624,6 @@ const createInitialGameState = (
     maxActions: BASE_ACTIONS_PER_TURN,
     tacticalActionsRemaining: TACTICAL_ACTIONS_PER_TURN,
     maxTacticalActions: TACTICAL_ACTIONS_PER_TURN,
-    
-    combat: {
-      territoryBattles: [],
-      soldierTraining: {
-        level: 1,
-        equipment: { weapons: 'basic', armor: 'none', vehicles: 'none', cost: 0, effectiveness: 0 },
-        specialization: 'enforcer', experience: 0,
-      },
-      combatModifiers: [],
-    },
     
     economy: {
       marketConditions: [
@@ -1266,7 +1253,9 @@ export const useEnhancedMafiaGameState = (
       // Apply capo extortion bonuses
       let newResources = prev.resources;
       if (bonusMoney > 0) {
-        newResources = { ...prev.resources, money: prev.resources.money + bonusMoney, respect: prev.resources.respect + bonusRespect };
+        newResources = { ...prev.resources, money: prev.resources.money + bonusMoney, respect: Math.min(100, prev.resources.respect + bonusRespect) };
+        // Sync reputation.respect to match
+        prev.reputation.respect = newResources.respect;
       }
 
       let newAvailableMoves: Array<{q:number;r:number;s:number}> = [];
@@ -1682,7 +1671,9 @@ export const useEnhancedMafiaGameState = (
       });
 
       if (bonusMoney > 0) {
-        newResources = { ...newResources, money: newResources.money + bonusMoney, respect: (newResources.respect || 0) + bonusRespect };
+        newResources = { ...newResources, money: newResources.money + bonusMoney, respect: Math.min(100, (newResources.respect || 0) + bonusRespect) };
+        // Sync reputation.respect to match
+        prev.reputation.respect = newResources.respect;
       }
 
       const notifications = autoExtortNotification
@@ -3774,7 +3765,7 @@ export const useEnhancedMafiaGameState = (
           if (!planTarget) {
             // Target is gone (dead/removed) — apply failure penalties
             if (newState.resources.respect >= newState.reputation.fear) {
-              newState.resources.respect = Math.max(0, newState.resources.respect - PLAN_HIT_FAIL_REPUTATION);
+              syncRespect(newState, Math.max(0, newState.resources.respect - PLAN_HIT_FAIL_REPUTATION));
             } else {
               newState.reputation.fear = Math.max(0, newState.reputation.fear - PLAN_HIT_FAIL_REPUTATION);
             }
@@ -4512,7 +4503,7 @@ export const useEnhancedMafiaGameState = (
             if (newState.familyControl[rivalFamily] !== undefined) {
               newState.familyControl[rivalFamily] = Math.max(0, newState.familyControl[rivalFamily] - 5);
               newState.familyControl[newState.playerFamily as keyof typeof newState.familyControl] += 2;
-              newState.resources.respect += 3;
+              syncRespect(newState, Math.min(100, newState.resources.respect + 3));
             }
           }
           break;
@@ -5481,7 +5472,7 @@ export const useEnhancedMafiaGameState = (
         const respectPenalty = 3;
         const fearPenalty = 2;
         const extraHeat = 5;
-        state.reputation.respect = Math.max(0, state.reputation.respect - respectPenalty);
+        syncRespect(state, Math.max(0, state.reputation.respect - respectPenalty));
         state.reputation.fear = Math.max(0, state.reputation.fear - fearPenalty);
         const failDetails = `Respect -${respectPenalty}, Fear -${fearPenalty}, Heat +${(isEnemy ? 12 : 8) + extraHeat} — the locals refused and word spread`;
         state.lastCombatResult = {
