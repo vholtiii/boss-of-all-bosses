@@ -283,11 +283,18 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   ];
 
   // RICO or Bankruptcy Game Over
-  if (gameState.gameOver?.type === 'rico' || (gameState.gameOver as any)?.type === 'bankruptcy') {
-    const isRICO = gameState.gameOver?.type === 'rico';
+  if (gameState.gameOver?.type === 'rico' || (gameState.gameOver as any)?.type === 'bankruptcy' || (gameState.gameOver as any)?.type === 'assassination') {
+    const goType = (gameState.gameOver as any)?.type;
     const playerTerritoryCount = gameState.hexMap.filter(h => h.controllingFamily === gameState.playerFamily).length;
     const playerSoldierCount = gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'soldier').length;
     const eliminatedCount = (gameState as any).eliminatedFamilies?.length || 0;
+    const goEmoji = goType === 'rico' ? '🚨' : goType === 'assassination' ? '🔫' : '💸';
+    const goTitle = goType === 'rico' ? 'RICO INDICTMENT' : goType === 'assassination' ? 'THE COMMISSION HAS SPOKEN' : 'BANKRUPTCY';
+    const goDesc = goType === 'rico'
+      ? 'The federal government has dismantled your criminal empire after 5 consecutive turns at critical heat.'
+      : goType === 'assassination'
+      ? 'With no soldiers, no money, and no way out — the other families voted. The Boss sleeps with the fishes.'
+      : 'Your family collapsed under crushing debt. The other families have divided your territory.';
     return (
       <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
         <motion.div
@@ -302,7 +309,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             transition={{ delay: 0.3 }}
             className="text-6xl mb-4"
           >
-            {isRICO ? '🚨' : '💸'}
+            {goEmoji}
           </motion.div>
           <motion.h1
             initial={{ y: -30, opacity: 0 }}
@@ -310,7 +317,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             transition={{ delay: 0.5 }}
             className="text-4xl font-bold text-destructive mb-4 font-playfair"
           >
-            {isRICO ? 'RICO INDICTMENT' : 'BANKRUPTCY'}
+            {goTitle}
           </motion.h1>
           <motion.p
             initial={{ y: 20, opacity: 0 }}
@@ -318,9 +325,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             transition={{ delay: 0.7 }}
             className="text-lg text-muted-foreground mb-6"
           >
-            {isRICO
-              ? 'The federal government has dismantled your criminal empire after 5 consecutive turns at critical heat.'
-              : 'Your family collapsed under crushing debt. The other families have divided your territory.'}
+            {goDesc}
           </motion.p>
           {/* Post-game stats */}
           <motion.div

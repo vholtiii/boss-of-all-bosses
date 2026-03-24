@@ -1942,7 +1942,23 @@ export const useEnhancedMafiaGameState = (
             });
           }
         }
-        if (debt >= 50000) {
+        // Boss Assassination check — no soldiers, in debt, no recovery path
+        const remainingPlayerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+        const totalIncome = newState.hexMap.reduce((sum, t) => {
+          if (t.controllingFamily === newState.playerFamily && t.business) return sum + (t.business.income || 0);
+          return sum;
+        }, 0);
+        const totalCosts = remainingPlayerSoldiers.length * 600 + newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily && !t.isHeadquarters && newState.deployedUnits.filter(u => u.q === t.q && u.r === t.r && u.s === t.s).length === 0).length * 150;
+        if (remainingPlayerSoldiers.length === 0 && newState.resources.money < 0 && totalIncome <= totalCosts) {
+          turnReport.events.push('☠️ With no soldiers left and the family drowning in debt, the Five Families called a sitdown. The vote was unanimous.');
+          newState.pendingNotifications.push({
+            type: 'error' as const, title: '☠️ The Bosses Took You Out',
+            message: 'All four rival families ordered the hit. With no muscle and no money, there was nothing left to protect the Boss.',
+          });
+          newState.hexMap.forEach(t => { if (t.controllingFamily === newState.playerFamily && !t.isHeadquarters) t.controllingFamily = 'neutral'; });
+          newState.deployedUnits = newState.deployedUnits.filter(u => u.family !== newState.playerFamily);
+          newState.gameOver = { type: 'assassination' as any, turn: newState.turn };
+        } else if (debt >= 50000) {
           turnReport.events.push('☠️ BANKRUPTCY! The family has collapsed under $50K+ debt. Game Over.');
           newState.pendingNotifications.push({
             type: 'error' as const, title: '☠️ Game Over — Bankruptcy',
