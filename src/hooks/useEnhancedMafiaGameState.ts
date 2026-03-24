@@ -1139,8 +1139,8 @@ export const useEnhancedMafiaGameState = (
       const newUnits = [...prev.deployedUnits];
       let remainingMoves = unit.movesRemaining - moveCost;
 
-      // Zone of control: if soldier moves adjacent to enemy, movement ends (not on free moves)
-      if (unit.type === 'soldier' && !isFreeMove) {
+      // FIX #5: Zone of control applies even on free moves — free movement skips COST but not ZoC
+      if (unit.type === 'soldier') {
         if (isAdjacentToEnemy(targetLocation.q, targetLocation.r, targetLocation.s, prev.hexMap, prev.deployedUnits, prev.playerFamily)) {
           remainingMoves = 0;
         }
@@ -1531,6 +1531,15 @@ export const useEnhancedMafiaGameState = (
       let newSoldierStats = { ...prev.soldierStats };
 
       if (unitType === 'soldier') {
+        // FIX #4: Check stacking limit (max 2 units per non-HQ hex)
+        const isTargetHQ = prev.hexMap.some(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s && t.isHeadquarters === family);
+        if (!isTargetHQ) {
+          const unitsAtTarget = newDeployedUnits.filter(u => u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s);
+          if (unitsAtTarget.length >= 2) {
+            return prev; // Hex is full
+          }
+        }
+
         // First try to move a soldier already sitting at HQ
         const soldierAtHQ = newDeployedUnits.findIndex(u => 
           u.family === family && u.type === 'soldier' &&
@@ -2240,6 +2249,8 @@ export const useEnhancedMafiaGameState = (
       if (hasPlayerDistrictBonus(newState, 'respect')) {
         newState.reputation.respect = Math.min(100, newState.reputation.respect + 2);
       }
+      // FIX #3: Sync resources.respect with reputation.respect (single source of truth)
+      newState.resources.respect = Math.round(newState.reputation.respect);
       
       // --- Heat decay (after arrests) ---
       let heatReduction = newState.policeHeat.reductionPerTurn;
@@ -2249,6 +2260,73 @@ export const useEnhancedMafiaGameState = (
       }
       newState.policeHeat.level = Math.max(0, newState.policeHeat.level - heatReduction);
       
+      // FIX #2: Process hitman contracts
+      if (newState.hitmanContracts && newState.hitmanContracts.length > 0) {
+        const resolvedContracts: string[] = [];
+        newState.hitmanContracts = newState.hitmanContracts.map(contract => {
+          const updated = { ...contract, turnsRemaining: contract.turnsRemaining - 1 };
+          if (updated.turnsRemaining <= 0) {
+            resolvedContracts.push(contract.id);
+            // Resolve: find the target
+            const targetUnit = newState.deployedUnits.find(u => u.id === contract.targetUnitId);
+            if (!targetUnit) {
+              // Target already dead — refund
+              newState.resources.money += Math.round(contract.cost * HITMAN_REFUND_RATE);
+              newState.pendingNotifications.push({
+                type: 'info' as const, title: '🎯 Hitman: Target Gone',
+                message: `Target eliminated by other means. $${Math.round(contract.cost * HITMAN_REFUND_RATE).toLocaleString()} refunded.`,
+              });
+              return updated;
+            }
+            // Determine success rate based on target's current hex
+            const tHex = newState.hexMap.find(t => t.q === targetUnit.q && t.r === targetUnit.r && t.s === targetUnit.s);
+            const isAtHQ = tHex?.isHeadquarters === targetUnit.family;
+            const isAtSafehouse = (newState.safehouses || []).some(s => targetUnit.q === s.q && targetUnit.r === s.r && targetUnit.s === s.s);
+            const isFort = targetUnit.fortified;
+            let successRate = HITMAN_BASE_SUCCESS;
+            if (isAtHQ) successRate = HITMAN_HQ_SUCCESS;
+            else if (isAtSafehouse) successRate = HITMAN_SAFEHOUSE_SUCCESS;
+            else if (isFort) successRate = HITMAN_FORTIFIED_SUCCESS;
+
+            if (Math.random() < successRate) {
+              // Kill the target
+              newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== contract.targetUnitId);
+              delete newState.soldierStats[contract.targetUnitId];
+              turnReport.events.push(`🎯 Hitman eliminated a ${contract.targetFamily} ${targetUnit.type}!`);
+              newState.pendingNotifications.push({
+                type: 'success' as const, title: '🎯 Contract Fulfilled',
+                message: `Your hitman successfully eliminated a ${contract.targetFamily} ${targetUnit.type}. No heat generated.`,
+              });
+            } else {
+              // Failed — refund 50%, alert target family
+              newState.resources.money += Math.round(contract.cost * HITMAN_REFUND_RATE);
+              newState.aiAlertState[contract.targetFamily] = HITMAN_ALERT_DURATION;
+              turnReport.events.push(`🎯 Hitman failed to eliminate a ${contract.targetFamily} ${targetUnit.type}.`);
+              newState.pendingNotifications.push({
+                type: 'warning' as const, title: '🎯 Contract Failed',
+                message: `Hitman failed. $${Math.round(contract.cost * HITMAN_REFUND_RATE).toLocaleString()} refunded. ${contract.targetFamily} family is now on high alert.`,
+              });
+            }
+          }
+          return updated;
+        });
+        // Remove resolved contracts and expired ones
+        newState.hitmanContracts = newState.hitmanContracts.filter(c => !resolvedContracts.includes(c.id) && (newState.turn - c.hiredOnTurn) < HITMAN_MAX_LIFETIME);
+        // Expire old contracts with refund
+        const expiredBefore = newState.hitmanContracts.length;
+        newState.hitmanContracts = newState.hitmanContracts.filter(c => {
+          if ((newState.turn - c.hiredOnTurn) >= HITMAN_MAX_LIFETIME) {
+            newState.resources.money += Math.round(c.cost * HITMAN_REFUND_RATE);
+            newState.pendingNotifications.push({
+              type: 'info' as const, title: '🎯 Contract Expired',
+              message: `Hitman contract expired after ${HITMAN_MAX_LIFETIME} turns. $${Math.round(c.cost * HITMAN_REFUND_RATE).toLocaleString()} refunded.`,
+            });
+            return false;
+          }
+          return true;
+        });
+      }
+
       // Compute turn report deltas
       const afterPlayerHexes = new Set(
         newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).map(t => `${t.q},${t.r},${t.s}`)
@@ -4698,9 +4776,10 @@ export const useEnhancedMafiaGameState = (
     const enemySoldiersNearHQ = state.deployedUnits.filter(u =>
       u.family === targetFamily && u.type === 'soldier' && hexDistance(u, { q: targetQ, r: targetR, s: targetS }) <= 1
     );
+    // FIX #6: Any soldier with loyalty < 80 can be targeted (low loyalty = easier to flip)
     const flippableTargets = enemySoldiersNearHQ.filter(u => {
       const uStats = state.soldierStats[u.id];
-      return uStats && uStats.loyalty > 60 && !(state.flippedSoldiers || []).some(f => f.unitId === u.id);
+      return uStats && uStats.loyalty < 80 && !(state.flippedSoldiers || []).some(f => f.unitId === u.id);
     });
 
     if (flippableTargets.length === 0) {
@@ -4713,7 +4792,9 @@ export const useEnhancedMafiaGameState = (
     const targetStats = state.soldierStats[target.id]!;
 
     let chance = FLIP_SOLDIER_BASE_CHANCE;
-    if (targetStats.loyalty >= 60 && targetStats.loyalty <= 70) chance += 0.10;
+    // Low loyalty = easier to flip, high loyalty = harder
+    if (targetStats.loyalty < 60) chance += 0.15;
+    else if (targetStats.loyalty > 70) chance -= 0.10;
     const playerInfluence = state.resources.influence || 0;
     if (playerInfluence > 50) chance += (playerInfluence - 50) * 0.005;
     const schemerAdjacent = state.deployedUnits.some(u =>
@@ -5042,7 +5123,9 @@ export const useEnhancedMafiaGameState = (
           };
         } else {
           // ===== SCOUTED HIT VICTORY: Standard rewards =====
-          state.resources.respect += 5;
+          // FIX #3: Write to reputation.respect (source of truth), sync to resources.respect
+          state.reputation.respect = Math.min(100, (state.reputation.respect || 0) + 5);
+          state.resources.respect = Math.round(state.reputation.respect);
           state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + 5);
           
           playerUnits.forEach(u => {
