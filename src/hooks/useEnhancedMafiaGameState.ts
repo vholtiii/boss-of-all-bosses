@@ -933,8 +933,8 @@ export const useEnhancedMafiaGameState = (
                 selectedUnitId: null, availableMoveHexes: [],
                 tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
                 pendingNotifications: [...prev.pendingNotifications, {
-                  type: 'info' as const, title: '🚗 Soldier Called to Escort',
-                  message: `A soldier has been called to ${unit.name || 'Capo'}'s location for escort duty.`,
+                  type: 'info' as const, title: '🚗 Escort Summoned',
+                  message: `${unit.name || 'The Capo'} sent word — a soldier's been called to the meeting point.`,
                 }],
               };
             }
