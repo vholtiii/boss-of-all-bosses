@@ -3262,7 +3262,7 @@ export const useEnhancedMafiaGameState = (
             const targetUnit = state.deployedUnits.find(u => u.id === target.id);
             const hasHitIntel = targetUnit && (
               state.scoutedHexes.some(s => s.q === targetUnit.q && s.r === targetUnit.r && s.s === targetUnit.s) ||
-              (state.activeBribes || []).some(b => b.tier === 'police_captain' || b.tier === 'police_chief')
+              (state.activeBribes || []).some(b => (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'mayor') && b.active)
             );
             if (hasHitIntel) {
               turnReport.aiActions.push({ family: fam, action: 'plan_hit', detail: `Planned a hit against a player capo` });
