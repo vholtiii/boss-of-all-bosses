@@ -921,6 +921,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             sitdownCooldownUntil={(gameState as any).sitdownCooldownUntil || 0}
             onCallSitdown={(soldierIds) => handleAction({ type: 'call_sitdown', soldierIds })}
             detectedThreats={isPlayerHQ ? ((gameState as any).aiPlannedHits || []).filter((h: any) => h.detectedVia) : []}
+            onBossNegotiate={isPlayerHQ ? (targetFamily) => handleAction({ type: 'open_boss_negotiate', targetFamily }) : undefined}
+            negotiationUsedThisTurn={(gameState as any).negotiationUsedThisTurn || false}
+            activePacts={isPlayerHQ ? {
+              ceasefires: (gameState as any).ceasefires || [],
+              alliances: (gameState as any).alliances || [],
+              shareProfits: (gameState as any).shareProfitsPacts || [],
+              safePassages: (gameState as any).safePassagePacts || [],
+            } : undefined}
+            enemyFamilies={isPlayerHQ ? gameState.aiOpponents.map((o: any) => o.family).filter((f: string) => !((gameState as any).eliminatedFamilies || []).includes(f)) : []}
           />
         );
       })()}
