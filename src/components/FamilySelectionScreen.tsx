@@ -84,7 +84,7 @@ const families: FamilyInfo[] = [
       { label: 'Loyalty', icon: <Users className="h-3.5 w-3.5" />, value: 5 },
     ],
     bonuses: ['+20% extortion income', '+25% intimidation power', '+15% fear generation'],
-    startingResources: { money: 40000, soldiers: 5, influence: 8, politicalPower: 15, respect: 35 },
+    startingResources: { money: 40000, soldiers: 3, influence: 8, politicalPower: 15, respect: 35 },
   },
   {
     id: 'colombo',
