@@ -291,6 +291,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                   )}
                 </div>
               );
+            })()}
             {/* AI Assassination Warnings */}
             {(gameState as any).aiPlannedHits && (gameState as any).aiPlannedHits.length > 0 && (
               <div className="p-2 rounded-lg bg-red-500/20 border border-red-500/40 text-[11px] text-red-300">
@@ -303,7 +304,6 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 </div>
               </div>
             )}
-            })()}
             <Separator className="my-1" />
             <ActionButton
               icon={<Users className="h-4 w-4" />}
