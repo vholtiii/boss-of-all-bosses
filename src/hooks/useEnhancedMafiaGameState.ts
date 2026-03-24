@@ -5709,8 +5709,7 @@ export const useEnhancedMafiaGameState = (
           );
           if (attackedAlly) {
             cond.violated = true;
-            state.reputation.respect = Math.max(0, state.reputation.respect - 15);
-            state.resources.respect = Math.round(state.reputation.respect);
+            syncRespect(state, Math.max(0, state.reputation.respect - 15));
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'error', title: '⚠️ Alliance Violated!',
               message: `You attacked ${a.alliedFamily} — alliance broken! -15 respect.`,
