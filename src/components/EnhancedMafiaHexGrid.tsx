@@ -459,8 +459,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           reasons.hit = noActions ? 'No actions left' : (!isSoldier && !isCapo) ? 'Need soldier or capo' : '';
         }
         if (!canExtort) {
-          if (!hasIllegalBusiness && (isNeutral || isEnemy) && tile.business) reasons.extort = 'No illegal business';
-          else if (hasIllegalBusiness && isSoldier && !unitOnTargetHex) reasons.extort = 'Soldier must be on hex';
+          if (!hasCompletedBusiness && (isNeutral || isEnemy) && tile.business) reasons.extort = 'Business under construction';
+          else if (!hasCompletedBusiness && (isNeutral || isEnemy)) reasons.extort = 'No business on hex';
+          else if (hasCompletedBusiness && isSoldier && !unitOnTargetHex) reasons.extort = 'Soldier must be on hex';
           else if (noActions) reasons.extort = 'No actions left';
         }
         if (!canClaim && isNeutral) {
