@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import bossIcon from '@/assets/boss-icon.png';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -196,13 +197,27 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                 </div>
               </div>
               
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2">
-                <div className="flex items-center gap-1">
-                  <Target className="h-3 w-3 text-yellow-400" />
-                  <span className="text-xs font-medium text-yellow-400">Boss</span>
-                  <span className="text-[10px] text-muted-foreground ml-1">at headquarters</span>
+              <motion.div
+                className={`bg-mafia-gold/10 border border-mafia-gold/30 rounded-lg p-2 flex items-center gap-3 ${isPlayerFamily ? 'cursor-pointer hover:border-mafia-gold/60 hover:bg-mafia-gold/20 transition-all' : ''}`}
+                whileHover={isPlayerFamily ? { scale: 1.02 } : {}}
+                whileTap={isPlayerFamily ? { scale: 0.98 } : {}}
+              >
+                <div className="w-10 h-10 rounded-full border-2 border-mafia-gold overflow-hidden bg-noir-dark flex items-center justify-center shadow-[0_0_8px_rgba(212,175,55,0.4)]">
+                  <img
+                    src={bossIcon}
+                    alt="The Boss"
+                    className="w-8 h-8 object-contain"
+                    style={{ mixBlendMode: 'multiply', filter: 'invert(1) brightness(1.5) sepia(1) saturate(3) hue-rotate(15deg)' }}
+                  />
                 </div>
-              </div>
+                <div className="flex-1">
+                  <div className="text-xs font-semibold text-mafia-gold font-playfair">The Boss</div>
+                  <div className="text-[10px] text-muted-foreground">At Headquarters</div>
+                </div>
+                {isPlayerFamily && (
+                  <div className="text-[9px] text-mafia-gold/50 italic">Coming soon</div>
+                )}
+              </motion.div>
             </div>
 
             {/* Business Count */}
