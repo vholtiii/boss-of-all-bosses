@@ -4109,7 +4109,7 @@ export const useEnhancedMafiaGameState = (
           const targetHex = newState.hexMap.find(t => t.q === targetUnit.q && t.r === targetUnit.r && t.s === targetUnit.s);
           const isAtHQ = targetHex?.isHeadquarters === targetUnit.family;
           const isAtSafehouse = newState.safehouses.some(s => targetUnit.q === s.q && targetUnit.r === s.r && targetUnit.s === s.s);
-          const isFortified = targetUnit.fortified;
+          const isFortified = isHexFortified(newState.fortifiedHexes || [], targetUnit.q, targetUnit.r, targetUnit.s, targetUnit.family);
           
           let duration = HITMAN_OPEN_TURNS;
           if (isAtHQ) duration = HITMAN_HQ_TURNS;
