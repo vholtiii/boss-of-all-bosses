@@ -552,6 +552,72 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
               )}
             </AnimatePresence>
 
+            {/* Diplomacy — Boss Negotiation */}
+            {isPlayerFamily && onBossNegotiate && (
+              <div className="mt-2 space-y-2">
+                <h4 className="text-xs font-semibold text-foreground/80 flex items-center gap-1">
+                  🏛️ Diplomacy
+                </h4>
+                
+                {/* Active Pacts */}
+                {activePacts && (
+                  <div className="space-y-1">
+                    {activePacts.ceasefires.filter(c => c.active).map(c => (
+                      <div key={c.id} className="flex items-center justify-between text-[10px] px-2 py-1 rounded bg-accent/10 border border-accent/20">
+                        <span>🤝 Ceasefire — <span className="capitalize">{c.family}</span></span>
+                        <Badge variant="outline" className="text-[9px] h-4">{c.turnsRemaining}t</Badge>
+                      </div>
+                    ))}
+                    {activePacts.alliances.filter(a => a.active).map(a => (
+                      <div key={a.id} className="flex items-center justify-between text-[10px] px-2 py-1 rounded bg-primary/10 border border-primary/20">
+                        <span>⚖️ Alliance — <span className="capitalize">{a.alliedFamily}</span></span>
+                        <Badge variant="outline" className="text-[9px] h-4">{a.turnsRemaining}t</Badge>
+                      </div>
+                    ))}
+                    {activePacts.shareProfits.filter(p => p.active).map(p => (
+                      <div key={p.id} className="flex items-center justify-between text-[10px] px-2 py-1 rounded bg-green-500/10 border border-green-500/20">
+                        <span>💰 Profits — <span className="capitalize">{p.targetFamily}</span></span>
+                        <Badge variant="outline" className="text-[9px] h-4">{p.turnsRemaining}t</Badge>
+                      </div>
+                    ))}
+                    {activePacts.safePassages.filter(p => p.active).map(p => (
+                      <div key={p.id} className="flex items-center justify-between text-[10px] px-2 py-1 rounded bg-blue-500/10 border border-blue-500/20">
+                        <span>🛤️ Passage — <span className="capitalize">{p.targetFamily}</span></span>
+                        <Badge variant="outline" className="text-[9px] h-4">{p.turnsRemaining}t</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Boss negotiate buttons */}
+                {turnPhase === 'action' && enemyFamilies.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground">Negotiate ceasefire or alliance:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {enemyFamilies.map(fam => (
+                        <Button
+                          key={fam}
+                          variant="outline"
+                          size="sm"
+                          className="text-[10px] h-6 px-2 capitalize"
+                          disabled={negotiationUsedThisTurn}
+                          onClick={() => onBossNegotiate(fam)}
+                        >
+                          🏛️ {fam}
+                        </Button>
+                      ))}
+                    </div>
+                    {negotiationUsedThisTurn && (
+                      <p className="text-[9px] text-muted-foreground italic">Already negotiated this turn</p>
+                    )}
+                  </div>
+                )}
+                {turnPhase !== 'action' && (
+                  <p className="text-[10px] text-muted-foreground italic">Available during Action phase</p>
+                )}
+              </div>
+            )}
+
             {/* Call a Sitdown — Boss Action */}
             {isPlayerFamily && onCallSitdown && (
               (() => {
