@@ -54,6 +54,12 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+// ============ SYNC HELPER ============
+const syncRespect = (state: any, value: number) => {
+  state.reputation.respect = value;
+  state.resources.respect = Math.round(value);
+};
+
 // ============ DIFFICULTY SYSTEM ============
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
