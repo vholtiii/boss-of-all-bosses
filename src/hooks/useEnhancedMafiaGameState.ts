@@ -2234,6 +2234,11 @@ export const useEnhancedMafiaGameState = (
         if (bonuses.territoryIncome > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.territoryIncome / 100));
         if (bonuses.income > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.income / 100));
         
+        // District control bonus: Manhattan +20% income
+        if (tile.district === 'Manhattan' && hasPlayerDistrictBonus(state, 'income')) {
+          tileIncome = Math.floor(tileIncome * 1.2);
+        }
+        
         income += tileIncome;
       }
     });
