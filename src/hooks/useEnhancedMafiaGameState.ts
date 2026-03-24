@@ -59,6 +59,13 @@ const syncRespect = (state: any, value: number) => {
   state.resources.respect = Math.round(value);
 };
 
+// ============ HEX FORTIFICATION HELPERS ============
+const isHexFortified = (fortifiedHexes: FortifiedHex[], q: number, r: number, s: number, family: string): boolean =>
+  (fortifiedHexes || []).some(f => f.q === q && f.r === r && f.s === s && f.family === family);
+
+const isHexFortifiedAny = (fortifiedHexes: FortifiedHex[], q: number, r: number, s: number): boolean =>
+  (fortifiedHexes || []).some(f => f.q === q && f.r === r && f.s === s);
+
 // ============ DIFFICULTY SYSTEM ============
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
