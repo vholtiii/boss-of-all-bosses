@@ -5464,40 +5464,71 @@ export const useEnhancedMafiaGameState = (
 
   // ============ NEGOTIATION HANDLER ============
   const processNegotiation = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
-    const { negotiationType, targetQ, targetR, targetS, capoId, extraData } = action;
-    const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
-    if (!tile || tile.controllingFamily === state.playerFamily || tile.controllingFamily === 'neutral') return state;
+    const { negotiationType, targetQ, targetR, targetS, capoId, extraData, isBossNegotiation, targetFamily: actionTargetFamily } = action;
 
-    const capo = state.deployedUnits.find(u => u.id === capoId);
-    if (!capo || capo.type !== 'capo' || capo.family !== state.playerFamily) return state;
+    // 1 negotiation per turn (Boss + Capo combined)
+    if (state.negotiationUsedThisTurn) {
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'warning', title: '⏳ Negotiation Cooldown',
+        message: 'Only 1 negotiation attempt per turn (Boss + Capo combined).',
+      }];
+      return state;
+    }
 
-    const enemyFamily = tile.controllingFamily;
     const config = NEGOTIATION_TYPES.find(n => n.type === negotiationType);
     if (!config) return state;
 
-    const cost = config.baseCost + (negotiationType === 'bribe_territory' ? (state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS).length * 2000 + (tile.business?.income || 0)) : 0);
+    let enemyFamily: string;
+    let tile: any = null;
+
+    if (isBossNegotiation) {
+      // Boss (family-level) — no hex needed
+      if (config.scope !== 'family') return state;
+      enemyFamily = actionTargetFamily;
+      if (!enemyFamily || enemyFamily === state.playerFamily) return state;
+    } else {
+      // Capo (territory-level)
+      if (config.scope !== 'territory') return state;
+      tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
+      if (!tile || tile.controllingFamily === state.playerFamily || tile.controllingFamily === 'neutral') return state;
+
+      const capo = state.deployedUnits.find(u => u.id === capoId);
+      if (!capo || capo.type !== 'capo' || capo.family !== state.playerFamily) return state;
+      enemyFamily = tile.controllingFamily;
+    }
+
+    const cost = config.baseCost + (negotiationType === 'bribe_territory' && tile ? (state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS).length * 2000 + (tile.business?.income || 0)) : 0);
     if (state.resources.money < cost) return state;
 
     state.resources.money -= cost;
+    state.negotiationUsedThisTurn = true;
 
     // Reputation cost
     if (config.reputationCost > 0) {
       state.reputation.respect = Math.max(0, state.reputation.respect - config.reputationCost);
+      state.resources.respect = Math.round(state.reputation.respect);
     }
 
-    // ── SUCCESS ROLL ── (was previously missing — negotiations auto-succeeded)
-    const capoPersonality = capo.personality || 'enforcer';
-    const personalityBonus = PERSONALITY_BONUSES[capoPersonality]?.[negotiationType] || 0;
-    const allBonus = PERSONALITY_BONUSES[capoPersonality]?.all || 0;
-    const influenceBonus = (state.resources.influence / 100) * 10; // up to +10%
-    const totalChance = Math.min(95, config.baseSuccess + personalityBonus + allBonus + influenceBonus);
+    // ── SUCCESS ROLL ──
+    let totalChance = config.baseSuccess;
+    if (!isBossNegotiation && capoId) {
+      const capo = state.deployedUnits.find(u => u.id === capoId);
+      const capoPersonality = capo?.personality || 'enforcer';
+      totalChance += PERSONALITY_BONUSES[capoPersonality]?.[negotiationType] || 0;
+      totalChance += PERSONALITY_BONUSES[capoPersonality]?.all || 0;
+    }
+    totalChance += (state.resources.influence / 100) * 10;
+    totalChance += Math.floor(state.reputation.respect / 5);
+    totalChance = Math.max(5, Math.min(95, totalChance));
     const roll = Math.random() * 100;
 
     if (roll > totalChance) {
-      // Negotiation FAILED
+      // Negotiation FAILED — 50% refund
+      const refund = Math.floor(cost * NEGOTIATION_REFUND_RATE);
+      state.resources.money += refund;
       state.pendingNotifications = [...state.pendingNotifications, {
         type: 'error', title: `❌ ${config.label} Failed!`,
-        message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} rejected the offer. You spent $${cost.toLocaleString()} for nothing. (${Math.round(totalChance)}% chance)`,
+        message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} rejected the offer. $${refund.toLocaleString()} refunded (50%). (${Math.round(totalChance)}% chance)`,
       }];
       syncLegacyUnits(state);
       return state;
@@ -5520,7 +5551,7 @@ export const useEnhancedMafiaGameState = (
         break;
       }
       case 'bribe_territory': {
-        // Peacefully claim the hex
+        if (!tile) break;
         const enemyUnits = state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS);
         enemyUnits.forEach(eu => {
           const idx = state.deployedUnits.indexOf(eu);
@@ -5544,13 +5575,47 @@ export const useEnhancedMafiaGameState = (
           turnFormed: state.turn,
           active: true,
         }];
-        // Also boost relationship
         if (state.reputation.familyRelationships[enemyFamily] !== undefined) {
           state.reputation.familyRelationships[enemyFamily] += 20;
         }
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '⚖️ Alliance Formed!',
           message: `Pact with ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} for ${duration} turns. Condition: ${condition.type.replace(/_/g, ' ')}.`,
+        }];
+        break;
+      }
+      case 'share_profits': {
+        if (!tile) break;
+        const duration = 5;
+        state.shareProfitsPacts = [...(state.shareProfitsPacts || []), {
+          id: `share-profits-${Date.now()}`,
+          targetFamily: enemyFamily,
+          hexQ: targetQ,
+          hexR: targetR,
+          hexS: targetS,
+          incomeShare: 0.3,
+          turnsRemaining: duration,
+          turnFormed: state.turn,
+          active: true,
+        }];
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: '💰 Profit Sharing Deal!',
+          message: `You'll earn 30% of this hex's income for ${duration} turns. Cost: $${cost.toLocaleString()}.`,
+        }];
+        break;
+      }
+      case 'safe_passage': {
+        const duration = 3;
+        state.safePassagePacts = [...(state.safePassagePacts || []), {
+          id: `safe-passage-${Date.now()}`,
+          targetFamily: enemyFamily,
+          turnsRemaining: duration,
+          turnFormed: state.turn,
+          active: true,
+        }];
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: '🛤️ Safe Passage Granted!',
+          message: `Free movement through ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} territory for ${duration} turns. Cost: $${cost.toLocaleString()}.`,
         }];
         break;
       }
