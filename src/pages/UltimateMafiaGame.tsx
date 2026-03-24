@@ -35,11 +35,14 @@ import SoundSettingsDialog from '@/components/SoundSettingsDialog';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
 
+type MapSize = 'small' | 'medium' | 'large';
+
 interface GameConfig {
   family: FamilyId;
   resources: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number };
   difficulty: 'easy' | 'normal' | 'hard';
   seed?: number;
+  mapSize?: MapSize;
 }
 
 const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = ({ config, onExitToMenu }) => {
