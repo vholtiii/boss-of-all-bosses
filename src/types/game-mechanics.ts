@@ -61,6 +61,12 @@ export interface VictoryProgress {
 export type VictoryType = 'territory' | 'economic' | 'legacy' | 'domination' | null;
 
 // ============ HQ ASSAULT & FLIP SOLDIER ============
+// ============ SITDOWN (BOSS ACTION) ============
+export const SITDOWN_COST = 2000;
+export const SITDOWN_COOLDOWN = 5;
+export const SITDOWN_LOYALTY_BONUS = 5;
+export const SITDOWN_DEFENSE_PER_SOLDIER = 5;
+
 export const HQ_ASSAULT_BASE_CHANCE = 0.15;
 export const HQ_DEFENSE_BONUS = 0.30;
 export const HQ_ASSAULT_MAX_CHANCE = 0.50;

@@ -815,6 +815,10 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           hexMap={gameState.hexMap || []}
           bossHighlightHex={bossHighlightHex}
           onBossHighlightHex={setBossHighlightHex}
+          turnPhase={gameState.turnPhase}
+          currentTurn={gameState.turn}
+          sitdownCooldownUntil={(gameState as any).sitdownCooldownUntil || 0}
+          onCallSitdown={(soldierIds) => handleAction({ type: 'call_sitdown', soldierIds })}
         />
       )}
 
