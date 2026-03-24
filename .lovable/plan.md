@@ -1,31 +1,45 @@
 
 
-# Add Status HUD Badges to Top Bar
+# Fix All 5 Code Review Issues
 
-## What
-Add a compact badge strip below the existing Turn/Season display showing expiring pacts, negotiation cooldowns, and deployed soldier ratio.
+## 1. Delete `src/systems/CombatSystem.ts`
+Remove the entire file — 590 lines of dead code. No imports reference it anywhere.
 
-## Where
-`src/pages/UltimateMafiaGame.tsx` — the center "Game Status" section (lines 500-523)
+## 2. Fix Colombo Family Bonuses
+**File**: `src/types/game-mechanics.ts` (lines 139-145)
 
-## Changes
+Colombo shouldn't have `combatBonus: 20`. Per lore, Colombo is the smallest, scrappiest family — their bonuses should lean toward survival/recruitment, not raw combat power.
 
-### Add status badges below "Turn X / Season" (after line 505)
+Change:
+- `combatBonus: 20` → `combatBonus: 0`
+- `income: 0` → `income: 20` (scrappy income generation to compensate)
+- Keep `recruitmentDiscount: 15` and `fearGeneration: 15` as-is (thematic fit)
 
-A new `div` with `flex-wrap gap-1` containing:
+## 3. Enforce Safe Passage in Combat
+**File**: `src/hooks/useEnhancedMafiaGameState.ts` — `processTerritoryHit` (~line 4944)
 
-1. **Expiring pact warnings** — For each active ceasefire, alliance, share profits, or safe passage pact with `turnsRemaining <= 1`, show a ⚠️ amber badge: `"⚠️ Ceasefire w/ Gambino expires!"`. Skip if no pacts are expiring soon.
+After the ceasefire/alliance check, add a safe passage check:
+- If `safePassagePacts` has an active pact with the target hex's controlling family, block the attack
+- If the player attacks anyway (shouldn't reach this, but safety), auto-violate: remove pact, -15 respect, -10 reputation, notify
 
-2. **Negotiation cooldowns** — Two small badges:
-   - `"🏛️ Boss: Ready"` (green) or `"🏛️ Boss: 1t"` (muted) based on `bossNegotiationCooldown`
-   - `"👔 Capo: Ready"` (green) or `"👔 Capo: 1t"` (muted) based on `capoNegotiationCooldown`
+## 4. Balance Blind Hit Rewards
+**File**: `src/hooks/useEnhancedMafiaGameState.ts` (lines 5166-5174)
 
-3. **Deployed ratio** — Count soldiers on non-HQ hexes vs total: `"⚔️ 12/18 deployed"`. Green if >50% deployed, amber if <30%.
+Replace stat-maxing with bounded boosts:
+- `toughness`: `+3` (capped at 5) — instead of setting to 5
+- `victories`: `+2` (capped at 5) — instead of setting to 5
+- `loyalty`: `+15` (capped at SOLDIER_LOYALTY_CAP) — instead of setting to 80
+- Keep `hits += 1`
 
-All badges use the existing `rounded-full px-2 py-0.5 text-[10px]` pattern already used by the pact badges in the bottom bar (lines 743-762).
+Update notification text from "soldier stats maxed!" to "soldier stats boosted!"
 
-Only render badges that have meaningful info (hide "Ready" cooldowns if both are 0 to reduce clutter — only show when at least one is on cooldown).
+## 5. Atomic Respect Updates
+**File**: `src/hooks/useEnhancedMafiaGameState.ts`
+
+Create a helper function `syncRespect(state, value)` that writes to both `state.reputation.respect` and `state.resources.respect` in one call. Replace the ~5 places where both are written manually with calls to this helper. This prevents future drift between the two values.
 
 ## Files Modified
-- `src/pages/UltimateMafiaGame.tsx` — add status badge strip to top bar center section
+- `src/systems/CombatSystem.ts` — **deleted**
+- `src/types/game-mechanics.ts` — Colombo bonuses
+- `src/hooks/useEnhancedMafiaGameState.ts` — safe passage enforcement, blind hit balance, respect sync helper
 
