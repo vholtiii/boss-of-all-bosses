@@ -19,9 +19,10 @@
 - [15. Boss Actions](#15-boss-actions)
 - [16. Victory Conditions](#16-victory-conditions)
 - [17. Bankruptcy](#17-bankruptcy)
-- [18. Difficulty Modes](#18-difficulty-modes)
+- [18. Difficulty & Map Size](#18-difficulty--map-size)
 - [19. AI Opponents](#19-ai-opponents)
-- [20. Strategic Tips](#20-strategic-tips)
+- [20. Intel & Threat Detection](#20-intel--threat-detection)
+- [21. Strategic Tips](#21-strategic-tips)
 
 ---
 
@@ -35,6 +36,8 @@ Each turn represents one month. Strict phase order:
 Deploy → Tactical (Move) → Action → End Turn
 ```
 
+**Skip to Action**: Players can jump directly from Deploy or Tactical phase to the Action phase using the "Skip to Action" button.
+
 ### 1.2 Action Budget
 
 - **Base actions per turn**: 2
@@ -47,7 +50,15 @@ Deploy → Tactical (Move) → Action → End Turn
 
 ### 2.1 Hex Grid
 
-~331 hexes, radius 10, cube coordinates (q, r, s).
+Map size is chosen at game start:
+
+| Size | Radius | ~Hex Count | Feel |
+|------|--------|-----------|------|
+| Small | 7 | ~169 | Fast, aggressive |
+| Medium | 10 | ~331 | Classic (default) |
+| Large | 13 | ~547 | Epic, sprawling |
+
+Cube coordinates (q, r, s). All game values (AI recruitment, victory targets, economy) scale with map size.
 
 ### 2.2 Districts
 
@@ -59,6 +70,8 @@ Deploy → Tactical (Move) → Action → End Turn
 | Manhattan | Commercial center, extortion 20% harder |
 | Bronx | Urban warfare |
 | Staten Island | Isolated |
+
+District boundaries scale proportionally with map radius (threshold ≈ 40% of radius).
 
 ### 2.3 Territory Control States
 
@@ -82,6 +95,10 @@ Deploy → Tactical (Move) → Action → End Turn
 
 ### 3.2 Headquarters Locations
 
+HQ positions vary by map size:
+
+**Medium (radius 10, default):**
+
 | Family | District | Coordinates (q,r,s) |
 |---|---|---|
 | Gambino | Little Italy | (-8, 8, 0) |
@@ -89,6 +106,10 @@ Deploy → Tactical (Move) → Action → End Turn
 | Lucchese | Queens | (-8, -1, 9) |
 | Bonanno | Staten Island | (7, 3, -10) |
 | Colombo | Bronx | (0, -9, 9) |
+
+**Small (radius 7):** gambino(-5,5,0), genovese(5,-5,0), lucchese(-5,-1,6), bonanno(5,2,-7), colombo(0,-6,6)
+
+**Large (radius 13):** gambino(-11,11,0), genovese(11,-11,0), lucchese(-11,-1,12), bonanno(10,3,-13), colombo(0,-12,12)
 
 ### 3.3 Starting Setup
 
@@ -114,7 +135,7 @@ All families also start with 1 Capo and 1 Boss. Each HQ + 6 adjacent hexes are p
 | Moves per turn | 2 |
 | Mercenary cost | $1,500 |
 | Local recruit cost | $300 (requires 10+ controlled hexes) |
-| Maintenance | $600/turn |
+| Maintenance | **$600/turn (deployed only)** — undeployed soldiers in the recruitment pool are free |
 
 ### 4.2 Capos
 
@@ -126,6 +147,11 @@ All families also start with 1 Capo and 1 Boss. Each HQ + 6 adjacent hexes are p
 | Max capos | 3 |
 | Income bonus | 100% territory income (vs soldiers' 30%) |
 | Abilities | Negotiate, Safehouse, Escort |
+| Scout range | 2 hexes (vs soldiers' 1 hex) |
+| Auto-claim | Claims neutral territory automatically on arrival |
+| Combat immunity | Cannot die in regular combat — wounded instead |
+
+**Wound Mechanic**: If a capo would be killed in combat, they are instead wounded: -10 loyalty, -1 move penalty for 1 turn. Capos can only be permanently killed via hitman contract or planned hit.
 
 **Capo Personalities:**
 - **Diplomat** 🕊️ — +20% Ceasefire, +10% Alliance
@@ -178,9 +204,11 @@ Enemy-adjacent hexes stop movement (zone of control). Free movement within conne
 ### 6.1 Deploy Phase
 - Deploy soldiers/capos from HQ or active safehouse
 - Soldiers: adjacent hexes only. Capos: up to 5 hexes.
+- Can skip directly to Action phase
 
 ### 6.2 Tactical (Move) Phase
 - 3 tactical actions: Move, Scout, Fortify, Safehouse, Escort
+- Can skip directly to Action phase
 
 ### 6.3 Action Phase
 - 2-3 action points: Hit, Extort, Claim, Negotiate, Boss Actions
@@ -193,7 +221,7 @@ Enemy-adjacent hexes stop movement (zone of control). Free movement within conne
 ## 7. Tactical Actions
 
 ### 7.1 Scout
-+15% hit bonus for 3 turns. Reveals enemy count, family, business details. 15% detection chance on enemy hexes.
++15% hit bonus for 3 turns. Reveals enemy count, family, business details. 15% detection chance on enemy hexes. **Capos scout at 2-hex range vs soldiers' 1-hex range.**
 
 ### 7.2 Fortify
 +25% defense, 50% casualty reduction. Persists until unit moves.
@@ -223,6 +251,8 @@ Clamped: 10%–95%
 **Victory**: Territory → neutral, enemy units removed, +5 respect/fear, 20% attacker casualties.
 **Defeat**: 40% attacker casualties (min 1).
 **Heat**: min(25, 8 + totalUnits × 2).
+
+**Capo combat immunity**: Capos cannot die in regular combat. They are wounded instead (-10 loyalty, -1 move for 1 turn).
 
 ### 8.2 Extort
 
@@ -267,9 +297,11 @@ Requires a capo. Success is rolled against base chance + personality bonus + inf
 - Capo on hex: 100% income. Soldiers only: 30%. No units: 10% passive.
 - Family bonuses modify income (e.g., Genovese +30%).
 
-### 10.3 Maintenance
-- $600/turn per soldier
+### 10.3 Maintenance & Financial Display
+- **$600/turn per deployed soldier** (undeployed reserves are free)
 - $150/turn per empty claimed hex (community upkeep)
+- HQ panel shows **gross income** (pre-penalty), with arrest penalties and heat penalties listed as separate expense line items
+- Math is transparent: **Gross Income − All Expenses = Net Profit**
 
 ---
 
@@ -293,6 +325,8 @@ Requires a capo. Success is rolled against base chance + personality bonus + inf
 | Police Captain | $2,000 | 60% | 5 turns | Economic pressure on rivals |
 | Police Chief | $8,000 | 40% | 7 turns | +50% intel on rival |
 | Mayor | $25,000 | 25% | 10 turns | Shut down rival territory |
+
+Active bribes can also reveal enemy planned hits — see [Intel & Threat Detection](#20-intel--threat-detection).
 
 ---
 
@@ -350,12 +384,12 @@ Requires a capo. Success is rolled against base chance + personality bonus + inf
 
 ## 16. Victory Conditions
 
-| Path | Target |
-|---|---|
-| Territory Domination | 60 hexes |
-| Economic Empire | $50,000/month income |
-| Legacy of Power | Beat highest rival by 25% after turn 15 |
-| Total Domination | Eliminate all 4 rival families |
+| Path | Small Map | Medium Map | Large Map |
+|---|---|---|---|
+| Territory Domination | 40 hexes | 60 hexes | 80 hexes |
+| Economic Empire | $50,000/month | $50,000/month | $50,000/month |
+| Legacy of Power | Beat rival by 25% after turn 15 | Same | Same |
+| Total Domination | Eliminate all 4 families | Same | Same |
 
 ---
 
@@ -367,13 +401,19 @@ Requires a capo. Success is rolled against base chance + personality bonus + inf
 
 ---
 
-## 18. Difficulty Modes
+## 18. Difficulty & Map Size
+
+### 18.1 Difficulty Modes
 
 | Mode | Player Money | AI Aggression | AI Income |
 |---|---|---|---|
 | Easy | 1.5x | 0.7x | Standard |
 | Normal | 1.0x | 1.0x | Standard |
 | Hard | 0.7x | 1.5x | +20% |
+
+### 18.2 Map Size
+
+Selected at game start alongside difficulty. Affects hex count, HQ positions, district boundaries, AI recruitment caps, and victory targets. See [Section 2.1](#21-hex-grid).
 
 ---
 
@@ -384,10 +424,32 @@ Requires a capo. Success is rolled against base chance + personality bonus + inf
 - AI respects stacking limits, ceasefires, alliances
 - AI respect grows with territory and combat activity
 - Aggressive AI attempts HQ assault after turn 12
+- **Map-scaled AI**: Recruitment caps, action budgets, and income floors scale with map size to ensure AI fills the map appropriately
 
 ---
 
-## 20. Strategic Tips
+## 20. Intel & Threat Detection
+
+### 20.1 Sources
+
+Planned enemy hits can be detected through:
+- **Scouted hexes**: If the target or source hex is scouted, the planned hit is revealed
+- **Police bribes**: Active captain/chief/mayor bribes can reveal planned hits against you
+
+### 20.2 Detection
+
+- `detectedVia` field tracks the source: `'scout'`, `'bribe_captain'`, `'bribe_chief'`, or `'bribe_mayor'`
+- Notifications fire when a threat is first discovered with flavor text matching the intel source
+- Only detected planned hits are shown in the UI (undetected hits remain hidden)
+
+### 20.3 Display
+
+- **Side panel**: Detected threats show with source and turns remaining
+- **HQ panel**: "Active Threats" section shows detected planned hits with urgency colors (red for 1 turn, yellow for 2+)
+
+---
+
+## 21. Strategic Tips
 
 ### Early Game (Turns 1–5)
 1. Claim adjacent neutral territory for free respect/influence

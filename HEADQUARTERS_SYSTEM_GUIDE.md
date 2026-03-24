@@ -24,6 +24,10 @@ Each of the five families has a headquarters on the hex map. The HQ is the start
 
 ## 2. Headquarters Locations
 
+HQ positions vary by map size:
+
+### Medium Map (radius 10, default)
+
 | Family | District | Coordinates (q,r,s) |
 |---|---|---|
 | **Gambino** | Little Italy | (-8, 8, 0) |
@@ -31,6 +35,26 @@ Each of the five families has a headquarters on the hex map. The HQ is the start
 | **Lucchese** | Queens | (-8, -1, 9) |
 | **Bonanno** | Staten Island | (7, 3, -10) |
 | **Colombo** | Bronx | (0, -9, 9) |
+
+### Small Map (radius 7)
+
+| Family | Coordinates (q,r,s) |
+|---|---|
+| Gambino | (-5, 5, 0) |
+| Genovese | (5, -5, 0) |
+| Lucchese | (-5, -1, 6) |
+| Bonanno | (5, 2, -7) |
+| Colombo | (0, -6, 6) |
+
+### Large Map (radius 13)
+
+| Family | Coordinates (q,r,s) |
+|---|---|
+| Gambino | (-11, 11, 0) |
+| Genovese | (11, -11, 0) |
+| Lucchese | (-11, -1, 12) |
+| Bonanno | (10, 3, -13) |
+| Colombo | (0, -12, 12) |
 
 Each HQ + its 6 adjacent hexes start as pre-claimed territory for that family.
 
@@ -71,6 +95,7 @@ All units start at their family's HQ.
 2. Click your headquarters
 3. Choose "Deploy Soldier" or "Deploy Capo"
 4. Click an available hex (shown in sky blue)
+5. Or use **Skip to Action** to jump directly to the Action phase
 
 ### 5.2 Deployment Ranges
 
@@ -106,6 +131,10 @@ Standard movement: 1 hex adjacent, 2 moves per turn.
 | Movement range | Up to 5 hexes (flying) |
 | Moves per turn | 3 |
 | Territory rules | Not affected — always flies |
+| Auto-claim | Claims neutral territory on arrival |
+| Scout range | 2 hexes (vs soldiers' 1 hex) |
+
+**Wound Mechanic**: Capos cannot die in regular combat. If "killed," they are wounded instead (-10 loyalty, -1 move penalty for 1 turn). Can only be permanently eliminated via hitman or planned hit.
 
 ### 6.3 Boss
 
@@ -169,11 +198,12 @@ Weaken enemy HQ defenses by compromising a rival soldier.
 
 Click any headquarters to view:
 
-- **Financial overview**: Income, expenses, net profit
+- **Financial overview**: Gross income, itemized expenses (soldier maintenance, community upkeep, arrest penalties, heat penalties), and net profit — math is fully transparent
 - **Unit status**: Soldiers and capos at HQ vs deployed
 - **Business count**: Number of controlled businesses
 - **Deploy actions**: Deploy buttons (player HQ only, deploy phase)
 - **Sitdown button**: Available during action phase (player HQ only)
+- **Active Threats**: Detected planned hits from scouting/bribes showing attacking family, target, turns remaining, and intel source (player HQ only)
 - **Rival info**: Respect, influence, soldier count, money (rival HQs)
 
 ---

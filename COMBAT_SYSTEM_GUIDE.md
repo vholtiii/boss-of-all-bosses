@@ -18,6 +18,8 @@
 
 Combat in Boss of All Bosses is resolved through three primary actions during the **Action Phase**: **Hit**, **Extort**, and **Claim**. Each consumes 1 action point (2–3 per turn). Additionally, **HQ Assault** and **Flip Soldier** are endgame combat actions.
 
+Players can **skip directly to the Action phase** from Deploy or Tactical using the "Skip to Action" button.
+
 ---
 
 ## 2. Hit (Attack Enemy Territory)
@@ -158,6 +160,8 @@ Neutral hexes only. Automatic success.
 
 ### 5.2 Scouting
 - +15% hit success (fresh, within 1 turn). +7% (stale, turns 2-3). Duration: 3 turns.
+- **Capos scout at 2-hex range** vs soldiers' 1-hex range.
+- Scouted hexes can reveal enemy planned hits — see [Intel & Threat Detection](./GAME_MECHANICS.md#20-intel--threat-detection).
 
 ### 5.3 Hitman Contracts
 - External killers, NOT in regular combat. 40-90% success. No heat.
@@ -175,6 +179,7 @@ Neutral hexes only. Automatic success.
 - Fortified: 50% fewer casualties
 - **Extortion failures: NO casualties**
 - **Claim: NO casualties**
+- **Capos cannot die in regular combat** — they are wounded instead (-10 loyalty, -1 move for 1 turn). Capos can only be permanently killed via hitman contract or planned hit.
 
 ---
 
@@ -226,12 +231,12 @@ Weaken enemy HQ defenses by turning a rival soldier.
 
 ## 9. Victory Conditions
 
-| Path | Target |
-|---|---|
-| Territory Domination | 60 hexes (~18% of map) |
-| Economic Empire | $50,000/month income |
-| Legacy of Power | Beat rivals by 25% after turn 15 |
-| **Total Domination** | **Eliminate all 4 rival families via HQ Assault** |
+| Path | Small Map | Medium Map | Large Map |
+|---|---|---|---|
+| Territory Domination | 40 hexes | 60 hexes | 80 hexes |
+| Economic Empire | $50,000/month | $50,000/month | $50,000/month |
+| Legacy of Power | Beat rival by 25% after turn 15 | Same | Same |
+| **Total Domination** | **Eliminate all 4 rival families via HQ Assault** | Same | Same |
 
 ---
 

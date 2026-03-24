@@ -50,6 +50,18 @@ Open `http://localhost:8080` and choose your family to start playing.
 | **Bonanno** | Intimidation | +25% intimidation, +20% extortion | 2 | Staten Island |
 | **Colombo** | Growth | +20% income, +15% recruit discount | 1 | Bronx |
 
+### Map Sizes
+
+Choose your battlefield at game start:
+
+| Size | Radius | ~Hex Count | Feel |
+|------|--------|-----------|------|
+| 🗺️ Small | 7 | ~169 | Fast, aggressive — tight quarters |
+| 🗺️ Medium | 10 | ~331 | Classic — balanced pacing |
+| 🗺️ Large | 13 | ~547 | Epic — sprawling empire building |
+
+Victory targets, AI recruitment caps, and economy values scale automatically with map size.
+
 ### Turn Structure
 
 Each turn = 1 month. Four phases per turn:
@@ -60,12 +72,13 @@ Deploy → Tactical (Move) → Action → End Turn
 
 - **2–3 action points** per turn (bonus at 50+ respect & influence)
 - **3 tactical actions** per turn (separate budget)
+- **Skip to Action**: Jump directly from Deploy or Tactical phase to Action phase
 
 ### Victory Conditions
 
 | Path | Target |
 |---|---|
-| 🗺️ Territory Domination | Control **60 hexes** (~18% of map) |
+| 🗺️ Territory Domination | **40 / 60 / 80 hexes** (Small / Medium / Large map) |
 | 💰 Economic Empire | **$50,000+** monthly income |
 | 👑 Legacy of Power | Beat highest rival rep by **25%** after **turn 15** |
 | 💀 Total Domination | Eliminate **all 4 rival families** via HQ Assault |
@@ -75,7 +88,7 @@ Deploy → Tactical (Move) → Action → End Turn
 ## 🔧 Core Systems
 
 ### Hex Grid Map
-- ~331 hexes across 6 NYC districts (Little Italy, Brooklyn, Queens, Manhattan, Bronx, Staten Island)
+- 169–547 hexes across 6 NYC districts depending on map size (Little Italy, Brooklyn, Queens, Manhattan, Bronx, Staten Island)
 - Zoom, pan, and mobile touch controls
 - Color-coded territory ownership
 
@@ -85,8 +98,8 @@ Deploy → Tactical (Move) → Action → End Turn
 - Capos still fly up to 5 hexes regardless
 
 ### Units & Personnel
-- **Soldiers**: 1-hex movement (or free within connected territory), 2 moves/turn, $1,500 (mercenary) or $300 (local recruit, requires 10+ hexes)
-- **Capos**: 5-hex flying movement, 3 moves/turn, 100% territory income, negotiation abilities
+- **Soldiers**: 1-hex movement (or free within connected territory), 2 moves/turn, $1,500 (mercenary) or $300 (local recruit, requires 10+ hexes). **Only deployed soldiers cost $600/turn maintenance — undeployed reserves are free.**
+- **Capos**: 5-hex flying movement, 3 moves/turn, 100% territory income, negotiation abilities. Auto-claim neutral territory on arrival. **Wound mechanic**: immune to death in regular combat — wounded instead (-10 loyalty, -1 move for 1 turn). Can only be killed via hitman or planned hit. Scout at 2-hex range.
 - **Boss**: Permanent HQ presence. Can call a Sitdown.
 - **Hitmen**: External contract killers ($15,000), 40-90% success based on target location
 
@@ -94,6 +107,11 @@ Deploy → Tactical (Move) → Action → End Turn
 - **Hit**: Attack enemy territory. Success based on force ratio, modifiers, and luck (10–95% range). Territory set to neutral on success.
 - **Extort**: Shakedown neutral (90%) or enemy (50%) hexes for money and territory. No casualties on failure.
 - **Claim**: Peacefully take neutral territory (+1 respect, +1 influence)
+
+### Intel & Threat Detection
+- **Scouted hexes** and **active police bribes** can reveal enemy planned hits before they execute
+- Detected threats appear in the HQ panel's "Active Threats" section with source intel and urgency indicators
+- Notifications fire when new threats are discovered via street scouts or police contacts
 
 ### HQ Assault & Elimination
 - **Assault HQ**: Soldiers with toughness ≥ 4 and loyalty ≥ 70, adjacent to enemy HQ, can attempt to destroy it (15% base, 50% max)
@@ -107,7 +125,7 @@ Deploy → Tactical (Move) → Action → End Turn
 - Recalled soldiers gain +5 loyalty
 
 ### Tactical Actions
-- **Scout**: Reveal hex intel, +15% hit bonus for 3 turns
+- **Scout**: Reveal hex intel, +15% hit bonus for 3 turns. Capos scout at 2-hex range.
 - **Fortify**: +25% defense, 50% casualty reduction (persists until move)
 - **Safehouse**: Capo creates secondary deploy point for 5 turns
 - **Escort**: Capo transports up to 2 soldiers across any distance
@@ -121,8 +139,14 @@ Deploy → Tactical (Move) → Action → End Turn
 ### Economy & Businesses
 Four business types: Brothel ($3K), Gambling Den ($4K), Loan Sharking ($5K), Store Front ($2K). Capos earn 100% income vs soldiers' 30%.
 
+### Financial Display
+- HQ panel shows **gross income** (pre-penalty) as the income header
+- Expenses include soldier maintenance, community upkeep, arrest penalties, and heat penalties as transparent line items
+- Math is fully transparent: **Gross Income − All Expenses = Net Profit**
+
 ### Soldier Maintenance
-- $600/turn per soldier
+- **Deployed soldiers**: $600/turn per soldier
+- **Undeployed reserves**: Free (no maintenance until deployed)
 - $150/turn per empty claimed hex (community upkeep)
 - Bankruptcy at -$50K triggers game over; soldiers desert at 1 per $10K debt
 
