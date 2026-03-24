@@ -5487,11 +5487,19 @@ export const useEnhancedMafiaGameState = (
   const processNegotiation = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
     const { negotiationType, targetQ, targetR, targetS, capoId, extraData, isBossNegotiation, targetFamily: actionTargetFamily } = action;
 
-    // 1 negotiation per turn (Boss + Capo combined)
-    if (state.negotiationUsedThisTurn) {
+    // Separate cooldowns for Boss and Capo
+    const isFamily = isBossNegotiation;
+    if (isFamily && state.bossNegotiationUsedThisTurn) {
       state.pendingNotifications = [...state.pendingNotifications, {
-        type: 'warning', title: '⏳ Negotiation Cooldown',
-        message: 'Only 1 negotiation attempt per turn (Boss + Capo combined).',
+        type: 'warning', title: '⏳ Boss Negotiation Cooldown',
+        message: 'The Boss has already negotiated this turn.',
+      }];
+      return state;
+    }
+    if (!isFamily && state.capoNegotiationUsedThisTurn) {
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'warning', title: '⏳ Capo Negotiation Cooldown',
+        message: 'A Capo has already negotiated this turn.',
       }];
       return state;
     }
