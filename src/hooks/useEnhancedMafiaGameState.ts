@@ -3236,7 +3236,7 @@ export const useEnhancedMafiaGameState = (
           opponent.resources.money -= SAFEHOUSE_COST;
           if (turnReport) {
             const hasIntel = state.scoutedHexes.some(s => s.q === bestHex.q && s.r === bestHex.r && s.s === bestHex.s) ||
-              (state.activeBribes || []).some(b => b.tier === 'police_captain' || b.tier === 'police_chief');
+              (state.activeBribes || []).some(b => (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'mayor') && b.active);
             if (hasIntel) {
               turnReport.aiActions.push({ family: fam, action: 'safehouse', detail: `Established a safehouse in ${bestHex.district}` });
             }
