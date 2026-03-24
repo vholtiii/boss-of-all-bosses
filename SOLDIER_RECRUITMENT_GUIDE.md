@@ -112,11 +112,18 @@ Each promoted capo receives a random personality:
 | **Enforcer** | 💪 | +15% Bribe for Territory |
 | **Schemer** | 🧠 | +15% Alliance, +10% all negotiations |
 
-Capo properties:
-- **Named**: Unique generated name
-- **Movement**: Up to 5 hexes (flying), 3 moves per turn
-- **Income**: 100% territory income (vs soldiers' 30%)
-- **Abilities**: Negotiate, establish safehouses, escort soldiers
+### 5.3 Capo Properties
+
+| Property | Value |
+|---|---|
+| Movement | Up to 5 hexes (flying), 3 moves per turn |
+| Income | 100% territory income (vs soldiers' 30%) |
+| Scout range | 2 hexes (vs soldiers' 1 hex) |
+| Auto-claim | Claims neutral territory automatically on arrival |
+| Combat immunity | Cannot die in regular combat — wounded instead |
+| Abilities | Negotiate, establish safehouses, escort soldiers |
+
+**Wound Mechanic**: If a capo would be killed in combat, they are instead wounded: -10 loyalty and -1 move penalty for 1 turn. Capos can only be permanently eliminated via hitman contract or planned hit.
 
 ---
 
@@ -165,11 +172,14 @@ Auto-fails after 5 turns total.
 
 | Unit | Cost | Per-Turn Maintenance |
 |---|---|---|
-| Soldier (Mercenary) | $1,500 | $600/turn |
-| Soldier (Local Recruit) | $300 | $600/turn |
+| Soldier (Mercenary) | $1,500 | $600/turn **(deployed only)** |
+| Soldier (Local Recruit) | $300 | $600/turn **(deployed only)** |
+| Soldier (Undeployed) | — | **Free** |
 | Capo (Promotion) | $10,000 | — |
 | Hitman contract | $15,000 | — (one-time) |
 | Empty claimed hex | — | $150/turn (community upkeep) |
+
+**Note**: Soldiers only incur maintenance costs once deployed to the map. Undeployed soldiers in the recruitment pool are free. Once deployed (including if recalled to HQ via Sitdown or manual movement), they continue to cost $600/turn.
 
 ---
 
@@ -179,17 +189,20 @@ Auto-fails after 5 turns total.
 - Recruit mercenaries early for action coverage ($1,500 each)
 - Once at 10+ hexes, switch to local recruits ($300 each)
 - Respect ≥ 50 gives up to 30% discount
+- Keep a reserve of undeployed soldiers — they're free until you need them
 
 ### Capo Promotion
 - Focus on getting a soldier to 3 victories, 3 toughness, 3 racketeering
 - Deploy soldiers near combat zones for toughness growth
 - Use extortion to build racketeering + victories simultaneously
 - Deploy capos to high-income hexes (100% vs 30% income)
+- Capos auto-claim neutral territory on arrival — use their 5-hex fly for rapid expansion
 
 ### Hitman Contracts
 - Target enemy capos on high-value hexes
 - Target units in open field for 90% success
 - Failed contracts trigger 5-turn AI alert — plan accordingly
+- Hitman contracts are the only way to permanently kill enemy capos
 
 ### HQ Assault Preparation
 - Build a soldier to toughness ≥ 4 and loyalty ≥ 70
