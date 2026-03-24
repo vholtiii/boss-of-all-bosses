@@ -98,6 +98,8 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   alliances: (state.alliances || []).map(a => ({ ...a, conditions: a.conditions.map(c => ({ ...c })) })),
   ceasefires: (state.ceasefires || []).map(c => ({ ...c })),
   events: [...(state.events || [])],
+  flippedSoldiers: (state.flippedSoldiers || []).map(f => ({ ...f })),
+  eliminatedFamilies: [...(state.eliminatedFamilies || [])],
   hitmanContracts: [...(state.hitmanContracts || [])],
   aiOpponents: (state.aiOpponents || []).map(o => ({
     ...o,
