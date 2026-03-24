@@ -366,9 +366,20 @@ export const AI_PLAN_HIT_CHANCE = 0.15;        // 15% chance per turn for aggres
 export const AI_PLAN_HIT_SUCCESS_RATE = 0.5;   // 50% success when executing
 export const AI_PLAN_HIT_DURATION = 2;         // turns before AI executes the hit
 
+export type IntelSource = 'scout' | 'bribe_captain' | 'bribe_chief' | 'bribe_mayor';
+
+export const INTEL_SOURCE_LABELS: Record<IntelSource, { label: string; flavorPrefix: string }> = {
+  scout: { label: 'Street Scout', flavorPrefix: 'Your soldier overheard' },
+  bribe_captain: { label: 'Police Captain', flavorPrefix: 'The Captain tipped you off —' },
+  bribe_chief: { label: 'Police Chief', flavorPrefix: 'High-level sources confirm —' },
+  bribe_mayor: { label: "Mayor's Office", flavorPrefix: 'Top brass intelligence —' },
+};
+
 export interface AIPlannedHit {
   family: string;
   targetUnitId: string;
   turnsRemaining: number;
   plannedOnTurn: number;
+  detectedVia?: IntelSource;
+  detectedOnTurn?: number;
 }

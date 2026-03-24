@@ -36,7 +36,7 @@ import {
   LOYALTY_ACTION_BONUS, LOYALTY_COMBAT_BONUS, LOYALTY_INCOME_HEX_BONUS, LOYALTY_INCOME_HEX_THRESHOLD, LOYALTY_UNPAID_PENALTY,
   CAPO_WOUND_LOYALTY_PENALTY, CAPO_WOUND_MOVE_PENALTY,
   AI_PLAN_HIT_CHANCE, AI_PLAN_HIT_SUCCESS_RATE, AI_PLAN_HIT_DURATION,
-  AIPlannedHit,
+  AIPlannedHit, IntelSource, INTEL_SOURCE_LABELS,
   FlippedSoldier,
   HQ_ASSAULT_BASE_CHANCE, HQ_DEFENSE_BONUS, HQ_ASSAULT_MAX_CHANCE, HQ_ASSAULT_MIN_TOUGHNESS, HQ_ASSAULT_MIN_LOYALTY,
   FLIP_SOLDIER_COST, FLIP_SOLDIER_BASE_CHANCE, FLIP_SOLDIER_FAIL_INFLUENCE_LOSS,
@@ -3251,20 +3251,44 @@ export const useEnhancedMafiaGameState = (
         const availableTargets = playerCapos.filter(c => !alreadyTargeted.has(c.id));
         if (availableTargets.length > 0) {
           const target = availableTargets[Math.floor(Math.random() * availableTargets.length)];
+          // Determine intel source for detection
+          const targetUnit = state.deployedUnits.find(u => u.id === target.id);
+          let detectedVia: import('@/types/game-mechanics').IntelSource | undefined;
+          
+          // Check bribe intel first (higher tier = better source)
+          const activeBribes = (state.activeBribes || []).filter(b => b.active);
+          const mayorBribe = activeBribes.find(b => b.tier === 'mayor');
+          const chiefBribe = activeBribes.find(b => b.tier === 'police_chief');
+          const captainBribe = activeBribes.find(b => b.tier === 'police_captain' && (b.targetFamily === fam || !b.targetFamily));
+          
+          if (mayorBribe) {
+            detectedVia = 'bribe_mayor';
+          } else if (chiefBribe) {
+            detectedVia = 'bribe_chief';
+          } else if (captainBribe) {
+            detectedVia = 'bribe_captain';
+          } else if (targetUnit && state.scoutedHexes.some(s => s.q === targetUnit.q && s.r === targetUnit.r && s.s === targetUnit.s)) {
+            detectedVia = 'scout';
+          }
+          
           state.aiPlannedHits.push({
             family: fam,
             targetUnitId: target.id,
             turnsRemaining: AI_PLAN_HIT_DURATION,
             plannedOnTurn: state.turn,
+            detectedVia,
+            detectedOnTurn: detectedVia ? state.turn : undefined,
           });
-          // Gate plan hit intel behind fog-of-war
-          if (turnReport) {
-            const targetUnit = state.deployedUnits.find(u => u.id === target.id);
-            const hasHitIntel = targetUnit && (
-              state.scoutedHexes.some(s => s.q === targetUnit.q && s.r === targetUnit.r && s.s === targetUnit.s) ||
-              (state.activeBribes || []).some(b => (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'mayor') && b.active)
-            );
-            if (hasHitIntel) {
+          
+          // Fire notification if detected
+          if (detectedVia) {
+            const sourceInfo = INTEL_SOURCE_LABELS[detectedVia];
+            state.pendingNotifications.push({
+              type: 'warning' as const,
+              title: '🔫 Hit Planned Against You!',
+              message: `${sourceInfo.flavorPrefix} the ${fam} family is planning a hit on your capo!`,
+            });
+            if (turnReport) {
               turnReport.aiActions.push({ family: fam, action: 'plan_hit', detail: `Planned a hit against a player capo` });
             }
           }
@@ -3376,6 +3400,38 @@ export const useEnhancedMafiaGameState = (
         }
       }
     });
+
+    // ── RE-CHECK UNDETECTED PLANNED HITS FOR NEW INTEL ──
+    if (state.aiPlannedHits && state.aiPlannedHits.length > 0) {
+      const activeBribes = (state.activeBribes || []).filter(b => b.active);
+      for (const hit of state.aiPlannedHits) {
+        if (hit.detectedVia) continue; // already detected
+        
+        const targetUnit = state.deployedUnits.find(u => u.id === hit.targetUnitId);
+        let detectedVia: IntelSource | undefined;
+        
+        if (activeBribes.find(b => b.tier === 'mayor')) {
+          detectedVia = 'bribe_mayor';
+        } else if (activeBribes.find(b => b.tier === 'police_chief')) {
+          detectedVia = 'bribe_chief';
+        } else if (activeBribes.find(b => b.tier === 'police_captain' && (b.targetFamily === hit.family || !b.targetFamily))) {
+          detectedVia = 'bribe_captain';
+        } else if (targetUnit && state.scoutedHexes.some(s => s.q === targetUnit.q && s.r === targetUnit.r && s.s === targetUnit.s)) {
+          detectedVia = 'scout';
+        }
+        
+        if (detectedVia) {
+          hit.detectedVia = detectedVia;
+          hit.detectedOnTurn = state.turn;
+          const sourceInfo = INTEL_SOURCE_LABELS[detectedVia];
+          state.pendingNotifications.push({
+            type: 'warning' as const,
+            title: '🔫 Hit Intel Discovered!',
+            message: `${sourceInfo.flavorPrefix} the ${hit.family} family has a hit planned on your capo!`,
+          });
+        }
+      }
+    }
 
     // ── EXECUTE PENDING AI PLANNED HITS ──
     if (state.aiPlannedHits && state.aiPlannedHits.length > 0) {

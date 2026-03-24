@@ -293,18 +293,33 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 </div>
               );
             })()}
-            {/* AI Assassination Warnings */}
-            {(gameState as any).aiPlannedHits && (gameState as any).aiPlannedHits.length > 0 && (
-              <div className="p-2 rounded-lg bg-red-500/20 border border-red-500/40 text-[11px] text-red-300">
-                <div className="flex items-center gap-1.5 font-bold">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  ⚠️ Intel Warning: {(gameState as any).aiPlannedHits.length} assassination plot{(gameState as any).aiPlannedHits.length > 1 ? 's' : ''} detected
+            {/* AI Assassination Warnings — only show detected hits */}
+            {(() => {
+              const allHits = (gameState as any).aiPlannedHits || [];
+              const detectedHits = allHits.filter((h: any) => h.detectedVia);
+              if (detectedHits.length === 0) return null;
+              const sourceLabels: Record<string, string> = {
+                scout: '🕵️ Street Scout',
+                bribe_captain: '👮 Police Captain',
+                bribe_chief: '🏛️ Police Chief',
+                bribe_mayor: '🏛️ Mayor\'s Office',
+              };
+              return (
+                <div className="p-2 rounded-lg bg-red-500/20 border border-red-500/40 text-[11px] text-red-300 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    ⚠️ Intel Warning: {detectedHits.length} assassination plot{detectedHits.length > 1 ? 's' : ''} detected
+                  </div>
+                  {detectedHits.map((hit: any, i: number) => (
+                    <div key={i} className="text-[10px] opacity-90 pl-2 border-l border-red-500/30">
+                      <span className="font-semibold capitalize">{hit.family}</span> targeting your capo
+                      {hit.turnsRemaining != null && <span className="text-red-400 ml-1">({hit.turnsRemaining} turn{hit.turnsRemaining !== 1 ? 's' : ''} left)</span>}
+                      <div className="opacity-70">Source: {sourceLabels[hit.detectedVia] || 'Unknown'}</div>
+                    </div>
+                  ))}
                 </div>
-                <div className="text-[10px] opacity-80 mt-0.5">
-                  Rival families are planning hits on your capos. Stay vigilant.
-                </div>
-              </div>
-            )}
+              );
+            })()}
             <Separator className="my-1" />
             <ActionButton
               icon={<Users className="h-4 w-4" />}
