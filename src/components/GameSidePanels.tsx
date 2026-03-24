@@ -44,10 +44,11 @@ interface GameSidePanelProps {
 
 // ─── LEFT PANEL: Resources + Actions ──────────────────────────────────
 
-export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: any) => void; turnPhase?: string }> = ({
+export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: any) => void; turnPhase?: string; onSelectUnit?: (unitType: string, hex: { q: number; r: number; s: number }) => void }> = ({
   gameState,
   onAction,
   turnPhase,
+  onSelectUnit,
 }) => {
   const phase = turnPhase || gameState.turnPhase || 'action';
   const actionsLocked = phase === 'deploy' || phase === 'move';
