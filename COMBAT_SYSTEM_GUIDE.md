@@ -4,32 +4,19 @@
 
 - [1. Overview](#1-overview)
 - [2. Hit (Attack Enemy Territory)](#2-hit-attack-enemy-territory)
-  - [2.1 Who Participates](#21-who-participates)
-  - [2.2 Success Chance Formula](#22-success-chance-formula)
-  - [2.3 Victory Outcome](#23-victory-outcome)
-  - [2.4 Defeat Outcome](#24-defeat-outcome)
-  - [2.5 Police Heat from Hits](#25-police-heat-from-hits)
-  - [2.6 Diplomacy Interactions](#26-diplomacy-interactions)
 - [3. Extort](#3-extort)
-  - [3.1 Neutral vs Enemy Extortion](#31-neutral-vs-enemy-extortion)
-  - [3.2 Success Chance Formula](#32-success-chance-formula)
-  - [3.3 Success Outcome](#33-success-outcome)
-  - [3.4 Failure Outcome](#34-failure-outcome)
-  - [3.5 Police Heat from Extortion](#35-police-heat-from-extortion)
 - [4. Claim Territory](#4-claim-territory)
 - [5. Combat Modifiers](#5-combat-modifiers)
-  - [5.1 Fortification](#51-fortification)
-  - [5.2 Scouting](#52-scouting)
-  - [5.3 Hitmen](#53-hitmen)
-  - [5.4 Family Bonuses](#54-family-bonuses)
 - [6. Casualty System](#6-casualty-system)
-- [7. Victory Conditions](#7-victory-conditions)
+- [7. HQ Assault](#7-hq-assault)
+- [8. Flip Soldier](#8-flip-soldier)
+- [9. Victory Conditions](#9-victory-conditions)
 
 ---
 
 ## 1. Overview
 
-Combat in Boss of All Bosses is resolved through three distinct actions available during the **Action Phase**: **Hit**, **Extort**, and **Claim**. Each consumes 1 action point from your turn budget (2–3 per turn).
+Combat in Boss of All Bosses is resolved through three primary actions during the **Action Phase**: **Hit**, **Extort**, and **Claim**. Each consumes 1 action point (2–3 per turn). Additionally, **HQ Assault** and **Flip Soldier** are endgame combat actions.
 
 ---
 
@@ -37,7 +24,7 @@ Combat in Boss of All Bosses is resolved through three distinct actions availabl
 
 The primary offensive action. Attacks an enemy-controlled hex to clear it (territory becomes neutral — must Claim next turn).
 
-**Scouted vs Unscouted (Blind) Hits** determine risk/reward:
+**Scouted vs Unscouted (Blind) Hits:**
 
 | | Scouted Hit | Blind Hit (Unscouted) |
 |---|---|---|
@@ -46,149 +33,104 @@ The primary offensive action. Attacks an enemy-controlled hex to clear it (terri
 | Victory respect | +5 | +15 |
 | Victory fear | +5 | +15 |
 | Soldier stat boost | Normal (+1 each) | Maxed (toughness, loyalty, victories) |
-| Street cred event | No | Yes — all rivals gain fear |
 | Bounty placed | No | Yes — targeted family attacks you for 3 turns |
 | Target family penalty | None | −10 influence |
 
-### 2.0 Civilian Hit (Blind Hit Only)
+### 2.1 Civilian Hit (Blind Hit Only)
 
-If you hit an **unscouted hex with no enemy units**, your soldier struck a civilian:
+If you hit an unscouted hex with no enemy units:
 
 | Penalty | Value |
 |---|---|
 | Police heat | Set to **100 (maximum)** |
-| Attacking soldier | Removed from board, enters **hiding for 3 turns** |
-| Soldier return | Loyalty check upon return (see Internal Family Hit) |
-| Respect/fear gained | None |
+| Attacking soldier | Removed, enters hiding for **3 turns** |
+| Return check | Loyalty ≥ 70: returns. < 70: permanently eliminated |
 
-### 2.0.1 Internal Family Hit (Post-Hiding)
+### 2.2 Who Participates
 
-When a soldier's hiding period ends, the family evaluates their loyalty:
-
-| Loyalty | Outcome |
-|---|---|
-| **≥ 70** | Soldier returns to HQ normally |
-| **< 70** | Soldier is **permanently eliminated** by the family |
-
-**If eliminated:**
-
-| Effect | Value |
-|---|---|
-| Heat reduction | **−25** (family cleaned up its mess) |
-| Morale risk | Each remaining soldier has **10% chance** of losing **−15 loyalty** |
-| Notification | "The family dealt with the soldier internally." |
-
-### 2.1 Who Participates
-
-- The **selected unit** (initiator, typically adjacent to target)
+- The **selected unit** (must be adjacent to or on the target hex)
 - Any **player units already on the target hex**
-- Enemy units on the target hex defend
+- Player units on **adjacent hexes** (90% effectiveness)
+- All **enemy units** on the target hex defend
 
-### 2.2 Success Chance Formula
+### 2.3 Success Chance Formula
 
 ```
 chance = 50% + (attackers - defenders) × 15%
        + family combat bonus (e.g., Gambino +25%)
        + family hit success bonus (e.g., Lucchese +25%)
-       + scout bonus (+15% if hex scouted)
+       + scout bonus (+15% if scouted, +7% if stale)
        + fortified attacker bonus (+12.5%)
        - fortified defender penalty (-25%)
+       - blind hit penalty (-20% if unscouted)
+       + planned hit bonus (+20% if planned)
 
-Clamped to range: 10% – 95%
+Clamped: 10%–95%
 ```
 
-**Example:**
-- 2 attackers vs 1 defender: 50% + (1 × 15%) = 65%
-- With Gambino bonus: 65% + 25% = 90%
-- With 1 fortified defender: 90% - 25% = 65%
-
-### 2.3 Victory Outcome
+### 2.4 Victory Outcome
 
 | Effect | Value |
 |---|---|
-| Territory captured | ❌ (set to neutral; must Claim next turn) |
+| Territory | Set to **neutral** (must Claim next turn) |
 | Enemy units on hex | Removed |
 | Respect gained | +5 |
 | Fear gained | +5 |
 | Attacker casualties | 20% of attackers (random, min 0) |
 | Fortified casualty reduction | 50% fewer casualties |
 
-Surviving attackers gain +1 "survived conflicts" stat.
-
-### 2.4 Defeat Outcome
+### 2.5 Defeat Outcome
 
 | Effect | Value |
 |---|---|
-| Territory captured | ❌ |
+| Territory | Unchanged |
 | Attacker casualties | 40% of attackers (random, min 1) |
-| Fortified casualty reduction | 50% fewer casualties |
+| Fortified casualty reduction | 50% fewer |
 
-Surviving units gain +1 "survived conflicts" stat.
-
-### 2.5 Police Heat from Hits
+### 2.6 Police Heat from Hits
 
 ```
 heatGain = min(25, 8 + totalUnitsInvolved × 2)
 ```
 
-Heat scales with battle size. A 2v1 fight generates 14 heat; a 5v3 fight generates 24 heat.
-
-### 2.6 Diplomacy Interactions
+### 2.7 Diplomacy Interactions
 
 | Situation | Penalty |
 |---|---|
-| Attack an allied family | Alliance broken, −25 respect, −15 reputation, −40 relationship |
-| Break a ceasefire | Ceasefire voided, −15 respect |
-
-Both penalties apply if both are active. The attack still proceeds after penalties.
+| Attack allied family | Alliance broken, −25 respect, −15 reputation, −40 relationship |
+| Break ceasefire | Ceasefire voided, −15 respect |
 
 ---
 
 ## 3. Extort
 
-A shakedown operation. Works on **neutral** and **enemy** hexes.
-
-### 3.1 Neutral vs Enemy Extortion
+### 3.1 Neutral vs Enemy
 
 | | Neutral | Enemy |
 |---|---|---|
 | Base success | 90% | 50% |
-| On success | Claims territory + money | Steals income only (no territory change) |
-| Base money | $3,000 | Business income or $2,000 |
-| Respect gained | +5 | +3 |
+| On success | Claims territory + money | Steals income only |
+| Money | $3,000 × respect multiplier | Business income × respect multiplier |
+| Respect | +5 | +3 |
 
-### 3.2 Success Chance Formula
+**Respect payout multiplier**: 0.5 + (respect / 100). Range: 0.5x–1.5x.
+
+### 3.2 Success Modifiers
 
 ```
-chance = base (90% or 50%)
-       + family extortion bonus (e.g., Bonanno +20%)
-       - heat / 1000 (up to −10% at max heat)
-       + (influence / 100) × 15% (up to +15%)
-       × 0.8 if Manhattan (20% harder)
-
++ family extortion bonus (e.g., Bonanno +20%)
+- heat / 1000 (up to -10%)
++ (influence / 100) × 15% (up to +15%)
+× 0.8 if Manhattan (20% harder)
 Max: 99%
 ```
 
-**Participants**: Player units on the target hex + player units on adjacent hexes.
+### 3.3 Failure Outcome
 
-### 3.3 Success Outcome
+**No casualties.** Reputational blow only:
+- −3 respect, −2 fear, +5 extra heat
 
-- Neutral: territory claimed to player
-- Money gained = base × respect multiplier (0.5 + respect/100)
-- Respect gained (+5 neutral, +3 enemy)
-- All participating units get +1 extortion stat
-
-### 3.4 Failure Outcome
-
-**No casualties.** Failed extortion is a reputational blow, not a firefight.
-
-| Penalty | Value |
-|---|---|
-| Respect lost | −3 |
-| Fear lost | −2 |
-| Extra police heat | +5 (on top of base) |
-
-### 3.5 Police Heat from Extortion
+### 3.4 Heat from Extortion
 
 | Target | Base Heat | Failed Bonus |
 |---|---|---|
@@ -199,77 +141,97 @@ Max: 99%
 
 ## 4. Claim Territory
 
-The peaceful way to expand. **Neutral hexes only.**
+Neutral hexes only. Automatic success.
 
 | Property | Value |
 |---|---|
-| Combat roll | None — automatic success |
-| Requires | ≥1 player soldier on or adjacent to the hex |
+| Requires | ≥1 player soldier on or adjacent to hex |
 | Reward | +1 respect, +1 influence |
-| Casualties | None |
-| Heat | None |
+| Casualties / Heat | None |
 
 ---
 
 ## 5. Combat Modifiers
 
 ### 5.1 Fortification
-
-| Modifier | Value |
-|---|---|
-| Defense bonus | +25% for defenders |
-| Attack bonus | +12.5% for attackers (half value) |
-| Casualty reduction | 50% fewer casualties |
-| Duration | Persists until the unit moves |
-| Visibility | Hidden from enemies |
+- Defense: +25%. Attack: +12.5%. Casualty reduction: 50%. Persists until move. Hidden from enemies.
 
 ### 5.2 Scouting
-
-| Modifier | Value |
-|---|---|
-| Hit success bonus | +15% on scouted hexes |
-| Duration | 3 turns after scouting |
-| Intel revealed | Enemy count, family, business details |
+- +15% hit success (fresh, within 1 turn). +7% (stale, turns 2-3). Duration: 3 turns.
 
 ### 5.3 Hitman Contracts
-
-Hitmen are **external contract killers** — they do NOT participate in regular combat. Instead, they perform surgical strikes against specific enemy units over 3-5 turns. See [SOLDIER_RECRUITMENT_GUIDE.md](./SOLDIER_RECRUITMENT_GUIDE.md#6-hitman-contracts) for full details.
-
-| Property | Value |
-|---|---|
-| Combat bonus | None (external, not in battle) |
-| Success rate | 40-90% depending on target location |
-| Heat generated | None |
+- External killers, NOT in regular combat. 40-90% success. No heat.
 
 ### 5.4 Family Bonuses
-
-| Family | Combat Modifier |
-|---|---|
-| Gambino | +25% combat bonus |
-| Lucchese | +25% hit success |
-| Bonanno | +20% extortion |
-| Others | See family bonus table |
+- Gambino: +25% combat. Lucchese: +25% hit success. Bonanno: +20% extortion.
 
 ---
 
 ## 6. Casualty System
 
-- Casualties are selected **randomly** from the participant pool (shuffled before removal)
-- On hit victory: 20% of attackers (min 0)
-- On hit defeat: 40% of attackers (min 1)
-- Fortified units reduce casualties by 50%
-- **Extortion failures cause NO casualties** — only reputation and heat penalties
-- **Claim territory causes NO casualties**
+- Random selection from participant pool
+- Hit victory: 20% of attackers (min 0)
+- Hit defeat: 40% of attackers (min 1)
+- Fortified: 50% fewer casualties
+- **Extortion failures: NO casualties**
+- **Claim: NO casualties**
 
 ---
 
-## 7. Victory Conditions
+## 7. HQ Assault
 
-| Path | Target | Details |
-|---|---|---|
-| Territory Domination | 60 hexes | ~18% of the map |
-| Economic Empire | $50,000/month | Requires capos on high-value businesses |
-| Legacy of Power | Beat rivals by 25% after turn 15 | Player rep vs rival score: (territory×3 + soldiers×2 + money/500) |
+The endgame elimination mechanic. Destroy an enemy headquarters to remove that family from the game.
+
+| Property | Value |
+|---|---|
+| Who | Soldiers only (not capos) |
+| Position | Must be **adjacent** to enemy HQ (not on it) |
+| Requirements | Toughness ≥ 4, Loyalty ≥ 70 |
+| Base success | 15% |
+| Max chance | 50% |
+| HQ defense penalty | -30% |
+| Friendly adjacent bonus | +5% per friendly unit adjacent to HQ |
+| Flipped soldier bonus | +10% per flipped enemy soldier at HQ |
+| Family combat bonus | Applies |
+
+**On Success:**
+- Target family **eliminated** — all units removed, all territory set to neutral
+- +$25,000, +30 respect, +40 fear
+
+**On Failure:**
+- Attacking soldier **killed**
+- All participating units lose 30 loyalty
+- **No police heat penalty**
+
+**Cannot**: Scout, claim, or extort HQ hexes.
+
+---
+
+## 8. Flip Soldier
+
+Weaken enemy HQ defenses by turning a rival soldier.
+
+| Property | Value |
+|---|---|
+| Cost | $5,000 |
+| Position | Must have unit adjacent to enemy HQ |
+| Target | Enemy soldier at/near HQ with loyalty > 60 |
+| Base success | 25% |
+| Modifiers | +10% if target loyalty 60-70, +5% per influence above 50, +schemer capo bonus |
+
+**On Success:** Target marked as flipped (hidden from enemy). Reduces HQ defense by 10%.
+**On Failure:** Scheming family loses **15 influence**. Target soldier gains +10 loyalty. Enemy notified.
+
+---
+
+## 9. Victory Conditions
+
+| Path | Target |
+|---|---|
+| Territory Domination | 60 hexes (~18% of map) |
+| Economic Empire | $50,000/month income |
+| Legacy of Power | Beat rivals by 25% after turn 15 |
+| **Total Domination** | **Eliminate all 4 rival families via HQ Assault** |
 
 ---
 

@@ -7,12 +7,7 @@
 - [3. Soldier Recruitment](#3-soldier-recruitment)
 - [4. Soldier Stats](#4-soldier-stats)
 - [5. Capo Promotion](#5-capo-promotion)
-  - [5.1 Requirements](#51-requirements)
-  - [5.2 Capo Personalities](#52-capo-personalities)
 - [6. Hitman Contracts](#6-hitman-contracts)
-  - [6.1 How It Works](#61-how-it-works)
-  - [6.2 Duration & Success](#62-duration--success)
-  - [6.3 Failed Hits & AI Alert](#63-failed-hits--ai-alert)
 - [7. Unit Costs & Maintenance](#7-unit-costs--maintenance)
 - [8. Strategic Tips](#8-strategic-tips)
 
@@ -20,33 +15,36 @@
 
 ## 1. Overview
 
-The personnel system governs recruitment of new soldiers and promotion of experienced soldiers into specialized roles (capos). Hitmen are external contract killers hired for surgical strikes.
+The personnel system governs recruitment of new soldiers and promotion of experienced soldiers into capos. Hitmen are external contract killers hired for surgical strikes.
 
 ---
 
 ## 2. Starting Conditions
 
-| Property | Value |
-|---|---|
-| Starting soldiers | 3 per family |
-| Starting capos | 1 per family |
-| Starting boss | 1 per family (permanent) |
-| Starting money | Varies by family |
+Starting soldiers vary by family (historically inspired):
 
-All families start with the same unit composition, ensuring a balanced early game.
+| Family | Soldiers | Capos | Boss | Starting Money |
+|---|---|---|---|---|
+| Gambino | 4 | 1 | 1 | $50,000 |
+| Genovese | 4 | 1 | 1 | $50,000 |
+| Lucchese | 3 | 1 | 1 | $50,000 |
+| Bonanno | 2 | 1 | 1 | $50,000 |
+| Colombo | 1 | 1 | 1 | $50,000 |
+
+All units start at their family's HQ hex.
 
 ---
 
 ## 3. Soldier Recruitment
 
-| Property | Value |
-|---|---|
-| Cost | $500 per soldier |
-| Location | Recruited at headquarters |
-| Deployment | Must be deployed during Deploy phase |
-| Movement | 1 hex adjacent, 2 moves per turn |
+Two recruitment paths:
 
-New recruits start with base stats and must build experience through combat operations.
+| Type | Cost | Requirement | Notes |
+|---|---|---|---|
+| **Mercenary** | $1,500 | None | Available immediately |
+| **Local Recruit** | $300 | 10+ controlled hexes | Cheaper, marked as "recruited" |
+
+Both deploy at headquarters during the Deploy phase. Respect ≥ 50 provides up to 30% recruitment discount.
 
 ---
 
@@ -54,25 +52,23 @@ New recruits start with base stats and must build experience through combat oper
 
 Every soldier tracks individual statistics:
 
-| Stat | Range | Description |
-|---|---|---|
-| Loyalty | 0–80 (soldiers) / 0–99 (capos) | Affects promotion eligibility, internal hit survival, and overall effectiveness |
-| Training | 0–3 | +1 per turn deployed away from HQ. Combat effectiveness and hitman eligibility |
-| Hits | Count | Number of hit operations completed |
-| Extortions | Count | Number of extortion operations completed |
-| Victories | 0–5 | +1 per successful extortion or hit |
-| Toughness | 0–5 | +1 per survived combat encounter |
-| Racketeering | 0–5 | +1 per successful extortion |
+| Stat | Range | Growth | Description |
+|---|---|---|---|
+| Loyalty | 0–80 (soldiers) / 0–99 (capos) | +2 per action, +5 per combat, -2/turn if unpaid | Promotion eligibility, internal hit survival |
+| Training | 0–3 | +1 per turn deployed away from HQ | Combat effectiveness |
+| Victories | 0–5 | +1 per successful hit or extortion | Promotion requirement |
+| Toughness | 0–5 | +1 per survived combat encounter | HQ assault eligibility |
+| Racketeering | 0–5 | +1 per successful extortion | Promotion requirement |
+| Hits | Count | +1 per hit action | Tracking only |
+| Extortions | Count | +1 per extortion action | Tracking only |
 
 ### 4.1 Loyalty Growth & Decay
-
-Loyalty changes dynamically each turn and during actions:
 
 **Per-Turn Growth:**
 | Source | Bonus | Condition |
 |---|---|---|
-| Stats baseline | `floor((training + toughness + racketeering + victories) / 4)` | Always (rewards well-rounded soldiers) |
-| High-income hex | +3/turn | Stationed on hex with business income ≥ $4,000 |
+| Stats baseline | `floor((training + toughness + racketeering + victories) / 4)` | Always |
+| High-income hex | +3/turn | On hex with business income ≥ $4,000 |
 
 **Action Bonuses (immediate):**
 | Trigger | Bonus |
@@ -83,11 +79,8 @@ Loyalty changes dynamically each turn and during actions:
 **Decay:**
 | Trigger | Penalty |
 |---|---|
-| Unpaid maintenance (family can't afford upkeep) | -2 loyalty/turn |
-
-**Note:** Soldiers returning from hiding with loyalty < 70 are eliminated by the family (internal hit). See [COMBAT_SYSTEM_GUIDE.md](./COMBAT_SYSTEM_GUIDE.md) for details.
-
-Stats increase through successful operations and can be tracked per unit.
+| Unpaid maintenance | -2 loyalty/turn |
+| Capo wounded in combat | -10 loyalty |
 
 ---
 
@@ -100,111 +93,109 @@ Promote an experienced soldier into a capo — a leader unit with enhanced movem
 | Requirement | Value |
 |---|---|
 | Cost | $10,000 |
-| Min survived conflicts | 5 |
-| Min loyalty | 60 |
-| Min training | 3 (on 1–10 scale) |
+| Min victories | **3** (0–5 scale) |
+| Min loyalty | **60** (0–80 scale) |
+| Min training | **2** (0–3 scale) |
+| Min toughness | **3** (0–5 scale) |
+| Min racketeering | **3** (0–5 scale) |
 | Max capos | 3 total |
+
+A soldier typically needs 3+ successful hits/extortions, 3+ survived combats, and 2+ turns deployed to qualify. This is achievable in roughly 8-12 turns of active use.
 
 ### 5.2 Capo Personalities
 
-Each promoted capo receives a random personality that provides negotiation bonuses:
+Each promoted capo receives a random personality:
 
 | Personality | Icon | Bonuses |
 |---|---|---|
-| **Diplomat** | 🕊️ | +20% Ceasefire success, +10% Alliance success |
-| **Enforcer** | 💪 | +15% Bribe for Territory success |
-| **Schemer** | 🧠 | +15% Alliance success, +10% all negotiations |
+| **Diplomat** | 🕊️ | +20% Ceasefire, +10% Alliance |
+| **Enforcer** | 💪 | +15% Bribe for Territory |
+| **Schemer** | 🧠 | +15% Alliance, +10% all negotiations |
 
 Capo properties:
-- **Named**: Each capo has a unique generated name
+- **Named**: Unique generated name
 - **Movement**: Up to 5 hexes (flying), 3 moves per turn
 - **Income**: 100% territory income (vs soldiers' 30%)
-- **Abilities**: Can negotiate, establish safehouses, escort soldiers
+- **Abilities**: Negotiate, establish safehouses, escort soldiers
 
 ---
 
 ## 6. Hitman Contracts
 
-Hitmen are **external contract killers** — not members of your family. They are expensive but perform surgical strikes with no heat and no bonuses.
+External contract killers — not family members.
 
 ### 6.1 How It Works
 
 | Property | Value |
 |---|---|
 | Cost | $15,000 per contract |
-| Max active contracts | 3 |
-| Heat generated | None |
+| Max active | 3 |
+| Heat | None |
 | Bonuses gained | None (no respect, fear, or stat gains) |
-| Target selection | Blind — you see family + unit type only, no location or stats |
-
-When you hire a hitman, you pick an enemy **soldier or capo** from a list showing only their family and unit type. The hitman finds and eliminates them wherever they are when the contract resolves.
 
 ### 6.2 Duration & Success
 
-**Duration** (set at hire based on target's current location):
+**Duration** (based on target location at hire):
 
-| Target location at hire | Duration |
+| Location | Duration |
 |---|---|
 | Open field | 3 turns |
 | Fortified / Safehouse | 4 turns |
 | HQ | 5 turns |
 
-**Success rate** (checked at resolution based on target's location at that moment):
+**Success rate** (based on target location at resolution):
 
-| Target location at resolution | Success rate |
+| Location | Success |
 |---|---|
 | Open field | 90% |
 | Fortified | 65% |
 | Safehouse | 55% |
 | HQ | 40% |
 
-Auto-fails if contract exceeds 5 turns total.
+Auto-fails after 5 turns total.
 
 ### 6.3 Failed Hits & AI Alert
 
-**Payment on failure:** 50% refunded ($7,500 back).
-
-**AI Alert State:** When a contract fails against an AI-controlled family, that family enters **alert mode** for 5 turns:
-- Recruits +1 extra soldier per turn
-- Prioritizes fortifying hexes
-- Gets +1 additional move per unit
-- Actively targets player hexes
-
-If the target was already eliminated before the contract resolves, the contract is cancelled with a 50% refund.
+- **Refund**: 50% ($7,500 back)
+- **AI Alert**: Target family enters alert mode for 5 turns (+1 recruit/turn, +1 move/unit, fortify priority, targets player)
 
 ---
 
 ## 7. Unit Costs & Maintenance
 
-| Unit | Recruitment/Promotion Cost | Per-Turn Maintenance |
+| Unit | Cost | Per-Turn Maintenance |
 |---|---|---|
-| Soldier | $500 | Base rate |
-| Capo | $10,000 (promotion) | — |
-| Hitman contract | $15,000 | — (one-time cost) |
+| Soldier (Mercenary) | $1,500 | $600/turn |
+| Soldier (Local Recruit) | $300 | $600/turn |
+| Capo (Promotion) | $10,000 | — |
+| Hitman contract | $15,000 | — (one-time) |
+| Empty claimed hex | — | $150/turn (community upkeep) |
 
 ---
 
 ## 8. Strategic Tips
 
 ### Recruitment
-- Recruit early when money allows — more soldiers = more actions available
-- Deploy soldiers near neutral territory for easy claims and extortions
+- Recruit mercenaries early for action coverage ($1,500 each)
+- Once at 10+ hexes, switch to local recruits ($300 each)
+- Respect ≥ 50 gives up to 30% discount
 
 ### Capo Promotion
-- Focus on getting soldiers to 5 survived conflicts and 60 loyalty
-- Deploy capos to high-income hexes for maximum revenue (100% vs 30%)
-- Use capo personalities strategically — diplomats for peace, enforcers for expansion
+- Focus on getting a soldier to 3 victories, 3 toughness, 3 racketeering
+- Deploy soldiers near combat zones for toughness growth
+- Use extortion to build racketeering + victories simultaneously
+- Deploy capos to high-income hexes (100% vs 30% income)
 
 ### Hitman Contracts
-- Use hitmen to eliminate key enemy capos on high-value hexes
-- Target units at open field hexes for highest success rate
-- Be prepared: failed contracts alert the enemy and make them more aggressive
-- Never rely solely on hitmen — they provide no strategic bonuses
+- Target enemy capos on high-value hexes
+- Target units in open field for 90% success
+- Failed contracts trigger 5-turn AI alert — plan accordingly
 
-### General
-- Don't over-extend — each soldier lost is an action budget lost
-- Fortify key defensive positions to protect valuable territory
-- Use escorts to rapidly move soldiers across the map via capos
+### HQ Assault Preparation
+- Build a soldier to toughness ≥ 4 and loyalty ≥ 70
+- Flip enemy soldiers at their HQ to weaken defenses (-10% each)
+- Use Sitdown to consolidate your own HQ defense
+- Position multiple units adjacent to target HQ for the +5% per-unit bonus
 
 ---
 

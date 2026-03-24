@@ -7,55 +7,59 @@
 - [3. Starting Units](#3-starting-units)
 - [4. Headquarters Properties](#4-headquarters-properties)
 - [5. Deployment System](#5-deployment-system)
-  - [5.1 Deploy Phase](#51-deploy-phase)
-  - [5.2 Deployment Ranges](#52-deployment-ranges)
-  - [5.3 Safehouse as Secondary Deploy Point](#53-safehouse-as-secondary-deploy-point)
 - [6. Unit Movement Rules](#6-unit-movement-rules)
-  - [6.1 Soldiers](#61-soldiers)
-  - [6.2 Capos](#62-capos)
-  - [6.3 Boss](#63-boss)
-- [7. HQ Information Panel](#7-hq-information-panel)
-- [8. Visual Indicators](#8-visual-indicators)
+- [7. HQ Assault & Defense](#7-hq-assault--defense)
+- [8. Boss Actions: Call a Sitdown](#8-boss-actions-call-a-sitdown)
+- [9. Flip Soldier](#9-flip-soldier)
+- [10. HQ Information Panel](#10-hq-information-panel)
+- [11. Visual Indicators](#11-visual-indicators)
 
 ---
 
 ## 1. Overview
 
-Each of the five families has a headquarters on the hex map. The HQ is the starting location for all units, the permanent home of the Boss, and the primary deployment point for new recruits. Headquarters **cannot be captured or destroyed**.
+Each of the five families has a headquarters on the hex map. The HQ is the starting location for all units, the permanent home of the Boss, and the primary deployment point for new recruits. HQ **can be assaulted** — a successful assault eliminates the family from the game.
 
 ---
 
 ## 2. Headquarters Locations
 
-| Family | District | Quadrant | Coordinates (q,r,s) |
-|---|---|---|---|
-| **Gambino** | Little Italy | Northwest | (-5, 5, 0) |
-| **Genovese** | Brooklyn Heights | Southeast | (5, -5, 0) |
-| **Lucchese** | Queens | Southwest | (-5, -5, 10) |
-| **Bonanno** | Staten Island | Northeast | (5, 5, -10) |
-| **Colombo** | Manhattan | Center | (0, 0, 0) |
+| Family | District | Coordinates (q,r,s) |
+|---|---|---|
+| **Gambino** | Little Italy | (-8, 8, 0) |
+| **Genovese** | Manhattan | (8, -8, 0) |
+| **Lucchese** | Queens | (-8, -1, 9) |
+| **Bonanno** | Staten Island | (7, 3, -10) |
+| **Colombo** | Bronx | (0, -9, 9) |
+
+Each HQ + its 6 adjacent hexes start as pre-claimed territory for that family.
 
 ---
 
 ## 3. Starting Units
 
-Every family begins with exactly:
+Starting soldiers vary by family (historically inspired):
 
-| Unit Type | Count | Starting Location |
-|---|---|---|
-| Soldier | 3 | Headquarters |
-| Capo | 1 | Headquarters |
-| Boss | 1 | Headquarters (permanent) |
+| Family | Soldiers | Capos | Boss |
+|---|---|---|---|
+| Gambino | 4 | 1 | 1 |
+| Genovese | 4 | 1 | 1 |
+| Lucchese | 3 | 1 | 1 |
+| Bonanno | 2 | 1 | 1 |
+| Colombo | 1 | 1 | 1 |
+
+All units start at their family's HQ.
 
 ---
 
 ## 4. Headquarters Properties
 
-- **Invulnerable**: Cannot be attacked, captured, or destroyed
-- **Permanent control**: Always belongs to its family
+- **Can be assaulted**: Enemy soldiers adjacent to HQ can attempt an HQ Assault (endgame elimination)
+- **Built-in defense**: -30% to attacker success rate
+- **Permanent control**: Always belongs to its family (unless eliminated)
 - **Unit spawning**: All recruited units appear at HQ
-- **Visual distinction**: Gold highlight for player HQ, brown for rivals
-- **Icon**: 🏛️ building icon
+- **Stacking exempt**: HQ hex is exempt from the 2-unit stacking limit
+- **Cannot be**: Scouted, claimed, or extorted
 
 ---
 
@@ -77,19 +81,23 @@ Every family begins with exactly:
 
 ### 5.3 Safehouse as Secondary Deploy Point
 
-If a safehouse is active (established by a capo during the Tactical phase), units can also be deployed from the safehouse hex using the same range rules. Safehouses last 5 turns and are destroyed if the hex is captured by an enemy.
+Active safehouses (established by capos) serve as secondary deploy points with the same range rules. Safehouses last 5 turns and are destroyed if the hex is captured.
 
 ---
 
 ## 6. Unit Movement Rules
 
-### 6.1 Soldiers
+### 6.1 Soldiers — Free Movement in Connected Territory
 
-| Property | Value |
+Soldiers can move **unlimited hexes for free** within territory that forms an unbroken chain of player-owned hexes back to HQ. This is determined by BFS flood-fill.
+
+| Scenario | Move Cost |
 |---|---|
-| Movement range | 1 hex (adjacent only) |
-| Moves per turn | 2 |
-| Can fly/jump | No |
+| Within connected territory | **Free** (0 moves) |
+| Leaving connected territory | 1 move (standard) |
+| Crossing gap to disconnected territory | 1 move (standard) |
+
+Standard movement: 1 hex adjacent, 2 moves per turn.
 
 ### 6.2 Capos
 
@@ -97,41 +105,89 @@ If a safehouse is active (established by a capo during the Tactical phase), unit
 |---|---|
 | Movement range | Up to 5 hexes (flying) |
 | Moves per turn | 3 |
-| Can fly/jump | Yes — can move over occupied hexes |
+| Territory rules | Not affected — always flies |
 
 ### 6.3 Boss
 
-| Property | Value |
-|---|---|
-| Movement | None — permanently at HQ |
-| Purpose | Command and control, leadership |
+Permanently at HQ. Never moves.
 
 ---
 
-## 7. HQ Information Panel
+## 7. HQ Assault & Defense
+
+### 7.1 Assault Requirements
+- Attacking unit: **Soldier only** (not capo)
+- Position: Must be on a hex **adjacent** to enemy HQ
+- Stats: Toughness ≥ 4, Loyalty ≥ 70
+- Base success: 15%, max cap: 50%
+
+### 7.2 Defense Modifiers
+- Built-in HQ defense: -30%
+- Each friendly soldier at HQ: +5% defense (via Sitdown)
+- Each flipped enemy soldier: -10% defense
+
+### 7.3 Outcomes
+- **Success**: Target family eliminated. All their units removed, all territory neutralized. Attacker gains $25,000, +30 respect, +40 fear.
+- **Failure**: Attacking soldier killed. All participating units lose 30 loyalty. No police heat.
+
+---
+
+## 8. Boss Actions: Call a Sitdown
+
+The Boss can recall soldiers to HQ for a strategic defensive consolidation.
+
+| Property | Value |
+|---|---|
+| Cost | $2,000 |
+| Cooldown | 5 turns |
+| Selection | Choose "All Soldiers" or pick individuals |
+| Effect | Selected soldiers teleported to HQ hex instantly |
+| Defense bonus | +5% HQ assault defense per soldier at HQ |
+| Loyalty bonus | +5 loyalty to all recalled soldiers |
+| Tradeoff | Recalled soldiers lose fortification, cannot act again this turn |
+
+HQ hex is exempt from the 2-unit stacking limit for Sitdown purposes.
+
+---
+
+## 9. Flip Soldier
+
+Weaken enemy HQ defenses by compromising a rival soldier.
+
+| Property | Value |
+|---|---|
+| Cost | $5,000 |
+| Requirement | Unit adjacent to enemy HQ |
+| Target | Enemy soldier at/near HQ with loyalty > 60 |
+| Base success | 25% |
+| On success | Target flipped (hidden). -10% HQ defense per flipped soldier. |
+| On failure | -15 influence, target gains +10 loyalty, enemy notified |
+
+---
+
+## 10. HQ Information Panel
 
 Click any headquarters to view:
 
-- **Financial overview**: Legal profits, illegal profits, total profits
+- **Financial overview**: Income, expenses, net profit
 - **Unit status**: Soldiers and capos at HQ vs deployed
 - **Business count**: Number of controlled businesses
-- **Deploy actions**: Deploy buttons appear during Deploy phase (player HQ only)
-
-Click rival HQs to view their family data (intel only, no deploy actions).
+- **Deploy actions**: Deploy buttons (player HQ only, deploy phase)
+- **Sitdown button**: Available during action phase (player HQ only)
+- **Rival info**: Respect, influence, soldier count, money (rival HQs)
 
 ---
 
-## 8. Visual Indicators
+## 11. Visual Indicators
 
 | Indicator | Color/Style | Meaning |
 |---|---|---|
 | Player HQ | Gold highlight | Your headquarters |
 | Rival HQ | Brown highlight | Enemy headquarters |
-| 🏛️ icon | Building icon | Distinguishes HQ from regular hexes |
-| Sky blue hex | Available target | Deployment target during Deploy phase |
-| Light green hex | Available target | Movement target during Tactical phase |
-| "DEPLOY" label | On hex | Indicates deployable location |
-| "MOVE" label | On hex | Indicates movable location |
+| 🏛️ icon | Building icon | HQ hex |
+| Sky blue hex | Available target | Deployment target |
+| Light green hex | Available target | Movement target |
+| "DEPLOY" label | On hex | Deployable location |
 
 ---
 
