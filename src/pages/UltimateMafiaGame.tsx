@@ -498,28 +498,81 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       </div>
       
       {/* Center - Game Status */}
-      <div className="flex items-center space-x-6">
-        <div className="text-center">
-          <div className="text-lg font-bold text-mafia-gold">Turn {gameState.turn}</div>
-          <div className="text-xs text-muted-foreground capitalize">{gameState.season}</div>
+      <div className="flex flex-col items-center gap-1">
+        <div className="flex items-center space-x-6">
+          <div className="text-center">
+            <div className="text-lg font-bold text-mafia-gold">Turn {gameState.turn}</div>
+            <div className="text-xs text-muted-foreground capitalize">{gameState.season}</div>
+          </div>
+          {(gameState.ricoTimer || 0) > 0 && (
+            <motion.div
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 0.8, repeat: Infinity }}
+              className="text-center px-3 py-1 rounded-lg bg-destructive/20 border border-destructive/40"
+            >
+              <div className="text-sm font-bold text-destructive">🚨 RICO {gameState.ricoTimer}/5</div>
+            </motion.div>
+          )}
+          <div className="text-center">
+            <div className="text-sm font-medium text-green-400">Commission Active</div>
+            <motion.div
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+              className="w-2 h-2 bg-green-400 rounded-full mx-auto mt-1"
+            />
+          </div>
         </div>
-        {(gameState.ricoTimer || 0) > 0 && (
-          <motion.div
-            animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 0.8, repeat: Infinity }}
-            className="text-center px-3 py-1 rounded-lg bg-destructive/20 border border-destructive/40"
-          >
-            <div className="text-sm font-bold text-destructive">🚨 RICO {gameState.ricoTimer}/5</div>
-          </motion.div>
-        )}
-        <div className="text-center">
-          <div className="text-sm font-medium text-green-400">Commission Active</div>
-          <motion.div
-            animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-            className="w-2 h-2 bg-green-400 rounded-full mx-auto mt-1"
-          />
-        </div>
+        {/* Status HUD Badges */}
+        {(() => {
+          const bossCd = (gameState as any).bossNegotiationCooldown || 0;
+          const capoCd = (gameState as any).capoNegotiationCooldown || 0;
+          const hasCooldowns = bossCd > 0 || capoCd > 0;
+          
+          const expiringPacts: Array<{ label: string; emoji: string }> = [];
+          (gameState.ceasefires || []).filter((c: any) => c.active && c.turnsRemaining <= 1).forEach((c: any) => {
+            expiringPacts.push({ label: `Ceasefire w/ ${c.family.charAt(0).toUpperCase() + c.family.slice(1)}`, emoji: '🤝' });
+          });
+          (gameState.alliances || []).filter((a: any) => a.active && a.turnsRemaining <= 1).forEach((a: any) => {
+            expiringPacts.push({ label: `Alliance w/ ${(a.alliedFamily || a.family || '').charAt(0).toUpperCase() + (a.alliedFamily || a.family || '').slice(1)}`, emoji: '⚖️' });
+          });
+          ((gameState as any).shareProfitsPacts || []).filter((p: any) => p.active && p.turnsRemaining <= 1).forEach((p: any) => {
+            expiringPacts.push({ label: `Profits w/ ${p.targetFamily.charAt(0).toUpperCase() + p.targetFamily.slice(1)}`, emoji: '💰' });
+          });
+          ((gameState as any).safePassagePacts || []).filter((p: any) => p.active && p.turnsRemaining <= 1).forEach((p: any) => {
+            expiringPacts.push({ label: `Passage w/ ${p.targetFamily.charAt(0).toUpperCase() + p.targetFamily.slice(1)}`, emoji: '🛤️' });
+          });
+
+          const deployedCount = (gameState.deployedUnits || []).filter((u: any) => u.family === gameState.playerFamily && u.type === 'soldier').length;
+          const totalSoldiers = deployedCount + (gameState.resources?.soldiers || 0);
+          const deployRatio = totalSoldiers > 0 ? deployedCount / totalSoldiers : 0;
+
+          if (!hasCooldowns && expiringPacts.length === 0 && totalSoldiers === 0) return null;
+
+          return (
+            <div className="flex flex-wrap items-center justify-center gap-1">
+              {expiringPacts.map((p, i) => (
+                <span key={i} className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 border border-amber-500/30 text-amber-400 animate-pulse">
+                  ⚠️ {p.emoji} {p.label} expires!
+                </span>
+              ))}
+              {hasCooldowns && (
+                <>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] border ${bossCd > 0 ? 'bg-muted/30 border-muted text-muted-foreground' : 'bg-green-500/20 border-green-500/30 text-green-400'}`}>
+                    🏛️ Boss: {bossCd > 0 ? `${bossCd}t` : 'Ready'}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] border ${capoCd > 0 ? 'bg-muted/30 border-muted text-muted-foreground' : 'bg-green-500/20 border-green-500/30 text-green-400'}`}>
+                    👔 Capo: {capoCd > 0 ? `${capoCd}t` : 'Ready'}
+                  </span>
+                </>
+              )}
+              {totalSoldiers > 0 && (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] border ${deployRatio > 0.5 ? 'bg-green-500/20 border-green-500/30 text-green-400' : deployRatio < 0.3 ? 'bg-amber-500/20 border-amber-500/30 text-amber-400' : 'bg-muted/30 border-muted text-muted-foreground'}`}>
+                  ⚔️ {deployedCount}/{totalSoldiers} deployed
+                </span>
+              )}
+            </div>
+          );
+        })()}
       </div>
       
       {/* Right side - Actions */}
