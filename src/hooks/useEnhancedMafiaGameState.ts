@@ -3020,6 +3020,15 @@ export const useEnhancedMafiaGameState = (
           }
         }
       }
+
+      // ── AI RESPECT & INFLUENCE GROWTH ──
+      const aiTerritoryCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
+      // Influence: +1 per 3 hexes controlled, with decay
+      const influenceGain = Math.floor(aiTerritoryCount / 3);
+      opponent.resources.influence = Math.min(100, Math.max(0, opponent.resources.influence + influenceGain - 0.5));
+      // Respect: grows with territory and combat activity
+      const respectGain = Math.floor(aiTerritoryCount / 4) + (aggression > 60 ? 1 : 0);
+      opponent.resources.respect = Math.min(100, Math.max(0, (opponent.resources.respect || 0) + respectGain - 0.5));
     });
 
     // ── EXECUTE PENDING AI PLANNED HITS ──
