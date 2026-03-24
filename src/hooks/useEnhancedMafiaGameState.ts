@@ -4379,27 +4379,7 @@ export const useEnhancedMafiaGameState = (
           break;
       }
 
-      // Recalculate finances after every action
-      const legalBiz = newState.businesses.filter((b: any) => b.type === 'legal');
-      const illegalBiz = newState.businesses.filter((b: any) => b.type === 'illegal');
-
-      newState.finances.legalProfit = legalBiz.reduce((sum: number, b: any) => {
-        const baseProfit = b.monthlyIncome - b.monthlyExpenses;
-        const extortionBonus = b.isExtorted ? baseProfit * b.extortionRate : 0;
-        return sum + baseProfit + extortionBonus;
-      }, 0) - newState.legalStatus.totalLegalCosts;
-
-      newState.finances.illegalProfit = illegalBiz.reduce((sum: number, b: any) =>
-        sum + (b.monthlyIncome - b.monthlyExpenses), 0
-      );
-
-      newState.finances.totalProfit = newState.finances.legalProfit + newState.finances.illegalProfit;
-      newState.finances.totalIncome = newState.businesses.reduce((sum: number, b: any) => sum + b.monthlyIncome, 0);
-      newState.finances.totalExpenses = newState.businesses.reduce((sum: number, b: any) => sum + b.monthlyExpenses, 0) + newState.legalStatus.totalLegalCosts;
-      newState.finances.legalCosts = newState.legalStatus.totalLegalCosts;
-
-      const totalHeat = illegalBiz.reduce((sum: number, b: any) => sum + b.heatLevel, 0);
-      newState.legalStatus.prosecutionRisk = Math.min(100, totalHeat / 2);
+      // Finance values are computed by processEconomy at end of turn — no legacy recalculation here
 
       return newState;
     });
