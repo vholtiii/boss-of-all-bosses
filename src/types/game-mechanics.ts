@@ -12,6 +12,7 @@ export interface SoldierStats {
 }
 
 export const CLAIM_TOUGHNESS_GAIN = 0.25; // +0.25 progress per territory claim (4 claims = +1 toughness)
+export const EXTORTION_TOUGHNESS_GAIN = 0.3; // +0.3 progress per successful extortion (~3-4 extortions = +1 toughness)
 
 export const SOLDIER_LOYALTY_CAP = 80;
 export const CAPO_LOYALTY_CAP = 99;

@@ -41,7 +41,7 @@ import {
   HQ_ASSAULT_BASE_CHANCE, HQ_DEFENSE_BONUS, HQ_ASSAULT_MAX_CHANCE, HQ_ASSAULT_MIN_TOUGHNESS, HQ_ASSAULT_MIN_LOYALTY,
   FLIP_SOLDIER_COST, FLIP_SOLDIER_BASE_CHANCE, FLIP_SOLDIER_FAIL_INFLUENCE_LOSS,
   SITDOWN_COST, SITDOWN_COOLDOWN, SITDOWN_LOYALTY_BONUS, SITDOWN_DEFENSE_PER_SOLDIER,
-  CLAIM_TOUGHNESS_GAIN,
+  CLAIM_TOUGHNESS_GAIN, EXTORTION_TOUGHNESS_GAIN,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -5448,6 +5448,13 @@ export const useEnhancedMafiaGameState = (
               u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
               state.soldierStats[u.id].loyalty + LOYALTY_ACTION_BONUS
             );
+            // Toughness progress from extortion
+            const extStats = state.soldierStats[u.id];
+            extStats.toughnessProgress = (extStats.toughnessProgress || 0) + EXTORTION_TOUGHNESS_GAIN;
+            if (extStats.toughnessProgress >= 1.0 && extStats.toughness < 5) {
+              extStats.toughness += 1;
+              extStats.toughnessProgress -= 1.0;
+            }
           }
         });
 
