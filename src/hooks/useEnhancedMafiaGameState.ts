@@ -2579,15 +2579,19 @@ export const useEnhancedMafiaGameState = (
           }
 
           // Alert: fortify chance
-          if (isAlerted && !unit.fortified && Math.random() < 0.3) {
+          if (isAlerted && !unit.fortified && Math.random() < 0.3 && aiTacticalRemaining > 0) {
             unit.fortified = true;
             unit.movesRemaining = 0;
+            aiTacticalRemaining--;
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'fortify', detail: `Fortified a unit (alert mode)` });
             continue;
           }
 
           if (targetPool.length === 0) targetPool = validMoves;
           const target = targetPool[Math.floor(Math.random() * targetPool.length)];
+          
+          // Save original position — only commit move after combat resolution
+          const origQ = unit.q, origR = unit.r, origS = unit.s;
           unit.q = target.q;
           unit.r = target.r;
           unit.s = target.s;
@@ -2597,6 +2601,7 @@ export const useEnhancedMafiaGameState = (
           const moveCost = isCommunityHex ? 2 : 1;
           unit.movesRemaining = Math.max(0, unit.movesRemaining - moveCost);
           movesLeft = Math.max(0, movesLeft - moveCost);
+          aiTacticalRemaining--;
 
           const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
           if (tile && !tile.isHeadquarters) {
