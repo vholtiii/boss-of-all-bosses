@@ -5713,6 +5713,34 @@ export const useEnhancedMafiaGameState = (
       }
       return { ...a, turnsRemaining: remaining };
     }).filter(a => a.active);
+
+    // Tick down share profits pacts
+    state.shareProfitsPacts = (state.shareProfitsPacts || []).map(p => {
+      if (!p.active) return p;
+      const remaining = p.turnsRemaining - 1;
+      if (remaining <= 0) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'info', title: '💰 Profit Sharing Ended',
+          message: `Profit sharing deal with ${p.targetFamily.charAt(0).toUpperCase() + p.targetFamily.slice(1)} has expired.`,
+        }];
+        return { ...p, turnsRemaining: 0, active: false };
+      }
+      return { ...p, turnsRemaining: remaining };
+    }).filter(p => p.active);
+
+    // Tick down safe passage pacts
+    state.safePassagePacts = (state.safePassagePacts || []).map(p => {
+      if (!p.active) return p;
+      const remaining = p.turnsRemaining - 1;
+      if (remaining <= 0) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'info', title: '🛤️ Safe Passage Expired',
+          message: `Safe passage through ${p.targetFamily.charAt(0).toUpperCase() + p.targetFamily.slice(1)} territory has ended.`,
+        }];
+        return { ...p, turnsRemaining: 0, active: false };
+      }
+      return { ...p, turnsRemaining: remaining };
+    }).filter(p => p.active);
   };
 
 
