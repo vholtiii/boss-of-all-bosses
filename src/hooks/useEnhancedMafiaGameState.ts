@@ -1763,6 +1763,7 @@ export const useEnhancedMafiaGameState = (
       const seasons = ['spring', 'summer', 'fall', 'winter'] as const;
       newState.season = seasons[Math.floor((newState.turn - 1) / 3) % 4];
       
+      computeDistrictBonuses(newState, turnReport);
       processEconomy(newState);
       turnReport.income = newState.finances.totalIncome;
       turnReport.maintenance = newState.finances.totalExpenses;
