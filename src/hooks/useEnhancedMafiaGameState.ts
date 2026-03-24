@@ -1745,7 +1745,7 @@ export const useEnhancedMafiaGameState = (
             if (!newState.soldierStats[h.unitId]) {
               newState.soldierStats[h.unitId] = {
                 loyalty: 50, training: 0, hits: 0, extortions: 0,
-                victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0,
+                victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
               };
             }
           }
