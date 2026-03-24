@@ -1,23 +1,24 @@
 
 
-# Capo Promotion: Available Any Phase, No Action Cost
+# Fix HQ Financial Overview — Use Actual Game Finances
 
-## Current Behavior
-- Capo promotion panel is **locked during Deploy phase** (`phaseLocked={actionsLocked}`)
-- Only accessible during Action phase
-- Implicitly tied to the action budget
+## Problem
+The HQ panel calculates profits by summing `business.income` from `gameState.businesses` (a legacy array). But actual income is computed from `hexMap` tiles in `processEconomy()` and stored in `gameState.finances`. These two data sources are disconnected, so the HQ panel shows stale/incorrect numbers.
+
+## Solution
+Pass `gameState.finances` directly to `HeadquartersInfoPanel` and display the real computed values instead of re-calculating from the businesses array.
 
 ## Changes
 
-### `src/components/GameSidePanels.tsx` (~lines 460-480)
-- Remove `phaseLocked={actionsLocked}` from the Capo Promotion `CollapsibleSection`
-- Remove the `actionsLocked` conditional that shows "🔒 Unlock in Action phase" — always render `CapoPromotionPanel` regardless of phase
+### `src/components/HeadquartersInfoPanel.tsx`
+- Add `finances` prop typed as `{ totalIncome: number; totalExpenses: number; legalProfit: number; illegalProfit: number; totalProfit: number; dirtyMoney: number; cleanMoney: number; legalCosts: number }`
+- Replace the local profit calculation (lines 100-110) with direct use of `finances.legalProfit`, `finances.illegalProfit`, `finances.totalProfit`
+- Also display dirty/clean money split and maintenance costs so the player sees a complete financial picture
 
-### `src/hooks/useEnhancedMafiaGameState.ts` (~lines 3844-3892)
-- In the `promote_capo` case: **do not decrement `actionsRemaining`** (confirm it doesn't already — it appears it doesn't, but verify no action budget check blocks it)
-- Remove any phase gate if present (the action handler should work in any phase)
+### `src/pages/UltimateMafiaGame.tsx`
+- Pass `finances={gameState.finances}` to `HeadquartersInfoPanel` (around line 860)
 
 ## Files Modified
-- `src/components/GameSidePanels.tsx` — unlock promotion panel in all phases
-- `src/hooks/useEnhancedMafiaGameState.ts` — ensure no action cost on promotion
+- `src/components/HeadquartersInfoPanel.tsx`
+- `src/pages/UltimateMafiaGame.tsx`
 
