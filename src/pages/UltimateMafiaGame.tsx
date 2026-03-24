@@ -185,6 +185,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const [showSettings, setShowSettings] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showTurnSummary, setShowTurnSummary] = useState(false);
+  const [bossHighlightHex, setBossHighlightHex] = useState<{ q: number; r: number; s: number } | null>(null);
   const [selectedHeadquarters, setSelectedHeadquarters] = useState<{
     family: string;
     headquarters: any;
