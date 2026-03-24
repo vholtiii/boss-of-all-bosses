@@ -67,7 +67,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     fortifyUnit,
     setMoveAction,
     startEscort,
-  } = useEnhancedMafiaGameState(config.family, config.resources, config.difficulty, config.seed);
+  } = useEnhancedMafiaGameState(config.family, config.resources, config.difficulty, config.seed, config.mapSize);
 
   const { notifySuccess, notifyError, notifyWarning, notifyInfo, notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
   const { playSound, playSoundSequence, updateSoundConfig, soundConfig } = useSoundSystem();
