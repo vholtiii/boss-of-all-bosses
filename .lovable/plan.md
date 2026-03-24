@@ -1,29 +1,31 @@
 
 
-# Change Negotiation Cooldown: 1 per 2 Turns
+# Add Status HUD Badges to Top Bar
 
-## Change
-Replace boolean cooldown flags with numeric counters that track remaining cooldown turns.
+## What
+Add a compact badge strip below the existing Turn/Season display showing expiring pacts, negotiation cooldowns, and deployed soldier ratio.
 
-### `src/hooks/useEnhancedMafiaGameState.ts`
-- Replace `bossNegotiationUsedThisTurn: boolean` → `bossNegotiationCooldown: number` (0 = ready, >0 = turns remaining)
-- Replace `capoNegotiationUsedThisTurn: boolean` → `capoNegotiationCooldown: number`
-- Init both to `0` in initial state and deep copy
-- In `advanceToNextTurn`: decrement each by 1 (min 0) instead of resetting to false
-- In `processNegotiation`: check `> 0` to block, set to `2` after use (cooldown lasts current + next turn)
+## Where
+`src/pages/UltimateMafiaGame.tsx` — the center "Game Status" section (lines 500-523)
 
-### `src/pages/UltimateMafiaGame.tsx`
-- Pass `(gameState as any).bossNegotiationCooldown > 0` / `capoNegotiationCooldown > 0` as `negotiationUsedThisTurn` prop
+## Changes
 
-### `src/components/NegotiationDialog.tsx`
-- Update cooldown message to say "Wait 1 more turn" (no code logic change needed, just text)
+### Add status badges below "Turn X / Season" (after line 505)
 
-### `src/components/HeadquartersInfoPanel.tsx`
-- Update prop to use `bossNegotiationCooldown > 0`
+A new `div` with `flex-wrap gap-1` containing:
+
+1. **Expiring pact warnings** — For each active ceasefire, alliance, share profits, or safe passage pact with `turnsRemaining <= 1`, show a ⚠️ amber badge: `"⚠️ Ceasefire w/ Gambino expires!"`. Skip if no pacts are expiring soon.
+
+2. **Negotiation cooldowns** — Two small badges:
+   - `"🏛️ Boss: Ready"` (green) or `"🏛️ Boss: 1t"` (muted) based on `bossNegotiationCooldown`
+   - `"👔 Capo: Ready"` (green) or `"👔 Capo: 1t"` (muted) based on `capoNegotiationCooldown`
+
+3. **Deployed ratio** — Count soldiers on non-HQ hexes vs total: `"⚔️ 12/18 deployed"`. Green if >50% deployed, amber if <30%.
+
+All badges use the existing `rounded-full px-2 py-0.5 text-[10px]` pattern already used by the pact badges in the bottom bar (lines 743-762).
+
+Only render badges that have meaningful info (hide "Ready" cooldowns if both are 0 to reduce clutter — only show when at least one is on cooldown).
 
 ## Files Modified
-- `src/hooks/useEnhancedMafiaGameState.ts`
-- `src/pages/UltimateMafiaGame.tsx`
-- `src/components/NegotiationDialog.tsx`
-- `src/components/HeadquartersInfoPanel.tsx`
+- `src/pages/UltimateMafiaGame.tsx` — add status badge strip to top bar center section
 
