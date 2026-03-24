@@ -5224,7 +5224,7 @@ export const useEnhancedMafiaGameState = (
             }];
           }
           
-          const hitDetails = `+${BLIND_HIT_RESPECT} respect, +${BLIND_HIT_FEAR} fear, soldier stats maxed!`;
+          const hitDetails = `+${BLIND_HIT_RESPECT} respect, +${BLIND_HIT_FEAR} fear, soldier stats boosted!`;
           state.lastCombatResult = {
             q: targetQ, r: targetR, s: targetS,
             success: true, type: 'hit',
