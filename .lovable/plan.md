@@ -1,41 +1,31 @@
 
 
-# Split Negotiation: Boss (Family-Level) vs Capo (Territory-Level) — IMPLEMENTED
+# Fix: Separate Negotiation Cooldowns for Boss and Capo
 
-## Summary
-Split negotiations into two tiers: Boss handles family-level diplomacy from HQ (Ceasefire $8,000, Alliance $5,000), Capos handle territory-level deals on enemy hexes (Bribe $8,000+, Share Profits $3,000, Safe Passage $2,000). 1 negotiation per turn total, 50% refund on failure.
+## Current Problem
+`negotiationUsedThisTurn` is a single boolean — if the Boss negotiates, the Capo can't, and vice versa. The user wants each to have their own independent cooldown.
 
-## Changes Made
-
-### `src/types/game-mechanics.ts`
-- Added `scope: 'family' | 'territory'` to `NegotiationConfig`
-- Added `share_profits` and `safe_passage` to `NegotiationType` union
-- Added `ShareProfitsPact` and `SafePassagePact` interfaces
-- Updated personality bonuses for new negotiation types
-- Raised ceasefire cost from $3,000 to $8,000
-- Added `NEGOTIATION_REFUND_RATE = 0.5`
+## Change
 
 ### `src/hooks/useEnhancedMafiaGameState.ts`
-- Added `negotiationUsedThisTurn`, `shareProfitsPacts`, `safePassagePacts` to state
-- Reset `negotiationUsedThisTurn` each turn in `endTurn`
-- Updated `processNegotiation` for scope-based handling, cooldown, 50% refund, new pact types
-- Added `boss_negotiate` action type
-- Added share_profits income to `processEconomy` (30% of target hex income)
-- Updated `processPacts` to tick down share profits and safe passage pacts
+- Replace `negotiationUsedThisTurn: boolean` with two flags:
+  - `bossNegotiationUsedThisTurn: boolean`
+  - `capoNegotiationUsedThisTurn: boolean`
+- Reset both to `false` in `advanceToNextTurn`
+- In `processNegotiation`: check/set the appropriate flag based on negotiation scope (`'family'` → boss flag, `'territory'` → capo flag)
 
 ### `src/components/NegotiationDialog.tsx`
-- Added `scope` prop to filter negotiation options by family/territory
-- Added `negotiationUsedThisTurn` prop for cooldown display
-- Added scope badges and refund notes
-- Boss mode: family selector dropdown, no capo personality display
-- Territory mode: shows bribe, share profits, safe passage only
+- Update cooldown prop to accept the relevant flag (boss or capo) based on current `scope`
 
 ### `src/components/HeadquartersInfoPanel.tsx`
-- Added Diplomacy section to Boss Overview with per-family negotiate buttons
-- Shows active pacts (ceasefires, alliances, share profits, safe passages) with turns remaining
+- Pass `bossNegotiationUsedThisTurn` for disabling Boss diplomacy buttons
 
 ### `src/pages/UltimateMafiaGame.tsx`
-- Wired Boss negotiate via `open_boss_negotiate` action from HQ panel
-- Updated negotiation state to support both scopes
-- Passes scope, cooldown, and active pacts to dialog and HQ panel
-- Bottom bar now shows share profits and safe passage pacts
+- Pass the correct cooldown flag to `NegotiationDialog` based on whether scope is `'family'` or `'territory'`
+
+## Files Modified
+- `src/hooks/useEnhancedMafiaGameState.ts`
+- `src/components/NegotiationDialog.tsx`
+- `src/components/HeadquartersInfoPanel.tsx`
+- `src/pages/UltimateMafiaGame.tsx`
+
