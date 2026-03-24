@@ -440,16 +440,26 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         const unitOnTargetHex = selectedUnit.q === tile.q && selectedUnit.r === tile.r && selectedUnit.s === tile.s;
         const hasCompletedBusiness = !!tile.business && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
         
-        const canHit = isEnemy && (isSoldier || isCapo);
+        const isEnemyHQ = !!tile.isHeadquarters && tile.isHeadquarters !== playerFamily;
+        
+        // Block all normal actions on HQ hexes
+        const canHit = isEnemy && (isSoldier || isCapo) && !tile.isHeadquarters;
         const canExtort = hasCompletedBusiness && (
           (isSoldier && unitOnTargetHex) || 
-          (isCapo && (unitOnTargetHex || true)) // Capo can extort from adjacent (already validated as valid target)
-        ) && (isNeutral || isEnemy);
-        const canClaim = isNeutral && isSoldier && !tile.business;
-        const canNegotiate = isEnemy && isCapo;
-        const canSabotage = isEnemy && isSoldier && !!tile.business;
+          (isCapo && (unitOnTargetHex || true))
+        ) && (isNeutral || isEnemy) && !tile.isHeadquarters;
+        const canClaim = isNeutral && isSoldier && !tile.business && !tile.isHeadquarters;
+        const canNegotiate = isEnemy && isCapo && !tile.isHeadquarters;
+        const canSabotage = isEnemy && isSoldier && !!tile.business && !tile.isHeadquarters;
         const canSafehouse = isOwned && !tile.isHeadquarters;
         const negotiateCapoId = isCapo ? selectedUnit.id : undefined;
+        
+        // HQ Assault: soldier adjacent to enemy HQ
+        const isAdjacentToHQ = isEnemyHQ && isSoldier && !unitOnTargetHex;
+        const soldierStats = gameState?.soldierStats?.[selectedUnit.id];
+        const meetsToughness = soldierStats && soldierStats.toughness >= 4 && soldierStats.loyalty >= 70;
+        const canAssaultHQ = isAdjacentToHQ && meetsToughness;
+        const canFlipSoldier = isEnemyHQ && isAdjacentToHQ;
         
         // Compute reasons for disabled actions (contextually relevant only)
         const reasons: Record<string, string> = {};
