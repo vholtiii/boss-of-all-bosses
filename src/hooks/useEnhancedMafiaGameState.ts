@@ -4958,7 +4958,7 @@ export const useEnhancedMafiaGameState = (
           state.alliances = state.alliances.map(a => 
             a.active && a.alliedFamily === tile.controllingFamily ? { ...a, active: false } : a
           ).filter(a => a.active);
-          state.reputation.respect = Math.max(0, state.reputation.respect - 25);
+          syncRespect(state, Math.max(0, state.reputation.respect - 25));
           state.reputation.reputation = Math.max(0, state.reputation.reputation - 15);
           if (state.reputation.familyRelationships[tile.controllingFamily] !== undefined) {
             state.reputation.familyRelationships[tile.controllingFamily] -= 40;
