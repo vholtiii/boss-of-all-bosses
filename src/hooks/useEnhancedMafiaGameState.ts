@@ -3336,7 +3336,11 @@ export const useEnhancedMafiaGameState = (
       }
 
       // ── AI PLAN HIT AGAINST PLAYER CAPOS ──
-      if ((personality === 'aggressive' || personality === 'opportunistic') && Math.random() < AI_PLAN_HIT_CHANCE) {
+      const hasCeasefireWithPlayer = (state.ceasefires || []).some(p => p.family === fam && p.active);
+      const hasAllianceWithPlayer = (state.alliances || []).some(p => p.alliedFamily === fam && p.active);
+      if (hasCeasefireWithPlayer || hasAllianceWithPlayer) {
+        // Skip plan hit — active pact with player
+      } else if ((personality === 'aggressive' || personality === 'opportunistic') && Math.random() < AI_PLAN_HIT_CHANCE) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
         const availableTargets = playerCapos.filter(c => !alreadyTargeted.has(c.id));
