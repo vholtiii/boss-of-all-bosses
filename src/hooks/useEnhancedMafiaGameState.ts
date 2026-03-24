@@ -247,6 +247,7 @@ export interface EnhancedMafiaGameState {
   // Move phase systems
   scoutedHexes: ScoutedHex[];
   safehouses: Safehouse[];
+  fortifiedHexes: FortifiedHex[];
   plannedHit: PlannedHit | null;
   planHitCooldownUntil: number;
   selectedMoveAction: MoveAction;
