@@ -3266,7 +3266,8 @@ export const useEnhancedMafiaGameState = (
           // District control bonus: Bronx -$500 recruit discount
           const bronxDiscount = hasPlayerDistrictBonus(newState, 'recruit_discount') ? 500 : 0;
           const finalCost = Math.max(100, cost - bronxDiscount);
-            newState.resources.money -= cost;
+          if (newState.resources.money >= finalCost) {
+            newState.resources.money -= finalCost;
             newState.resources.soldiers += 1;
             newState.tacticalActionsRemaining -= 1;
             // Mercenary loyalty penalty
@@ -3289,7 +3290,7 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'info' as const,
               title: '💰 Mercenary Hired',
-              message: `A hired gun joins the family for $${cost.toLocaleString()}. Loyalty -3 (outsider).${respectDiscount > 0.01 ? ` Respect saved $${(Math.floor(SOLDIER_COST * (1 - discount)) - cost).toLocaleString()}.` : ''}`,
+              message: `A hired gun joins the family for $${finalCost.toLocaleString()}. Loyalty -3 (outsider).${bronxDiscount > 0 ? ' (Bronx discount applied)' : ''}${respectDiscount > 0.01 ? ` Respect saved $${(Math.floor(SOLDIER_COST * (1 - discount)) - cost).toLocaleString()}.` : ''}`,
             }];
           }
           return newState;
