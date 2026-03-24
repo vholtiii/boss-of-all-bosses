@@ -858,6 +858,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           headquarters={selectedHeadquarters.headquarters}
           units={selectedHeadquarters.units}
           businesses={gameState.businesses || []}
+          finances={gameState.finances}
           onClose={closeHeadquartersPanel}
           onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
           movementPhase={gameState.movementPhase}

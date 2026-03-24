@@ -211,11 +211,27 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
             </div>
             
             <div className="bg-mafia-gold/10 border border-mafia-gold/20 rounded-lg p-2">
-              <div className="text-xs text-mafia-gold font-medium">Total Profits</div>
+              <div className="text-xs text-mafia-gold font-medium">Net Income/Turn</div>
               <div className="text-base font-bold text-mafia-gold">
                 ${totalProfits.toLocaleString()}
               </div>
             </div>
+            {finances && (
+              <div className="grid grid-cols-3 gap-1.5">
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-1.5">
+                  <div className="text-[10px] text-orange-400 font-medium">Expenses</div>
+                  <div className="text-xs font-bold text-orange-400">${totalExpenses.toLocaleString()}</div>
+                </div>
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-1.5">
+                  <div className="text-[10px] text-yellow-400 font-medium">Dirty $</div>
+                  <div className="text-xs font-bold text-yellow-400">${dirtyMoney.toLocaleString()}</div>
+                </div>
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-1.5">
+                  <div className="text-[10px] text-emerald-400 font-medium">Clean $</div>
+                  <div className="text-xs font-bold text-emerald-400">${cleanMoney.toLocaleString()}</div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Units Section */}
