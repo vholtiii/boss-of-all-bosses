@@ -3382,7 +3382,9 @@ export const useEnhancedMafiaGameState = (
         // Check adjacent enemy hexes with businesses
         const adjacentEnemyBiz = state.hexMap.filter(t => {
           const dist = Math.max(Math.abs(t.q - unit.q), Math.abs(t.r - unit.r), Math.abs(t.s - unit.s));
-          return dist === 1 && t.controllingFamily !== fam && t.controllingFamily !== 'neutral' &&
+          // Territory freeze: skip ceasefire families
+          const isCeasefireTarget = (state.ceasefires || []).some(c => c.active && (c.family === t.controllingFamily || (t.controllingFamily === state.playerFamily && c.family === fam)));
+          return dist === 1 && t.controllingFamily !== fam && t.controllingFamily !== 'neutral' && !isCeasefireTarget &&
                  t.business && (t.business.constructionProgress === undefined || t.business.constructionProgress >= (t.business.constructionGoal || 3));
         });
         
