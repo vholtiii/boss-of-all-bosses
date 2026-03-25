@@ -2997,9 +2997,12 @@ export const useEnhancedMafiaGameState = (
           if (validMoves.length === 0) break;
 
           // Personality-driven target prioritization
+          // Ceasefire enforcement: filter out hexes belonging to ceasefire families
+          const hasCeasefireWith = (targetFam: string) => (state.ceasefires || []).some(c => c.active && c.family === targetFam) ||
+            (targetFam === state.playerFamily && (state.ceasefires || []).some(c => c.active && c.family === fam));
           const playerHexes = validMoves.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
-            return tile && tile.controllingFamily === state.playerFamily;
+            return tile && tile.controllingFamily === state.playerFamily && !hasCeasefireWith(state.playerFamily);
           });
           const neutralHexes = validMoves.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
@@ -3007,7 +3010,7 @@ export const useEnhancedMafiaGameState = (
           });
           const otherAIHexes = validMoves.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
-            return tile && tile.controllingFamily !== fam && tile.controllingFamily !== 'neutral' && tile.controllingFamily !== state.playerFamily;
+            return tile && tile.controllingFamily !== fam && tile.controllingFamily !== 'neutral' && tile.controllingFamily !== state.playerFamily && !hasCeasefireWith(tile.controllingFamily);
           });
           const enemyHexes = [...playerHexes, ...otherAIHexes];
 
