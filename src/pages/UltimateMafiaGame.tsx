@@ -1104,7 +1104,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               playerMoney={gameState.resources.money}
               enemyStrength={enemyUnitsOnHex.length}
               hexIncome={tile.business?.income || 0}
-            />
+              treacheryTurnsRemaining={(gameState as any).treacheryDebuff?.turnsRemaining || 0}
           );
         } else {
           // Boss (family-level) negotiation
