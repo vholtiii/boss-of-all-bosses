@@ -813,7 +813,12 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             🛤️ {p.targetFamily.charAt(0).toUpperCase() + p.targetFamily.slice(1)} ({p.turnsRemaining}t)
           </span>
         ))}
-        {(!gameState.ceasefires?.length && !gameState.alliances?.length && !(gameState as any).shareProfitsPacts?.length && !(gameState as any).safePassagePacts?.length) && (
+        {(gameState as any).treacheryDebuff?.turnsRemaining > 0 && (
+          <span className="px-2 py-0.5 rounded-full bg-destructive/20 border border-destructive/30 text-destructive animate-pulse">
+            🗡️ Treachery (-{20}% neg, {(gameState as any).treacheryDebuff.turnsRemaining}t)
+          </span>
+        )}
+        {(!gameState.ceasefires?.length && !gameState.alliances?.length && !(gameState as any).shareProfitsPacts?.length && !(gameState as any).safePassagePacts?.length && !((gameState as any).treacheryDebuff?.turnsRemaining > 0)) && (
           <span className="text-muted-foreground font-playfair italic">"Strategy Rules the Underworld"</span>
         )}
       </div>
