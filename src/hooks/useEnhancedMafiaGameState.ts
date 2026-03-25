@@ -1228,12 +1228,14 @@ export const useEnhancedMafiaGameState = (
 
       // Only Capos auto-claim and auto-extort neutral tiles on move
       // Soldiers do NOT auto-claim — they must use the Action phase
+      // Wounded capos cannot auto-claim or auto-extort
       let autoExtortNotification: typeof prev.pendingNotifications[0] | null = null;
       let bonusMoney = 0;
       let bonusRespect = 0;
+      const isWoundedCapo = unit.type === 'capo' && (unit.woundedTurnsRemaining || 0) > 0;
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
-          if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters && unit.type === 'capo') {
+          if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters && unit.type === 'capo' && !isWoundedCapo) {
             const hasCompletedBusiness = tile.business && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
             if (hasCompletedBusiness) {
               // Capo auto-extorts any completed business on arrival (legal pays less)
