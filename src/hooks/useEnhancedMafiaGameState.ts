@@ -3245,6 +3245,10 @@ export const useEnhancedMafiaGameState = (
                   // Enemy territory with no defenders: requires an action point to claim
                   if (aiActionsRemaining > 0) {
                     aiActionsRemaining--;
+                    // Check for built business seizure before changing ownership
+                    if (prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted) {
+                      applyBuiltBusinessSeizure(state, tile, fam, prevOwner);
+                    }
                     tile.controllingFamily = fam;
                     if (prevOwner === state.playerFamily && turnReport) {
                       turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
