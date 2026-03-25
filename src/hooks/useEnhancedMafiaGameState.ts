@@ -3281,8 +3281,11 @@ export const useEnhancedMafiaGameState = (
                     tile.controllingFamily = fam;
                   }
                 } else {
-                  // Enemy territory with no defenders: requires an action point to claim
-                  if (aiActionsRemaining > 0) {
+                  // Territory freeze: skip claiming ceasefire family hexes
+                  const prevOwnerCeasefire = (state.ceasefires || []).some(c => c.active && (c.family === prevOwner || (prevOwner === state.playerFamily && c.family === fam)));
+                  if (prevOwnerCeasefire) {
+                    // Can't claim — ceasefire territory freeze
+                  } else if (aiActionsRemaining > 0) {
                     // Built business protection: requires a Capo to seize
                     const isPlayerBuiltBiz2 = prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted;
                     if (isPlayerBuiltBiz2 && unit.type !== 'capo') {
