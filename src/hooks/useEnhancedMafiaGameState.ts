@@ -3112,6 +3112,13 @@ export const useEnhancedMafiaGameState = (
               u.family !== fam && u.q === target.q && u.r === target.r && u.s === target.s
             );
             if (enemyUnitsHere.length > 0) {
+              // Ceasefire guard: skip combat against ceasefire families
+              const ceasefireFamilies = new Set((state.ceasefires || []).filter(c => c.active).map(c => c.family));
+              const enemyFromCeasefireFamily = enemyUnitsHere.every(u => ceasefireFamilies.has(u.family) || (u.family === state.playerFamily && ceasefireFamilies.has(fam)));
+              if (enemyFromCeasefireFamily) {
+                unit.q = origQ; unit.r = origR; unit.s = origS;
+                break;
+              }
               // Combat costs an action point
               if (aiActionsRemaining <= 0) {
                 // No action budget left — revert position and skip
