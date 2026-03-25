@@ -695,6 +695,27 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             ⚠️
                           </text>
                         )}
+                        {/* Capo threat indicator — enemy Capo on a player-built business hex */}
+                        {(() => {
+                          const isPlayerBuiltBiz = isPlayerTerritory && tile.business && !tile.business.isExtorted && 
+                            (!tile.business.constructionGoal || (tile.business.constructionProgress ?? 0) >= tile.business.constructionGoal);
+                          const enemyCapoOnHex = isPlayerBuiltBiz && deployedUnits.some(u => 
+                            u.family !== playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s
+                          );
+                          if (!enemyCapoOnHex) return null;
+                          return (
+                            <text 
+                              x={x - baseHexRadius * 0.55} 
+                              y={y + baseHexRadius * 0.55} 
+                              textAnchor="middle" 
+                              fontSize="9" 
+                              className="pointer-events-none select-none"
+                            >
+                              <animate attributeName="opacity" values="1;0.3;1" dur="1.2s" repeatCount="indefinite" />
+                              👔
+                            </text>
+                          );
+                        })()}
                       </>
                     );
                   })()}
