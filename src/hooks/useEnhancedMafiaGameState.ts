@@ -2619,7 +2619,11 @@ export const useEnhancedMafiaGameState = (
         );
         
         let tileIncome = 0;
-        if (hasCapo) {
+        const isPlayerBuilt = !tile.business.isExtorted && tile.controllingFamily === state.playerFamily;
+        if (isPlayerBuilt) {
+          // Player-built businesses earn 100% regardless of unit presence
+          tileIncome = tile.business.income;
+        } else if (hasCapo) {
           tileIncome = tile.business.income; // 100%
         } else if (hasSoldier) {
           tileIncome = Math.floor(tile.business.income * 0.3); // 30%
