@@ -31,6 +31,7 @@ interface HexBusiness {
   baseIncome?: number;
   isLegal: boolean;
   isExtorted: boolean;
+  isPlayerBuilt?: boolean;
   underConstruction?: boolean;
   collectionRate?: number;
   collectionReason?: string;
