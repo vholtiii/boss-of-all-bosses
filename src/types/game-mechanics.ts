@@ -401,6 +401,7 @@ export const CAPO_WOUND_DURATION = 2;          // wounded state lasts 2 turns
 export const CAPO_WOUND_COMBAT_PENALTY = 0.05; // -5% combat effectiveness while wounded
 
 // ============ BUILT VS EXTORTED BUSINESS ============
+export const BUILT_BUSINESS_DEFENSE_BONUS = 20;       // +20% defense on player-built business hexes
 export const BUILT_BUSINESS_HEAT_REDUCTION = 0.5;    // 50% less heat from player-built businesses
 export const BUILT_BUSINESS_RESPECT_THRESHOLD = 3;   // every 3 built businesses grants bonuses
 export const BUILT_BUSINESS_RESPECT_BONUS = 1;       // +1 respect per turn per 3 built businesses

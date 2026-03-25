@@ -41,7 +41,7 @@ import {
   FLIP_SOLDIER_COST, FLIP_SOLDIER_BASE_CHANCE, FLIP_SOLDIER_FAIL_INFLUENCE_LOSS,
   SITDOWN_COST, SITDOWN_COOLDOWN, SITDOWN_LOYALTY_BONUS, SITDOWN_DEFENSE_PER_SOLDIER,
   CLAIM_TOUGHNESS_GAIN, EXTORTION_TOUGHNESS_GAIN,
-  BUILT_BUSINESS_HEAT_REDUCTION, BUILT_BUSINESS_RESPECT_THRESHOLD, BUILT_BUSINESS_RESPECT_BONUS, BUILT_BUSINESS_LOYALTY_BONUS,
+  BUILT_BUSINESS_DEFENSE_BONUS, BUILT_BUSINESS_HEAT_REDUCTION, BUILT_BUSINESS_RESPECT_THRESHOLD, BUILT_BUSINESS_RESPECT_BONUS, BUILT_BUSINESS_LOYALTY_BONUS,
   BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION, BUILT_BIZ_SEIZURE_INCOME_PENALTY, BUILT_BIZ_SEIZURE_RESPECT_LOSS, BUILT_BIZ_SEIZURE_FEAR_LOSS, BUILT_BIZ_SEIZURE_INFLUENCE_GAIN,
 } from '@/types/game-mechanics';
 
@@ -3127,8 +3127,11 @@ export const useEnhancedMafiaGameState = (
               if (aiStrength >= enemyUnitsHere.length || Math.random() < combatWillingness) {
                 aiActionsRemaining--; // Deduct action point for combat
                 // Safehouse defense bonus: defenders on safehouse hex are harder to kill
-                const isTargetSafehouse = state.safehouses.some(s => s.q === target.q && s.r === target.r && s.s === target.s);
-                const baseKillChance = isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) : 0.7;
+              const isTargetSafehouse = state.safehouses.some(s => s.q === target.q && s.r === target.r && s.s === target.s);
+                // Built business defense bonus: player-built businesses on this hex grant defenders +20% protection
+                const isDefenderBuiltBiz = tile.controllingFamily === state.playerFamily && tile.business && !tile.business.isExtorted;
+                const builtBizDefBonus = isDefenderBuiltBiz ? (BUILT_BUSINESS_DEFENSE_BONUS / 100) : 0;
+                const baseKillChance = isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) - builtBizDefBonus : 0.7 - builtBizDefBonus;
                 enemyUnitsHere.forEach(eu => {
                   // Capos cannot be killed in regular combat — only wounded
                   if (eu.type === 'capo') {
@@ -3178,13 +3181,30 @@ export const useEnhancedMafiaGameState = (
                 const remainingEnemies = state.deployedUnits.filter(u =>
                   u.family !== fam && u.q === target.q && u.r === target.r && u.s === target.s
                 );
-                if (remainingEnemies.length === 0) {
+              if (remainingEnemies.length === 0) {
                   const prevOwner = tile.controllingFamily;
-                  // Check for built business seizure before changing ownership
-                  if (prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted) {
-                    applyBuiltBusinessSeizure(state, tile, fam, prevOwner);
+                  // Built business seizure: requires a Capo to take over
+                  const isPlayerBuiltBiz = prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted;
+                  const hasCapoOnHex = state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === target.q && u.r === target.r && u.s === target.s);
+                  if (isPlayerBuiltBiz && !hasCapoOnHex) {
+                    // Regular soldiers can't seize player-built businesses
+                    state.pendingNotifications.push({
+                      type: 'info' as const,
+                      title: '🛡️ Business Defended!',
+                      message: `Your built business in ${tile.district || 'unknown territory'} repelled a ${fam} takeover — only a Capo can seize player-built businesses.`,
+                    });
+                    tile.controllingFamily = 'neutral' as any;
+                  } else {
+                    if (isPlayerBuiltBiz) {
+                      applyBuiltBusinessSeizure(state, tile, fam, prevOwner);
+                      state.pendingNotifications.push({
+                        type: 'error' as const,
+                        title: '🚨 Capo Seized Your Business!',
+                        message: `The ${fam} Capo seized your built business in ${tile.district || 'unknown territory'}! Only Capos can take player-built businesses.`,
+                      });
+                    }
+                    tile.controllingFamily = 'neutral' as any;
                   }
-                  tile.controllingFamily = 'neutral' as any;
                   // Destroy fortification on captured hex
                   state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === target.q && f.r === target.r && f.s === target.s));
                   // Check if any safehouse was on this hex (player's)
@@ -3250,14 +3270,29 @@ export const useEnhancedMafiaGameState = (
                 } else {
                   // Enemy territory with no defenders: requires an action point to claim
                   if (aiActionsRemaining > 0) {
-                    aiActionsRemaining--;
-                    // Check for built business seizure before changing ownership
-                    if (prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted) {
-                      applyBuiltBusinessSeizure(state, tile, fam, prevOwner);
-                    }
-                    tile.controllingFamily = fam;
-                    if (prevOwner === state.playerFamily && turnReport) {
-                      turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
+                    // Built business protection: requires a Capo to seize
+                    const isPlayerBuiltBiz2 = prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted;
+                    if (isPlayerBuiltBiz2 && unit.type !== 'capo') {
+                      // Regular soldiers can't seize player-built businesses — notify player
+                      state.pendingNotifications.push({
+                        type: 'info' as const,
+                        title: '🛡️ Business Defended!',
+                        message: `Your built business in ${tile.district || 'unknown territory'} repelled a ${fam} takeover — only a Capo can seize player-built businesses.`,
+                      });
+                    } else {
+                      aiActionsRemaining--;
+                      if (isPlayerBuiltBiz2) {
+                        applyBuiltBusinessSeizure(state, tile, fam, prevOwner);
+                        state.pendingNotifications.push({
+                          type: 'error' as const,
+                          title: '🚨 Capo Seized Your Business!',
+                          message: `The ${fam} Capo seized your built business in ${tile.district || 'unknown territory'}! Only Capos can take player-built businesses.`,
+                        });
+                      }
+                      tile.controllingFamily = fam;
+                      if (prevOwner === state.playerFamily && turnReport) {
+                        turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
+                      }
                     }
                   }
                   // No action budget? Can't claim — just occupying the hex
@@ -5236,6 +5271,11 @@ export const useEnhancedMafiaGameState = (
       const isDefenderSafehouse = state.safehouses.some(s => s.q === targetQ && s.r === targetR && s.s === targetS);
       if (isDefenderSafehouse) {
         chance -= SAFEHOUSE_DEFENSE_BONUS / 100;
+      }
+      // Built business defense bonus for defenders
+      const isDefenderBuiltBiz = tile.business && !tile.business.isExtorted && tile.controllingFamily !== state.playerFamily;
+      if (isDefenderBuiltBiz) {
+        chance -= BUILT_BUSINESS_DEFENSE_BONUS / 100;
       }
       // Attacker bonus: attacking FROM a fortified hex
       const attackerUnit = playerUnits[0];
