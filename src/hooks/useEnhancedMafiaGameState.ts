@@ -2863,11 +2863,17 @@ export const useEnhancedMafiaGameState = (
       let aiIncome = 0;
       state.hexMap.forEach(tile => {
         if (tile.controllingFamily === fam && tile.business) {
+          let tileInc = 0;
           const hasCapo = state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
           const hasSoldier = state.deployedUnits.some(u => u.family === fam && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
-          if (hasCapo) aiIncome += tile.business.income;
-          else if (hasSoldier) aiIncome += Math.floor(tile.business.income * 0.3);
-          else aiIncome += Math.floor(tile.business.income * 0.1);
+          if (hasCapo) tileInc = tile.business.income;
+          else if (hasSoldier) tileInc = Math.floor(tile.business.income * 0.3);
+          else tileInc = Math.floor(tile.business.income * 0.1);
+          // Seized player-built business runs at 50% during penalty period
+          if (tile.business.seizurePenaltyTurns && tile.business.seizurePenaltyTurns > 0) {
+            tileInc = Math.floor(tileInc * BUILT_BIZ_SEIZURE_INCOME_PENALTY);
+          }
+          aiIncome += tileInc;
         }
       });
       const mapScale = state.mapSize === 'small' ? 0.6 : state.mapSize === 'large' ? 1.5 : 1.0;
