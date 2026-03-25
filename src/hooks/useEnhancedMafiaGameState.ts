@@ -180,6 +180,7 @@ export interface HexTile {
     turnsUntilComplete?: number;
     constructionProgress?: number;
     constructionGoal?: number;
+    isExtorted?: boolean;
   };
   isHeadquarters?: string;
 }
