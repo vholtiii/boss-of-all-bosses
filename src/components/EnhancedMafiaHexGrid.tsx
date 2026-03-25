@@ -454,9 +454,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           (isCapo && (unitOnTargetHex || true))
         ) && (isNeutral || isEnemy) && !tile.isHeadquarters;
         const canClaim = isNeutral && isSoldier && !tile.business && !tile.isHeadquarters;
-        const canNegotiate = isEnemy && isCapo && !tile.isHeadquarters;
+        const isCapoWounded = isCapo && (selectedUnit as any).woundedTurnsRemaining > 0;
+        const canNegotiate = isEnemy && isCapo && !tile.isHeadquarters && !isCapoWounded;
         const canSabotage = isEnemy && isSoldier && !!tile.business && !tile.isHeadquarters;
-        const canSafehouse = isOwned && !tile.isHeadquarters;
+        const canSafehouse = isOwned && !tile.isHeadquarters && !isCapoWounded;
         const negotiateCapoId = isCapo ? selectedUnit.id : undefined;
         
         // HQ Assault: soldier adjacent to enemy HQ
