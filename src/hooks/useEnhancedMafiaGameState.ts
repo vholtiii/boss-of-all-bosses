@@ -159,6 +159,7 @@ export interface DeployedUnit {
   escortingSoldierIds?: string[]; // capo only — IDs of soldiers being escorted
   recruited?: boolean; // true = locally recruited (loyal), false/undefined = mercenary (bought)
   pendingDefection?: boolean; // set by Internal Betrayal event — resolved in endTurn
+  woundedTurnsRemaining?: number; // capo only — 0 or undefined = healthy, >0 = wounded
 }
 
 // ============ HEX TILE ============
