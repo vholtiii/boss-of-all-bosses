@@ -1533,7 +1533,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               <div className="text-[10px] font-bold text-foreground/80 uppercase tracking-wider mb-1">Badges</div>
               {[
                 { icon: '🏛️', label: 'Headquarters' },
-                { icon: '🏗️', label: 'Player-Built Biz' },
+                { icon: '🏗️', label: 'Player-Built (+20% def, Capo to seize)' },
+                { icon: '👔', label: 'Capo Threat (enemy Capo!)' },
                 { icon: '🚧', label: 'Under Construction' },
                 { icon: '👁️', label: 'Scouted Hex' },
                 { icon: '🩸', label: 'Wounded Capo' },

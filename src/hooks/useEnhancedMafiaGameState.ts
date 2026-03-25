@@ -5272,6 +5272,11 @@ export const useEnhancedMafiaGameState = (
       if (isDefenderSafehouse) {
         chance -= SAFEHOUSE_DEFENSE_BONUS / 100;
       }
+      // Built business defense bonus for defenders
+      const isDefenderBuiltBiz = tile.business && !tile.business.isExtorted && tile.controllingFamily !== state.playerFamily;
+      if (isDefenderBuiltBiz) {
+        chance -= BUILT_BUSINESS_DEFENSE_BONUS / 100;
+      }
       // Attacker bonus: attacking FROM a fortified hex
       const attackerUnit = playerUnits[0];
       const attackerHexFortified = attackerUnit && isHexFortified(state.fortifiedHexes || [], attackerUnit.q, attackerUnit.r, attackerUnit.s, state.playerFamily);
