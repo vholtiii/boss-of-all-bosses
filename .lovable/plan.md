@@ -1,39 +1,52 @@
 
 
-# Player-Built Business Defense: Capo Requirement + Defense Bonus + Capo Threat Alerts
+# Ceasefire Enforcement: Full Combat Block, Territory Freeze & Treachery Debuff
 
 ## Overview
 
-Player-built businesses become significantly harder for rivals to seize, with clear visual and notification feedback when threatened.
+Ceasefires become meaningful: both sides are blocked from attacking or claiming each other's territory. Violations trigger harsh penalties and a "treachery" debuff that hurts future negotiations.
 
-### Mechanics
+## Changes
 
-1. **Only a Capo can seize** a player-built business hex — regular soldiers occupy but can't flip ownership
-2. **+20% defense bonus** on player-built business hexes (stacks with fortify/safehouse)
-3. **Capo threat indicator & notification** — when a rival Capo occupies or attacks a player-built business hex, the player gets a prominent alert and the hex shows a special threat marker
+### 1. New types & constants (`src/types/game-mechanics.ts`)
+- Add `CEASEFIRE_VIOLATION_RESPECT_LOSS = 15`
+- Add `CEASEFIRE_VIOLATION_FEAR_LOSS = 10`
+- Add `TREACHERY_DEBUFF_DURATION = 3` (turns)
+- Add `TREACHERY_NEGOTIATION_PENALTY = 20` (% reduction to all negotiation success)
+- Add `treacheryDebuff` interface: `{ turnsRemaining: number; appliedOnTurn: number }`
 
-### Capo Threat Alert (new addition)
+### 2. State additions (`src/hooks/useEnhancedMafiaGameState.ts`)
+- Add `treacheryDebuff?: { turnsRemaining: number; appliedOnTurn: number }` to game state
+- Initialize as `undefined` in initial state
 
-- **Notification**: "🚨 Capo Threat! The {family} Capo is attacking your built business in {district}! Only Capos can seize built businesses." — high-priority alert (error-level, 10s duration)
-- **Map indicator**: Player-built business hexes with an enemy Capo present get a pulsing red 👔 badge overlay, distinct from the ⚠️ seizure penalty badge
-- When a regular soldier occupies (but can't seize), a softer notification: "🛡️ Your built business in {district} repelled a takeover — only a Capo can seize it."
+### 3. AI movement & combat block (~lines 2997-3009, 3104-3127)
+- **Target filtering**: When building `playerHexes` target pool, skip player hexes if `state.ceasefires.some(c => c.active && c.family === fam)`. AI units with ceasefire won't select player territory as a target.
+- **Combat guard**: Before AI engages combat (~line 3108), check if the enemy units belong to a ceasefire family. If so, revert AI unit position and skip — no combat occurs.
+- **Territory claim guard**: In the no-combat claim path (~line 3261-3297), if the hex belongs to a ceasefire family, skip the claim entirely.
 
-## Technical Changes
+### 4. Player attack block & violation penalties (~lines 5150-5202)
+- **Hard block option**: When player initiates a hit/extortion/combat against a ceasefire family, show a confirmation warning: "⚠️ This will break the ceasefire!" then proceed with violation penalties if confirmed. Since the current code already applies -15 respect on violation, enhance it:
+  - Add `-10 fear` loss
+  - Apply `treacheryDebuff = { turnsRemaining: 3, appliedOnTurn: state.turn }`
+  - Push notification: "🗡️ Treachery! You broke the ceasefire. -15 respect, -10 fear. Other families trust you less for 3 turns."
+  - Reduce relationship with ALL families by -10 (not just the violated one)
 
-### `src/types/game-mechanics.ts`
-- Add `BUILT_BUSINESS_DEFENSE_BONUS = 20`
+### 5. Territory freeze — player side
+- In player territory claim actions (extortion, move-to-claim), check if the target hex belongs to a ceasefire family. If so, block the action with a notification: "🤝 Ceasefire Active — you cannot claim {family} territory during a ceasefire."
+- Same check for Plan Hit target selection — can't plan hits against ceasefire families
 
-### `src/hooks/useEnhancedMafiaGameState.ts`
-- **No-combat capture path**: Block territory flip on player-built business hexes unless unit is a Capo. Push "repelled" notification for soldiers, "Capo Threat" notification for Capos.
-- **Combat capture path**: After combat, only flip ownership if surviving AI units include a Capo. Same notification logic.
-- **Combat defense calcs**: Add `BUILT_BUSINESS_DEFENSE_BONUS / 100` to defender survival on player-built business hexes.
+### 6. Treachery debuff effect
+- In the negotiation success calculation (where `baseSuccess` is used), apply: `if (state.treacheryDebuff?.turnsRemaining > 0) successChance -= TREACHERY_NEGOTIATION_PENALTY`
+- Tick down `treacheryDebuff.turnsRemaining` each turn in `processPacts`. Clear when it reaches 0.
+- Show active debuff in the pacts bar (UI): "🗡️ Treachery (-20% negotiations, {N}t)"
 
-### `src/components/EnhancedMafiaHexGrid.tsx`
-- Add pulsing red 👔 badge on player-built hexes where an enemy Capo is present (check units on hex for rival Capo type)
-- Update legend: "🏗️ Player-Built: +20% defense, Capo required to seize"
+### 7. UI updates
+- **Pacts bar** (`src/pages/UltimateMafiaGame.tsx`): Show treachery debuff alongside active pacts
+- **NegotiationDialog** (`src/components/NegotiationDialog.tsx`): Show warning text when treachery debuff is active, indicating reduced success rates
 
 ## Files Modified
-- `src/types/game-mechanics.ts`
-- `src/hooks/useEnhancedMafiaGameState.ts`
-- `src/components/EnhancedMafiaHexGrid.tsx`
+- `src/types/game-mechanics.ts` — new constants and interface
+- `src/hooks/useEnhancedMafiaGameState.ts` — AI blocking, player violation logic, territory freeze, debuff processing
+- `src/pages/UltimateMafiaGame.tsx` — treachery debuff display in pacts bar
+- `src/components/NegotiationDialog.tsx` — treachery warning on negotiation panel
 
