@@ -1,28 +1,47 @@
 
 
-# Add Visual Indicator for Player-Built Business Hexes
+# Player-Built Business Seizure — Auto-Ceasefire & Reputation Impact
 
-## Problem
-Player-built businesses (not extorted) have gameplay advantages (100% income without units, lower heat) but look identical to extorted businesses on the hex map. Players need a subtle visual cue to distinguish them.
+## What Happens
 
-## Approach
-Currently, player-territory hexes with legal businesses already get a blue outline (`#3B82F6`). We'll add a distinct indicator for **player-built** businesses (where `isExtorted === false` and hex is player-controlled):
+When a rival family takes over a hex that had a **player-built** business (not extorted), three things trigger:
 
-- **Inner glow/ring**: A subtle inner polygon or dashed outline in a warm green/teal tone (e.g., `#10B981` — emerald) to indicate "player-built", distinct from the existing blue legal-business stroke
-- **Small 🏗️ icon badge**: A small badge in the corner of the hex (similar to the existing 👁️ scout badge) for built businesses
+1. **Forced 5-turn ceasefire** between the two families — hostilities pause so the business can operate
+2. **Business runs at 50% revenue** for those 5 turns (the new owner is still settling in)
+3. **Reputation impact**: The player who lost the business suffers a bigger reputation hit; the rival who seized it gains influence
 
-This keeps the existing blue outline for legal businesses while adding an additional layer for the "built" distinction.
+When a rival takes an **extorted** business hex, none of this triggers — it's just a normal territory flip.
 
 ## Technical Changes
 
+### `src/types/game-mechanics.ts`
+- Add constants: `BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION = 5`, `BUILT_BIZ_SEIZURE_INCOME_PENALTY = 0.5`, `BUILT_BIZ_SEIZURE_RESPECT_LOSS = 8`, `BUILT_BIZ_SEIZURE_FEAR_LOSS = 5`, `BUILT_BIZ_SEIZURE_INFLUENCE_GAIN = 10`
+- Add a `wasPlayerBuilt?: boolean` flag to track seized built-businesses on tiles (so the 50% penalty persists for 5 turns)
+- Add `seizurePenaltyTurns?: number` field on the business object
+
+### `src/hooks/useEnhancedMafiaGameState.ts`
+
+**AI territory capture (lines ~3190-3197)**: When AI claims a player hex, check if the tile had a player-built business (`!tile.business.isExtorted`). If so:
+- Auto-create a ceasefire pact (5 turns) between the rival and the player
+- Set `tile.business.seizurePenaltyTurns = 5` and `tile.business.wasPlayerBuilt = true`
+- Apply reputation loss to player: -8 respect, -5 fear
+- Apply influence gain to rival: +10 influence
+- Push notification: "⚠️ Business Seized! The {family} family took over your built business in {district}. A 5-turn ceasefire is now in effect."
+
+**AI income calculation (lines ~2812-2816)**: If `tile.business.seizurePenaltyTurns > 0`, apply 50% income modifier for the controlling AI family.
+
+**Turn end processing**: Decrement `seizurePenaltyTurns` each turn. When it reaches 0, clear `wasPlayerBuilt` flag — business now operates at full capacity. Push notification: "💼 Business Stabilized — {family}'s seized business now runs at full revenue."
+
+**Combat resolution**: Same check applies wherever combat results in territory changing hands from player to rival — if the lost hex had a built business, trigger the same seizure logic.
+
 ### `src/components/EnhancedMafiaHexGrid.tsx`
+- Show a subtle ⚠️ badge on rival-held hexes that have `seizurePenaltyTurns > 0` (so the player can see their former built business is still in transition)
 
-**Line 655-656 (stroke logic)**: Add a check for player-built businesses. If `tile.business && !tile.business.isExtorted && isPlayerTerritory`, use a green-tinted stroke (`#10B981`) instead of the blue legal stroke, with a slightly different stroke style (e.g., dashed or thicker).
+### `src/components/HeadquartersInfoPanel.tsx`
+- No changes needed (panel only shows player-controlled hexes)
 
-**After line 662**: Add a small inner polygon or badge icon for player-built hexes — a slightly smaller hex polygon with a semi-transparent emerald fill (`#10B98120`) to create a subtle inner glow effect, plus a small "🏗️" badge in the bottom-left corner.
-
-## Result
-- Player-built hexes get an emerald green outline + subtle inner tint + 🏗️ badge
-- Extorted hexes keep existing styling (blue for legal, gold for player territory)
-- Quick at-a-glance differentiation on the map
+## Files Modified
+- `src/types/game-mechanics.ts`
+- `src/hooks/useEnhancedMafiaGameState.ts`
+- `src/components/EnhancedMafiaHexGrid.tsx`
 
