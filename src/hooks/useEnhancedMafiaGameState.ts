@@ -5815,6 +5815,10 @@ export const useEnhancedMafiaGameState = (
     }
     totalChance += (state.resources.influence / 100) * 10;
     totalChance += Math.floor(state.reputation.respect / 5);
+    // Treachery debuff reduces negotiation success
+    if (state.treacheryDebuff && state.treacheryDebuff.turnsRemaining > 0) {
+      totalChance -= TREACHERY_NEGOTIATION_PENALTY;
+    }
     totalChance = Math.max(5, Math.min(95, totalChance));
     const roll = Math.random() * 100;
 
