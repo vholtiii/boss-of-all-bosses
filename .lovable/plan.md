@@ -1,37 +1,69 @@
 
 
-# Fix: Sync Boss Business List Income with Actual Financial Data
+# Two Mechanics Updates: Wounded Capo Recovery & Built vs Extorted Businesses
 
-## Problem
-The Boss Overview business list shows raw base income (`tile.business.income`) per business, while the Financial Overview shows actual computed income from `processEconomy`. These use completely different calculations:
+## A. Wounded Capo — Multi-Turn Recovery (2 turns)
 
-- A $2,000 business with no unit on it earns only $200 (10% passive), but the Boss list says "$2,000/turn"
-- Under-construction businesses show income in the Boss list but are excluded from financials
-- Family bonuses and district multipliers are not reflected in per-business display
+### Current State
+Wounded capos lose -10 loyalty and -1 move for exactly 1 turn, then auto-reset. No persistent wound state.
 
-## Fix
+### Changes
 
-### `src/pages/UltimateMafiaGame.tsx` (~line 954-963)
-When building `hexBusinesses`, replicate the same income logic used in `processEconomy`:
+**New field on deployed units:** `woundedTurnsRemaining: number` (0 = healthy, 2 = just wounded). Decrements by 1 each turn.
 
-1. **Skip under-construction businesses** — if `constructionProgress < constructionGoal`, set income to 0 or exclude them (but still show with a "🚧 Under Construction" label and $0 income)
-2. **Apply collection modifier** — check if a capo, soldier, or nobody is on the hex:
-   - Capo present → 100% of base income
-   - Soldier only → 30%
-   - Nobody → 10%
-3. **Apply family bonuses** — `businessIncome`, `territoryIncome`, `income` bonuses from the player's family
-4. **Apply district bonus** — Manhattan +20% if player controls the district
-5. **Add a `baseIncome` field** so the UI can show both: "Base: $2,000 → Earning: $200 (no unit)"
+**While wounded:**
+- -1 max moves (2 instead of 3)
+- **Cannot auto-claim or auto-extort on movement** — capo moves like a soldier (manual actions only)
+- Cannot use Negotiate, Escort, or Safehouse abilities
+- -5% combat effectiveness
+- Visual 🩸 badge on unit
 
-### `src/components/HeadquartersInfoPanel.tsx` (~line 536-539)
-Update the per-business income display to show the effective income, with an optional tooltip or subtitle showing why it differs from base (e.g., "10% — no unit present").
+**Healing:** Automatic after 2 turns. Notification: "💚 Capo Recovered"
 
-### Result
-- Boss business list income will sum to match `finances.legalProfit + finances.illegalProfit` (before penalties)
-- Players can see exactly why a business earns less than its base rate
-- Under-construction businesses show clearly as $0 earning
+### Technical Changes
+
+**`src/types/game-mechanics.ts`** — Add `CAPO_WOUND_DURATION = 2`
+
+**`src/hooks/useEnhancedMafiaGameState.ts`**
+- Set `unit.woundedTurnsRemaining = 2` when capo is wounded (replace current 1-turn maxMoves hack)
+- In `advanceToNextTurn`: decrement wound counter, restore when 0, push recovery notification
+- In capo movement logic: skip auto-claim/auto-extort if `woundedTurnsRemaining > 0`
+- Block negotiate/escort/safehouse if wounded
+- Remove current 1-turn maxMoves reset
+
+**`src/components/EnhancedMafiaHexGrid.tsx`** — 🩸 badge on wounded capos
+
+**`src/pages/UltimateMafiaGame.tsx`** — Tooltip shows wound status + turns remaining, ability buttons disabled with reason
+
+---
+
+## B. Built vs Extorted Business Benefits
+
+### Changes — Player-built businesses get 3 bonuses:
+
+1. **No unit required for full income** — 100% collection regardless of unit presence (extorted keep 100%/30%/10% capo/soldier/empty rates)
+2. **50% less heat** — built businesses generate half the base heat
+3. **Passive loyalty & respect** — every 3 built businesses: +1 respect/turn, +1 loyalty to all soldiers/turn
+
+### Technical Changes
+
+**`src/types/game-mechanics.ts`** — Add `BUILT_BUSINESS_HEAT_REDUCTION = 0.5`, `BUILT_BUSINESS_RESPECT_THRESHOLD = 3`, `BUILT_BUSINESS_RESPECT_BONUS = 1`, `BUILT_BUSINESS_LOYALTY_BONUS = 1`
+
+**`src/hooks/useEnhancedMafiaGameState.ts`**
+- Income: skip capo/soldier/empty modifier for player-built businesses (100% always)
+- Heat: apply 50% reduction for built businesses
+- Turn end: count built businesses, add respect/loyalty per threshold
+
+**`src/components/HeadquartersInfoPanel.tsx`** — "🏗️ Player-Built" badge, "100% (player-built)" collection rate
+
+**`src/pages/UltimateMafiaGame.tsx`** — Pass `isPlayerBuilt` flag to HQ panel
+
+---
 
 ## Files Modified
-- `src/pages/UltimateMafiaGame.tsx` — compute effective income per hex-business using the same rules as `processEconomy`
-- `src/components/HeadquartersInfoPanel.tsx` — display effective income with collection-rate context
+- `src/types/game-mechanics.ts`
+- `src/hooks/useEnhancedMafiaGameState.ts`
+- `src/components/EnhancedMafiaHexGrid.tsx`
+- `src/components/HeadquartersInfoPanel.tsx`
+- `src/pages/UltimateMafiaGame.tsx`
 
