@@ -1645,13 +1645,15 @@ export const useEnhancedMafiaGameState = (
       }
 
       // Only Capos auto-claim neutral hexes on deploy; soldiers do not
+      // Wounded capos cannot auto-claim or auto-extort
       let autoExtortNotification: typeof prev.pendingNotifications[0] | null = null;
       let bonusMoney = 0;
       let bonusRespect = 0;
       const deployedUnit = unitType === 'capo' ? newDeployedUnits.find(u => u.family === family && u.type === 'capo' && u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s) : null;
+      const isWoundedCapo = deployedUnit && (deployedUnit.woundedTurnsRemaining || 0) > 0;
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
-          if (unitType === 'capo' && tile.controllingFamily === 'neutral' && !tile.isHeadquarters) {
+          if (unitType === 'capo' && tile.controllingFamily === 'neutral' && !tile.isHeadquarters && !isWoundedCapo) {
             const hasCompletedBusiness = tile.business && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
             if (hasCompletedBusiness) {
               const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
