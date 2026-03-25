@@ -1,44 +1,36 @@
 
 
-# Player-Built Business Seizure — Auto-Ceasefire & Reputation Impact
+# Player-Built Business Defense: Capo Requirement + Defense Bonus + Capo Threat Alerts
 
-## What Happens
+## Overview
 
-When a rival family takes over a hex that had a **player-built** business (not extorted), three things trigger:
+Player-built businesses become significantly harder for rivals to seize, with clear visual and notification feedback when threatened.
 
-1. **Forced 5-turn ceasefire** between the two families — hostilities pause so the business can operate
-2. **Business runs at 50% revenue** for those 5 turns (the new owner is still settling in)
-3. **Reputation impact**: The player who lost the business suffers a bigger reputation hit; the rival who seized it gains influence
+### Mechanics
 
-When a rival takes an **extorted** business hex, none of this triggers — it's just a normal territory flip.
+1. **Only a Capo can seize** a player-built business hex — regular soldiers occupy but can't flip ownership
+2. **+20% defense bonus** on player-built business hexes (stacks with fortify/safehouse)
+3. **Capo threat indicator & notification** — when a rival Capo occupies or attacks a player-built business hex, the player gets a prominent alert and the hex shows a special threat marker
+
+### Capo Threat Alert (new addition)
+
+- **Notification**: "🚨 Capo Threat! The {family} Capo is attacking your built business in {district}! Only Capos can seize built businesses." — high-priority alert (error-level, 10s duration)
+- **Map indicator**: Player-built business hexes with an enemy Capo present get a pulsing red 👔 badge overlay, distinct from the ⚠️ seizure penalty badge
+- When a regular soldier occupies (but can't seize), a softer notification: "🛡️ Your built business in {district} repelled a takeover — only a Capo can seize it."
 
 ## Technical Changes
 
 ### `src/types/game-mechanics.ts`
-- Add constants: `BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION = 5`, `BUILT_BIZ_SEIZURE_INCOME_PENALTY = 0.5`, `BUILT_BIZ_SEIZURE_RESPECT_LOSS = 8`, `BUILT_BIZ_SEIZURE_FEAR_LOSS = 5`, `BUILT_BIZ_SEIZURE_INFLUENCE_GAIN = 10`
-- Add a `wasPlayerBuilt?: boolean` flag to track seized built-businesses on tiles (so the 50% penalty persists for 5 turns)
-- Add `seizurePenaltyTurns?: number` field on the business object
+- Add `BUILT_BUSINESS_DEFENSE_BONUS = 20`
 
 ### `src/hooks/useEnhancedMafiaGameState.ts`
-
-**AI territory capture (lines ~3190-3197)**: When AI claims a player hex, check if the tile had a player-built business (`!tile.business.isExtorted`). If so:
-- Auto-create a ceasefire pact (5 turns) between the rival and the player
-- Set `tile.business.seizurePenaltyTurns = 5` and `tile.business.wasPlayerBuilt = true`
-- Apply reputation loss to player: -8 respect, -5 fear
-- Apply influence gain to rival: +10 influence
-- Push notification: "⚠️ Business Seized! The {family} family took over your built business in {district}. A 5-turn ceasefire is now in effect."
-
-**AI income calculation (lines ~2812-2816)**: If `tile.business.seizurePenaltyTurns > 0`, apply 50% income modifier for the controlling AI family.
-
-**Turn end processing**: Decrement `seizurePenaltyTurns` each turn. When it reaches 0, clear `wasPlayerBuilt` flag — business now operates at full capacity. Push notification: "💼 Business Stabilized — {family}'s seized business now runs at full revenue."
-
-**Combat resolution**: Same check applies wherever combat results in territory changing hands from player to rival — if the lost hex had a built business, trigger the same seizure logic.
+- **No-combat capture path**: Block territory flip on player-built business hexes unless unit is a Capo. Push "repelled" notification for soldiers, "Capo Threat" notification for Capos.
+- **Combat capture path**: After combat, only flip ownership if surviving AI units include a Capo. Same notification logic.
+- **Combat defense calcs**: Add `BUILT_BUSINESS_DEFENSE_BONUS / 100` to defender survival on player-built business hexes.
 
 ### `src/components/EnhancedMafiaHexGrid.tsx`
-- Show a subtle ⚠️ badge on rival-held hexes that have `seizurePenaltyTurns > 0` (so the player can see their former built business is still in transition)
-
-### `src/components/HeadquartersInfoPanel.tsx`
-- No changes needed (panel only shows player-controlled hexes)
+- Add pulsing red 👔 badge on player-built hexes where an enemy Capo is present (check units on hex for rival Capo type)
+- Update legend: "🏗️ Player-Built: +20% defense, Capo required to seize"
 
 ## Files Modified
 - `src/types/game-mechanics.ts`
