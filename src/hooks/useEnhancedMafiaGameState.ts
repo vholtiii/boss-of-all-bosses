@@ -61,6 +61,54 @@ const syncRespect = (state: any, value: number) => {
   state.resources.respect = Math.round(value);
 };
 
+// ============ BUILT BUSINESS SEIZURE HELPER ============
+const applyBuiltBusinessSeizure = (state: any, tile: any, seizingFamily: string, losingFamily: string) => {
+  if (!tile.business || tile.business.isExtorted) return; // Only applies to player-built businesses
+  
+  // Mark business with seizure penalty
+  tile.business.seizurePenaltyTurns = BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION;
+  tile.business.wasPlayerBuilt = true;
+  
+  // Auto-ceasefire between the two families
+  const existingCeasefire = (state.ceasefires || []).some(
+    (c: any) => c.active && c.family === seizingFamily
+  );
+  if (!existingCeasefire) {
+    state.ceasefires = [...(state.ceasefires || []), {
+      id: `ceasefire-seizure-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      family: seizingFamily,
+      turnsRemaining: BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION,
+      turnFormed: state.turn,
+      active: true,
+    }];
+  }
+  
+  // Reputation loss for the losing family (player)
+  if (losingFamily === state.playerFamily) {
+    syncRespect(state, Math.max(0, state.reputation.respect - BUILT_BIZ_SEIZURE_RESPECT_LOSS));
+    state.reputation.fear = Math.max(0, (state.reputation.fear || 0) - BUILT_BIZ_SEIZURE_FEAR_LOSS);
+  }
+  
+  // Influence gain for the seizing family
+  const seizingOpp = state.aiOpponents.find((o: any) => o.family === seizingFamily);
+  if (seizingOpp) {
+    seizingOpp.resources.money += 0; // no direct cash, just influence
+  }
+  // If player seized it (future-proofing), gain influence
+  if (seizingFamily === state.playerFamily) {
+    state.resources.influence = (state.resources.influence || 0) + BUILT_BIZ_SEIZURE_INFLUENCE_GAIN;
+  }
+  
+  // Notification
+  if (losingFamily === state.playerFamily) {
+    state.pendingNotifications.push({
+      type: 'error' as const,
+      title: '⚠️ Business Seized!',
+      message: `The ${seizingFamily.charAt(0).toUpperCase() + seizingFamily.slice(1)} family took over your built business in ${tile.district}! A ${BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION}-turn ceasefire is now in effect. Business runs at 50% revenue. -${BUILT_BIZ_SEIZURE_RESPECT_LOSS} respect, -${BUILT_BIZ_SEIZURE_FEAR_LOSS} fear.`,
+    });
+  }
+};
+
 // ============ HEX FORTIFICATION HELPERS ============
 const isHexFortified = (fortifiedHexes: FortifiedHex[], q: number, r: number, s: number, family: string): boolean =>
   (fortifiedHexes || []).some(f => f.q === q && f.r === r && f.s === s && f.family === family);
