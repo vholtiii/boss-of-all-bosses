@@ -537,6 +537,11 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                                           Extorted
                                         </Badge>
                                       )}
+                                      {biz.isPlayerBuilt && (
+                                        <Badge variant="outline" className="text-[9px] h-4 text-blue-400 border-blue-400/30">
+                                          🏗️ Built
+                                        </Badge>
+                                      )}
                                     </div>
                                     <div className="text-[10px] text-muted-foreground flex items-center gap-1">
                                       <MapPin className="h-2.5 w-2.5" />
