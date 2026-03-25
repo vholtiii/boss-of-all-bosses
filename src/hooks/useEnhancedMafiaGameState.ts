@@ -181,6 +181,8 @@ export interface HexTile {
     constructionProgress?: number;
     constructionGoal?: number;
     isExtorted?: boolean;
+    seizurePenaltyTurns?: number;  // turns remaining at 50% income after rival seizes a player-built business
+    wasPlayerBuilt?: boolean;       // tracks that this was originally a player-built business (cleared when penalty expires)
   };
   isHeadquarters?: string;
 }
