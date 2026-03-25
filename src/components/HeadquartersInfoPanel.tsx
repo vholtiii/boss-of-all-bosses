@@ -31,6 +31,7 @@ interface HexBusiness {
   baseIncome?: number;
   isLegal: boolean;
   isExtorted: boolean;
+  isPlayerBuilt?: boolean;
   underConstruction?: boolean;
   collectionRate?: number;
   collectionReason?: string;
@@ -534,6 +535,11 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                                       {biz.isExtorted && (
                                         <Badge variant="outline" className="text-[9px] h-4 text-yellow-400 border-yellow-400/30">
                                           Extorted
+                                        </Badge>
+                                      )}
+                                      {biz.isPlayerBuilt && (
+                                        <Badge variant="outline" className="text-[9px] h-4 text-blue-400 border-blue-400/30">
+                                          🏗️ Built
                                         </Badge>
                                       )}
                                     </div>

@@ -454,9 +454,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           (isCapo && (unitOnTargetHex || true))
         ) && (isNeutral || isEnemy) && !tile.isHeadquarters;
         const canClaim = isNeutral && isSoldier && !tile.business && !tile.isHeadquarters;
-        const canNegotiate = isEnemy && isCapo && !tile.isHeadquarters;
+        const isCapoWounded = isCapo && (selectedUnit as any).woundedTurnsRemaining > 0;
+        const canNegotiate = isEnemy && isCapo && !tile.isHeadquarters && !isCapoWounded;
         const canSabotage = isEnemy && isSoldier && !!tile.business && !tile.isHeadquarters;
-        const canSafehouse = isOwned && !tile.isHeadquarters;
+        const canSafehouse = isOwned && !tile.isHeadquarters && !isCapoWounded;
         const negotiateCapoId = isCapo ? selectedUnit.id : undefined;
         
         // HQ Assault: soldier adjacent to enemy HQ
@@ -488,10 +489,14 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           else if (!isSoldier) reasons.sabotage = 'Need a soldier';
           else if (noActions) reasons.sabotage = 'No actions left';
         }
-        if (!canNegotiate && isEnemy && !isCapo) {
+        if (!canNegotiate && isEnemy && isCapo && isCapoWounded) {
+          reasons.negotiate = 'Capo is wounded';
+        } else if (!canNegotiate && isEnemy && !isCapo) {
           reasons.negotiate = 'Need a capo';
         }
-        if (!canSafehouse && isOwned && tile.isHeadquarters) {
+        if (!canSafehouse && isOwned && isCapoWounded) {
+          reasons.safehouse = 'Capo is wounded';
+        } else if (!canSafehouse && isOwned && tile.isHeadquarters) {
           reasons.safehouse = 'Cannot use HQ';
         }
         if (isEnemyHQ && !canAssaultHQ) {
@@ -899,6 +904,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             level={capo.level}
                             isPlayerFamily={fam === playerFamily}
                             selected={isSelected}
+                            wounded={(capo as any).woundedTurnsRemaining > 0}
                             onClick={isClickable ? (e) => {
                               e.stopPropagation();
                               if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {

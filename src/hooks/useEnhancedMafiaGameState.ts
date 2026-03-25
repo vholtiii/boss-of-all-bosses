@@ -33,7 +33,7 @@ import {
   BLIND_HIT_PENALTY, BLIND_HIT_RESPECT, BLIND_HIT_FEAR, HIDING_DURATION, BOUNTY_DURATION, BLIND_HIT_INFLUENCE_LOSS,
   INTERNAL_HIT_LOYALTY_THRESHOLD, INTERNAL_HIT_HEAT_REDUCTION, INTERNAL_HIT_MORALE_RISK, INTERNAL_HIT_MORALE_PENALTY,
   LOYALTY_ACTION_BONUS, LOYALTY_COMBAT_BONUS, LOYALTY_INCOME_HEX_BONUS, LOYALTY_INCOME_HEX_THRESHOLD, LOYALTY_UNPAID_PENALTY,
-  CAPO_WOUND_LOYALTY_PENALTY, CAPO_WOUND_MOVE_PENALTY,
+  CAPO_WOUND_LOYALTY_PENALTY, CAPO_WOUND_MOVE_PENALTY, CAPO_WOUND_DURATION, CAPO_WOUND_COMBAT_PENALTY,
   AI_PLAN_HIT_CHANCE, AI_PLAN_HIT_SUCCESS_RATE, AI_PLAN_HIT_DURATION,
   AIPlannedHit, IntelSource, INTEL_SOURCE_LABELS,
   FlippedSoldier,
@@ -41,6 +41,7 @@ import {
   FLIP_SOLDIER_COST, FLIP_SOLDIER_BASE_CHANCE, FLIP_SOLDIER_FAIL_INFLUENCE_LOSS,
   SITDOWN_COST, SITDOWN_COOLDOWN, SITDOWN_LOYALTY_BONUS, SITDOWN_DEFENSE_PER_SOLDIER,
   CLAIM_TOUGHNESS_GAIN, EXTORTION_TOUGHNESS_GAIN,
+  BUILT_BUSINESS_HEAT_REDUCTION, BUILT_BUSINESS_RESPECT_THRESHOLD, BUILT_BUSINESS_RESPECT_BONUS, BUILT_BUSINESS_LOYALTY_BONUS,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -159,6 +160,7 @@ export interface DeployedUnit {
   escortingSoldierIds?: string[]; // capo only — IDs of soldiers being escorted
   recruited?: boolean; // true = locally recruited (loyal), false/undefined = mercenary (bought)
   pendingDefection?: boolean; // set by Internal Betrayal event — resolved in endTurn
+  woundedTurnsRemaining?: number; // capo only — 0 or undefined = healthy, >0 = wounded
 }
 
 // ============ HEX TILE ============
@@ -178,6 +180,7 @@ export interface HexTile {
     turnsUntilComplete?: number;
     constructionProgress?: number;
     constructionGoal?: number;
+    isExtorted?: boolean;
   };
   isHeadquarters?: string;
 }
@@ -1142,8 +1145,14 @@ export const useEnhancedMafiaGameState = (
         return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
       }
 
-      // Handle safehouse action (tactical phase only)
+      // Handle safehouse action (tactical phase only) — blocked for wounded capos
       if (prev.turnPhase === 'move' && moveAction === 'safehouse' && unit.type === 'capo') {
+        if ((unit.woundedTurnsRemaining || 0) > 0) {
+          return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
+            type: 'warning' as const, title: '🩸 Capo Wounded',
+            message: `${unit.name || 'Your Capo'} is wounded and cannot establish a safehouse for ${unit.woundedTurnsRemaining} more turn(s).`,
+          }]};
+        }
         if (prev.tacticalActionsRemaining <= 0) return prev;
         const result = processSafehouse(prev, unit);
         return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
@@ -1226,12 +1235,14 @@ export const useEnhancedMafiaGameState = (
 
       // Only Capos auto-claim and auto-extort neutral tiles on move
       // Soldiers do NOT auto-claim — they must use the Action phase
+      // Wounded capos cannot auto-claim or auto-extort
       let autoExtortNotification: typeof prev.pendingNotifications[0] | null = null;
       let bonusMoney = 0;
       let bonusRespect = 0;
+      const isWoundedCapo = unit.type === 'capo' && (unit.woundedTurnsRemaining || 0) > 0;
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
-          if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters && unit.type === 'capo') {
+          if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters && unit.type === 'capo' && !isWoundedCapo) {
             const hasCompletedBusiness = tile.business && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
             if (hasCompletedBusiness) {
               // Capo auto-extorts any completed business on arrival (legal pays less)
@@ -1252,7 +1263,7 @@ export const useEnhancedMafiaGameState = (
                 message: `${unit.name || 'Your Capo'} claimed this territory on arrival.`,
               };
             }
-            return { ...tile, controllingFamily: prev.playerFamily };
+            return { ...tile, controllingFamily: prev.playerFamily, business: tile.business ? { ...tile.business, isExtorted: true } : undefined };
           }
         }
         return tile;
@@ -1641,13 +1652,15 @@ export const useEnhancedMafiaGameState = (
       }
 
       // Only Capos auto-claim neutral hexes on deploy; soldiers do not
+      // Wounded capos cannot auto-claim or auto-extort
       let autoExtortNotification: typeof prev.pendingNotifications[0] | null = null;
       let bonusMoney = 0;
       let bonusRespect = 0;
       const deployedUnit = unitType === 'capo' ? newDeployedUnits.find(u => u.family === family && u.type === 'capo' && u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s) : null;
+      const isWoundedCapo = deployedUnit && (deployedUnit.woundedTurnsRemaining || 0) > 0;
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
-          if (unitType === 'capo' && tile.controllingFamily === 'neutral' && !tile.isHeadquarters) {
+          if (unitType === 'capo' && tile.controllingFamily === 'neutral' && !tile.isHeadquarters && !isWoundedCapo) {
             const hasCompletedBusiness = tile.business && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
             if (hasCompletedBusiness) {
               const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
@@ -1666,7 +1679,7 @@ export const useEnhancedMafiaGameState = (
                 message: `${deployedUnit?.name || 'Your Capo'} claimed this territory on deployment.`,
               };
             }
-            return { ...tile, controllingFamily: family as any };
+            return { ...tile, controllingFamily: family as any, business: tile.business ? { ...tile.business, isExtorted: true } : undefined };
           }
           if (unitType === 'capo' && tile.controllingFamily === family && !tile.isHeadquarters) {
             return tile; // already owned
@@ -1898,14 +1911,27 @@ export const useEnhancedMafiaGameState = (
       newState.tacticalActionsRemaining = TACTICAL_ACTIONS_PER_TURN;
       newState.maxTacticalActions = TACTICAL_ACTIONS_PER_TURN;
 
-      // Reset moves and escort for new turn (fortified persists until unit moves)
-      // Restore wounded capo maxMoves back to 3 (wound is 1-turn penalty)
-      newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
-        ...u,
-        movesRemaining: u.type === 'capo' ? 3 : u.maxMoves,
-        maxMoves: u.type === 'capo' ? 3 : u.maxMoves,
-        escortingSoldierIds: undefined,
-      }));
+      // Reset moves and escort for new turn; handle wound recovery for capos
+      newState.deployedUnits = (newState.deployedUnits || []).map(u => {
+        const wounded = u.woundedTurnsRemaining && u.woundedTurnsRemaining > 0;
+        let newWounded = wounded ? u.woundedTurnsRemaining! - 1 : 0;
+        
+        if (wounded && newWounded <= 0 && u.family === newState.playerFamily) {
+          newState.pendingNotifications.push({
+            type: 'success' as const,
+            title: '💚 Capo Recovered!',
+            message: `${u.name || 'Your Capo'} has fully healed and is back to full strength.`,
+          });
+        }
+        
+        return {
+          ...u,
+          movesRemaining: u.type === 'capo' ? (newWounded > 0 ? 2 : 3) : u.maxMoves,
+          maxMoves: u.type === 'capo' ? (newWounded > 0 ? 2 : 3) : u.maxMoves,
+          escortingSoldierIds: undefined,
+          woundedTurnsRemaining: u.type === 'capo' ? newWounded : undefined,
+        };
+      });
 
       // --- Hex fortification abandonment tick ---
       newState.fortifiedHexes = (newState.fortifiedHexes || []).filter(f => {
@@ -2161,14 +2187,48 @@ export const useEnhancedMafiaGameState = (
       // Sync resources.loyalty from reputation.loyalty
       newState.resources.loyalty = Math.round(newState.reputation.loyalty);
       
-      // --- Passive heat from illegal operations ---
+      // --- Passive heat from illegal operations (built businesses generate 50% less heat) ---
       {
-        const illegalBizCount = newState.hexMap.filter(t => 
+        const illegalBizzes = newState.hexMap.filter(t => 
           t.controllingFamily === newState.playerFamily && t.business && !t.business.isLegal
-        ).length;
-        const passiveHeat = Math.floor(illegalBizCount / 3);
+        );
+        let heatFromBiz = 0;
+        illegalBizzes.forEach(t => {
+          const isPlayerBuilt = !t.business!.isExtorted;
+          heatFromBiz += isPlayerBuilt ? 0.5 : 1; // built = half heat contribution
+        });
+        const passiveHeat = Math.floor(heatFromBiz / 3);
         if (passiveHeat > 0) {
           newState.policeHeat.level = Math.min(100, newState.policeHeat.level + passiveHeat);
+        }
+      }
+      
+      // --- Built business empire bonuses: +1 respect & +1 loyalty per 3 built businesses ---
+      {
+        const builtBizCount = newState.hexMap.filter(t => 
+          t.controllingFamily === newState.playerFamily && t.business && !t.business.isExtorted &&
+          !(t.business.constructionProgress !== undefined && t.business.constructionProgress < (t.business.constructionGoal || 3))
+        ).length;
+        const bonusTiers = Math.floor(builtBizCount / BUILT_BUSINESS_RESPECT_THRESHOLD);
+        if (bonusTiers > 0) {
+          const respectBonus = bonusTiers * BUILT_BUSINESS_RESPECT_BONUS;
+          newState.reputation.respect = Math.min(100, newState.reputation.respect + respectBonus);
+          newState.resources.respect = Math.round(newState.reputation.respect);
+          
+          const loyaltyBonus = bonusTiers * BUILT_BUSINESS_LOYALTY_BONUS;
+          newState.deployedUnits.forEach(u => {
+            if (u.family === newState.playerFamily) {
+              const stats = newState.soldierStats[u.id];
+              if (stats) {
+                const cap = u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP;
+                stats.loyalty = Math.min(cap, stats.loyalty + loyaltyBonus);
+              }
+            }
+          });
+          
+          if (bonusTiers >= 1) {
+            turnReport.events.push(`🏗️ Your ${builtBizCount} built businesses earned +${respectBonus} respect and +${loyaltyBonus} loyalty across all units.`);
+          }
         }
       }
       
@@ -2594,7 +2654,11 @@ export const useEnhancedMafiaGameState = (
         );
         
         let tileIncome = 0;
-        if (hasCapo) {
+        const isPlayerBuilt = !tile.business.isExtorted && tile.controllingFamily === state.playerFamily;
+        if (isPlayerBuilt) {
+          // Player-built businesses earn 100% regardless of unit presence
+          tileIncome = tile.business.income;
+        } else if (hasCapo) {
           tileIncome = tile.business.income; // 100%
         } else if (hasSoldier) {
           tileIncome = Math.floor(tile.business.income * 0.3); // 30%
@@ -3018,12 +3082,13 @@ export const useEnhancedMafiaGameState = (
                       if (state.soldierStats[eu.id]) {
                         state.soldierStats[eu.id].loyalty = Math.max(0, state.soldierStats[eu.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
                       }
+                      eu.woundedTurnsRemaining = CAPO_WOUND_DURATION;
                       eu.maxMoves = Math.max(1, (eu.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
                       if (eu.family === state.playerFamily) {
                         state.pendingNotifications.push({
                           type: 'warning' as const,
                           title: '🩸 Capo Wounded!',
-                          message: `Your capo was wounded by the ${fam} family in ${tile.district || 'unknown territory'}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
+                          message: `Your capo was wounded by the ${fam} family in ${tile.district || 'unknown territory'}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, wounded for ${CAPO_WOUND_DURATION} turns.`,
                         });
                         if (turnReport) {
                           turnReport.events.push(`🩸 Capo wounded by the ${fam} family in ${tile.district || 'unknown territory'}`);
@@ -5353,10 +5418,11 @@ export const useEnhancedMafiaGameState = (
             if (state.soldierStats[capo.id]) {
               state.soldierStats[capo.id].loyalty = Math.max(0, state.soldierStats[capo.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
             }
+            capo.woundedTurnsRemaining = CAPO_WOUND_DURATION;
             capo.maxMoves = Math.max(1, (capo.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'warning' as const, title: '🩸 Capo Wounded!',
-              message: `Your capo was wounded during the assault on ${tile.district}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
+              message: `Your capo was wounded during the assault on ${tile.district}. Wounded for ${CAPO_WOUND_DURATION} turns.`,
             }];
             state.combatLog = [...(state.combatLog || []), `🩸 Capo wounded during assault on ${tile.district}`];
           }
@@ -5383,10 +5449,11 @@ export const useEnhancedMafiaGameState = (
           if (state.soldierStats[capo.id]) {
             state.soldierStats[capo.id].loyalty = Math.max(0, state.soldierStats[capo.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
           }
+          capo.woundedTurnsRemaining = CAPO_WOUND_DURATION;
           capo.maxMoves = Math.max(1, (capo.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
           state.pendingNotifications = [...state.pendingNotifications, {
             type: 'warning' as const, title: '🩸 Capo Wounded!',
-            message: `Your capo was wounded in the failed attack on ${tile.district}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
+            message: `Your capo was wounded in the failed attack on ${tile.district}. Wounded for ${CAPO_WOUND_DURATION} turns.`,
           }];
           state.combatLog = [...(state.combatLog || []), `🩸 Capo wounded in failed attack on ${tile.district}`];
         });
@@ -5478,6 +5545,7 @@ export const useEnhancedMafiaGameState = (
       if (Math.random() < chance) {
         if (isNeutral) {
           tile.controllingFamily = state.playerFamily;
+          if (tile.business) tile.business.isExtorted = true;
         }
         const baseMoneyGain = isEnemy ? (tile.business?.income || 2000) : 3000;
         const respectPayoutMultiplier = 0.5 + (state.reputation.respect / 100);

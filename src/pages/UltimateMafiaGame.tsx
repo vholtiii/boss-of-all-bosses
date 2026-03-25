@@ -990,8 +990,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
 
             let collectionRate = 10;
             let collectionReason = 'No unit';
+            const isPlayerBuilt = !tile.business.isExtorted;
             let tileIncome = Math.floor(baseIncome * 0.1);
-            if (hasCapo) {
+            
+            if (isPlayerBuilt) {
+              // Player-built businesses earn 100% regardless of unit presence
+              tileIncome = baseIncome;
+              collectionRate = 100;
+              collectionReason = 'Player-built';
+            } else if (hasCapo) {
               tileIncome = baseIncome;
               collectionRate = 100;
               collectionReason = 'Capo';
@@ -1017,6 +1024,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               baseIncome,
               isLegal: tile.business.isLegal !== false,
               isExtorted: tile.business.isExtorted === true,
+              isPlayerBuilt,
               underConstruction,
               collectionRate,
               collectionReason,
