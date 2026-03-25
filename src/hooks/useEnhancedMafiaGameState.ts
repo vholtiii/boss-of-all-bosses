@@ -5974,6 +5974,18 @@ export const useEnhancedMafiaGameState = (
       return { ...c, turnsRemaining: remaining };
     }).filter(c => c.active);
 
+    // Tick down treachery debuff
+    if (state.treacheryDebuff && state.treacheryDebuff.turnsRemaining > 0) {
+      state.treacheryDebuff.turnsRemaining -= 1;
+      if (state.treacheryDebuff.turnsRemaining <= 0) {
+        state.treacheryDebuff = undefined;
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'info', title: '🕊️ Treachery Forgotten',
+          message: `The other families have moved past your ceasefire violation. Negotiation penalties lifted.`,
+        }];
+      }
+    }
+
     // Tick down alliances and check conditions
     state.alliances = (state.alliances || []).map(a => {
       if (!a.active) return a;
