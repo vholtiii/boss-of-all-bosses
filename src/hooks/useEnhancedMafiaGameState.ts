@@ -3174,6 +3174,10 @@ export const useEnhancedMafiaGameState = (
                 );
                 if (remainingEnemies.length === 0) {
                   const prevOwner = tile.controllingFamily;
+                  // Check for built business seizure before changing ownership
+                  if (prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted) {
+                    applyBuiltBusinessSeizure(state, tile, fam, prevOwner);
+                  }
                   tile.controllingFamily = 'neutral' as any;
                   // Destroy fortification on captured hex
                   state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === target.q && f.r === target.r && f.s === target.s));
