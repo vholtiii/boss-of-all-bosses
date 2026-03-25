@@ -2186,14 +2186,48 @@ export const useEnhancedMafiaGameState = (
       // Sync resources.loyalty from reputation.loyalty
       newState.resources.loyalty = Math.round(newState.reputation.loyalty);
       
-      // --- Passive heat from illegal operations ---
+      // --- Passive heat from illegal operations (built businesses generate 50% less heat) ---
       {
-        const illegalBizCount = newState.hexMap.filter(t => 
+        const illegalBizzes = newState.hexMap.filter(t => 
           t.controllingFamily === newState.playerFamily && t.business && !t.business.isLegal
-        ).length;
-        const passiveHeat = Math.floor(illegalBizCount / 3);
+        );
+        let heatFromBiz = 0;
+        illegalBizzes.forEach(t => {
+          const isPlayerBuilt = !t.business!.isExtorted;
+          heatFromBiz += isPlayerBuilt ? 0.5 : 1; // built = half heat contribution
+        });
+        const passiveHeat = Math.floor(heatFromBiz / 3);
         if (passiveHeat > 0) {
           newState.policeHeat.level = Math.min(100, newState.policeHeat.level + passiveHeat);
+        }
+      }
+      
+      // --- Built business empire bonuses: +1 respect & +1 loyalty per 3 built businesses ---
+      {
+        const builtBizCount = newState.hexMap.filter(t => 
+          t.controllingFamily === newState.playerFamily && t.business && !t.business.isExtorted &&
+          !(t.business.constructionProgress !== undefined && t.business.constructionProgress < (t.business.constructionGoal || 3))
+        ).length;
+        const bonusTiers = Math.floor(builtBizCount / BUILT_BUSINESS_RESPECT_THRESHOLD);
+        if (bonusTiers > 0) {
+          const respectBonus = bonusTiers * BUILT_BUSINESS_RESPECT_BONUS;
+          newState.reputation.respect = Math.min(100, newState.reputation.respect + respectBonus);
+          newState.resources.respect = Math.round(newState.reputation.respect);
+          
+          const loyaltyBonus = bonusTiers * BUILT_BUSINESS_LOYALTY_BONUS;
+          newState.deployedUnits.forEach(u => {
+            if (u.family === newState.playerFamily) {
+              const stats = newState.soldierStats[u.id];
+              if (stats) {
+                const cap = u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP;
+                stats.loyalty = Math.min(cap, stats.loyalty + loyaltyBonus);
+              }
+            }
+          });
+          
+          if (bonusTiers >= 1) {
+            turnReport.events.push(`🏗️ Your ${builtBizCount} built businesses earned +${respectBonus} respect and +${loyaltyBonus} loyalty across all units.`);
+          }
         }
       }
       
