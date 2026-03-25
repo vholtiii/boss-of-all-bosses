@@ -1,37 +1,37 @@
 
 
-# Fix: AI Plan Hit Must Respect Pacts + Notification on Cancellation
+# Fix: Sync Boss Business List Income with Actual Financial Data
 
-## Changes
+## Problem
+The Boss Overview business list shows raw base income (`tile.business.income`) per business, while the Financial Overview shows actual computed income from `processEconomy`. These use completely different calculations:
 
-### `src/hooks/useEnhancedMafiaGameState.ts`
+- A $2,000 business with no unit on it earns only $200 (10% passive), but the Boss list says "$2,000/turn"
+- Under-construction businesses show income in the Boss list but are excluded from financials
+- Family bonuses and district multipliers are not reflected in per-business display
 
-**1. Block AI Plan Hit initiation (~line 3338)**
-Before the personality check, add ceasefire/alliance lookup. If active pact exists with that family, `continue` — skip planning.
+## Fix
 
-**2. Cancel existing hits when pact is formed**
-In `processNegotiation`, when ceasefire or alliance succeeds, filter `aiPlannedHits` to remove hits from that family. Push notification:
-- `"🕊️ Hit Called Off"` / `"The [Family] called off a planned hit — ceasefire agreement honored."`
-- Or for alliance: `"...alliance pact honored."`
+### `src/pages/UltimateMafiaGame.tsx` (~line 954-963)
+When building `hexBusinesses`, replicate the same income logic used in `processEconomy`:
 
-**3. Block execution of stale hits (~line 3531, safety net)**
-Inside the execution loop, before executing, check if the hit family has an active ceasefire or alliance. If so, skip execution, remove the hit, and push notification:
-- `"🕊️ Hit Called Off"` / `"The [Family] stood down from a planned hit — [ceasefire/alliance] in effect."`
+1. **Skip under-construction businesses** — if `constructionProgress < constructionGoal`, set income to 0 or exclude them (but still show with a "🚧 Under Construction" label and $0 income)
+2. **Apply collection modifier** — check if a capo, soldier, or nobody is on the hex:
+   - Capo present → 100% of base income
+   - Soldier only → 30%
+   - Nobody → 10%
+3. **Apply family bonuses** — `businessIncome`, `territoryIncome`, `income` bonuses from the player's family
+4. **Apply district bonus** — Manhattan +20% if player controls the district
+5. **Add a `baseIncome` field** so the UI can show both: "Base: $2,000 → Earning: $200 (no unit)"
 
-**4. Target gone notification (~line 3557)**
-Currently when `targetUnit` is not found, the hit is silently dropped. Add a notification:
-- `"🔫 Hit Abandoned"` / `"The [Family] abandoned a planned hit — the target could not be found."`
+### `src/components/HeadquartersInfoPanel.tsx` (~line 536-539)
+Update the per-business income display to show the effective income, with an optional tooltip or subtitle showing why it differs from base (e.g., "10% — no unit present").
 
-### Notification summary
-
-| Scenario | Title | Message |
-|----------|-------|---------|
-| Pact formed, pending hit cancelled | 🕊️ Hit Called Off | The [Family] called off a planned hit — [ceasefire/alliance] honored. |
-| Execution blocked by active pact | 🕊️ Hit Called Off | The [Family] stood down from a planned hit — [ceasefire/alliance] in effect. |
-| Target unit gone before execution | 🔫 Hit Abandoned | The [Family] abandoned a planned hit — the target could not be found. |
-
-All notifications are `type: 'info'` (not errors — these are good news for the player).
+### Result
+- Boss business list income will sum to match `finances.legalProfit + finances.illegalProfit` (before penalties)
+- Players can see exactly why a business earns less than its base rate
+- Under-construction businesses show clearly as $0 earning
 
 ## Files Modified
-- `src/hooks/useEnhancedMafiaGameState.ts` — 4 surgical additions
+- `src/pages/UltimateMafiaGame.tsx` — compute effective income per hex-business using the same rules as `processEconomy`
+- `src/components/HeadquartersInfoPanel.tsx` — display effective income with collection-rate context
 
