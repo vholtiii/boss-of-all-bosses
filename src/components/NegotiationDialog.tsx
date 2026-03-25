@@ -143,6 +143,16 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
           </div>
         )}
 
+        {/* Treachery debuff warning */}
+        {(treacheryTurnsRemaining || 0) > 0 && (
+          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-center">
+            <p className="text-sm font-semibold text-destructive">🗡️ Treachery Debuff Active</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              -20% negotiation success for {treacheryTurnsRemaining} more turn{treacheryTurnsRemaining === 1 ? '' : 's'}. Other families don't trust you.
+            </p>
+          </div>
+        )}
+
         {/* Boss family selector */}
         {scope === 'family' && availableEnemyFamilies && availableEnemyFamilies.length > 1 && !selectedType && (
           <div className="space-y-1">
