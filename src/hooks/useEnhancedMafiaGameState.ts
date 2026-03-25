@@ -1679,7 +1679,7 @@ export const useEnhancedMafiaGameState = (
                 message: `${deployedUnit?.name || 'Your Capo'} claimed this territory on deployment.`,
               };
             }
-            return { ...tile, controllingFamily: family as any };
+            return { ...tile, controllingFamily: family as any, business: tile.business ? { ...tile.business, isExtorted: true } : undefined };
           }
           if (unitType === 'capo' && tile.controllingFamily === family && !tile.isHeadquarters) {
             return tile; // already owned
