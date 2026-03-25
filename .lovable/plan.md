@@ -1,69 +1,28 @@
 
 
-# Two Mechanics Updates: Wounded Capo Recovery & Built vs Extorted Businesses
+# Add Visual Indicator for Player-Built Business Hexes
 
-## A. Wounded Capo — Multi-Turn Recovery (2 turns)
+## Problem
+Player-built businesses (not extorted) have gameplay advantages (100% income without units, lower heat) but look identical to extorted businesses on the hex map. Players need a subtle visual cue to distinguish them.
 
-### Current State
-Wounded capos lose -10 loyalty and -1 move for exactly 1 turn, then auto-reset. No persistent wound state.
+## Approach
+Currently, player-territory hexes with legal businesses already get a blue outline (`#3B82F6`). We'll add a distinct indicator for **player-built** businesses (where `isExtorted === false` and hex is player-controlled):
 
-### Changes
+- **Inner glow/ring**: A subtle inner polygon or dashed outline in a warm green/teal tone (e.g., `#10B981` — emerald) to indicate "player-built", distinct from the existing blue legal-business stroke
+- **Small 🏗️ icon badge**: A small badge in the corner of the hex (similar to the existing 👁️ scout badge) for built businesses
 
-**New field on deployed units:** `woundedTurnsRemaining: number` (0 = healthy, 2 = just wounded). Decrements by 1 each turn.
+This keeps the existing blue outline for legal businesses while adding an additional layer for the "built" distinction.
 
-**While wounded:**
-- -1 max moves (2 instead of 3)
-- **Cannot auto-claim or auto-extort on movement** — capo moves like a soldier (manual actions only)
-- Cannot use Negotiate, Escort, or Safehouse abilities
-- -5% combat effectiveness
-- Visual 🩸 badge on unit
+## Technical Changes
 
-**Healing:** Automatic after 2 turns. Notification: "💚 Capo Recovered"
+### `src/components/EnhancedMafiaHexGrid.tsx`
 
-### Technical Changes
+**Line 655-656 (stroke logic)**: Add a check for player-built businesses. If `tile.business && !tile.business.isExtorted && isPlayerTerritory`, use a green-tinted stroke (`#10B981`) instead of the blue legal stroke, with a slightly different stroke style (e.g., dashed or thicker).
 
-**`src/types/game-mechanics.ts`** — Add `CAPO_WOUND_DURATION = 2`
+**After line 662**: Add a small inner polygon or badge icon for player-built hexes — a slightly smaller hex polygon with a semi-transparent emerald fill (`#10B98120`) to create a subtle inner glow effect, plus a small "🏗️" badge in the bottom-left corner.
 
-**`src/hooks/useEnhancedMafiaGameState.ts`**
-- Set `unit.woundedTurnsRemaining = 2` when capo is wounded (replace current 1-turn maxMoves hack)
-- In `advanceToNextTurn`: decrement wound counter, restore when 0, push recovery notification
-- In capo movement logic: skip auto-claim/auto-extort if `woundedTurnsRemaining > 0`
-- Block negotiate/escort/safehouse if wounded
-- Remove current 1-turn maxMoves reset
-
-**`src/components/EnhancedMafiaHexGrid.tsx`** — 🩸 badge on wounded capos
-
-**`src/pages/UltimateMafiaGame.tsx`** — Tooltip shows wound status + turns remaining, ability buttons disabled with reason
-
----
-
-## B. Built vs Extorted Business Benefits
-
-### Changes — Player-built businesses get 3 bonuses:
-
-1. **No unit required for full income** — 100% collection regardless of unit presence (extorted keep 100%/30%/10% capo/soldier/empty rates)
-2. **50% less heat** — built businesses generate half the base heat
-3. **Passive loyalty & respect** — every 3 built businesses: +1 respect/turn, +1 loyalty to all soldiers/turn
-
-### Technical Changes
-
-**`src/types/game-mechanics.ts`** — Add `BUILT_BUSINESS_HEAT_REDUCTION = 0.5`, `BUILT_BUSINESS_RESPECT_THRESHOLD = 3`, `BUILT_BUSINESS_RESPECT_BONUS = 1`, `BUILT_BUSINESS_LOYALTY_BONUS = 1`
-
-**`src/hooks/useEnhancedMafiaGameState.ts`**
-- Income: skip capo/soldier/empty modifier for player-built businesses (100% always)
-- Heat: apply 50% reduction for built businesses
-- Turn end: count built businesses, add respect/loyalty per threshold
-
-**`src/components/HeadquartersInfoPanel.tsx`** — "🏗️ Player-Built" badge, "100% (player-built)" collection rate
-
-**`src/pages/UltimateMafiaGame.tsx`** — Pass `isPlayerBuilt` flag to HQ panel
-
----
-
-## Files Modified
-- `src/types/game-mechanics.ts`
-- `src/hooks/useEnhancedMafiaGameState.ts`
-- `src/components/EnhancedMafiaHexGrid.tsx`
-- `src/components/HeadquartersInfoPanel.tsx`
-- `src/pages/UltimateMafiaGame.tsx`
+## Result
+- Player-built hexes get an emerald green outline + subtle inner tint + 🏗️ badge
+- Extorted hexes keep existing styling (blue for legal, gold for player territory)
+- Quick at-a-glance differentiation on the map
 
