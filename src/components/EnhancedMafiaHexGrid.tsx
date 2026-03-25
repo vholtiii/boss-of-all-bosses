@@ -489,10 +489,14 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           else if (!isSoldier) reasons.sabotage = 'Need a soldier';
           else if (noActions) reasons.sabotage = 'No actions left';
         }
-        if (!canNegotiate && isEnemy && !isCapo) {
+        if (!canNegotiate && isEnemy && isCapo && isCapoWounded) {
+          reasons.negotiate = 'Capo is wounded';
+        } else if (!canNegotiate && isEnemy && !isCapo) {
           reasons.negotiate = 'Need a capo';
         }
-        if (!canSafehouse && isOwned && tile.isHeadquarters) {
+        if (!canSafehouse && isOwned && isCapoWounded) {
+          reasons.safehouse = 'Capo is wounded';
+        } else if (!canSafehouse && isOwned && tile.isHeadquarters) {
           reasons.safehouse = 'Cannot use HQ';
         }
         if (isEnemyHQ && !canAssaultHQ) {
