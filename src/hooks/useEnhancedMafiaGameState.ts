@@ -5545,6 +5545,7 @@ export const useEnhancedMafiaGameState = (
       if (Math.random() < chance) {
         if (isNeutral) {
           tile.controllingFamily = state.playerFamily;
+          if (tile.business) tile.business.isExtorted = true;
         }
         const baseMoneyGain = isEnemy ? (tile.business?.income || 2000) : 3000;
         const respectPayoutMultiplier = 0.5 + (state.reputation.respect / 100);
