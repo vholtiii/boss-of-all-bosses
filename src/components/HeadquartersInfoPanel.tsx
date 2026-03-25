@@ -28,8 +28,12 @@ interface HexBusiness {
   district: string;
   businessType: string;
   income: number;
+  baseIncome?: number;
   isLegal: boolean;
   isExtorted: boolean;
+  underConstruction?: boolean;
+  collectionRate?: number;
+  collectionReason?: string;
 }
 
 interface HeadquartersInfoPanelProps {
