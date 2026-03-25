@@ -23,7 +23,7 @@ const familyColors = {
 };
 
 const CapoIcon: React.FC<CapoIconProps> = ({ 
-  x, y, family, name, level, isPlayerFamily = false, selected = false, onClick 
+  x, y, family, name, level, isPlayerFamily = false, selected = false, wounded = false, onClick 
 }) => {
   const familyColor = familyColors[family];
   const size = 32;
