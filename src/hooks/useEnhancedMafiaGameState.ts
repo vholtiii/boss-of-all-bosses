@@ -42,6 +42,7 @@ import {
   SITDOWN_COST, SITDOWN_COOLDOWN, SITDOWN_LOYALTY_BONUS, SITDOWN_DEFENSE_PER_SOLDIER,
   CLAIM_TOUGHNESS_GAIN, EXTORTION_TOUGHNESS_GAIN,
   BUILT_BUSINESS_HEAT_REDUCTION, BUILT_BUSINESS_RESPECT_THRESHOLD, BUILT_BUSINESS_RESPECT_BONUS, BUILT_BUSINESS_LOYALTY_BONUS,
+  BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION, BUILT_BIZ_SEIZURE_INCOME_PENALTY, BUILT_BIZ_SEIZURE_RESPECT_LOSS, BUILT_BIZ_SEIZURE_FEAR_LOSS, BUILT_BIZ_SEIZURE_INFLUENCE_GAIN,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -58,6 +59,54 @@ function mulberry32(seed: number): () => number {
 const syncRespect = (state: any, value: number) => {
   state.reputation.respect = value;
   state.resources.respect = Math.round(value);
+};
+
+// ============ BUILT BUSINESS SEIZURE HELPER ============
+const applyBuiltBusinessSeizure = (state: any, tile: any, seizingFamily: string, losingFamily: string) => {
+  if (!tile.business || tile.business.isExtorted) return; // Only applies to player-built businesses
+  
+  // Mark business with seizure penalty
+  tile.business.seizurePenaltyTurns = BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION;
+  tile.business.wasPlayerBuilt = true;
+  
+  // Auto-ceasefire between the two families
+  const existingCeasefire = (state.ceasefires || []).some(
+    (c: any) => c.active && c.family === seizingFamily
+  );
+  if (!existingCeasefire) {
+    state.ceasefires = [...(state.ceasefires || []), {
+      id: `ceasefire-seizure-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      family: seizingFamily,
+      turnsRemaining: BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION,
+      turnFormed: state.turn,
+      active: true,
+    }];
+  }
+  
+  // Reputation loss for the losing family (player)
+  if (losingFamily === state.playerFamily) {
+    syncRespect(state, Math.max(0, state.reputation.respect - BUILT_BIZ_SEIZURE_RESPECT_LOSS));
+    state.reputation.fear = Math.max(0, (state.reputation.fear || 0) - BUILT_BIZ_SEIZURE_FEAR_LOSS);
+  }
+  
+  // Influence gain for the seizing family
+  const seizingOpp = state.aiOpponents.find((o: any) => o.family === seizingFamily);
+  if (seizingOpp) {
+    seizingOpp.resources.money += 0; // no direct cash, just influence
+  }
+  // If player seized it (future-proofing), gain influence
+  if (seizingFamily === state.playerFamily) {
+    state.resources.influence = (state.resources.influence || 0) + BUILT_BIZ_SEIZURE_INFLUENCE_GAIN;
+  }
+  
+  // Notification
+  if (losingFamily === state.playerFamily) {
+    state.pendingNotifications.push({
+      type: 'error' as const,
+      title: '⚠️ Business Seized!',
+      message: `The ${seizingFamily.charAt(0).toUpperCase() + seizingFamily.slice(1)} family took over your built business in ${tile.district}! A ${BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION}-turn ceasefire is now in effect. Business runs at 50% revenue. -${BUILT_BIZ_SEIZURE_RESPECT_LOSS} respect, -${BUILT_BIZ_SEIZURE_FEAR_LOSS} fear.`,
+    });
+  }
 };
 
 // ============ HEX FORTIFICATION HELPERS ============
@@ -181,6 +230,8 @@ export interface HexTile {
     constructionProgress?: number;
     constructionGoal?: number;
     isExtorted?: boolean;
+    seizurePenaltyTurns?: number;  // turns remaining at 50% income after rival seizes a player-built business
+    wasPlayerBuilt?: boolean;       // tracks that this was originally a player-built business (cleared when penalty expires)
   };
   isHeadquarters?: string;
 }
@@ -2812,11 +2863,17 @@ export const useEnhancedMafiaGameState = (
       let aiIncome = 0;
       state.hexMap.forEach(tile => {
         if (tile.controllingFamily === fam && tile.business) {
+          let tileInc = 0;
           const hasCapo = state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
           const hasSoldier = state.deployedUnits.some(u => u.family === fam && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
-          if (hasCapo) aiIncome += tile.business.income;
-          else if (hasSoldier) aiIncome += Math.floor(tile.business.income * 0.3);
-          else aiIncome += Math.floor(tile.business.income * 0.1);
+          if (hasCapo) tileInc = tile.business.income;
+          else if (hasSoldier) tileInc = Math.floor(tile.business.income * 0.3);
+          else tileInc = Math.floor(tile.business.income * 0.1);
+          // Seized player-built business runs at 50% during penalty period
+          if (tile.business.seizurePenaltyTurns && tile.business.seizurePenaltyTurns > 0) {
+            tileInc = Math.floor(tileInc * BUILT_BIZ_SEIZURE_INCOME_PENALTY);
+          }
+          aiIncome += tileInc;
         }
       });
       const mapScale = state.mapSize === 'small' ? 0.6 : state.mapSize === 'large' ? 1.5 : 1.0;
@@ -3123,6 +3180,10 @@ export const useEnhancedMafiaGameState = (
                 );
                 if (remainingEnemies.length === 0) {
                   const prevOwner = tile.controllingFamily;
+                  // Check for built business seizure before changing ownership
+                  if (prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted) {
+                    applyBuiltBusinessSeizure(state, tile, fam, prevOwner);
+                  }
                   tile.controllingFamily = 'neutral' as any;
                   // Destroy fortification on captured hex
                   state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === target.q && f.r === target.r && f.s === target.s));
@@ -3190,6 +3251,10 @@ export const useEnhancedMafiaGameState = (
                   // Enemy territory with no defenders: requires an action point to claim
                   if (aiActionsRemaining > 0) {
                     aiActionsRemaining--;
+                    // Check for built business seizure before changing ownership
+                    if (prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted) {
+                      applyBuiltBusinessSeizure(state, tile, fam, prevOwner);
+                    }
                     tile.controllingFamily = fam;
                     if (prevOwner === state.playerFamily && turnReport) {
                       turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
@@ -5811,6 +5876,21 @@ export const useEnhancedMafiaGameState = (
 
   // ============ PROCESS PACTS AT END OF TURN ============
   const processPacts = (state: EnhancedMafiaGameState) => {
+    // Tick down seizure penalties on businesses
+    state.hexMap.forEach(tile => {
+      if (tile.business && tile.business.seizurePenaltyTurns && tile.business.seizurePenaltyTurns > 0) {
+        tile.business.seizurePenaltyTurns -= 1;
+        if (tile.business.seizurePenaltyTurns <= 0) {
+          tile.business.seizurePenaltyTurns = undefined;
+          tile.business.wasPlayerBuilt = undefined;
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'info', title: '💼 Business Stabilized',
+            message: `${tile.controllingFamily.charAt(0).toUpperCase() + tile.controllingFamily.slice(1)}'s seized business in ${tile.district} now runs at full revenue.`,
+          }];
+        }
+      }
+    });
+
     // Tick down ceasefires
     state.ceasefires = (state.ceasefires || []).map(c => {
       if (!c.active) return c;

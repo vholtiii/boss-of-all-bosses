@@ -406,6 +406,13 @@ export const BUILT_BUSINESS_RESPECT_THRESHOLD = 3;   // every 3 built businesses
 export const BUILT_BUSINESS_RESPECT_BONUS = 1;       // +1 respect per turn per 3 built businesses
 export const BUILT_BUSINESS_LOYALTY_BONUS = 1;        // +1 loyalty to all soldiers per turn per 3 built businesses
 
+// ============ BUILT BUSINESS SEIZURE ============
+export const BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION = 5;  // 5-turn auto-ceasefire when rival seizes a player-built business
+export const BUILT_BIZ_SEIZURE_INCOME_PENALTY = 0.5;    // 50% income during seizure penalty period
+export const BUILT_BIZ_SEIZURE_RESPECT_LOSS = 8;        // -8 respect for the family that lost the business
+export const BUILT_BIZ_SEIZURE_FEAR_LOSS = 5;           // -5 fear for the family that lost the business
+export const BUILT_BIZ_SEIZURE_INFLUENCE_GAIN = 10;     // +10 influence for the family that seized it
+
 // ============ AI PLAN HIT SYSTEM ============
 export const AI_PLAN_HIT_CHANCE = 0.15;        // 15% chance per turn for aggressive/opportunistic AI
 export const AI_PLAN_HIT_SUCCESS_RATE = 0.5;   // 50% success when executing
