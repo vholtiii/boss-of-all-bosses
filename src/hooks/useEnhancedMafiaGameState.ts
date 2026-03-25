@@ -5192,10 +5192,17 @@ export const useEnhancedMafiaGameState = (
         }
         if (hasCeasefire) {
           state.ceasefires = state.ceasefires.filter(c => !(c.active && c.family === tile.controllingFamily));
-          syncRespect(state, Math.max(0, state.reputation.respect - 15));
+          syncRespect(state, Math.max(0, state.reputation.respect - CEASEFIRE_VIOLATION_RESPECT_LOSS));
+          state.reputation.fear = Math.max(0, (state.reputation.fear || 0) - CEASEFIRE_VIOLATION_FEAR_LOSS);
+          // Apply treachery debuff
+          state.treacheryDebuff = { turnsRemaining: TREACHERY_DEBUFF_DURATION, appliedOnTurn: state.turn };
+          // Reduce relationships with ALL families
+          for (const fam of Object.keys(state.reputation.familyRelationships)) {
+            state.reputation.familyRelationships[fam] = (state.reputation.familyRelationships[fam] || 0) - 10;
+          }
           state.pendingNotifications = [...state.pendingNotifications, {
-            type: 'warning', title: '⚠️ Ceasefire Violated!',
-            message: `You broke the ceasefire! -15 respect.`,
+            type: 'error', title: '🗡️ Treachery!',
+            message: `You broke the ceasefire! -${CEASEFIRE_VIOLATION_RESPECT_LOSS} respect, -${CEASEFIRE_VIOLATION_FEAR_LOSS} fear. Other families trust you less for ${TREACHERY_DEBUFF_DURATION} turns (-${TREACHERY_NEGOTIATION_PENALTY}% negotiations).`,
           }];
         }
       }
