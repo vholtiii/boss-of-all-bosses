@@ -10,6 +10,7 @@ interface CapoIconProps {
   level: number;
   isPlayerFamily?: boolean;
   selected?: boolean;
+  wounded?: boolean;
   onClick?: (e: React.MouseEvent) => void;
 }
 
