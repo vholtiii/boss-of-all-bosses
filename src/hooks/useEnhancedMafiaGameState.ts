@@ -3267,14 +3267,29 @@ export const useEnhancedMafiaGameState = (
                 } else {
                   // Enemy territory with no defenders: requires an action point to claim
                   if (aiActionsRemaining > 0) {
-                    aiActionsRemaining--;
-                    // Check for built business seizure before changing ownership
-                    if (prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted) {
-                      applyBuiltBusinessSeizure(state, tile, fam, prevOwner);
-                    }
-                    tile.controllingFamily = fam;
-                    if (prevOwner === state.playerFamily && turnReport) {
-                      turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
+                    // Built business protection: requires a Capo to seize
+                    const isPlayerBuiltBiz2 = prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted;
+                    if (isPlayerBuiltBiz2 && unit.type !== 'capo') {
+                      // Regular soldiers can't seize player-built businesses — notify player
+                      state.pendingNotifications.push({
+                        type: 'info' as const,
+                        title: '🛡️ Business Defended!',
+                        message: `Your built business in ${tile.district || 'unknown territory'} repelled a ${fam} takeover — only a Capo can seize player-built businesses.`,
+                      });
+                    } else {
+                      aiActionsRemaining--;
+                      if (isPlayerBuiltBiz2) {
+                        applyBuiltBusinessSeizure(state, tile, fam, prevOwner);
+                        state.pendingNotifications.push({
+                          type: 'error' as const,
+                          title: '🚨 Capo Seized Your Business!',
+                          message: `The ${fam} Capo seized your built business in ${tile.district || 'unknown territory'}! Only Capos can take player-built businesses.`,
+                        });
+                      }
+                      tile.controllingFamily = fam;
+                      if (prevOwner === state.playerFamily && turnReport) {
+                        turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
+                      }
                     }
                   }
                   // No action budget? Can't claim — just occupying the hex
