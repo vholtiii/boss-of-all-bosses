@@ -1144,8 +1144,14 @@ export const useEnhancedMafiaGameState = (
         return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
       }
 
-      // Handle safehouse action (tactical phase only)
+      // Handle safehouse action (tactical phase only) — blocked for wounded capos
       if (prev.turnPhase === 'move' && moveAction === 'safehouse' && unit.type === 'capo') {
+        if ((unit.woundedTurnsRemaining || 0) > 0) {
+          return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
+            type: 'warning' as const, title: '🩸 Capo Wounded',
+            message: `${unit.name || 'Your Capo'} is wounded and cannot establish a safehouse for ${unit.woundedTurnsRemaining} more turn(s).`,
+          }]};
+        }
         if (prev.tacticalActionsRemaining <= 0) return prev;
         const result = processSafehouse(prev, unit);
         return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
