@@ -301,6 +301,7 @@ export interface EnhancedMafiaGameState {
   safePassagePacts: SafePassagePact[];
   bossNegotiationCooldown: number;
   capoNegotiationCooldown: number;
+  treacheryDebuff?: TreacheryDebuff;
   victoryProgress: VictoryProgress;
   victoryType: VictoryType;
   familyBonuses: FamilyBonuses;
