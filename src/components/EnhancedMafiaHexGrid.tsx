@@ -649,17 +649,48 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
               return (
                 <g key={key}>
-                  <polygon
-                    points={getHexPoints(x, y, baseHexRadius)}
-                    fill={getHexColor(tile)}
-                    stroke={tile.isHeadquarters ? '#D4AF37' : (tile.business?.isLegal && isPlayerTerritory) ? '#3B82F6' : isPlayerTerritory ? '#D4AF3780' : '#333333'}
-                    strokeWidth={tile.isHeadquarters ? 3 : (tile.business?.isLegal && isPlayerTerritory) ? 2.5 : isPlayerTerritory ? 2 : 1}
-                    opacity={getHexOpacity(tile)}
-                    className="cursor-pointer transition-all duration-150"
-                    onClick={() => handleHexClick(tile)}
-                    onMouseEnter={() => setHoveredHex(tile)}
-                    onMouseLeave={() => setHoveredHex(null)}
-                  />
+                  {(() => {
+                    const isPlayerBuilt = tile.business && !tile.business.isExtorted && isPlayerTerritory;
+                    const isConstructionComplete = tile.business && (!tile.business.constructionGoal || (tile.business.constructionProgress ?? 0) >= tile.business.constructionGoal);
+                    const showBuiltIndicator = isPlayerBuilt && isConstructionComplete;
+                    const hexStroke = tile.isHeadquarters ? '#D4AF37'
+                      : showBuiltIndicator ? '#10B981'
+                      : (tile.business?.isLegal && isPlayerTerritory) ? '#3B82F6'
+                      : isPlayerTerritory ? '#D4AF3780' : '#333333';
+                    const hexStrokeWidth = tile.isHeadquarters ? 3
+                      : showBuiltIndicator ? 2.5
+                      : (tile.business?.isLegal && isPlayerTerritory) ? 2.5
+                      : isPlayerTerritory ? 2 : 1;
+                    return (
+                      <>
+                        <polygon
+                          points={getHexPoints(x, y, baseHexRadius)}
+                          fill={getHexColor(tile)}
+                          stroke={hexStroke}
+                          strokeWidth={hexStrokeWidth}
+                          strokeDasharray={showBuiltIndicator ? '6 3' : undefined}
+                          opacity={getHexOpacity(tile)}
+                          className="cursor-pointer transition-all duration-150"
+                          onClick={() => handleHexClick(tile)}
+                          onMouseEnter={() => setHoveredHex(tile)}
+                          onMouseLeave={() => setHoveredHex(null)}
+                        />
+                        {showBuiltIndicator && (
+                          <>
+                            <polygon
+                              points={getHexPoints(x, y, baseHexRadius * 0.85)}
+                              fill="#10B98112"
+                              stroke="none"
+                              className="pointer-events-none"
+                            />
+                            <text x={x + baseHexRadius * 0.55} y={y - baseHexRadius * 0.45} textAnchor="middle" fontSize="8" className="pointer-events-none select-none">
+                              🏗️
+                            </text>
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
 
                   {/* Deploy/Move label */}
                   {(isDeployTarget || isMoveTarget) && (
