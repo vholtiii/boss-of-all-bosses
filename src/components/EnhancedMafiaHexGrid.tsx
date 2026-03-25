@@ -1476,6 +1476,50 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Map Legend */}
+      <div className="absolute bottom-3 left-3 z-30">
+        <button
+          onClick={() => setShowLegend(prev => !prev)}
+          className="bg-card/90 backdrop-blur-sm border border-border rounded px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {showLegend ? '▼ Legend' : '▶ Legend'}
+        </button>
+        {showLegend && (
+          <div className="mt-1 bg-card/95 backdrop-blur-sm border border-border rounded p-2.5 space-y-1.5 min-w-[160px]">
+            <div className="text-[10px] font-bold text-foreground/80 uppercase tracking-wider mb-1">Hex Outlines</div>
+            {[
+              { color: '#D4AF37', label: 'Headquarters', style: 'solid', width: 3 },
+              { color: '#10B981', label: 'Player-Built', style: 'dashed', width: 2.5 },
+              { color: '#3B82F6', label: 'Legal Business', style: 'solid', width: 2.5 },
+              { color: '#D4AF3780', label: 'Your Territory', style: 'solid', width: 2 },
+            ].map(item => (
+              <div key={item.label} className="flex items-center gap-2">
+                <svg width="20" height="12" className="flex-shrink-0">
+                  <line x1="0" y1="6" x2="20" y2="6" stroke={item.color} strokeWidth={item.width} strokeDasharray={item.style === 'dashed' ? '4 2' : undefined} />
+                </svg>
+                <span className="text-[10px] text-muted-foreground">{item.label}</span>
+              </div>
+            ))}
+            <div className="border-t border-border pt-1.5 mt-1.5">
+              <div className="text-[10px] font-bold text-foreground/80 uppercase tracking-wider mb-1">Badges</div>
+              {[
+                { icon: '🏛️', label: 'Headquarters' },
+                { icon: '🏗️', label: 'Player-Built Biz' },
+                { icon: '🚧', label: 'Under Construction' },
+                { icon: '👁️', label: 'Scouted Hex' },
+                { icon: '🩸', label: 'Wounded Capo' },
+                { icon: '🛡️', label: 'Safehouse' },
+              ].map(item => (
+                <div key={item.label} className="flex items-center gap-2">
+                  <span className="text-[10px] w-4 text-center flex-shrink-0">{item.icon}</span>
+                  <span className="text-[10px] text-muted-foreground">{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
