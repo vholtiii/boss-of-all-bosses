@@ -21,6 +21,7 @@ interface NegotiationDialogProps {
   enemyStrength: number;
   hexIncome: number;
   negotiationUsedThisTurn: boolean;
+  treacheryTurnsRemaining?: number;
   // For boss negotiation — choose target family
   availableEnemyFamilies?: string[];
   onSelectTargetFamily?: (family: string) => void;
