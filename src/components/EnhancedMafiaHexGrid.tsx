@@ -904,6 +904,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             level={capo.level}
                             isPlayerFamily={fam === playerFamily}
                             selected={isSelected}
+                            wounded={(capo as any).woundedTurnsRemaining > 0}
                             onClick={isClickable ? (e) => {
                               e.stopPropagation();
                               if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
