@@ -3020,12 +3020,13 @@ export const useEnhancedMafiaGameState = (
                       if (state.soldierStats[eu.id]) {
                         state.soldierStats[eu.id].loyalty = Math.max(0, state.soldierStats[eu.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
                       }
+                      eu.woundedTurnsRemaining = CAPO_WOUND_DURATION;
                       eu.maxMoves = Math.max(1, (eu.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
                       if (eu.family === state.playerFamily) {
                         state.pendingNotifications.push({
                           type: 'warning' as const,
                           title: '🩸 Capo Wounded!',
-                          message: `Your capo was wounded by the ${fam} family in ${tile.district || 'unknown territory'}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, -${CAPO_WOUND_MOVE_PENALTY} move.`,
+                          message: `Your capo was wounded by the ${fam} family in ${tile.district || 'unknown territory'}. -${CAPO_WOUND_LOYALTY_PENALTY} loyalty, wounded for ${CAPO_WOUND_DURATION} turns.`,
                         });
                         if (turnReport) {
                           turnReport.events.push(`🩸 Capo wounded by the ${fam} family in ${tile.district || 'unknown territory'}`);
