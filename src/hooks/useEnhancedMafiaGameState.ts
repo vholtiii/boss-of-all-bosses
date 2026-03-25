@@ -1900,14 +1900,27 @@ export const useEnhancedMafiaGameState = (
       newState.tacticalActionsRemaining = TACTICAL_ACTIONS_PER_TURN;
       newState.maxTacticalActions = TACTICAL_ACTIONS_PER_TURN;
 
-      // Reset moves and escort for new turn (fortified persists until unit moves)
-      // Restore wounded capo maxMoves back to 3 (wound is 1-turn penalty)
-      newState.deployedUnits = (newState.deployedUnits || []).map(u => ({
-        ...u,
-        movesRemaining: u.type === 'capo' ? 3 : u.maxMoves,
-        maxMoves: u.type === 'capo' ? 3 : u.maxMoves,
-        escortingSoldierIds: undefined,
-      }));
+      // Reset moves and escort for new turn; handle wound recovery for capos
+      newState.deployedUnits = (newState.deployedUnits || []).map(u => {
+        const wounded = u.woundedTurnsRemaining && u.woundedTurnsRemaining > 0;
+        let newWounded = wounded ? u.woundedTurnsRemaining! - 1 : 0;
+        
+        if (wounded && newWounded <= 0 && u.family === newState.playerFamily) {
+          newState.pendingNotifications.push({
+            type: 'success' as const,
+            title: '💚 Capo Recovered!',
+            message: `${u.name || 'Your Capo'} has fully healed and is back to full strength.`,
+          });
+        }
+        
+        return {
+          ...u,
+          movesRemaining: u.type === 'capo' ? (newWounded > 0 ? 2 : 3) : u.maxMoves,
+          maxMoves: u.type === 'capo' ? (newWounded > 0 ? 2 : 3) : u.maxMoves,
+          escortingSoldierIds: undefined,
+          woundedTurnsRemaining: u.type === 'capo' ? newWounded : undefined,
+        };
+      });
 
       // --- Hex fortification abandonment tick ---
       newState.fortifiedHexes = (newState.fortifiedHexes || []).filter(f => {
