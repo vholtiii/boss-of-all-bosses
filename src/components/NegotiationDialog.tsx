@@ -21,6 +21,7 @@ interface NegotiationDialogProps {
   enemyStrength: number;
   hexIncome: number;
   negotiationUsedThisTurn: boolean;
+  treacheryTurnsRemaining?: number;
   // For boss negotiation — choose target family
   availableEnemyFamilies?: string[];
   onSelectTargetFamily?: (family: string) => void;
@@ -29,7 +30,7 @@ interface NegotiationDialogProps {
 const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   open, onClose, onNegotiate, scope, capoName, capoPersonality,
   enemyFamily, playerReputation, playerMoney, enemyStrength, hexIncome,
-  negotiationUsedThisTurn, availableEnemyFamilies, onSelectTargetFamily,
+  negotiationUsedThisTurn, treacheryTurnsRemaining, availableEnemyFamilies, onSelectTargetFamily,
 }) => {
   const [selectedType, setSelectedType] = useState<NegotiationType | null>(null);
   const [rolling, setRolling] = useState(false);
@@ -138,6 +139,16 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
             <p className="text-sm font-semibold text-destructive">⏳ Negotiation on Cooldown</p>
             <p className="text-xs text-muted-foreground mt-1">
               {scope === 'family' ? 'The Boss must wait another turn before negotiating again.' : 'Capos must wait another turn before negotiating again.'}
+            </p>
+          </div>
+        )}
+
+        {/* Treachery debuff warning */}
+        {(treacheryTurnsRemaining || 0) > 0 && (
+          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-center">
+            <p className="text-sm font-semibold text-destructive">🗡️ Treachery Debuff Active</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              -20% negotiation success for {treacheryTurnsRemaining} more turn{treacheryTurnsRemaining === 1 ? '' : 's'}. Other families don't trust you.
             </p>
           </div>
         )}

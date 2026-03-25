@@ -43,6 +43,7 @@ import {
   CLAIM_TOUGHNESS_GAIN, EXTORTION_TOUGHNESS_GAIN,
   BUILT_BUSINESS_DEFENSE_BONUS, BUILT_BUSINESS_HEAT_REDUCTION, BUILT_BUSINESS_RESPECT_THRESHOLD, BUILT_BUSINESS_RESPECT_BONUS, BUILT_BUSINESS_LOYALTY_BONUS,
   BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION, BUILT_BIZ_SEIZURE_INCOME_PENALTY, BUILT_BIZ_SEIZURE_RESPECT_LOSS, BUILT_BIZ_SEIZURE_FEAR_LOSS, BUILT_BIZ_SEIZURE_INFLUENCE_GAIN,
+  CEASEFIRE_VIOLATION_RESPECT_LOSS, CEASEFIRE_VIOLATION_FEAR_LOSS, TREACHERY_DEBUFF_DURATION, TREACHERY_NEGOTIATION_PENALTY, TreacheryDebuff,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -300,6 +301,7 @@ export interface EnhancedMafiaGameState {
   safePassagePacts: SafePassagePact[];
   bossNegotiationCooldown: number;
   capoNegotiationCooldown: number;
+  treacheryDebuff?: TreacheryDebuff;
   victoryProgress: VictoryProgress;
   victoryType: VictoryType;
   familyBonuses: FamilyBonuses;
@@ -665,6 +667,7 @@ const createInitialGameState = (
     safePassagePacts: [],
     bossNegotiationCooldown: 0,
     capoNegotiationCooldown: 0,
+    treacheryDebuff: undefined,
     victoryProgress: {
       territory: { current: 0, target: mapSize === 'small' ? 40 : mapSize === 'large' ? 80 : 60, met: false },
       economic: { current: 0, target: 50000, met: false },
@@ -2994,9 +2997,12 @@ export const useEnhancedMafiaGameState = (
           if (validMoves.length === 0) break;
 
           // Personality-driven target prioritization
+          // Ceasefire enforcement: filter out hexes belonging to ceasefire families
+          const hasCeasefireWith = (targetFam: string) => (state.ceasefires || []).some(c => c.active && c.family === targetFam) ||
+            (targetFam === state.playerFamily && (state.ceasefires || []).some(c => c.active && c.family === fam));
           const playerHexes = validMoves.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
-            return tile && tile.controllingFamily === state.playerFamily;
+            return tile && tile.controllingFamily === state.playerFamily && !hasCeasefireWith(state.playerFamily);
           });
           const neutralHexes = validMoves.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
@@ -3004,7 +3010,7 @@ export const useEnhancedMafiaGameState = (
           });
           const otherAIHexes = validMoves.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
-            return tile && tile.controllingFamily !== fam && tile.controllingFamily !== 'neutral' && tile.controllingFamily !== state.playerFamily;
+            return tile && tile.controllingFamily !== fam && tile.controllingFamily !== 'neutral' && tile.controllingFamily !== state.playerFamily && !hasCeasefireWith(tile.controllingFamily);
           });
           const enemyHexes = [...playerHexes, ...otherAIHexes];
 
@@ -3106,6 +3112,13 @@ export const useEnhancedMafiaGameState = (
               u.family !== fam && u.q === target.q && u.r === target.r && u.s === target.s
             );
             if (enemyUnitsHere.length > 0) {
+              // Ceasefire guard: skip combat against ceasefire families
+              const ceasefireFamilies = new Set((state.ceasefires || []).filter(c => c.active).map(c => c.family));
+              const enemyFromCeasefireFamily = enemyUnitsHere.every(u => ceasefireFamilies.has(u.family) || (u.family === state.playerFamily && ceasefireFamilies.has(fam)));
+              if (enemyFromCeasefireFamily) {
+                unit.q = origQ; unit.r = origR; unit.s = origS;
+                break;
+              }
               // Combat costs an action point
               if (aiActionsRemaining <= 0) {
                 // No action budget left — revert position and skip
@@ -3268,8 +3281,11 @@ export const useEnhancedMafiaGameState = (
                     tile.controllingFamily = fam;
                   }
                 } else {
-                  // Enemy territory with no defenders: requires an action point to claim
-                  if (aiActionsRemaining > 0) {
+                  // Territory freeze: skip claiming ceasefire family hexes
+                  const prevOwnerCeasefire = (state.ceasefires || []).some(c => c.active && (c.family === prevOwner || (prevOwner === state.playerFamily && c.family === fam)));
+                  if (prevOwnerCeasefire) {
+                    // Can't claim — ceasefire territory freeze
+                  } else if (aiActionsRemaining > 0) {
                     // Built business protection: requires a Capo to seize
                     const isPlayerBuiltBiz2 = prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted;
                     if (isPlayerBuiltBiz2 && unit.type !== 'capo') {
@@ -3366,7 +3382,9 @@ export const useEnhancedMafiaGameState = (
         // Check adjacent enemy hexes with businesses
         const adjacentEnemyBiz = state.hexMap.filter(t => {
           const dist = Math.max(Math.abs(t.q - unit.q), Math.abs(t.r - unit.r), Math.abs(t.s - unit.s));
-          return dist === 1 && t.controllingFamily !== fam && t.controllingFamily !== 'neutral' &&
+          // Territory freeze: skip ceasefire families
+          const isCeasefireTarget = (state.ceasefires || []).some(c => c.active && (c.family === t.controllingFamily || (t.controllingFamily === state.playerFamily && c.family === fam)));
+          return dist === 1 && t.controllingFamily !== fam && t.controllingFamily !== 'neutral' && !isCeasefireTarget &&
                  t.business && (t.business.constructionProgress === undefined || t.business.constructionProgress >= (t.business.constructionGoal || 3));
         });
         
@@ -5174,10 +5192,17 @@ export const useEnhancedMafiaGameState = (
         }
         if (hasCeasefire) {
           state.ceasefires = state.ceasefires.filter(c => !(c.active && c.family === tile.controllingFamily));
-          syncRespect(state, Math.max(0, state.reputation.respect - 15));
+          syncRespect(state, Math.max(0, state.reputation.respect - CEASEFIRE_VIOLATION_RESPECT_LOSS));
+          state.reputation.fear = Math.max(0, (state.reputation.fear || 0) - CEASEFIRE_VIOLATION_FEAR_LOSS);
+          // Apply treachery debuff
+          state.treacheryDebuff = { turnsRemaining: TREACHERY_DEBUFF_DURATION, appliedOnTurn: state.turn };
+          // Reduce relationships with ALL families
+          for (const fam of Object.keys(state.reputation.familyRelationships)) {
+            state.reputation.familyRelationships[fam] = (state.reputation.familyRelationships[fam] || 0) - 10;
+          }
           state.pendingNotifications = [...state.pendingNotifications, {
-            type: 'warning', title: '⚠️ Ceasefire Violated!',
-            message: `You broke the ceasefire! -15 respect.`,
+            type: 'error', title: '🗡️ Treachery!',
+            message: `You broke the ceasefire! -${CEASEFIRE_VIOLATION_RESPECT_LOSS} respect, -${CEASEFIRE_VIOLATION_FEAR_LOSS} fear. Other families trust you less for ${TREACHERY_DEBUFF_DURATION} turns (-${TREACHERY_NEGOTIATION_PENALTY}% negotiations).`,
           }];
         }
       }
@@ -5790,6 +5815,10 @@ export const useEnhancedMafiaGameState = (
     }
     totalChance += (state.resources.influence / 100) * 10;
     totalChance += Math.floor(state.reputation.respect / 5);
+    // Treachery debuff reduces negotiation success
+    if (state.treacheryDebuff && state.treacheryDebuff.turnsRemaining > 0) {
+      totalChance -= TREACHERY_NEGOTIATION_PENALTY;
+    }
     totalChance = Math.max(5, Math.min(95, totalChance));
     const roll = Math.random() * 100;
 
@@ -5944,6 +5973,18 @@ export const useEnhancedMafiaGameState = (
       }
       return { ...c, turnsRemaining: remaining };
     }).filter(c => c.active);
+
+    // Tick down treachery debuff
+    if (state.treacheryDebuff && state.treacheryDebuff.turnsRemaining > 0) {
+      state.treacheryDebuff.turnsRemaining -= 1;
+      if (state.treacheryDebuff.turnsRemaining <= 0) {
+        state.treacheryDebuff = undefined;
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'info', title: '🕊️ Treachery Forgotten',
+          message: `The other families have moved past your ceasefire violation. Negotiation penalties lifted.`,
+        }];
+      }
+    }
 
     // Tick down alliances and check conditions
     state.alliances = (state.alliances || []).map(a => {

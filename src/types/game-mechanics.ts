@@ -436,3 +436,14 @@ export interface AIPlannedHit {
   detectedVia?: IntelSource;
   detectedOnTurn?: number;
 }
+
+// ============ CEASEFIRE ENFORCEMENT ============
+export const CEASEFIRE_VIOLATION_RESPECT_LOSS = 15;
+export const CEASEFIRE_VIOLATION_FEAR_LOSS = 10;
+export const TREACHERY_DEBUFF_DURATION = 3;        // turns
+export const TREACHERY_NEGOTIATION_PENALTY = 20;   // % reduction to all negotiation success
+
+export interface TreacheryDebuff {
+  turnsRemaining: number;
+  appliedOnTurn: number;
+}
