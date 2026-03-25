@@ -540,7 +540,20 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                                     <div className="text-[10px] text-muted-foreground flex items-center gap-1">
                                       <MapPin className="h-2.5 w-2.5" />
                                       {biz.district}
-                                      <span className="ml-auto text-green-400">${biz.income.toLocaleString()}/turn</span>
+                                      <span className="ml-auto flex items-center gap-1">
+                                        {biz.underConstruction ? (
+                                          <span className="text-yellow-400">🚧 $0</span>
+                                        ) : (
+                                          <>
+                                            <span className="text-green-400">${biz.income.toLocaleString()}/turn</span>
+                                            {biz.baseIncome !== undefined && biz.income !== biz.baseIncome && (
+                                              <span className="text-muted-foreground/60" title={`Base: $${biz.baseIncome.toLocaleString()} — ${biz.collectionRate}% (${biz.collectionReason})`}>
+                                                ({biz.collectionRate}%)
+                                              </span>
+                                            )}
+                                          </>
+                                        )}
+                                      </span>
                                     </div>
                                   </div>
                                   {highlighted && <div className="w-2 h-2 rounded-full bg-mafia-gold animate-pulse" />}
