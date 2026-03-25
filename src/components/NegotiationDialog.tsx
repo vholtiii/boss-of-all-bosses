@@ -30,7 +30,7 @@ interface NegotiationDialogProps {
 const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   open, onClose, onNegotiate, scope, capoName, capoPersonality,
   enemyFamily, playerReputation, playerMoney, enemyStrength, hexIncome,
-  negotiationUsedThisTurn, availableEnemyFamilies, onSelectTargetFamily,
+  negotiationUsedThisTurn, treacheryTurnsRemaining, availableEnemyFamilies, onSelectTargetFamily,
 }) => {
   const [selectedType, setSelectedType] = useState<NegotiationType | null>(null);
   const [rolling, setRolling] = useState(false);
