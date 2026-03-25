@@ -689,6 +689,12 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             </text>
                           </>
                         )}
+                        {/* Seizure penalty badge — rival holds a former player-built business */}
+                        {tile.business?.seizurePenaltyTurns && tile.business.seizurePenaltyTurns > 0 && !isPlayerTerritory && (
+                          <text x={x - baseHexRadius * 0.55} y={y - baseHexRadius * 0.45} textAnchor="middle" fontSize="8" className="pointer-events-none select-none">
+                            ⚠️
+                          </text>
+                        )}
                       </>
                     );
                   })()}

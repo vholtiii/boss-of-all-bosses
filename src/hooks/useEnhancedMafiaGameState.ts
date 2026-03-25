@@ -5876,6 +5876,21 @@ export const useEnhancedMafiaGameState = (
 
   // ============ PROCESS PACTS AT END OF TURN ============
   const processPacts = (state: EnhancedMafiaGameState) => {
+    // Tick down seizure penalties on businesses
+    state.hexMap.forEach(tile => {
+      if (tile.business && tile.business.seizurePenaltyTurns && tile.business.seizurePenaltyTurns > 0) {
+        tile.business.seizurePenaltyTurns -= 1;
+        if (tile.business.seizurePenaltyTurns <= 0) {
+          tile.business.seizurePenaltyTurns = undefined;
+          tile.business.wasPlayerBuilt = undefined;
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'info', title: '💼 Business Stabilized',
+            message: `${tile.controllingFamily.charAt(0).toUpperCase() + tile.controllingFamily.slice(1)}'s seized business in ${tile.district} now runs at full revenue.`,
+          }];
+        }
+      }
+    });
+
     // Tick down ceasefires
     state.ceasefires = (state.ceasefires || []).map(c => {
       if (!c.active) return c;
