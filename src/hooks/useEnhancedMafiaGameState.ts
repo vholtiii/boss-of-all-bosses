@@ -3178,13 +3178,30 @@ export const useEnhancedMafiaGameState = (
                 const remainingEnemies = state.deployedUnits.filter(u =>
                   u.family !== fam && u.q === target.q && u.r === target.r && u.s === target.s
                 );
-                if (remainingEnemies.length === 0) {
+              if (remainingEnemies.length === 0) {
                   const prevOwner = tile.controllingFamily;
-                  // Check for built business seizure before changing ownership
-                  if (prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted) {
-                    applyBuiltBusinessSeizure(state, tile, fam, prevOwner);
+                  // Built business seizure: requires a Capo to take over
+                  const isPlayerBuiltBiz = prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted;
+                  const hasCapoOnHex = state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === target.q && u.r === target.r && u.s === target.s);
+                  if (isPlayerBuiltBiz && !hasCapoOnHex) {
+                    // Regular soldiers can't seize player-built businesses
+                    state.pendingNotifications.push({
+                      type: 'info' as const,
+                      title: '🛡️ Business Defended!',
+                      message: `Your built business in ${tile.district || 'unknown territory'} repelled a ${fam} takeover — only a Capo can seize player-built businesses.`,
+                    });
+                    tile.controllingFamily = 'neutral' as any;
+                  } else {
+                    if (isPlayerBuiltBiz) {
+                      applyBuiltBusinessSeizure(state, tile, fam, prevOwner);
+                      state.pendingNotifications.push({
+                        type: 'error' as const,
+                        title: '🚨 Capo Seized Your Business!',
+                        message: `The ${fam} Capo seized your built business in ${tile.district || 'unknown territory'}! Only Capos can take player-built businesses.`,
+                      });
+                    }
+                    tile.controllingFamily = 'neutral' as any;
                   }
-                  tile.controllingFamily = 'neutral' as any;
                   // Destroy fortification on captured hex
                   state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === target.q && f.r === target.r && f.s === target.s));
                   // Check if any safehouse was on this hex (player's)
