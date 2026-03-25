@@ -951,16 +951,77 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       {selectedHeadquarters && (() => {
         const hqFamily = selectedHeadquarters.family;
         const isPlayerHQ = hqFamily === gameState.playerFamily;
+        const units = gameState.deployedUnits || [];
+        const bonuses = gameState.familyBonuses || {};
+        const activeDistrictBonuses = (gameState as any).activeDistrictBonuses || [];
+        const hasDistrictBonus = (bonusType: string) =>
+          activeDistrictBonuses.some((b: any) => b.family === hqFamily && b.bonusType === bonusType);
+
         const hexBusinesses = (gameState.hexMap || [])
           .filter((tile: any) => tile.controllingFamily === hqFamily && tile.business)
-          .map((tile: any) => ({
-            q: tile.q, r: tile.r, s: tile.s,
-            district: tile.district || 'Unknown',
-            businessType: tile.business.type || tile.business.businessType || 'Business',
-            income: tile.business.income || 0,
-            isLegal: tile.business.isLegal !== false,
-            isExtorted: tile.business.isExtorted === true,
-          }));
+          .map((tile: any) => {
+            const baseIncome = tile.business.income || 0;
+            const underConstruction = tile.business.constructionProgress !== undefined &&
+              tile.business.constructionProgress < (tile.business.constructionGoal || 3);
+
+            if (underConstruction || !isPlayerHQ) {
+              return {
+                q: tile.q, r: tile.r, s: tile.s,
+                district: tile.district || 'Unknown',
+                businessType: tile.business.type || tile.business.businessType || 'Business',
+                income: underConstruction ? 0 : baseIncome,
+                baseIncome,
+                isLegal: tile.business.isLegal !== false,
+                isExtorted: tile.business.isExtorted === true,
+                underConstruction,
+                collectionRate: underConstruction ? 0 : 100,
+                collectionReason: underConstruction ? 'Under construction' : '',
+              };
+            }
+
+            const hasCapo = units.some((u: any) =>
+              u.family === hqFamily && u.type === 'capo' &&
+              u.q === tile.q && u.r === tile.r && u.s === tile.s
+            );
+            const hasSoldier = units.some((u: any) =>
+              u.family === hqFamily && u.type === 'soldier' &&
+              u.q === tile.q && u.r === tile.r && u.s === tile.s
+            );
+
+            let collectionRate = 10;
+            let collectionReason = 'No unit';
+            let tileIncome = Math.floor(baseIncome * 0.1);
+            if (hasCapo) {
+              tileIncome = baseIncome;
+              collectionRate = 100;
+              collectionReason = 'Capo';
+            } else if (hasSoldier) {
+              tileIncome = Math.floor(baseIncome * 0.3);
+              collectionRate = 30;
+              collectionReason = 'Soldier';
+            }
+
+            if ((bonuses as any).businessIncome > 0) tileIncome = Math.floor(tileIncome * (1 + (bonuses as any).businessIncome / 100));
+            if ((bonuses as any).territoryIncome > 0) tileIncome = Math.floor(tileIncome * (1 + (bonuses as any).territoryIncome / 100));
+            if ((bonuses as any).income > 0) tileIncome = Math.floor(tileIncome * (1 + (bonuses as any).income / 100));
+
+            if (tile.district === 'Manhattan' && hasDistrictBonus('income')) {
+              tileIncome = Math.floor(tileIncome * 1.2);
+            }
+
+            return {
+              q: tile.q, r: tile.r, s: tile.s,
+              district: tile.district || 'Unknown',
+              businessType: tile.business.type || tile.business.businessType || 'Business',
+              income: tileIncome,
+              baseIncome,
+              isLegal: tile.business.isLegal !== false,
+              isExtorted: tile.business.isExtorted === true,
+              underConstruction,
+              collectionRate,
+              collectionReason,
+            };
+          });
         const territoryCount = (gameState.hexMap || []).filter((tile: any) => tile.controllingFamily === hqFamily).length;
         return (
           <HeadquartersInfoPanel
