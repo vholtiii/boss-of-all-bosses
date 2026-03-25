@@ -1131,6 +1131,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               enemyStrength={0}
               hexIncome={0}
               availableEnemyFamilies={enemyFamilies}
+              treacheryTurnsRemaining={(gameState as any).treacheryDebuff?.turnsRemaining || 0}
             />
           );
         }
