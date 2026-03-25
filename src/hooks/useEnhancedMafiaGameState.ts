@@ -1263,7 +1263,7 @@ export const useEnhancedMafiaGameState = (
                 message: `${unit.name || 'Your Capo'} claimed this territory on arrival.`,
               };
             }
-            return { ...tile, controllingFamily: prev.playerFamily };
+            return { ...tile, controllingFamily: prev.playerFamily, business: tile.business ? { ...tile.business, isExtorted: true } : undefined };
           }
         }
         return tile;
