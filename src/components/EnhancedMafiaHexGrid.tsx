@@ -333,7 +333,11 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     }
 
     // HQ click — toggle unit icons and open headquarters panel
+    // Block rival HQ clicks during deploy phase to prevent deploying from enemy HQs
     if (tile.isHeadquarters) {
+      if (turnPhase === 'deploy' && tile.isHeadquarters !== playerFamily) {
+        return; // Don't open rival HQ panel during deploy phase
+      }
       const hqKey = `${tile.q},${tile.r},${tile.s}`;
       if (expandedHQKey === hqKey) {
         setExpandedHQKey(null);
