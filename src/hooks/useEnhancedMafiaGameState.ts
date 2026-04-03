@@ -1613,8 +1613,11 @@ export const useEnhancedMafiaGameState = (
         : getHexesInRange(hq.q, hq.r, hq.s, range);
       
       // Add safehouse neighbors for soldier deployment, and safehouse range for capo deployment
-      // Only use safehouses owned by the player's family
-      const playerSafehouses = prev.safehouses.filter(sh => sh.family === family);
+      // Only use safehouses on hexes controlled by the player's family
+      const playerSafehouses = prev.safehouses.filter(sh => {
+        const hex = prev.hexMap.find(t => t.q === sh.q && t.r === sh.r && t.s === sh.s);
+        return hex && hex.controlledBy === family;
+      });
       if (playerSafehouses.length > 0) {
         for (const sh of playerSafehouses) {
           if (unitType === 'soldier') {
