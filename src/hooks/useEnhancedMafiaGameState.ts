@@ -5175,41 +5175,24 @@ export const useEnhancedMafiaGameState = (
       const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
       if (!tile || tile.controllingFamily === state.playerFamily || tile.isHeadquarters) return state;
 
-      // Check ceasefire
+      // Check ceasefire — BLOCK hits entirely during active ceasefire
       const hasCeasefire = state.ceasefires.some(c => c.active && c.family === tile.controllingFamily);
-      // Check alliance
+      if (hasCeasefire) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'warning', title: '🤝 Ceasefire Active',
+          message: `You have an active ceasefire with the ${tile.controllingFamily} family. You cannot attack their territory.`,
+        }];
+        return state;
+      }
+
+      // Check alliance — BLOCK hits entirely during active alliance
       const hasAlliance = state.alliances.some(a => a.active && a.alliedFamily === tile.controllingFamily);
-      if (hasCeasefire || hasAlliance) {
-        if (hasAlliance) {
-          // Breaking alliance — dissolve with penalty
-          state.alliances = state.alliances.map(a => 
-            a.active && a.alliedFamily === tile.controllingFamily ? { ...a, active: false } : a
-          ).filter(a => a.active);
-          syncRespect(state, Math.max(0, state.reputation.respect - 25));
-          state.reputation.reputation = Math.max(0, state.reputation.reputation - 15);
-          if (state.reputation.familyRelationships[tile.controllingFamily] !== undefined) {
-            state.reputation.familyRelationships[tile.controllingFamily] -= 40;
-          }
-          state.pendingNotifications = [...state.pendingNotifications, {
-            type: 'error', title: '💔 Alliance Broken!',
-            message: `You attacked your ally! -25 respect, -15 reputation. Relations devastated.`,
-          }];
-        }
-        if (hasCeasefire) {
-          state.ceasefires = state.ceasefires.filter(c => !(c.active && c.family === tile.controllingFamily));
-          syncRespect(state, Math.max(0, state.reputation.respect - CEASEFIRE_VIOLATION_RESPECT_LOSS));
-          state.reputation.fear = Math.max(0, (state.reputation.fear || 0) - CEASEFIRE_VIOLATION_FEAR_LOSS);
-          // Apply treachery debuff
-          state.treacheryDebuff = { turnsRemaining: TREACHERY_DEBUFF_DURATION, appliedOnTurn: state.turn };
-          // Reduce relationships with ALL families
-          for (const fam of Object.keys(state.reputation.familyRelationships)) {
-            state.reputation.familyRelationships[fam] = (state.reputation.familyRelationships[fam] || 0) - 10;
-          }
-          state.pendingNotifications = [...state.pendingNotifications, {
-            type: 'error', title: '🗡️ Treachery!',
-            message: `You broke the ceasefire! -${CEASEFIRE_VIOLATION_RESPECT_LOSS} respect, -${CEASEFIRE_VIOLATION_FEAR_LOSS} fear. Other families trust you less for ${TREACHERY_DEBUFF_DURATION} turns (-${TREACHERY_NEGOTIATION_PENALTY}% negotiations).`,
-          }];
-        }
+      if (hasAlliance) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'warning', title: '🤝 Alliance Active',
+          message: `You have an active alliance with the ${tile.controllingFamily} family. You cannot attack their territory.`,
+        }];
+        return state;
       }
 
       // Check safe passage
