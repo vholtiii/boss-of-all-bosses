@@ -1,29 +1,26 @@
 
 
-# Fix: Restrict Deployment to Player's Own HQ and Safehouses Only
+# Fix #10: Territory Freeze — Block Player Attacks During Ceasefire
 
 ## Problem
-During the Deploy phase, clicking rival HQs allows deploying units from them. The player should only be able to deploy from their own HQ or their active safehouses.
 
-## Root Cause
-Multiple layers need hardening — the hex grid HQ click handler, the deploy highlight calculation, and the HQ info panel all need stricter player-family checks.
+The approved ceasefire enforcement plan says hits against ceasefire families should be **blocked entirely**, but the current code allows the hit and just applies violation penalties. This means a player can hit a ceasefire family's hex (turning it neutral), then claim it — bypassing the territory freeze.
 
-## Changes
+## Fix
 
-### `src/components/EnhancedMafiaHexGrid.tsx`
-- **Line 336 area**: When a rival HQ is clicked during deploy phase, block the click from opening the HQ info panel OR ensure it doesn't trigger any deploy-related state. Add an early return or skip the `onSelectHeadquarters` call during deploy phase for non-player HQs.
-- **Line 768**: The "CLICK TO SEE UNITS" prompt already checks `tile.isHeadquarters === playerFamily` — no change needed.
+Two changes, both in `src/hooks/useEnhancedMafiaGameState.ts`:
 
-### `src/hooks/useEnhancedMafiaGameState.ts`
-- **`selectUnitFromHeadquarters` (~line 1588)**: Already has `family !== prev.playerFamily` guard — add a secondary guard that ensures the HQ coordinates used match the player's own HQ, not a rival's.
-- **`deployUnit` (~line 1645)**: Already has `family !== prev.playerFamily` guard — add validation that the deploy origin (HQ used for hex calculation) is the player's own HQ or an active safehouse.
-- **Deploy hex calculation**: Ensure `availableDeployHexes` is only computed from the player's HQ + their safehouses. Filter out any safehouse not owned by the player family.
+### 1. Block hits against ceasefire families (line ~5182)
 
-### `src/components/HeadquartersInfoPanel.tsx`
-- **Line 782**: The deploy buttons section already checks `isPlayerFamily` — add a secondary `turnPhase === 'deploy'` check to be extra safe, ensuring buttons only render when it's actually the deploy phase AND it's the player's HQ.
+Instead of allowing the hit and applying penalties, **return early** with a notification: "Ceasefire active — you cannot attack this family's territory." Remove the violation penalty code from hits (violations should only trigger from extortion attempts or other edge cases, not direct hits — since hits are now blocked).
+
+### 2. Block claims on hexes adjacent to ceasefire family territory (line ~4942)
+
+Add a secondary check in `processClaimTerritory`: if the neutral hex is **surrounded by** (or adjacent to) hexes controlled by a ceasefire family, block the claim. This catches edge cases where a hex became neutral through other means (e.g., AI-on-AI combat) but is still in a ceasefire family's sphere.
+
+Logic: check if any of the 6 neighbors of the target hex belong to an active ceasefire family. If so, block with notification "Territory freeze — cannot claim near ceasefire family territory."
 
 ## Files Modified
-- `src/components/EnhancedMafiaHexGrid.tsx` — block rival HQ clicks during deploy phase
-- `src/hooks/useEnhancedMafiaGameState.ts` — harden deploy origin validation
-- `src/components/HeadquartersInfoPanel.tsx` — tighten deploy button visibility
+
+- `src/hooks/useEnhancedMafiaGameState.ts` — two targeted edits (~10 lines each)
 
