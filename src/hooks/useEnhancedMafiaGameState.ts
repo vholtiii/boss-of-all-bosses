@@ -4941,6 +4941,22 @@ export const useEnhancedMafiaGameState = (
     const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
     if (!tile || tile.controllingFamily !== 'neutral' || tile.isHeadquarters) return state;
 
+    // Territory freeze: block claims on neutral hexes adjacent to ceasefire family territory
+    const claimCheckNeighbors = getHexNeighbors(targetQ, targetR, targetS);
+    const adjacentCeasefireFamily = claimCheckNeighbors.some(n => {
+      const neighborTile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+      return neighborTile && neighborTile.controllingFamily !== 'neutral' && 
+        neighborTile.controllingFamily !== state.playerFamily &&
+        state.ceasefires.some(c => c.active && c.family === neighborTile.controllingFamily);
+    });
+    if (adjacentCeasefireFamily) {
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'warning', title: '🤝 Territory Freeze',
+        message: `Cannot claim territory adjacent to a ceasefire family's zone.`,
+      }];
+      return state;
+    }
+
     // Allow both soldiers and capos to claim
     const playerUnitsOnHex = state.deployedUnits.filter(u => 
       u.family === state.playerFamily &&
