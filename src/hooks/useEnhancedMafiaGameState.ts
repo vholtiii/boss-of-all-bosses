@@ -1616,7 +1616,7 @@ export const useEnhancedMafiaGameState = (
       // Only use safehouses on hexes controlled by the player's family
       const playerSafehouses = prev.safehouses.filter(sh => {
         const hex = prev.hexMap.find(t => t.q === sh.q && t.r === sh.r && t.s === sh.s);
-        return hex && hex.controlledBy === family;
+        return hex && hex.controllingFamily === family;
       });
       if (playerSafehouses.length > 0) {
         for (const sh of playerSafehouses) {
