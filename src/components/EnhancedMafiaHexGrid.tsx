@@ -1002,6 +1002,23 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             } : undefined}
                           />
                         );
+                        // Show ceremony badge on soldiers with pending promotion
+                        const hasPendingPromotion = soldiers.some(s => (s as any).pendingPromotion);
+                        if (hasPendingPromotion && fam === playerFamily) {
+                          elements.push(
+                            <text
+                              key={`ceremony-${fam}-${key}`}
+                              x={x + baseHexRadius * 0.25 + offsetIdx * 12 - 8}
+                              y={y + baseHexRadius * 0.35 - 10}
+                              fontSize="10"
+                              textAnchor="middle"
+                              className="pointer-events-none"
+                              style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}
+                            >
+                              🎖️
+                            </text>
+                          );
+                        }
                         offsetIdx++;
                       });
                     }
@@ -1542,6 +1559,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 { icon: '🚧', label: 'Under Construction' },
                 { icon: '👁️', label: 'Scouted Hex' },
                 { icon: '🩸', label: 'Wounded Capo' },
+                { icon: '🎖️', label: 'Promotion Ceremony' },
                 { icon: '🛡️', label: 'Safehouse' },
               ].map(item => (
                 <div key={item.label} className="flex items-center gap-2">

@@ -18,7 +18,7 @@ import {
   HITMAN_CONTRACT_COST, HITMAN_BASE_SUCCESS, HITMAN_FORTIFIED_SUCCESS, HITMAN_SAFEHOUSE_SUCCESS, HITMAN_HQ_SUCCESS,
   HITMAN_OPEN_TURNS, HITMAN_FORTIFIED_TURNS, HITMAN_SAFEHOUSE_TURNS, HITMAN_HQ_TURNS,
   HITMAN_MAX_LIFETIME, HITMAN_REFUND_RATE, HITMAN_ALERT_DURATION,
-  MAX_CAPOS, CAPO_PROMOTION_COST, CAPO_PROMOTION_REQUIREMENTS,
+  MAX_CAPOS, CAPO_PROMOTION_COST, CAPO_PROMOTION_REQUIREMENTS, isCapoPromotionEligible, getCapoPromotionCost,
   SOLDIER_LOYALTY_CAP, CAPO_LOYALTY_CAP,
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType, NegotiationScope, PERSONALITY_BONUSES,
   NEGOTIATION_TYPES, NEGOTIATION_REFUND_RATE, ShareProfitsPact, SafePassagePact,
@@ -210,6 +210,7 @@ export interface DeployedUnit {
   escortingSoldierIds?: string[]; // capo only — IDs of soldiers being escorted
   recruited?: boolean; // true = locally recruited (loyal), false/undefined = mercenary (bought)
   pendingDefection?: boolean; // set by Internal Betrayal event — resolved in endTurn
+  pendingPromotion?: boolean; // soldier in 1-turn promotion ceremony — immobile, converts next turn
   woundedTurnsRemaining?: number; // capo only — 0 or undefined = healthy, >0 = wounded
 }
 
@@ -996,7 +997,7 @@ export const useEnhancedMafiaGameState = (
           u.family === prev.playerFamily && u.type === unitType &&
           u.q === location.q && u.r === location.r && u.s === location.s
         );
-        if (!unit) return prev;
+        if (!unit || (unit as any).pendingPromotion) return prev;
         
         // If clicking the already-selected unit, deselect
         if (prev.selectedUnitId === unit.id) {
@@ -1039,7 +1040,7 @@ export const useEnhancedMafiaGameState = (
         u.q === location.q && u.r === location.r && u.s === location.s &&
         (bypassMovesCheck || u.movesRemaining > 0)
       );
-      if (!unit) return prev;
+      if (!unit || (unit as any).pendingPromotion) return prev;
 
 
       // Tactical phase: only tactical actions (scout, fortify, safehouse, escort) — no regular movement
@@ -1969,6 +1970,33 @@ export const useEnhancedMafiaGameState = (
       newState.actionsRemaining = newState.maxActions;
       newState.tacticalActionsRemaining = TACTICAL_ACTIONS_PER_TURN;
       newState.maxTacticalActions = TACTICAL_ACTIONS_PER_TURN;
+
+      // Process pending promotions — convert soldiers in ceremony to capos
+      const pendingPromotionUnits = newState.deployedUnits.filter(u => u.pendingPromotion && u.type === 'soldier');
+      if (pendingPromotionUnits.length > 0) {
+        const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
+        newState.deployedUnits = newState.deployedUnits.map(u => {
+          if (!u.pendingPromotion || u.type !== 'soldier') return u;
+          const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
+          const capoName = `Capo ${Math.floor(Math.random() * 100)}`;
+          const personalityLabel = randomPersonality.charAt(0).toUpperCase() + randomPersonality.slice(1);
+          newState.pendingNotifications.push({
+            type: 'success' as const,
+            title: '⭐ Soldier Promoted to Capo!',
+            message: `${capoName} (${personalityLabel}) now commands 3 moves per turn and can extort, escort, and negotiate.`,
+          });
+          return {
+            ...u,
+            type: 'capo' as const,
+            maxMoves: 3,
+            movesRemaining: 3,
+            name: capoName,
+            personality: randomPersonality,
+            level: 1,
+            pendingPromotion: undefined,
+          };
+        });
+      }
 
       // Reset moves and escort for new turn; handle wound recovery for capos
       newState.deployedUnits = (newState.deployedUnits || []).map(u => {
@@ -3440,16 +3468,9 @@ export const useEnhancedMafiaGameState = (
         for (const solUnit of aiSoldierUnits) {
           const stats = state.soldierStats[solUnit.id];
           if (!stats) continue;
-          if (
-            stats.victories >= CAPO_PROMOTION_REQUIREMENTS.minVictories &&
-            stats.loyalty >= CAPO_PROMOTION_REQUIREMENTS.minLoyalty &&
-            stats.training >= CAPO_PROMOTION_REQUIREMENTS.minTraining &&
-            stats.toughness >= CAPO_PROMOTION_REQUIREMENTS.minToughness &&
-            stats.racketeering >= CAPO_PROMOTION_REQUIREMENTS.minRacketeering
-          ) {
-            if (!bestCandidate || stats.victories > bestCandidate.stats.victories) {
-              bestCandidate = { unit: solUnit, stats };
-            }
+          if (!isCapoPromotionEligible(stats)) continue;
+          if (!bestCandidate || stats.victories > bestCandidate.stats.victories) {
+            bestCandidate = { unit: solUnit, stats };
           }
         }
         if (bestCandidate) {
@@ -4217,47 +4238,33 @@ export const useEnhancedMafiaGameState = (
           const unitId = action.unitId as string;
           const unit = newState.deployedUnits.find(u => u.id === unitId);
           if (!unit || unit.type !== 'soldier' || unit.family !== newState.playerFamily) return newState;
+          if ((unit as any).pendingPromotion) return newState; // already in ceremony
           
           const currentCapos = newState.deployedUnits.filter(u => u.type === 'capo' && u.family === newState.playerFamily).length;
           if (currentCapos >= MAX_CAPOS) return newState;
-          if (newState.resources.money < CAPO_PROMOTION_COST) return newState;
           
           const stats = newState.soldierStats?.[unitId];
-          if (stats) {
-            if (
-              stats.victories < CAPO_PROMOTION_REQUIREMENTS.minVictories ||
-              stats.loyalty < CAPO_PROMOTION_REQUIREMENTS.minLoyalty ||
-              stats.training < CAPO_PROMOTION_REQUIREMENTS.minTraining ||
-              stats.toughness < CAPO_PROMOTION_REQUIREMENTS.minToughness ||
-              stats.racketeering < CAPO_PROMOTION_REQUIREMENTS.minRacketeering
-            ) return newState;
-          }
+          if (!stats || !isCapoPromotionEligible(stats)) return newState;
           
-          newState.resources.money -= CAPO_PROMOTION_COST;
+          const cost = getCapoPromotionCost(stats);
+          if (newState.resources.money < cost) return newState;
           
-          const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
-          const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
-          const personalityLabel = randomPersonality.charAt(0).toUpperCase() + randomPersonality.slice(1);
-          const capoName = `Capo ${Math.floor(Math.random() * 100)}`;
+          newState.resources.money -= cost;
           
+          // Set pending promotion — soldier enters ceremony for 1 turn
           newState.deployedUnits = newState.deployedUnits.map(u => 
             u.id === unitId ? {
               ...u,
-              type: 'capo' as const,
-              maxMoves: 3,
+              pendingPromotion: true,
               movesRemaining: 0,
-              name: capoName,
-              personality: randomPersonality,
-              level: 1,
             } : u
           );
           
-          // Hitman contracts targeting this unit are handled at end-of-turn resolution
-          
+          const discountApplied = cost < CAPO_PROMOTION_COST;
           newState.pendingNotifications = [...(newState.pendingNotifications || []), {
-            type: 'success' as const,
-            title: '⭐ Soldier Promoted to Capo!',
-            message: `${capoName} (${personalityLabel}) now commands 3 moves per turn and can extort, escort, and negotiate.`,
+            type: 'info' as const,
+            title: '🎖️ Promotion Ceremony Begins',
+            message: `Your soldier is being made. They cannot act this turn and will become a Capo next turn.${discountApplied ? ' (Loyalty discount applied: $' + cost.toLocaleString() + ')' : ''}`,
           }];
           
           return newState;

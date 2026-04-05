@@ -491,6 +491,11 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             }
             hitmanIds={[]}
             money={resources.money}
+            pendingPromotionIds={
+              gameState.deployedUnits
+                .filter(u => u.family === gameState.playerFamily && u.type === 'soldier' && (u as any).pendingPromotion)
+                .map(u => u.id)
+            }
             onPromote={(unitId) => onAction({ type: 'promote_capo', unitId })}
             onHighlightSoldier={(unitId) => {
               const unit = gameState.deployedUnits.find(u => u.id === unitId);
