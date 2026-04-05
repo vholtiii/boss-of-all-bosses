@@ -3441,9 +3441,8 @@ export const useEnhancedMafiaGameState = (
           const stats = state.soldierStats[solUnit.id];
           if (!stats) continue;
           if (!isCapoPromotionEligible(stats)) continue;
-            if (!bestCandidate || stats.victories > bestCandidate.stats.victories) {
-              bestCandidate = { unit: solUnit, stats };
-            }
+          if (!bestCandidate || stats.victories > bestCandidate.stats.victories) {
+            bestCandidate = { unit: solUnit, stats };
           }
         }
         if (bestCandidate) {
