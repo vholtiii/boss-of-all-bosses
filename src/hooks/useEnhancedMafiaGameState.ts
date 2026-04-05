@@ -210,6 +210,7 @@ export interface DeployedUnit {
   escortingSoldierIds?: string[]; // capo only — IDs of soldiers being escorted
   recruited?: boolean; // true = locally recruited (loyal), false/undefined = mercenary (bought)
   pendingDefection?: boolean; // set by Internal Betrayal event — resolved in endTurn
+  pendingPromotion?: boolean; // soldier in 1-turn promotion ceremony — immobile, converts next turn
   woundedTurnsRemaining?: number; // capo only — 0 or undefined = healthy, >0 = wounded
 }
 
@@ -996,7 +997,7 @@ export const useEnhancedMafiaGameState = (
           u.family === prev.playerFamily && u.type === unitType &&
           u.q === location.q && u.r === location.r && u.s === location.s
         );
-        if (!unit) return prev;
+        if (!unit || (unit as any).pendingPromotion) return prev;
         
         // If clicking the already-selected unit, deselect
         if (prev.selectedUnitId === unit.id) {
@@ -1969,6 +1970,33 @@ export const useEnhancedMafiaGameState = (
       newState.actionsRemaining = newState.maxActions;
       newState.tacticalActionsRemaining = TACTICAL_ACTIONS_PER_TURN;
       newState.maxTacticalActions = TACTICAL_ACTIONS_PER_TURN;
+
+      // Process pending promotions — convert soldiers in ceremony to capos
+      const pendingPromotionUnits = newState.deployedUnits.filter(u => u.pendingPromotion && u.type === 'soldier');
+      if (pendingPromotionUnits.length > 0) {
+        const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
+        newState.deployedUnits = newState.deployedUnits.map(u => {
+          if (!u.pendingPromotion || u.type !== 'soldier') return u;
+          const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
+          const capoName = `Capo ${Math.floor(Math.random() * 100)}`;
+          const personalityLabel = randomPersonality.charAt(0).toUpperCase() + randomPersonality.slice(1);
+          newState.pendingNotifications.push({
+            type: 'success' as const,
+            title: '⭐ Soldier Promoted to Capo!',
+            message: `${capoName} (${personalityLabel}) now commands 3 moves per turn and can extort, escort, and negotiate.`,
+          });
+          return {
+            ...u,
+            type: 'capo' as const,
+            maxMoves: 3,
+            movesRemaining: 3,
+            name: capoName,
+            personality: randomPersonality,
+            level: 1,
+            pendingPromotion: undefined,
+          };
+        });
+      }
 
       // Reset moves and escort for new turn; handle wound recovery for capos
       newState.deployedUnits = (newState.deployedUnits || []).map(u => {
