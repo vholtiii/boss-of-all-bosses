@@ -1,26 +1,47 @@
 
 
-# Fix #10: Territory Freeze — Block Player Attacks During Ceasefire
+# Capo Promotion Rework: Cross-Discount Requirements + Loyalty Discount + 1-Turn Ceremony
 
-## Problem
+## Promotion Eligibility (3 paths)
 
-The approved ceasefire enforcement plan says hits against ceasefire families should be **blocked entirely**, but the current code allows the hit and just applies violation penalties. This means a player can hit a ceasefire family's hex (turning it neutral), then claim it — bypassing the territory freeze.
+| Path | Victories | Racketeering |
+|------|-----------|--------------|
+| Racketeering maxed | ≥ 3 | 5 |
+| Victories maxed | 5 | ≥ 3 |
+| Neither maxed | ≥ 4 | ≥ 4 |
 
-## Fix
+## Other Mechanics
+- **Loyalty discount**: 25% off ($7,500 instead of $10,000) when loyalty = 80
+- **1-turn ceremony**: Soldier enters immobile `pendingPromotion` state, converts to Capo at start of next turn
+- **Personality**: Randomly assigned (unchanged)
 
-Two changes, both in `src/hooks/useEnhancedMafiaGameState.ts`:
+## Technical Changes
 
-### 1. Block hits against ceasefire families (line ~5182)
+### `src/types/game-mechanics.ts`
+- Replace `CAPO_PROMOTION_REQUIREMENTS` with:
+  - `maxThreshold: 5`, `discountedThreshold: 3`, `balancedThreshold: 4`
+- Add `CAPO_PROMOTION_LOYALTY_DISCOUNT = 0.25`, `CAPO_PROMOTION_LOYALTY_THRESHOLD = 80`
+- Remove `minLoyalty`, `minTraining`, `minToughness`
 
-Instead of allowing the hit and applying penalties, **return early** with a notification: "Ceasefire active — you cannot attack this family's territory." Remove the violation penalty code from hits (violations should only trigger from extortion attempts or other edge cases, not direct hits — since hits are now blocked).
+### `src/hooks/useEnhancedMafiaGameState.ts`
+- **Eligibility**: `(v>=5 && r>=3) || (r>=5 && v>=3) || (v>=4 && r>=4)`
+- **Promote action**: Set `pendingPromotion` flag, deduct cost (with discount), lock unit
+- **Start-of-turn**: Convert pending units to Capos, assign personality, notify
+- **Movement/action guards**: Skip `pendingPromotion` units
+- **AI promotion**: Same 3-path eligibility, skip ceremony
 
-### 2. Block claims on hexes adjacent to ceasefire family territory (line ~4942)
+### `src/components/CapoPromotionPanel.tsx`
+- Show Victories and Racketeering progress only
+- Indicate which path is closest / met
+- Show discount text when loyalty = 80
+- Show "In Ceremony" state for pending units
 
-Add a secondary check in `processClaimTerritory`: if the neutral hex is **surrounded by** (or adjacent to) hexes controlled by a ceasefire family, block the claim. This catches edge cases where a hex became neutral through other means (e.g., AI-on-AI combat) but is still in a ceasefire family's sphere.
-
-Logic: check if any of the 6 neighbors of the target hex belong to an active ceasefire family. If so, block with notification "Territory freeze — cannot claim near ceasefire family territory."
+### `src/components/EnhancedMafiaHexGrid.tsx`
+- Show 🎖️ badge on `pendingPromotion` units
 
 ## Files Modified
-
-- `src/hooks/useEnhancedMafiaGameState.ts` — two targeted edits (~10 lines each)
+- `src/types/game-mechanics.ts`
+- `src/hooks/useEnhancedMafiaGameState.ts`
+- `src/components/CapoPromotionPanel.tsx`
+- `src/components/EnhancedMafiaHexGrid.tsx`
 
