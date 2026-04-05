@@ -1559,6 +1559,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 { icon: '🚧', label: 'Under Construction' },
                 { icon: '👁️', label: 'Scouted Hex' },
                 { icon: '🩸', label: 'Wounded Capo' },
+                { icon: '🎖️', label: 'Promotion Ceremony' },
                 { icon: '🛡️', label: 'Safehouse' },
               ].map(item => (
                 <div key={item.label} className="flex items-center gap-2">

@@ -1040,7 +1040,7 @@ export const useEnhancedMafiaGameState = (
         u.q === location.q && u.r === location.r && u.s === location.s &&
         (bypassMovesCheck || u.movesRemaining > 0)
       );
-      if (!unit) return prev;
+      if (!unit || (unit as any).pendingPromotion) return prev;
 
 
       // Tactical phase: only tactical actions (scout, fortify, safehouse, escort) — no regular movement
