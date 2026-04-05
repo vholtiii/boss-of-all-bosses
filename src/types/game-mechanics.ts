@@ -274,13 +274,27 @@ export const HITMAN_ALERT_DURATION = 5;
 // ============ CAPO PROMOTION ============
 export const MAX_CAPOS = 3;
 export const CAPO_PROMOTION_COST = 10000;
+export const CAPO_PROMOTION_LOYALTY_DISCOUNT = 0.25; // 25% off when loyalty is at cap
+export const CAPO_PROMOTION_LOYALTY_THRESHOLD = 80;  // loyalty must be at this value for discount
 export const CAPO_PROMOTION_REQUIREMENTS = {
-  minVictories: 3,       // victories on SoldierStats (max 5)
-  minLoyalty: 60,         // loyalty on SoldierStats (soldier cap 80)
-  minTraining: 2,        // training on SoldierStats (0-3 scale)
-  minToughness: 3,       // toughness on SoldierStats (0-5)
-  minRacketeering: 3,    // racketeering on SoldierStats (0-5)
+  maxThreshold: 5,        // one stat maxed at 5 triggers discount on the other
+  discountedThreshold: 3, // the other stat only needs 3 if one is maxed
+  balancedThreshold: 4,   // both stats need 4 if neither is maxed at 5
 };
+
+// Helper: check if a soldier meets capo promotion eligibility
+export function isCapoPromotionEligible(stats: SoldierStats): boolean {
+  const v = stats.victories;
+  const r = stats.racketeering;
+  return (v >= 5 && r >= 3) || (r >= 5 && v >= 3) || (v >= 4 && r >= 4);
+}
+
+// Helper: get promotion cost with loyalty discount
+export function getCapoPromotionCost(stats: SoldierStats): number {
+  return stats.loyalty >= CAPO_PROMOTION_LOYALTY_THRESHOLD
+    ? Math.round(CAPO_PROMOTION_COST * (1 - CAPO_PROMOTION_LOYALTY_DISCOUNT))
+    : CAPO_PROMOTION_COST;
+}
 
 // Hitman promotion requirements (legacy — kept for reference)
 // Hitmen are now external contract killers, not promoted soldiers
