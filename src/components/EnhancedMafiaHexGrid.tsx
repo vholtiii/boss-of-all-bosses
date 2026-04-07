@@ -6,7 +6,7 @@ import { ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
-import { ScoutedHex, Safehouse, PlannedHit } from '@/types/game-mechanics';
+import { ScoutedHex, Safehouse, PlannedHit, SupplyNode, SUPPLY_NODE_CONFIG, SupplyNodeType } from '@/types/game-mechanics';
 
 interface EnhancedMafiaHexGridProps {
   width: number;
@@ -895,6 +895,27 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       <g className="pointer-events-none">
                         <circle cx={x} cy={y - baseHexRadius * 0.7} r={8} fill="#10B981" stroke="#ffffff" strokeWidth="1" />
                         <text x={x} y={y - baseHexRadius * 0.7 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🛡️</text>
+                      </g>
+                    );
+                  })()}
+
+                  {/* Supply node indicator — golden border + icon */}
+                  {tile.supplyNode && (() => {
+                    const cfg = SUPPLY_NODE_CONFIG[tile.supplyNode];
+                    return (
+                      <g className="pointer-events-none">
+                        <polygon
+                          points={getHexPoints(x, y, baseHexRadius + 4)}
+                          fill="none"
+                          stroke="#D4AF37"
+                          strokeWidth="2.5"
+                          opacity="0.85"
+                          strokeDasharray="4,2"
+                        />
+                        <circle cx={x} cy={y - baseHexRadius * 0.85} r={8} fill="#1a1a2e" stroke="#D4AF37" strokeWidth="1.5" />
+                        <text x={x} y={y - baseHexRadius * 0.85 + 4} textAnchor="middle" fontSize="10" className="select-none">
+                          {cfg.icon}
+                        </text>
                       </g>
                     );
                   })()}
