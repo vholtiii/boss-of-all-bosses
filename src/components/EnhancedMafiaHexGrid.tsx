@@ -1622,6 +1622,11 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 { icon: '🩸', label: 'Wounded Capo' },
                 { icon: '🎖️', label: 'Promotion Ceremony' },
                 { icon: '🛡️', label: 'Safehouse' },
+                { icon: '⚓', label: 'Supply Node: Docks' },
+                { icon: '🔧', label: 'Supply Node: Union Hall' },
+                { icon: '🚛', label: 'Supply Node: Trucking' },
+                { icon: '🍷', label: 'Supply Node: Liquor' },
+                { icon: '🐟', label: 'Supply Node: Food Market' },
               ].map(item => (
                 <div key={item.label} className="flex items-center gap-2">
                   <span className="text-[10px] w-4 text-center flex-shrink-0">{item.icon}</span>
