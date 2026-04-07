@@ -1063,8 +1063,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })}
 
-            {/* Supply route overlay lines */}
-            {(() => {
+
               const supplyNodes: SupplyNode[] = gameState?.supplyNodes || [];
               if (supplyNodes.length === 0) return null;
               const playerColor = familyColors[playerFamily] || '#D4AF37';
