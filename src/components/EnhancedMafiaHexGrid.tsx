@@ -1529,6 +1529,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   </>
                 );
               })()}
+              {hoveredHex.supplyNode && (() => {
+                const cfg = SUPPLY_NODE_CONFIG[hoveredHex.supplyNode];
+                return <p className="text-yellow-400 font-bold">{cfg.icon} Supply Node: {cfg.label}</p>;
+              })()}
               {hoveredHex.isHeadquarters && (
                 <p className="text-mafia-gold font-bold">🏛️ {hoveredHex.isHeadquarters.toUpperCase()} HQ</p>
               )}
