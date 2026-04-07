@@ -384,6 +384,10 @@ export interface EnhancedMafiaGameState {
   eliminatedFamilies: string[];
   sitdownCooldownUntil: number;
   
+  // Supply lines
+  supplyNodes: SupplyNode[];
+  supplyStockpile: SupplyStockpileEntry[];
+  
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
   };
