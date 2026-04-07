@@ -2142,6 +2142,42 @@ export const useEnhancedMafiaGameState = (
       newState.season = seasons[Math.floor((newState.turn - 1) / 3) % 4];
       
       computeDistrictBonuses(newState, turnReport);
+      // ============ SUPPLY STOCKPILE TRACKING ============
+      {
+        newState.supplyStockpile = newState.supplyStockpile || [];
+        const allFamiliesForSupply = [newState.playerFamily, ...newState.aiOpponents.map(o => o.family)];
+        allFamiliesForSupply.forEach(fam => {
+          const famConnected = getConnectedTerritory(newState.hexMap, fam);
+          const supplyNodeTypes: SupplyNodeType[] = ['docks', 'union_hall', 'trucking_depot', 'liquor_route', 'food_market'];
+          supplyNodeTypes.forEach(nodeType => {
+            const node = (newState.supplyNodes || []).find(n => n.type === nodeType);
+            if (!node) return;
+            const isConnected = famConnected.has(`${node.q},${node.r},${node.s}`);
+            const existing = newState.supplyStockpile.find(e => e.family === fam && e.nodeType === nodeType);
+            if (isConnected) {
+              // Connected — reset stockpile
+              if (existing) existing.turnsSinceDisconnected = 0;
+            } else {
+              // Not connected — increment
+              if (existing) {
+                existing.turnsSinceDisconnected++;
+              } else {
+                newState.supplyStockpile.push({ nodeType, family: fam, turnsSinceDisconnected: 1 });
+              }
+              // Notify player on first disconnect
+              if (fam === newState.playerFamily && existing?.turnsSinceDisconnected === 1) {
+                const cfg = SUPPLY_NODE_CONFIG[nodeType];
+                newState.pendingNotifications.push({
+                  type: 'warning',
+                  title: `⚠️ Supply Route Severed: ${cfg.label}`,
+                  message: `Your route to the ${cfg.label} ${cfg.icon} has been cut! You have ${SUPPLY_STOCKPILE_BUFFER} turns of stockpile before businesses start losing income.`,
+                });
+              }
+            }
+          });
+        });
+      }
+
       processEconomy(newState);
       turnReport.income = newState.finances.totalIncome;
       turnReport.maintenance = newState.finances.totalExpenses;
