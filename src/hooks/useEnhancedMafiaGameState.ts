@@ -238,6 +238,7 @@ export interface HexTile {
     wasPlayerBuilt?: boolean;       // tracks that this was originally a player-built business (cleared when penalty expires)
   };
   isHeadquarters?: string;
+  supplyNode?: SupplyNodeType;
 }
 
 export type TurnPhase = 'deploy' | 'move' | 'action' | 'waiting';
