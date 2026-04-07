@@ -567,6 +567,29 @@ const createInitialGameState = (
   const diffMods = DIFFICULTY_MODIFIERS[difficulty];
   let hexMap = generateHexMap(mapRadius, mapSeed);
 
+  // ============ PLACE SUPPLY NODES ============
+  const supplyRng = mulberry32(mapSeed + 7777); // offset seed for supply placement
+  const supplyNodeTypes: SupplyNodeType[] = ['docks', 'union_hall', 'trucking_depot', 'liquor_route', 'food_market'];
+  const supplyNodes: SupplyNode[] = [];
+  const usedHexKeys = new Set<string>();
+  
+  supplyNodeTypes.forEach(nodeType => {
+    const config = SUPPLY_NODE_CONFIG[nodeType];
+    // Find candidate hexes in the valid districts (no HQ, no existing supply node)
+    const candidates = hexMap.filter(t =>
+      config.districts.includes(t.district) &&
+      !t.isHeadquarters &&
+      !usedHexKeys.has(`${t.q},${t.r},${t.s}`)
+    );
+    if (candidates.length > 0) {
+      const idx = Math.floor(supplyRng() * candidates.length);
+      const chosen = candidates[idx];
+      chosen.supplyNode = nodeType;
+      usedHexKeys.add(`${chosen.q},${chosen.r},${chosen.s}`);
+      supplyNodes.push({ type: nodeType, q: chosen.q, r: chosen.r, s: chosen.s, district: chosen.district });
+    }
+  });
+
   const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'] as const;
   
   allFamilies.forEach(fam => {
