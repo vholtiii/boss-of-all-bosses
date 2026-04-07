@@ -173,6 +173,8 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   flippedSoldiers: (state.flippedSoldiers || []).map(f => ({ ...f })),
   eliminatedFamilies: [...(state.eliminatedFamilies || [])],
   sitdownCooldownUntil: state.sitdownCooldownUntil || 0,
+  supplyNodes: (state.supplyNodes || []).map(n => ({ ...n })),
+  supplyStockpile: (state.supplyStockpile || []).map(e => ({ ...e })),
   hitmanContracts: [...(state.hitmanContracts || [])],
   aiOpponents: (state.aiOpponents || []).map(o => ({
     ...o,
