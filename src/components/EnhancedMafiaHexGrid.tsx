@@ -1063,71 +1063,42 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })}
 
-
-              const supplyNodes: SupplyNode[] = gameState?.supplyNodes || [];
-              if (supplyNodes.length === 0) return null;
-              const playerColor = familyColors[playerFamily] || '#D4AF37';
-              const hqTile = hexMap.find(t => t.isHeadquarters === playerFamily);
-              if (!hqTile) return null;
-
-              const hexKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
-              const playerHexSet = new Set(hexMap.filter(t => t.controllingFamily === playerFamily || t.isHeadquarters === playerFamily).map(t => hexKey(t.q, t.r, t.s)));
-              
-              // BFS from HQ recording parent for path reconstruction
-              const parent = new Map<string, string>();
-              const visited = new Set<string>();
-              const bfsQueue: Array<{q:number;r:number;s:number}> = [{ q: hqTile.q, r: hqTile.r, s: hqTile.s }];
-              const startKey = hexKey(hqTile.q, hqTile.r, hqTile.s);
-              visited.add(startKey);
-              parent.set(startKey, '');
-              
-              const dirs = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
-              while (bfsQueue.length > 0) {
-                const cur = bfsQueue.shift()!;
-                for (const d of dirs) {
-                  const nq = cur.q + d.q, nr = cur.r + d.r, ns = cur.s + d.s;
-                  const nk = hexKey(nq, nr, ns);
-                  if (visited.has(nk) || !playerHexSet.has(nk)) continue;
-                  visited.add(nk);
-                  parent.set(nk, hexKey(cur.q, cur.r, cur.s));
-                  bfsQueue.push({q: nq, r: nr, s: ns});
+            {/* Supply route overlay lines */}
+            {(() => {
+              const sNodes: SupplyNode[] = gameState?.supplyNodes || [];
+              if (sNodes.length === 0) return null;
+              const pColor = familyColors[playerFamily] || '#D4AF37';
+              const hqT = hexMap.find(t => t.isHeadquarters === playerFamily);
+              if (!hqT) return null;
+              const hKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
+              const pHexSet = new Set(hexMap.filter(t => t.controllingFamily === playerFamily || t.isHeadquarters === playerFamily).map(t => hKey(t.q, t.r, t.s)));
+              const par = new Map<string, string>();
+              const vis = new Set<string>();
+              const bQ: Array<{q:number;r:number;s:number}> = [{ q: hqT.q, r: hqT.r, s: hqT.s }];
+              const sK = hKey(hqT.q, hqT.r, hqT.s);
+              vis.add(sK); par.set(sK, '');
+              const dd = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
+              while (bQ.length > 0) {
+                const c = bQ.shift()!;
+                for (const d of dd) {
+                  const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
+                  const nk = hKey(nq,nr,ns);
+                  if (vis.has(nk) || !pHexSet.has(nk)) continue;
+                  vis.add(nk); par.set(nk, hKey(c.q,c.r,c.s)); bQ.push({q:nq,r:nr,s:ns});
                 }
               }
-
               return (
                 <g className="pointer-events-none">
-                  {supplyNodes.map(node => {
-                    const nodeK = hexKey(node.q, node.r, node.s);
-                    const isConnected = visited.has(nodeK);
-                    if (!isConnected) return null;
-                    
-                    const pathKeys: string[] = [];
-                    let curKey = nodeK;
-                    while (curKey && curKey !== '') {
-                      pathKeys.push(curKey);
-                      curKey = parent.get(curKey) || '';
-                    }
-                    if (pathKeys.length < 2) return null;
-                    
-                    const pathPoints = pathKeys.map(k => {
-                      const [pq, pr] = k.split(',').map(Number);
-                      return getHexPosition(pq, pr);
-                    });
-                    
-                    const pathD = pathPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-                    
-                    return (
-                      <path
-                        key={`supply-route-${node.type}`}
-                        d={pathD}
-                        fill="none"
-                        stroke={playerColor}
-                        strokeWidth="2"
-                        strokeOpacity="0.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    );
+                  {sNodes.map(node => {
+                    const nK = hKey(node.q,node.r,node.s);
+                    if (!vis.has(nK)) return null;
+                    const pKeys: string[] = [];
+                    let ck = nK;
+                    while (ck && ck !== '') { pKeys.push(ck); ck = par.get(ck) || ''; }
+                    if (pKeys.length < 2) return null;
+                    const pts = pKeys.map(k => { const [pq,pr] = k.split(',').map(Number); return getHexPosition(pq,pr); });
+                    const pd = pts.map((p,i) => `${i===0?'M':'L'} ${p.x} ${p.y}`).join(' ');
+                    return <path key={`supply-route-${node.type}`} d={pd} fill="none" stroke={pColor} strokeWidth="2" strokeOpacity="0.2" strokeLinecap="round" strokeLinejoin="round" />;
                   })}
                 </g>
               );
