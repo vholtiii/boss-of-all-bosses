@@ -34,7 +34,8 @@ import HitmanPanel from '@/components/HitmanPanel';
 import CapoPromotionPanel from '@/components/CapoPromotionPanel';
 import CorruptionPanel from '@/components/CorruptionPanel';
 import VictoryTracker from '@/components/VictoryTracker';
-import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN } from '@/types/game-mechanics';
+import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType } from '@/types/game-mechanics';
+import { Anchor, Wrench, Truck, Wine, Fish } from 'lucide-react';
 
 interface GameSidePanelProps {
   gameState: EnhancedMafiaGameState;
