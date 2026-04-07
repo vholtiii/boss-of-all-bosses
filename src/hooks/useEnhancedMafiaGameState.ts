@@ -44,6 +44,8 @@ import {
   BUILT_BUSINESS_DEFENSE_BONUS, BUILT_BUSINESS_HEAT_REDUCTION, BUILT_BUSINESS_RESPECT_THRESHOLD, BUILT_BUSINESS_RESPECT_BONUS, BUILT_BUSINESS_LOYALTY_BONUS,
   BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION, BUILT_BIZ_SEIZURE_INCOME_PENALTY, BUILT_BIZ_SEIZURE_RESPECT_LOSS, BUILT_BIZ_SEIZURE_FEAR_LOSS, BUILT_BIZ_SEIZURE_INFLUENCE_GAIN,
   CEASEFIRE_VIOLATION_RESPECT_LOSS, CEASEFIRE_VIOLATION_FEAR_LOSS, TREACHERY_DEBUFF_DURATION, TREACHERY_NEGOTIATION_PENALTY, TreacheryDebuff,
+  SupplyNode, SupplyNodeType, SupplyStockpileEntry, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES,
+  SUPPLY_DECAY_RATE, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -171,6 +173,8 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   flippedSoldiers: (state.flippedSoldiers || []).map(f => ({ ...f })),
   eliminatedFamilies: [...(state.eliminatedFamilies || [])],
   sitdownCooldownUntil: state.sitdownCooldownUntil || 0,
+  supplyNodes: (state.supplyNodes || []).map(n => ({ ...n })),
+  supplyStockpile: (state.supplyStockpile || []).map(e => ({ ...e })),
   hitmanContracts: [...(state.hitmanContracts || [])],
   aiOpponents: (state.aiOpponents || []).map(o => ({
     ...o,
@@ -236,6 +240,7 @@ export interface HexTile {
     wasPlayerBuilt?: boolean;       // tracks that this was originally a player-built business (cleared when penalty expires)
   };
   isHeadquarters?: string;
+  supplyNode?: SupplyNodeType;
 }
 
 export type TurnPhase = 'deploy' | 'move' | 'action' | 'waiting';
@@ -380,6 +385,10 @@ export interface EnhancedMafiaGameState {
   flippedSoldiers: FlippedSoldier[];
   eliminatedFamilies: string[];
   sitdownCooldownUntil: number;
+  
+  // Supply lines
+  supplyNodes: SupplyNode[];
+  supplyStockpile: SupplyStockpileEntry[];
   
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
@@ -558,6 +567,29 @@ const createInitialGameState = (
   const diffMods = DIFFICULTY_MODIFIERS[difficulty];
   let hexMap = generateHexMap(mapRadius, mapSeed);
 
+  // ============ PLACE SUPPLY NODES ============
+  const supplyRng = mulberry32(mapSeed + 7777); // offset seed for supply placement
+  const supplyNodeTypes: SupplyNodeType[] = ['docks', 'union_hall', 'trucking_depot', 'liquor_route', 'food_market'];
+  const supplyNodes: SupplyNode[] = [];
+  const usedHexKeys = new Set<string>();
+  
+  supplyNodeTypes.forEach(nodeType => {
+    const config = SUPPLY_NODE_CONFIG[nodeType];
+    // Find candidate hexes in the valid districts (no HQ, no existing supply node)
+    const candidates = hexMap.filter(t =>
+      config.districts.includes(t.district) &&
+      !t.isHeadquarters &&
+      !usedHexKeys.has(`${t.q},${t.r},${t.s}`)
+    );
+    if (candidates.length > 0) {
+      const idx = Math.floor(supplyRng() * candidates.length);
+      const chosen = candidates[idx];
+      chosen.supplyNode = nodeType;
+      usedHexKeys.add(`${chosen.q},${chosen.r},${chosen.s}`);
+      supplyNodes.push({ type: nodeType, q: chosen.q, r: chosen.r, s: chosen.s, district: chosen.district });
+    }
+  });
+
   const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'] as const;
   
   allFamilies.forEach(fam => {
@@ -678,6 +710,8 @@ const createInitialGameState = (
     flippedSoldiers: [],
     eliminatedFamilies: [],
     sitdownCooldownUntil: 0,
+    supplyNodes,
+    supplyStockpile: [],
     victoryType: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
@@ -2108,6 +2142,42 @@ export const useEnhancedMafiaGameState = (
       newState.season = seasons[Math.floor((newState.turn - 1) / 3) % 4];
       
       computeDistrictBonuses(newState, turnReport);
+      // ============ SUPPLY STOCKPILE TRACKING ============
+      {
+        newState.supplyStockpile = newState.supplyStockpile || [];
+        const allFamiliesForSupply = [newState.playerFamily, ...newState.aiOpponents.map(o => o.family)];
+        allFamiliesForSupply.forEach(fam => {
+          const famConnected = getConnectedTerritory(newState.hexMap, fam);
+          const supplyNodeTypes: SupplyNodeType[] = ['docks', 'union_hall', 'trucking_depot', 'liquor_route', 'food_market'];
+          supplyNodeTypes.forEach(nodeType => {
+            const node = (newState.supplyNodes || []).find(n => n.type === nodeType);
+            if (!node) return;
+            const isConnected = famConnected.has(`${node.q},${node.r},${node.s}`);
+            const existing = newState.supplyStockpile.find(e => e.family === fam && e.nodeType === nodeType);
+            if (isConnected) {
+              // Connected — reset stockpile
+              if (existing) existing.turnsSinceDisconnected = 0;
+            } else {
+              // Not connected — increment
+              if (existing) {
+                existing.turnsSinceDisconnected++;
+              } else {
+                newState.supplyStockpile.push({ nodeType, family: fam, turnsSinceDisconnected: 1 });
+              }
+              // Notify player on first disconnect
+              if (fam === newState.playerFamily && existing?.turnsSinceDisconnected === 1) {
+                const cfg = SUPPLY_NODE_CONFIG[nodeType];
+                newState.pendingNotifications.push({
+                  type: 'warning',
+                  title: `⚠️ Supply Route Severed: ${cfg.label}`,
+                  message: `Your route to the ${cfg.label} ${cfg.icon} has been cut! You have ${SUPPLY_STOCKPILE_BUFFER} turns of stockpile before businesses start losing income.`,
+                });
+              }
+            }
+          });
+        });
+      }
+
       processEconomy(newState);
       turnReport.income = newState.finances.totalIncome;
       turnReport.maintenance = newState.finances.totalExpenses;
@@ -2722,6 +2792,15 @@ export const useEnhancedMafiaGameState = (
       }
     });
     
+    // Compute supply line connectivity (BFS from HQ)
+    const connectedHexes = getConnectedTerritory(state.hexMap, state.playerFamily);
+    const connectedNodeTypes = new Set<SupplyNodeType>();
+    (state.supplyNodes || []).forEach(node => {
+      if (connectedHexes.has(`${node.q},${node.r},${node.s}`)) {
+        connectedNodeTypes.add(node.type);
+      }
+    });
+
     let legalIncome = 0;
     let illegalIncome = 0;
     
@@ -2757,6 +2836,26 @@ export const useEnhancedMafiaGameState = (
         if (bonuses.businessIncome > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.businessIncome / 100));
         if (bonuses.territoryIncome > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.territoryIncome / 100));
         if (bonuses.income > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.income / 100));
+
+        // ── Supply Line Decay ──
+        const deps = SUPPLY_DEPENDENCIES[tile.business.type];
+        if (deps && deps.length > 0) {
+          // For store_front / restaurant / store: needs at least ONE of the listed nodes
+          const hasAccess = deps.some(dep => connectedNodeTypes.has(dep));
+          if (!hasAccess) {
+            // Check stockpile buffer
+            const stockEntry = (state.supplyStockpile || []).find(
+              e => e.family === state.playerFamily && deps.includes(e.nodeType)
+            );
+            const turnsSinceDisconnected = stockEntry?.turnsSinceDisconnected ?? 0;
+            if (turnsSinceDisconnected > SUPPLY_STOCKPILE_BUFFER) {
+              // Decay: -10% per turn past buffer, floor at 20%
+              const decayTurns = turnsSinceDisconnected - SUPPLY_STOCKPILE_BUFFER;
+              const decayMultiplier = Math.max(SUPPLY_DECAY_FLOOR, 1 - (SUPPLY_DECAY_RATE * decayTurns));
+              tileIncome = Math.floor(tileIncome * decayMultiplier);
+            }
+          }
+        }
         
         // District control bonus: Manhattan +20% income
         if (tile.district === 'Manhattan' && hasPlayerDistrictBonus(state, 'income')) {

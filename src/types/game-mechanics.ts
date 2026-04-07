@@ -461,3 +461,44 @@ export interface TreacheryDebuff {
   turnsRemaining: number;
   appliedOnTurn: number;
 }
+
+// ============ SUPPLY LINES ============
+export type SupplyNodeType = 'docks' | 'union_hall' | 'trucking_depot' | 'liquor_route' | 'food_market';
+
+export const SUPPLY_NODE_CONFIG: Record<SupplyNodeType, { label: string; icon: string; districts: string[] }> = {
+  docks:           { label: 'Docks',          icon: '⚓', districts: ['Brooklyn', 'Staten Island'] },
+  union_hall:      { label: 'Union Hall',     icon: '🔧', districts: ['Bronx', 'Queens'] },
+  trucking_depot:  { label: 'Trucking Depot', icon: '🚛', districts: ['Queens', 'Bronx'] },
+  liquor_route:    { label: 'Liquor Route',   icon: '🍷', districts: ['Manhattan'] },
+  food_market:     { label: 'Food Market',    icon: '🐟', districts: ['Little Italy', 'Brooklyn'] },
+};
+
+// Which businesses depend on which supply nodes
+// Store Front accepts EITHER food_market OR docks
+export const SUPPLY_DEPENDENCIES: Record<string, SupplyNodeType[]> = {
+  gambling_den: ['liquor_route'],
+  brothel: ['trucking_depot'],
+  loan_sharking: ['union_hall'],
+  store_front: ['food_market', 'docks'], // needs at least one
+  construction: ['union_hall'],
+  store: ['food_market', 'docks'],
+  restaurant: ['food_market', 'docks'],
+};
+
+export interface SupplyNode {
+  type: SupplyNodeType;
+  q: number;
+  r: number;
+  s: number;
+  district: string;
+}
+
+export interface SupplyStockpileEntry {
+  nodeType: SupplyNodeType;
+  family: string;
+  turnsSinceDisconnected: number; // 0 = connected, 1-2 = buffer, 3+ = decaying
+}
+
+export const SUPPLY_DECAY_RATE = 0.10;       // -10% per turn after buffer expires
+export const SUPPLY_DECAY_FLOOR = 0.20;       // minimum 20% of max revenue
+export const SUPPLY_STOCKPILE_BUFFER = 2;     // 2-turn grace period before decay starts
