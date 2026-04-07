@@ -2756,6 +2756,15 @@ export const useEnhancedMafiaGameState = (
       }
     });
     
+    // Compute supply line connectivity (BFS from HQ)
+    const connectedHexes = getConnectedTerritory(state.hexMap, state.playerFamily);
+    const connectedNodeTypes = new Set<SupplyNodeType>();
+    (state.supplyNodes || []).forEach(node => {
+      if (connectedHexes.has(`${node.q},${node.r},${node.s}`)) {
+        connectedNodeTypes.add(node.type);
+      }
+    });
+
     let legalIncome = 0;
     let illegalIncome = 0;
     
