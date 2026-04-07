@@ -2800,6 +2800,26 @@ export const useEnhancedMafiaGameState = (
         if (bonuses.businessIncome > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.businessIncome / 100));
         if (bonuses.territoryIncome > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.territoryIncome / 100));
         if (bonuses.income > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.income / 100));
+
+        // ── Supply Line Decay ──
+        const deps = SUPPLY_DEPENDENCIES[tile.business.type];
+        if (deps && deps.length > 0) {
+          // For store_front / restaurant / store: needs at least ONE of the listed nodes
+          const hasAccess = deps.some(dep => connectedNodeTypes.has(dep));
+          if (!hasAccess) {
+            // Check stockpile buffer
+            const stockEntry = (state.supplyStockpile || []).find(
+              e => e.family === state.playerFamily && deps.includes(e.nodeType)
+            );
+            const turnsSinceDisconnected = stockEntry?.turnsSinceDisconnected ?? 0;
+            if (turnsSinceDisconnected > SUPPLY_STOCKPILE_BUFFER) {
+              // Decay: -10% per turn past buffer, floor at 20%
+              const decayTurns = turnsSinceDisconnected - SUPPLY_STOCKPILE_BUFFER;
+              const decayMultiplier = Math.max(SUPPLY_DECAY_FLOOR, 1 - (SUPPLY_DECAY_RATE * decayTurns));
+              tileIncome = Math.floor(tileIncome * decayMultiplier);
+            }
+          }
+        }
         
         // District control bonus: Manhattan +20% income
         if (tile.district === 'Manhattan' && hasPlayerDistrictBonus(state, 'income')) {
