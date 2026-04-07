@@ -722,6 +722,68 @@ export const RightSidePanel: React.FC<{
           </div>
         </CollapsibleSection>
 
+        {/* ── Supply Lines ── */}
+        {(gameState as any).supplyNodes && (gameState as any).supplyNodes.length > 0 && (
+          <CollapsibleSection
+            title="Supply Lines"
+            icon={<Truck className="h-4 w-4" />}
+            isOpen={openSection === 'supply'}
+            onToggle={() => toggle('supply')}
+          >
+            <div className="space-y-2">
+              {((gameState as any).supplyNodes || []).map((node: any) => {
+                const cfg = SUPPLY_NODE_CONFIG[node.type as SupplyNodeType];
+                const nodeTile = (gameState.hexMap || []).find((t: any) => t.q === node.q && t.r === node.r && t.s === node.s);
+                const isOwned = nodeTile?.controllingFamily === gameState.playerFamily;
+                // Check connection via stockpile tracker
+                const stockEntry = ((gameState as any).supplyStockpile || []).find(
+                  (e: any) => e.family === gameState.playerFamily && e.nodeType === node.type && e.turnsSinceDisconnected > 0
+                );
+                const isConnected = isOwned || (!stockEntry);
+                const turnsSinceDisconnected = stockEntry?.turnsSinceDisconnected || 0;
+                const inBuffer = turnsSinceDisconnected > 0 && turnsSinceDisconnected <= SUPPLY_STOCKPILE_BUFFER;
+                const isDecaying = turnsSinceDisconnected > SUPPLY_STOCKPILE_BUFFER;
+                
+                // Find dependent businesses
+                const depBizTypes = Object.entries(SUPPLY_DEPENDENCIES)
+                  .filter(([, deps]) => deps.includes(node.type as SupplyNodeType))
+                  .map(([bType]) => bType);
+                
+                return (
+                  <div key={node.type} className="rounded-lg border border-border bg-card p-2.5">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-base">{cfg.icon}</span>
+                      <span className="text-xs font-bold text-foreground flex-1">{cfg.label}</span>
+                      {isConnected ? (
+                        <Badge variant="default" className="text-[9px] h-4 bg-green-600">Connected</Badge>
+                      ) : inBuffer ? (
+                        <Badge variant="outline" className="text-[9px] h-4 border-yellow-500 text-yellow-500">Buffer ({SUPPLY_STOCKPILE_BUFFER - turnsSinceDisconnected + 1}t)</Badge>
+                      ) : isDecaying ? (
+                        <Badge variant="destructive" className="text-[9px] h-4">Severed</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[9px] h-4">No Route</Badge>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {node.district} · {isOwned ? 'Owned' : nodeTile?.controllingFamily !== 'neutral' ? `Held by ${nodeTile?.controllingFamily}` : 'Neutral'}
+                    </p>
+                    {depBizTypes.length > 0 && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        Supplies: {depBizTypes.map(t => t.replace('_', ' ')).join(', ')}
+                      </p>
+                    )}
+                    {isDecaying && (
+                      <p className="text-[10px] text-destructive mt-0.5">
+                        ⚠️ Businesses at {Math.max(20, 100 - (turnsSinceDisconnected - SUPPLY_STOCKPILE_BUFFER) * 10)}% revenue
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleSection>
+        )}
+
         {/* ── Weather ── */}
         <div className="rounded-lg border border-border bg-card p-3">
           <div className="flex items-center gap-2 mb-1">
