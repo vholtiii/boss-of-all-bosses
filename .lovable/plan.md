@@ -1,33 +1,27 @@
 
 
-# Option B: Hex-Chain Tint Overlay for Supply Routes
+# Fix: Make Full Supply Line Chain Visible on Map
 
-## What Changes
+## Problem
+The supply route hex-chain tint overlay at 8% opacity is nearly invisible against the 10-12% district background tints. The user sees no visual indication of the route from HQ to the supply node.
 
-Replace the current invisible thin line (`strokeWidth="2"`, `strokeOpacity="0.2"`) with a **colored hex fill overlay** on every hex along the BFS path from HQ to each connected supply node. Each hex in the chain gets a faint family-color fill (~8% opacity), creating a visible "corridor." Connected nodes get a green ✅ badge; disconnected nodes get a red ⚠️ badge.
+## Solution
+Increase the tint visibility and add a connecting line between hex centers along the route path for clarity.
 
-## Visual Design
+### Changes to `src/components/EnhancedMafiaHexGrid.tsx`
 
-- **Connected route**: Each hex in the BFS path gets an additional polygon fill in the player's family color at 8% opacity — subtle but visible as a tinted corridor
-- **Connected node badge**: Small green circle with ✅ next to the supply node icon
-- **Disconnected node badge**: Small red pulsing circle with ⚠️ next to the supply node icon
-- **Neutral/unclaimed node**: Keep existing gold dashed border, no status badge
+1. **Increase hex tint opacity**: Raise `fillOpacity` from `0.08` to `0.15` and `strokeOpacity` from `0.15` to `0.30` on the supply-route hex polygons. This makes the corridor clearly stand out over district tints.
 
-## Technical Details
+2. **Add a connecting polyline**: Draw a thin line (`strokeWidth="2.5"`, `strokeOpacity="0.4"`) through the centers of all hexes in each route path (from HQ to node), using the family color. This creates a visible "supply line" thread through the tinted corridor.
 
-### `src/components/EnhancedMafiaHexGrid.tsx`
+3. **Fix BFS to include supply node hex**: Currently the BFS on line 632/644 only walks through player-controlled hexes. If a supply node is on a neutral hex adjacent to player territory, the route never connects. Add supply node hex keys to `pHexSet` so the BFS can reach them as endpoints even if they aren't formally "controlled."
 
-**Replace the route line renderer** (lines 1066-1105):
-- Keep the existing BFS logic that builds `par` (parent map) and `vis` (visited set)
-- Instead of drawing `<path>` lines, collect all hex keys along each route path into a `Set<string>`
-- In the hex rendering loop, check if a hex key is in the supply-route set — if so, render an additional `<polygon>` fill with the family color at 8% opacity behind the hex content
-- Add a status badge (`✅` or `⚠️`) next to existing supply node icons based on whether the node key is in the `vis` set (connected) or not
-
-**Changes to the hex tile render block** (around line 902-921):
-- After the existing supply node golden border/icon, add a conditional status badge:
-  - If node is connected to player HQ → green circle + ✅
-  - If node is owned by player but disconnected → red pulsing circle + ⚠️
+### Visual Result
+- Tinted corridor of hexes (15% opacity) from HQ to each connected supply node
+- Thin colored line threading through the corridor centers
+- Connected node: green border + ✓ badge (existing)
+- Disconnected node: red pulsing border + ! badge (existing)
 
 ## Files Modified
-- `src/components/EnhancedMafiaHexGrid.tsx` — replace route lines with hex tint overlays + add node status badges
+- `src/components/EnhancedMafiaHexGrid.tsx`
 
