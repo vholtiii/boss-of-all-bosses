@@ -1142,7 +1142,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })}
 
-            {/* Supply route hex-chain tint overlay — computed once, rendered per-hex below via supplyRouteHexSet */}
+            
 
             {/* District name labels */}
             {(() => {
