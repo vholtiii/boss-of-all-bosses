@@ -961,23 +961,40 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     );
                   })()}
 
-                  {/* Supply node indicator — golden border + icon */}
+                  {/* Supply node indicator — golden border + icon + status badge */}
                   {tile.supplyNode && (() => {
                     const cfg = SUPPLY_NODE_CONFIG[tile.supplyNode];
+                    const nodeKey = `${tile.q},${tile.r},${tile.s}`;
+                    const connectedKeys: Set<string> = (window as any).__connectedNodeKeys || new Set();
+                    const isConnected = connectedKeys.has(nodeKey);
+                    const isPlayerOwned = tile.controllingFamily === playerFamily;
                     return (
                       <g className="pointer-events-none">
                         <polygon
                           points={getHexPoints(x, y, baseHexRadius + 4)}
                           fill="none"
-                          stroke="#D4AF37"
+                          stroke={isConnected ? '#10B981' : isPlayerOwned ? '#EF4444' : '#D4AF37'}
                           strokeWidth="2.5"
                           opacity="0.85"
-                          strokeDasharray="4,2"
+                          strokeDasharray={isConnected ? 'none' : '4,2'}
                         />
                         <circle cx={x} cy={y - baseHexRadius * 0.85} r={8} fill="#1a1a2e" stroke="#D4AF37" strokeWidth="1.5" />
                         <text x={x} y={y - baseHexRadius * 0.85 + 4} textAnchor="middle" fontSize="10" className="select-none">
                           {cfg.icon}
                         </text>
+                        {/* Connection status badge */}
+                        {isConnected && (
+                          <g>
+                            <circle cx={x + baseHexRadius * 0.55} cy={y - baseHexRadius * 0.85} r={6} fill="#10B981" stroke="#ffffff" strokeWidth="1" />
+                            <text x={x + baseHexRadius * 0.55} y={y - baseHexRadius * 0.85 + 3.5} textAnchor="middle" fontSize="7" className="select-none">✓</text>
+                          </g>
+                        )}
+                        {!isConnected && isPlayerOwned && (
+                          <g className="animate-pulse">
+                            <circle cx={x + baseHexRadius * 0.55} cy={y - baseHexRadius * 0.85} r={6} fill="#EF4444" stroke="#ffffff" strokeWidth="1" />
+                            <text x={x + baseHexRadius * 0.55} y={y - baseHexRadius * 0.85 + 3.5} textAnchor="middle" fontSize="7" className="select-none">!</text>
+                          </g>
+                        )}
                       </g>
                     );
                   })()}
