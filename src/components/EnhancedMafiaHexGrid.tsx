@@ -1063,46 +1063,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })}
 
-            {/* Supply route overlay lines */}
-            {(() => {
-              const sNodes: SupplyNode[] = gameState?.supplyNodes || [];
-              if (sNodes.length === 0) return null;
-              const pColor = familyColors[playerFamily] || '#D4AF37';
-              const hqT = hexMap.find(t => t.isHeadquarters === playerFamily);
-              if (!hqT) return null;
-              const hKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
-              const pHexSet = new Set(hexMap.filter(t => t.controllingFamily === playerFamily || t.isHeadquarters === playerFamily).map(t => hKey(t.q, t.r, t.s)));
-              const par = new Map<string, string>();
-              const vis = new Set<string>();
-              const bQ: Array<{q:number;r:number;s:number}> = [{ q: hqT.q, r: hqT.r, s: hqT.s }];
-              const sK = hKey(hqT.q, hqT.r, hqT.s);
-              vis.add(sK); par.set(sK, '');
-              const dd = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
-              while (bQ.length > 0) {
-                const c = bQ.shift()!;
-                for (const d of dd) {
-                  const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
-                  const nk = hKey(nq,nr,ns);
-                  if (vis.has(nk) || !pHexSet.has(nk)) continue;
-                  vis.add(nk); par.set(nk, hKey(c.q,c.r,c.s)); bQ.push({q:nq,r:nr,s:ns});
-                }
-              }
-              return (
-                <g className="pointer-events-none">
-                  {sNodes.map(node => {
-                    const nK = hKey(node.q,node.r,node.s);
-                    if (!vis.has(nK)) return null;
-                    const pKeys: string[] = [];
-                    let ck = nK;
-                    while (ck && ck !== '') { pKeys.push(ck); ck = par.get(ck) || ''; }
-                    if (pKeys.length < 2) return null;
-                    const pts = pKeys.map(k => { const [pq,pr] = k.split(',').map(Number); return getHexPosition(pq,pr); });
-                    const pd = pts.map((p,i) => `${i===0?'M':'L'} ${p.x} ${p.y}`).join(' ');
-                    return <path key={`supply-route-${node.type}`} d={pd} fill="none" stroke={pColor} strokeWidth="2" strokeOpacity="0.2" strokeLinecap="round" strokeLinejoin="round" />;
-                  })}
-                </g>
-              );
-            })()}
+            {/* Supply route hex-chain tint overlay — computed once, rendered per-hex below via supplyRouteHexSet */}
 
             {/* District name labels */}
             {(() => {
