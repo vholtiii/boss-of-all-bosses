@@ -1,80 +1,33 @@
 
 
-# Supply Lines: Territory-Chain Routes with Visible Overlays
+# Option B: Hex-Chain Tint Overlay for Supply Routes
 
-## Core Concept
+## What Changes
 
-Supply nodes are special hexes placed during map generation, randomized per game seed but following real-world NYC geography. A **supply route** is an unbroken chain of your controlled hexes from HQ to a supply node. Businesses without supply access suffer gradual income decay (-10%/turn, floor at **20% of max revenue**). Multiple routes to the same node provide redundancy — rivals must sever ALL paths.
+Replace the current invisible thin line (`strokeWidth="2"`, `strokeOpacity="0.2"`) with a **colored hex fill overlay** on every hex along the BFS path from HQ to each connected supply node. Each hex in the chain gets a faint family-color fill (~8% opacity), creating a visible "corridor." Connected nodes get a green ✅ badge; disconnected nodes get a red ⚠️ badge.
 
-## Supply Node Types & District Placement
+## Visual Design
 
-```text
-NODE TYPE          DISTRICT(S)            REAL-WORLD BASIS
-──────────────────────────────────────────────────────────
-Docks ⚓           Brooklyn, Staten Is.   Waterfront / port
-Union Hall 🔧      Bronx, Queens          Labor / construction
-Trucking Depot 🚛  Queens, Bronx          Freight corridors
-Liquor Route 🍷    Manhattan              Speakeasy distribution
-Food Market 🐟     Little Italy, Brooklyn Wholesale food
-```
+- **Connected route**: Each hex in the BFS path gets an additional polygon fill in the player's family color at 8% opacity — subtle but visible as a tinted corridor
+- **Connected node badge**: Small green circle with ✅ next to the supply node icon
+- **Disconnected node badge**: Small red pulsing circle with ⚠️ next to the supply node icon
+- **Neutral/unclaimed node**: Keep existing gold dashed border, no status badge
 
-6 nodes total, 1 per type, neutral at start, no direct income (leverage only).
-
-## Business Dependencies
-
-| Business | Requires | Without Access (floor) |
-|----------|----------|------------------------|
-| Gambling Den 🎲 | Liquor Route 🍷 | 20% max revenue |
-| Brothel 💋 | Trucking Depot 🚛 | 20% max revenue |
-| Loan Sharking 💰 | Union Hall 🔧 | 20% max revenue |
-| Store Front 🏪 | Food Market 🐟 OR Docks ⚓ | 20% max revenue |
-| Construction 🏗️ | Union Hall 🔧 | 20% max revenue |
-
-All businesses decay to the same **20% floor** — uniform and punishing.
-
-## Route Mechanics
-
-- **Connection**: BFS from HQ through controlled hexes. Reaching a supply node = active route.
-- **Redundancy**: Multiple independent paths mean rivals must cut all of them.
-- **Route breaking**: 2-turn stockpile buffer (warning only), then -10%/turn decay to 20% floor.
-- **Reconnecting**: Restoring the chain instantly returns income to 100%.
-
-## Map Visuals
-
-- **Supply node hexes**: Distinct icon (⚓🔧🚛🍷🐟) with golden border
-- **Active routes**: Subtle thin line along the hex chain, tinted to family color at ~20% opacity — visible but not distracting. Only shown when the route is live.
-- **Severed routes**: Dashed red line with ⚠️ on the break point
-- **Disrupted nodes**: Pulsing warning overlay
-
-## Supply Deals & Sabotage (Phase 2-3, later)
-
-- Negotiate access (10-20% income share) to bypass route requirement
-- Sabotage action to disrupt a node for 2-3 turns
-
-## Phase 1 Implementation
-
-### `src/types/game-mechanics.ts`
-- Add `SupplyNodeType`, `SupplyNode` interface, `SUPPLY_DEPENDENCIES` table
-- Constants: `SUPPLY_DECAY_RATE = 0.10`, `SUPPLY_DECAY_FLOOR = 0.20`, `SUPPLY_STOCKPILE_BUFFER = 2`
-
-### `src/hooks/useEnhancedMafiaGameState.ts`
-- **Map init**: Place 6 supply nodes on random hexes within target districts (seeded)
-- **HexTile**: Add optional `supplyNode?: SupplyNodeType`
-- **Game state**: Add `supplyStockpile` tracker (turns since route broken, per node type per family)
-- **Income calc**: BFS connectivity check → apply decay if no route, respecting buffer and 20% floor
-- **End-of-turn**: Update stockpile timers, detect route breaks/restores, notify player
+## Technical Details
 
 ### `src/components/EnhancedMafiaHexGrid.tsx`
-- Render supply node icons on hexes with golden border
-- Draw subtle route overlay (thin semi-transparent line along BFS path) for active routes
-- Severed route: dashed red line at break point
 
-### `src/components/GameSidePanels.tsx`
-- "Supply Lines" collapsible section: owned nodes, route status, at-risk businesses
+**Replace the route line renderer** (lines 1066-1105):
+- Keep the existing BFS logic that builds `par` (parent map) and `vis` (visited set)
+- Instead of drawing `<path>` lines, collect all hex keys along each route path into a `Set<string>`
+- In the hex rendering loop, check if a hex key is in the supply-route set — if so, render an additional `<polygon>` fill with the family color at 8% opacity behind the hex content
+- Add a status badge (`✅` or `⚠️`) next to existing supply node icons based on whether the node key is in the `vis` set (connected) or not
+
+**Changes to the hex tile render block** (around line 902-921):
+- After the existing supply node golden border/icon, add a conditional status badge:
+  - If node is connected to player HQ → green circle + ✅
+  - If node is owned by player but disconnected → red pulsing circle + ⚠️
 
 ## Files Modified
-- `src/types/game-mechanics.ts`
-- `src/hooks/useEnhancedMafiaGameState.ts`
-- `src/components/EnhancedMafiaHexGrid.tsx`
-- `src/components/GameSidePanels.tsx`
+- `src/components/EnhancedMafiaHexGrid.tsx` — replace route lines with hex tint overlays + add node status badges
 
