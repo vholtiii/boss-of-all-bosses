@@ -620,22 +620,84 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       <div className="absolute inset-0 flex items-center justify-center">
         <svg width="100%" height="100%" viewBox={viewBox} className="overflow-visible">
           <g transform={`scale(${zoom})`}>
-            {/* District background tint layer */}
-            <g className="pointer-events-none">
-              {hexMap.map(tile => {
-                const { x, y } = getHexPosition(tile.q, tile.r);
-                const tint = districtTints[tile.district];
-                if (!tint) return null;
-                return (
-                  <polygon
-                    key={`tint-${tile.q},${tile.r},${tile.s}`}
-                    points={getHexPoints(x, y, baseHexRadius)}
-                    fill={tint}
-                    stroke="none"
-                  />
-                );
-              })}
-            </g>
+            {/* Compute supply route hex set for tint overlay */}
+            {(() => {
+              const sNodes: SupplyNode[] = gameState?.supplyNodes || [];
+              const pColor = familyColors[playerFamily] || '#D4AF37';
+              const hqT = hexMap.find(t => t.isHeadquarters === playerFamily);
+              const supplyRouteHexSet = new Set<string>();
+              const connectedNodeKeys = new Set<string>();
+              if (hqT && sNodes.length > 0) {
+                const hKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
+                const pHexSet = new Set(hexMap.filter(t => t.controllingFamily === playerFamily || t.isHeadquarters === playerFamily).map(t => hKey(t.q, t.r, t.s)));
+                const par = new Map<string, string>();
+                const vis = new Set<string>();
+                const bQ: Array<{q:number;r:number;s:number}> = [{ q: hqT.q, r: hqT.r, s: hqT.s }];
+                const sK = hKey(hqT.q, hqT.r, hqT.s);
+                vis.add(sK); par.set(sK, '');
+                const dd = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
+                while (bQ.length > 0) {
+                  const c = bQ.shift()!;
+                  for (const d of dd) {
+                    const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
+                    const nk = hKey(nq,nr,ns);
+                    if (vis.has(nk) || !pHexSet.has(nk)) continue;
+                    vis.add(nk); par.set(nk, hKey(c.q,c.r,c.s)); bQ.push({q:nq,r:nr,s:ns});
+                  }
+                }
+                for (const node of sNodes) {
+                  const nK = hKey(node.q, node.r, node.s);
+                  if (!vis.has(nK)) continue;
+                  connectedNodeKeys.add(nK);
+                  let ck = nK;
+                  while (ck && ck !== '') { supplyRouteHexSet.add(ck); ck = par.get(ck) || ''; }
+                }
+              }
+              // Store sets for use in hex rendering below
+              (window as any).__supplyRouteHexSet = supplyRouteHexSet;
+              (window as any).__connectedNodeKeys = connectedNodeKeys;
+              (window as any).__supplyRouteColor = pColor;
+
+              return (
+                <>
+                  {/* District background tint layer */}
+                  <g className="pointer-events-none">
+                    {hexMap.map(tile => {
+                      const { x, y } = getHexPosition(tile.q, tile.r);
+                      const tint = districtTints[tile.district];
+                      if (!tint) return null;
+                      return (
+                        <polygon
+                          key={`tint-${tile.q},${tile.r},${tile.s}`}
+                          points={getHexPoints(x, y, baseHexRadius)}
+                          fill={tint}
+                          stroke="none"
+                        />
+                      );
+                    })}
+                  </g>
+                  {/* Supply route hex-chain tint overlay */}
+                  <g className="pointer-events-none">
+                    {hexMap.map(tile => {
+                      const tk = `${tile.q},${tile.r},${tile.s}`;
+                      if (!supplyRouteHexSet.has(tk)) return null;
+                      const { x, y } = getHexPosition(tile.q, tile.r);
+                      return (
+                        <polygon
+                          key={`supply-tint-${tk}`}
+                          points={getHexPoints(x, y, baseHexRadius)}
+                          fill={pColor}
+                          fillOpacity="0.08"
+                          stroke={pColor}
+                          strokeWidth="1"
+                          strokeOpacity="0.15"
+                        />
+                      );
+                    })}
+                  </g>
+                </>
+              );
+            })()}
 
             {hexMap.map(tile => {
               const { x, y } = getHexPosition(tile.q, tile.r);
