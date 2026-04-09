@@ -1559,6 +1559,10 @@ export const useEnhancedMafiaGameState = (
       q: unit.q, r: unit.r, s: unit.s,
       turnsRemaining: SAFEHOUSE_DURATION,
       createdTurn: prev.turn,
+      stockpile: {},
+      allocationPercent: 0,
+      connectedSupplyTypes: [],
+      manualRouteEstablished: false,
     };
 
     return {
@@ -3659,6 +3663,10 @@ export const useEnhancedMafiaGameState = (
             q: bestHex.q, r: bestHex.r, s: bestHex.s,
             turnsRemaining: SAFEHOUSE_DURATION,
             createdTurn: state.turn,
+            stockpile: {},
+            allocationPercent: 0,
+            connectedSupplyTypes: [],
+            manualRouteEstablished: false,
           });
           opponent.resources.money -= SAFEHOUSE_COST;
           if (turnReport) {
@@ -5304,6 +5312,10 @@ export const useEnhancedMafiaGameState = (
       q: targetQ, r: targetR, s: targetS,
       turnsRemaining: SAFEHOUSE_DURATION,
       createdTurn: state.turn,
+      stockpile: {},
+      allocationPercent: 0,
+      connectedSupplyTypes: [],
+      manualRouteEstablished: false,
     });
     state.resources.money -= SAFEHOUSE_COST;
 
