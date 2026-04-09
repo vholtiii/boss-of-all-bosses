@@ -716,6 +716,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 { action: 'fortify' as const, label: `🛡️ Fortify (${(gameState.fortifiedHexes || []).filter((f: any) => f.family === gameState.playerFamily).length}/${4})`, tip: 'Click a unit to fortify its hex (+25% defense for all units there). Max 4.' },
                 { action: 'escort' as const, label: '🚗 Escort', tip: 'Call a soldier to your capo\'s location. Select a soldier, then click a capo.' },
                 { action: 'safehouse' as const, label: '🏠 Safehouse', tip: 'Select a capo on your territory to set up a secondary deploy point (5 turns).' },
+                { action: 'send_word' as const, label: `📩 Send Word (${((gameState as any).pendingNegotiations || []).length})`, tip: 'Select a capo, then click an enemy hex to request a sitdown. Negotiation available next turn.' },
               ] as const).map(({ action, label, tip }) => {
                 const noTactical = gameState.tacticalActionsRemaining <= 0;
                 const selectedUnit = gameState.selectedUnitId ? (gameState.deployedUnits || []).find((u: any) => u.id === gameState.selectedUnitId) : null;
