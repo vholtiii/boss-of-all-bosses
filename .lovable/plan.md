@@ -1,37 +1,28 @@
 
 
-# Fix: Make Supply Lines Visually Prominent on the Map
+# Fix: Supply Lines Invisible Due to SVG Render Order
 
 ## Problem
-The current supply route polyline (`strokeWidth: 2.5`, `strokeOpacity: 0.4`) and hex tint (`fillOpacity: 0.15`) are nearly invisible against district background tints and territory colors.
+The supply route tint overlay and animated polyline are rendered **before** the main hex tiles in the SVG. Since SVG paints back-to-front, the opaque territory hex fills (line 770+) completely cover the supply line visuals (lines 718-765). The lines exist but are hidden underneath.
 
 ## Solution
-Make the supply line a bold, animated, dashed line with higher contrast — plus boost the hex corridor tint.
+Move the supply route polylines to render **after** all hex tiles, so they paint on top of territory colors.
 
 ### Changes to `src/components/EnhancedMafiaHexGrid.tsx`
 
-**1. Boost hex corridor tint**
-- `fillOpacity`: 0.15 → 0.25
-- `strokeOpacity`: 0.30 → 0.50
-- `strokeWidth`: 1 → 1.5
+**1. Split the supply route IIFE into two parts:**
+- **Part A (keep in place, lines ~624-735):** The BFS computation + `defs` (filter, marker) + district tints + hex corridor tint overlay — these should remain underneath the hexes as a subtle background tint
+- **Part B (move after hex tiles):** The polyline group (lines 737-765) — the bold animated dashed lines with arrows and glow — moved to render after all hex tiles so they draw on top
 
-**2. Replace subtle polyline with bold animated dashed line**
-- `strokeWidth`: 2.5 → 4
-- `strokeOpacity`: 0.4 → 0.8
-- Add `strokeDasharray="8 4"` for a dashed pattern
-- Add CSS `@keyframes` animation to make dashes flow along the route (moving dash effect suggesting goods flowing from HQ to node)
-- Add a faint glow filter (`feGaussianBlur`) behind the line for extra pop
+**2. Store `routePaths`, `pColor`, and `markerId` on `window` (same pattern already used for `__supplyRouteHexSet`)** so Part B can access them outside the IIFE.
 
-**3. Add directional arrow markers**
-- Define an SVG `<marker>` arrowhead in the family color
-- Apply `marker-mid` on the polyline so small arrows appear along the route, indicating direction (HQ → Node)
+**3. Render Part B** after the main hex tile `.map()` block (after approximately line 950+), ensuring the animated supply lines are always visible on top of territory colors.
 
 ### Visual Result
-- A pulsing, animated dashed line with small directional arrows threading through a tinted hex corridor
-- Clearly distinguishable from territory borders and district tints
-- Still thematically subtle — not garish
+- Bold animated dashed lines with directional arrows will now be clearly visible on top of all hex tiles
+- The subtle hex corridor tint remains underneath as a background indicator
+- No change to the line styling itself — the existing bold styling is sufficient once rendering order is fixed
 
 ## Files Modified
-- `src/components/EnhancedMafiaHexGrid.tsx` — polyline styling + hex tint opacity boost
-- `src/index.css` — `@keyframes supplyFlow` for animated dash offset
+- `src/components/EnhancedMafiaHexGrid.tsx` — move polyline rendering after hex tiles
 
