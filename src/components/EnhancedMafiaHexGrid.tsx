@@ -683,14 +683,14 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       if (!supplyRouteHexSet.has(tk)) return null;
                       const { x, y } = getHexPosition(tile.q, tile.r);
                       return (
-                        <polygon
+                      <polygon
                           key={`supply-tint-${tk}`}
                           points={getHexPoints(x, y, baseHexRadius)}
                           fill={pColor}
-                          fillOpacity="0.08"
+                          fillOpacity="0.15"
                           stroke={pColor}
                           strokeWidth="1"
-                          strokeOpacity="0.15"
+                          strokeOpacity="0.30"
                         />
                       );
                     })}
