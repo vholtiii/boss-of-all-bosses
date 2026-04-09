@@ -4006,8 +4006,9 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // ── DIPLOMATIC AI: Ceasefire proposals ──
-      if (personality === 'diplomatic' && Math.random() < (cooperation / 200)) {
+      // ── DIPLOMATIC AI: Ceasefire proposals (skip if at war with player) ──
+      const atWarWithPlayer = areFamiliesAtWar(state, fam, state.playerFamily);
+      if (!atWarWithPlayer && (opponent.personality || 'aggressive') === 'diplomatic' && Math.random() < (cooperation / 200)) {
         const hasCeasefire = state.ceasefires.some(c => c.active && c.family === fam);
         if (!hasCeasefire) {
           state.pendingNotifications.push({
