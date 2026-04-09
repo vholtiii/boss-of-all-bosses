@@ -630,6 +630,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               if (hqT && sNodes.length > 0) {
                 const hKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
                 const pHexSet = new Set(hexMap.filter(t => t.controllingFamily === playerFamily || t.isHeadquarters === playerFamily).map(t => hKey(t.q, t.r, t.s)));
+                // Add supply node hexes as valid BFS endpoints so routes can reach neutral nodes
+                for (const node of sNodes) { pHexSet.add(hKey(node.q, node.r, node.s)); }
                 const par = new Map<string, string>();
                 const vis = new Set<string>();
                 const bQ: Array<{q:number;r:number;s:number}> = [{ q: hqT.q, r: hqT.r, s: hqT.s }];
