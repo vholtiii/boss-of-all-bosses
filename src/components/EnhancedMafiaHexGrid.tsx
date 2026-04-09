@@ -627,6 +627,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               const hqT = hexMap.find(t => t.isHeadquarters === playerFamily);
               const supplyRouteHexSet = new Set<string>();
               const connectedNodeKeys = new Set<string>();
+              const routePaths: Array<Array<{x:number;y:number}>> = [];
               if (hqT && sNodes.length > 0) {
                 const hKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
                 const pHexSet = new Set(hexMap.filter(t => t.controllingFamily === playerFamily || t.isHeadquarters === playerFamily).map(t => hKey(t.q, t.r, t.s)));
@@ -651,23 +652,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   const nK = hKey(node.q, node.r, node.s);
                   if (!vis.has(nK)) continue;
                   connectedNodeKeys.add(nK);
+                  // Collect hex keys for tint + build ordered path for polyline
+                  const pathKeys: string[] = [];
                   let ck = nK;
-                  while (ck && ck !== '') { supplyRouteHexSet.add(ck); ck = par.get(ck) || ''; }
-                }
-              }
-              // Build ordered route paths for polylines using the BFS parent map
-              const routePaths: Array<Array<{x:number;y:number}>> = [];
-              if (hqT && sNodes.length > 0) {
-                const hKey2 = (q: number, r: number, s: number) => `${q},${r},${s}`;
-                const pMap = new Map<string, string>();
-                // Rebuild parent map by tracing supplyRouteHexSet paths
-                // We already have the paths stored — reconstruct from the BFS par map stored earlier
-                // Actually par is in scope above, so rebuild paths directly from connectedNodeKeys
-                for (const node of sNodes) {
-                  const nK = hKey2(node.q, node.r, node.s);
-                  if (!connectedNodeKeys.has(nK)) continue;
-                  // Walk the supplyRouteHexSet from node back to HQ to get ordered path
-                  // We need the par map — let's store it
+                  while (ck && ck !== '') { supplyRouteHexSet.add(ck); pathKeys.push(ck); ck = par.get(ck) || ''; }
+                  pathKeys.reverse();
+                  const pts = pathKeys.map(k => {
+                    const [qq, rr] = k.split(',').map(Number);
+                    return getHexPosition(qq, rr);
+                  });
+                  if (pts.length > 1) routePaths.push(pts);
                 }
               }
               // Store sets for use in hex rendering below
