@@ -337,6 +337,7 @@ export interface EnhancedMafiaGameState {
   plannedHit: PlannedHit | null;
   planHitCooldownUntil: number;
   selectedMoveAction: MoveAction;
+  pendingNegotiations: PendingNegotiation[];
   
   // Action & tactical budgets
   actionsRemaining: number;
@@ -860,6 +861,7 @@ const createInitialGameState = (
     plannedHit: null,
     planHitCooldownUntil: 0,
     selectedMoveAction: 'move' as MoveAction,
+    pendingNegotiations: [],
     actionsRemaining: BASE_ACTIONS_PER_TURN,
     maxActions: BASE_ACTIONS_PER_TURN,
     tacticalActionsRemaining: TACTICAL_ACTIONS_PER_TURN,
