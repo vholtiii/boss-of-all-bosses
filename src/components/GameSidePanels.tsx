@@ -730,6 +730,7 @@ export const RightSidePanel: React.FC<{
             isOpen={openSection === 'supply'}
             onToggle={() => toggle('supply')}
           >
+            <p className="text-[10px] text-muted-foreground mb-2 italic">Connect HQ to nodes via territory to supply your businesses</p>
             <div className="space-y-2">
               {((gameState as any).supplyNodes || []).map((node: any) => {
                 const cfg = SUPPLY_NODE_CONFIG[node.type as SupplyNodeType];
@@ -780,26 +781,31 @@ export const RightSidePanel: React.FC<{
                       <span className="text-base">{cfg.icon}</span>
                       <span className="text-xs font-bold text-foreground flex-1">{cfg.label}</span>
                       {isConnected ? (
-                        <Badge variant="default" className="text-[9px] h-4 bg-green-600">Connected</Badge>
+                        <Badge variant="default" className="text-[9px] h-4 bg-green-600">✓ Active</Badge>
                       ) : inBuffer ? (
-                        <Badge variant="outline" className="text-[9px] h-4 border-yellow-500 text-yellow-500">Buffer ({SUPPLY_STOCKPILE_BUFFER - turnsSinceDisconnected + 1}t)</Badge>
+                        <Badge variant="outline" className="text-[9px] h-4 border-yellow-500 text-yellow-500">Stockpile: {SUPPLY_STOCKPILE_BUFFER - turnsSinceDisconnected + 1} turn{(SUPPLY_STOCKPILE_BUFFER - turnsSinceDisconnected + 1) !== 1 ? 's' : ''} left</Badge>
                       ) : isDecaying ? (
-                        <Badge variant="destructive" className="text-[9px] h-4">Severed</Badge>
+                        <Badge variant="destructive" className="text-[9px] h-4">✗ Severed</Badge>
                       ) : (
-                        <Badge variant="outline" className="text-[9px] h-4">No Route</Badge>
+                        <Badge variant="outline" className="text-[9px] h-4">— No Route</Badge>
                       )}
                     </div>
                     <p className="text-[10px] text-muted-foreground">
                       {node.district} · {isOwned ? 'Owned' : nodeTile?.controllingFamily !== 'neutral' ? `Held by ${nodeTile?.controllingFamily}` : 'Neutral'}
                     </p>
                     {depBizTypes.length > 0 && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                      <p className="text-[10px] font-semibold text-muted-foreground mt-0.5">
                         Supplies: {depBizTypes.map(t => t.replace('_', ' ')).join(', ')}
+                      </p>
+                    )}
+                    {inBuffer && (
+                      <p className="text-[10px] text-yellow-500 mt-0.5">
+                        ⏳ Businesses running on stored supplies
                       </p>
                     )}
                     {isDecaying && (
                       <p className="text-[10px] text-destructive mt-0.5">
-                        ⚠️ Businesses at {Math.max(20, 100 - (turnsSinceDisconnected - SUPPLY_STOCKPILE_BUFFER) * 10)}% revenue
+                        ⚠️ Supply cut — businesses at {Math.max(20, 100 - (turnsSinceDisconnected - SUPPLY_STOCKPILE_BUFFER) * 10)}% revenue
                       </p>
                     )}
                   </div>
