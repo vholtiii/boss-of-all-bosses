@@ -332,7 +332,21 @@ export const SAFEHOUSE_MAX_STOCKPILE = 5;
 export const SAFEHOUSE_MAX_ALLOCATION = 50;
 export const SAFEHOUSE_STOCKPILE_RATE = 1; // units per turn at 50% allocation per node type
 
-export type MoveAction = 'move' | 'scout' | 'fortify' | 'escort' | 'safehouse';
+export type MoveAction = 'move' | 'scout' | 'fortify' | 'escort' | 'safehouse' | 'send_word';
+
+// ============ PENDING NEGOTIATION (Send Word) ============
+export interface PendingNegotiation {
+  id: string;
+  capoId: string;
+  capoName: string;
+  capoPersonality: CapoPersonality;
+  targetQ: number;
+  targetR: number;
+  targetS: number;
+  targetFamily: string;
+  turnRequested: number;
+  ready: boolean; // false = just sent, true = available for use next turn
+}
 
 export const FORTIFY_DEFENSE_BONUS = 25; // +25% defense
 export const FORTIFY_ABANDON_TURNS = 3; // turns with no friendly units before fortification crumbles

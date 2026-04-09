@@ -136,6 +136,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     targetS: number;
     capoId: string;
     scope: 'territory';
+    pendingNegotiationId?: string;
   } | {
     open: boolean;
     scope: 'family';
@@ -158,6 +159,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         targetS: action.targetS,
         capoId: action.capoId,
         scope: 'territory',
+        pendingNegotiationId: action.pendingNegotiationId,
       });
       return;
     }
@@ -714,6 +716,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 { action: 'fortify' as const, label: `🛡️ Fortify (${(gameState.fortifiedHexes || []).filter((f: any) => f.family === gameState.playerFamily).length}/${4})`, tip: 'Click a unit to fortify its hex (+25% defense for all units there). Max 4.' },
                 { action: 'escort' as const, label: '🚗 Escort', tip: 'Call a soldier to your capo\'s location. Select a soldier, then click a capo.' },
                 { action: 'safehouse' as const, label: '🏠 Safehouse', tip: 'Select a capo on your territory to set up a secondary deploy point (5 turns).' },
+                { action: 'send_word' as const, label: `📩 Send Word (${((gameState as any).pendingNegotiations || []).length})`, tip: 'Select a capo, then click an enemy hex to request a sitdown. Negotiation available next turn.' },
               ] as const).map(({ action, label, tip }) => {
                 const noTactical = gameState.tacticalActionsRemaining <= 0;
                 const selectedUnit = gameState.selectedUnitId ? (gameState.deployedUnits || []).find((u: any) => u.id === gameState.selectedUnitId) : null;
@@ -762,6 +765,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               )}
               {gameState.selectedMoveAction === 'safehouse' && (
                 <p><span className="text-foreground font-semibold">🏠 Safehouse:</span> Select a capo on your territory to establish a secondary deploy point lasting 5 turns.</p>
+              )}
+              {gameState.selectedMoveAction === 'send_word' && (
+                <p><span className="text-foreground font-semibold">📩 Send Word:</span> Select a capo, then click an enemy hex to request a sitdown. Costs 1 tactical action. The negotiation becomes available next turn during the Action phase — the capo doesn't need to stay nearby.</p>
               )}
               {gameState.selectedMoveAction === 'move' && (
                 <p className="italic">Select a tactical action above to see its description. No regular movement in this phase.</p>
@@ -827,7 +833,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
 
   const phaseConfig: Record<string, { label: string; hint: string; color: string }> = {
     deploy: { label: '📦 DEPLOY', hint: 'Deploy units from HQ & move them across the map', color: 'bg-blue-600/80' },
-    move: { label: '📋 TACTICAL PHASE', hint: `Scout, Fortify, Escort, Safehouse (${gameState.tacticalActionsRemaining}/${gameState.maxTacticalActions} left) — no movement`, color: 'bg-amber-600/80' },
+    move: { label: '📋 TACTICAL PHASE', hint: `Scout, Fortify, Escort, Safehouse, Send Word (${gameState.tacticalActionsRemaining}/${gameState.maxTacticalActions} left) — no movement`, color: 'bg-amber-600/80' },
     action: { label: '⚔️ ACTION PHASE', hint: `Hit, Extort, Claim, Negotiate (${gameState.actionsRemaining}/${gameState.maxActions} left)`, color: 'bg-red-600/80' },
     waiting: { label: '⏳ END TURN', hint: 'Press End Turn to advance', color: 'bg-muted' },
   };
@@ -1075,8 +1081,14 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
       {negotiationState && (() => {
         if (negotiationState.scope === 'territory') {
           const tile = gameState.hexMap.find((t: any) => t.q === negotiationState.targetQ && t.r === negotiationState.targetR && t.s === negotiationState.targetS);
+          if (!tile) return null;
           const capo = gameState.deployedUnits.find((u: any) => u.id === negotiationState.capoId);
-          if (!tile || !capo) return null;
+          // For pending negotiations, capo may be anywhere or even dead — use pending data as fallback
+          const pendingEntry = (negotiationState as any).pendingNegotiationId 
+            ? ((gameState as any).pendingNegotiations || []).find((p: any) => p.id === (negotiationState as any).pendingNegotiationId) 
+            : null;
+          const capoName = capo?.name || pendingEntry?.capoName || 'Capo';
+          const capoPersonality = capo?.personality || pendingEntry?.capoPersonality || 'diplomat';
           const enemyFamily = tile.controllingFamily;
           const enemyUnitsOnHex = gameState.deployedUnits.filter((u: any) => u.family === enemyFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s);
           return (
@@ -1093,12 +1105,13 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
                   targetR: negotiationState.targetR,
                   targetS: negotiationState.targetS,
                   capoId: negotiationState.capoId,
+                  pendingNegotiationId: (negotiationState as any).pendingNegotiationId,
                   extraData,
                 });
                 setNegotiationState(null);
               }}
-              capoName={capo.name || 'Capo'}
-              capoPersonality={capo.personality || 'diplomat'}
+              capoName={capoName}
+              capoPersonality={capoPersonality}
               enemyFamily={enemyFamily}
               playerReputation={gameState.reputation.respect}
               playerMoney={gameState.resources.money}

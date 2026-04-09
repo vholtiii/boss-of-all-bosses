@@ -58,7 +58,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [showSupplyLines, setShowSupplyLines] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
-  const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; canAssaultHQ?: boolean; canFlipSoldier?: boolean; negotiateCapoId?: string; reasons?: Record<string, string> } | null>(null);
+  const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; canAssaultHQ?: boolean; canFlipSoldier?: boolean; negotiateCapoId?: string; pendingNegotiationId?: string; reasons?: Record<string, string> } | null>(null);
   const [planHitUnitMenu, setPlanHitUnitMenu] = useState<{ tile: HexTile; enemyUnits: DeployedUnit[] } | null>(null);
   const [expandedHQKey, setExpandedHQKey] = useState<string | null>(null);
   const [showLegend, setShowLegend] = useState(false);
@@ -461,10 +461,12 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         ) && (isNeutral || isEnemy) && !tile.isHeadquarters;
         const canClaim = isNeutral && isSoldier && !tile.business && !tile.isHeadquarters;
         const isCapoWounded = isCapo && (selectedUnit as any).woundedTurnsRemaining > 0;
-        const canNegotiate = isEnemy && isCapo && !tile.isHeadquarters && !isCapoWounded;
+        // Negotiate: only available during action phase when a pending negotiation is ready on this hex
+        const readyPending = (gameState?.pendingNegotiations || []).find((p: any) => p.ready && p.targetQ === tile.q && p.targetR === tile.r && p.targetS === tile.s);
+        const canNegotiate = isEnemy && !!readyPending && !tile.isHeadquarters;
         const canSabotage = isEnemy && isSoldier && !!tile.business && !tile.isHeadquarters;
         const canSafehouse = isOwned && !tile.isHeadquarters && !isCapoWounded;
-        const negotiateCapoId = isCapo ? selectedUnit.id : undefined;
+        const negotiateCapoId = readyPending?.capoId || (isCapo ? selectedUnit.id : undefined);
         
         // HQ Assault: soldier adjacent to enemy HQ
         const isAdjacentToHQ = isEnemyHQ && isSoldier && !unitOnTargetHex;
@@ -495,10 +497,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           else if (!isSoldier) reasons.sabotage = 'Need a soldier';
           else if (noActions) reasons.sabotage = 'No actions left';
         }
-        if (!canNegotiate && isEnemy && isCapo && isCapoWounded) {
-          reasons.negotiate = 'Capo is wounded';
-        } else if (!canNegotiate && isEnemy && !isCapo) {
-          reasons.negotiate = 'Need a capo';
+        if (!canNegotiate && isEnemy && !tile.isHeadquarters) {
+          const hasPending = (gameState?.pendingNegotiations || []).some((p: any) => p.targetQ === tile.q && p.targetR === tile.r && p.targetS === tile.s && !p.ready);
+          if (hasPending) reasons.negotiate = 'Word sent — available next turn';
+          else reasons.negotiate = 'Send Word first (tactical phase)';
         }
         if (!canSafehouse && isOwned && isCapoWounded) {
           reasons.safehouse = 'Capo is wounded';
@@ -521,7 +523,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           if (actionMenu && actionMenu.tile.q === tile.q && actionMenu.tile.r === tile.r) {
             setActionMenu(null);
           } else {
-            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, canAssaultHQ, canFlipSoldier, negotiateCapoId, reasons });
+            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, canAssaultHQ, canFlipSoldier, negotiateCapoId, pendingNegotiationId: readyPending?.id, reasons });
           }
           return;
         }
@@ -1046,7 +1048,19 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     );
                   })()}
 
-                  {/* Supply node indicator — golden border + icon + status badge */}
+                  {/* Pending negotiation badge */}
+                  {(() => {
+                    const pendingNegs = gameState?.pendingNegotiations || [];
+                    const pending = pendingNegs.find((p: any) => p.targetQ === tile.q && p.targetR === tile.r && p.targetS === tile.s);
+                    if (!pending) return null;
+                    return (
+                      <g className="pointer-events-none">
+                        <circle cx={x + baseHexRadius * 0.6} cy={y - baseHexRadius * 0.7} r={8} fill={pending.ready ? '#D4AF37' : '#6B7280'} stroke="#ffffff" strokeWidth="1" />
+                        <text x={x + baseHexRadius * 0.6} y={y - baseHexRadius * 0.7 + 3.5} textAnchor="middle" fontSize="9" className="select-none">{pending.ready ? '🤝' : '📩'}</text>
+                      </g>
+                    );
+                  })()}
+
                   {tile.supplyNode && (() => {
                     const cfg = SUPPLY_NODE_CONFIG[tile.supplyNode];
                     const nodeKey = `${tile.q},${tile.r},${tile.s}`;
@@ -1451,6 +1465,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             targetR: actionMenu.tile.r,
                             targetS: actionMenu.tile.s,
                             capoId: actionMenu.negotiateCapoId,
+                            pendingNegotiationId: actionMenu.pendingNegotiationId,
                           });
                           setActionMenu(null);
                         }}
@@ -1762,6 +1777,24 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       }
                     </p>
                     <p className="text-xs text-muted-foreground">+{FORTIFY_DEFENSE_BONUS}% defense, {FORTIFY_CASUALTY_REDUCTION}% casualty reduction</p>
+                  </div>
+                );
+              })()}
+              {/* Pending negotiation info */}
+              {(() => {
+                const pending = (gameState?.pendingNegotiations || []).find((p: any) => p.targetQ === hoveredHex.q && p.targetR === hoveredHex.r && p.targetS === hoveredHex.s);
+                if (!pending) return null;
+                return (
+                  <div className={cn("mt-1 p-1.5 rounded border", pending.ready ? "bg-yellow-900/30 border-yellow-500/30" : "bg-gray-800/30 border-gray-500/30")}>
+                    <p className="font-bold text-xs" style={{ color: pending.ready ? '#D4AF37' : '#9CA3AF' }}>
+                      {pending.ready ? '🤝 Sitdown Ready' : '📩 Word Sent'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Sent by <span className="text-foreground">{pending.capoName}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {pending.ready ? 'Available to negotiate this turn' : 'Negotiation available next turn'}
+                    </p>
                   </div>
                 );
               })()}

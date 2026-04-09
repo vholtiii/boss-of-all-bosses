@@ -22,7 +22,7 @@ import {
   SOLDIER_LOYALTY_CAP, CAPO_LOYALTY_CAP,
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType, NegotiationScope, PERSONALITY_BONUSES,
   NEGOTIATION_TYPES, NEGOTIATION_REFUND_RATE, ShareProfitsPact, SafePassagePact,
-  ScoutedHex, Safehouse, MoveAction, PlannedHit,
+  ScoutedHex, Safehouse, MoveAction, PlannedHit, PendingNegotiation,
   FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, MAX_FORTIFICATIONS, FortifiedHex, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
   SAFEHOUSE_COST, SAFEHOUSE_DEFENSE_BONUS, SAFEHOUSE_CAPTURE_BOUNTY, SAFEHOUSE_CAPTURE_INTEL_DURATION, SAFEHOUSE_TERRITORY_THRESHOLD, MAX_SAFEHOUSES,
   PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_FAIL_REPUTATION, PLAN_HIT_FAIL_LOYALTY,
@@ -337,6 +337,7 @@ export interface EnhancedMafiaGameState {
   plannedHit: PlannedHit | null;
   planHitCooldownUntil: number;
   selectedMoveAction: MoveAction;
+  pendingNegotiations: PendingNegotiation[];
   
   // Action & tactical budgets
   actionsRemaining: number;
@@ -860,6 +861,7 @@ const createInitialGameState = (
     plannedHit: null,
     planHitCooldownUntil: 0,
     selectedMoveAction: 'move' as MoveAction,
+    pendingNegotiations: [],
     actionsRemaining: BASE_ACTIONS_PER_TURN,
     maxActions: BASE_ACTIONS_PER_TURN,
     tacticalActionsRemaining: TACTICAL_ACTIONS_PER_TURN,
@@ -1293,6 +1295,18 @@ export const useEnhancedMafiaGameState = (
           return prev;
         }
 
+        if (moveAction === 'send_word') {
+          if (prev.tacticalActionsRemaining <= 0) return prev;
+          if (unitType !== 'capo') return prev;
+          if ((unit as any).woundedTurnsRemaining > 0) return prev;
+          // Show all enemy hexes as targets (excluding HQs)
+          const enemyHexes = prev.hexMap
+            .filter(t => t.controllingFamily !== prev.playerFamily && t.controllingFamily !== 'neutral' && !t.isHeadquarters)
+            .map(t => ({ q: t.q, r: t.r, s: t.s }));
+          if (enemyHexes.length === 0) return prev;
+          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: enemyHexes, deployMode: null, availableDeployHexes: [] };
+        }
+
         // No regular movement in tactical phase
         return prev;
       }
@@ -1415,6 +1429,40 @@ export const useEnhancedMafiaGameState = (
           pendingNotifications: [...prev.pendingNotifications, {
             type: 'info' as const, title: '🚗 Escort Summoned',
             message: `${capo.name || 'The Capo'} sent word — a soldier's been called to the meeting point.`,
+          }],
+        };
+      }
+
+      // Handle "Send Word" action (tactical phase only) — capo requests negotiation on enemy hex
+      if (prev.turnPhase === 'move' && moveAction === 'send_word' && unit.type === 'capo') {
+        if (prev.tacticalActionsRemaining <= 0) return prev;
+        const targetTile = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
+        if (!targetTile || targetTile.controllingFamily === prev.playerFamily || targetTile.controllingFamily === 'neutral' || targetTile.isHeadquarters) return prev;
+        // Check for duplicate pending on same hex
+        const existing = (prev.pendingNegotiations || []).find(p => p.targetQ === targetLocation.q && p.targetR === targetLocation.r && p.targetS === targetLocation.s);
+        if (existing) {
+          return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '📩 Already Pending', message: 'Word has already been sent to this territory.' }] };
+        }
+        const newPending: PendingNegotiation = {
+          id: `pn-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          capoId: unit.id,
+          capoName: unit.name || 'Capo',
+          capoPersonality: (unit as any).personality || 'enforcer',
+          targetQ: targetLocation.q,
+          targetR: targetLocation.r,
+          targetS: targetLocation.s,
+          targetFamily: targetTile.controllingFamily,
+          turnRequested: prev.turn,
+          ready: false,
+        };
+        return {
+          ...prev,
+          pendingNegotiations: [...(prev.pendingNegotiations || []), newPending],
+          selectedUnitId: null, availableMoveHexes: [],
+          tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
+          pendingNotifications: [...prev.pendingNotifications, {
+            type: 'info' as const, title: '📩 Word Sent',
+            message: `${unit.name || 'Your Capo'} has sent word to ${targetTile.controllingFamily} territory. Negotiation available next turn.`,
           }],
         };
       }
@@ -1976,6 +2024,14 @@ export const useEnhancedMafiaGameState = (
       newState.policeHeat.arrests = newState.policeHeat.arrests || [];
       newState.policeHeat.bribedOfficials = newState.policeHeat.bribedOfficials || [];
       newState.aiAlertState = newState.aiAlertState || {};
+      
+      // ============ PENDING NEGOTIATIONS LIFECYCLE ============
+      newState.pendingNegotiations = newState.pendingNegotiations || [];
+      // Expire "ready" negotiations that weren't used last turn
+      newState.pendingNegotiations = newState.pendingNegotiations.filter(p => !p.ready);
+      // Promote "pending" (from last turn) to "ready"
+      newState.pendingNegotiations = newState.pendingNegotiations.map(p => ({ ...p, ready: true }));
+      
       newState.turn += 1;
       
       // Snapshot before-state for turn report
@@ -5152,6 +5208,12 @@ export const useEnhancedMafiaGameState = (
         case 'negotiate': {
           const result = processNegotiation(newState, action);
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          // Consume the pending negotiation entry
+          if (action.pendingNegotiationId) {
+            result.pendingNegotiations = (result.pendingNegotiations || []).filter(
+              (p: PendingNegotiation) => p.id !== action.pendingNegotiationId
+            );
+          }
           return result;
         }
         case 'boss_negotiate': {
