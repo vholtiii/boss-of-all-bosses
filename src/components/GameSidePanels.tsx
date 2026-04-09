@@ -735,14 +735,39 @@ export const RightSidePanel: React.FC<{
                 const cfg = SUPPLY_NODE_CONFIG[node.type as SupplyNodeType];
                 const nodeTile = (gameState.hexMap || []).find((t: any) => t.q === node.q && t.r === node.r && t.s === node.s);
                 const isOwned = nodeTile?.controllingFamily === gameState.playerFamily;
-                // Check connection via stockpile tracker
+                // Check connection via BFS from HQ through player-controlled territory
+                const isConnected = (() => {
+                  const hMap = gameState.hexMap || [];
+                  const hqTile = hMap.find((t: any) => t.isHeadquarters === gameState.playerFamily);
+                  if (!hqTile) return false;
+                  const hk = (q: number, r: number, s: number) => `${q},${r},${s}`;
+                  const nodeKey = hk(node.q, node.r, node.s);
+                  const visited = new Set<string>();
+                  const queue: Array<{q:number;r:number;s:number}> = [{ q: hqTile.q, r: hqTile.r, s: hqTile.s }];
+                  visited.add(hk(hqTile.q, hqTile.r, hqTile.s));
+                  const dirs = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
+                  while (queue.length > 0) {
+                    const c = queue.shift()!;
+                    if (hk(c.q, c.r, c.s) === nodeKey) return true;
+                    for (const d of dirs) {
+                      const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
+                      const nk = hk(nq, nr, ns);
+                      if (visited.has(nk)) continue;
+                      const t = hMap.find((h: any) => h.q === nq && h.r === nr && h.s === ns);
+                      if (t && (t.controllingFamily === gameState.playerFamily || t.isHeadquarters === gameState.playerFamily || nk === nodeKey)) {
+                        visited.add(nk);
+                        queue.push({q:nq, r:nr, s:ns});
+                      }
+                    }
+                  }
+                  return false;
+                })();
                 const stockEntry = ((gameState as any).supplyStockpile || []).find(
                   (e: any) => e.family === gameState.playerFamily && e.nodeType === node.type && e.turnsSinceDisconnected > 0
                 );
-                const isConnected = isOwned || (!stockEntry);
                 const turnsSinceDisconnected = stockEntry?.turnsSinceDisconnected || 0;
-                const inBuffer = turnsSinceDisconnected > 0 && turnsSinceDisconnected <= SUPPLY_STOCKPILE_BUFFER;
-                const isDecaying = turnsSinceDisconnected > SUPPLY_STOCKPILE_BUFFER;
+                const inBuffer = !isConnected && turnsSinceDisconnected > 0 && turnsSinceDisconnected <= SUPPLY_STOCKPILE_BUFFER;
+                const isDecaying = !isConnected && turnsSinceDisconnected > SUPPLY_STOCKPILE_BUFFER;
                 
                 // Find dependent businesses
                 const depBizTypes = Object.entries(SUPPLY_DEPENDENCIES)

@@ -576,10 +576,19 @@ const createInitialGameState = (
   supplyNodeTypes.forEach(nodeType => {
     const config = SUPPLY_NODE_CONFIG[nodeType];
     // Find candidate hexes in the valid districts (no HQ, no existing supply node)
+    // Build set of hexes within range 1 of any HQ to prevent trivial turn-1 connections
+    const hqAdjacentKeys = new Set<string>();
+    allFamilies.forEach(fam => {
+      const hq = HQ_POSITIONS[fam];
+      hqAdjacentKeys.add(`${hq.q},${hq.r},${hq.s}`);
+      const ns = getHexNeighbors(hq.q, hq.r, hq.s);
+      ns.forEach(n => hqAdjacentKeys.add(`${n.q},${n.r},${n.s}`));
+    });
     const candidates = hexMap.filter(t =>
       config.districts.includes(t.district) &&
       !t.isHeadquarters &&
-      !usedHexKeys.has(`${t.q},${t.r},${t.s}`)
+      !usedHexKeys.has(`${t.q},${t.r},${t.s}`) &&
+      !hqAdjacentKeys.has(`${t.q},${t.r},${t.s}`)
     );
     if (candidates.length > 0) {
       const idx = Math.floor(supplyRng() * candidates.length);
