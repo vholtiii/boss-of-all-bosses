@@ -3520,15 +3520,17 @@ export const useEnhancedMafiaGameState = (
                   // Check if any safehouse was on this hex (player's)
                   const shIdx = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
                   if (shIdx !== -1) {
+                    const capturedSh = state.safehouses[shIdx];
+                    // Transfer stockpile to captor
+                    const stockpileDesc = Object.entries(capturedSh.stockpile || {}).filter(([,v]) => (v as number) > 0).map(([k,v]) => `${Math.floor(v as number)} ${k.replace('_',' ')}`).join(', ');
                     state.safehouses.splice(shIdx, 1);
                     if (prevOwner === state.playerFamily) {
                       state.pendingNotifications.push({
                         type: 'error' as const,
                         title: '🏠 Safehouse Destroyed',
-                        message: `The ${fam} family captured the hex and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} and intel on your operations.`,
+                        message: `The ${fam} family captured the hex and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} and intel on your operations.${stockpileDesc ? ` Seized stockpile: ${stockpileDesc}.` : ''}`,
                       });
                     }
-                    // Bounty to capturing AI family
                     const captorOpponent = state.aiOpponents.find(o => o.family === fam);
                     if (captorOpponent) captorOpponent.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
                     if (prevOwner === state.playerFamily) {
