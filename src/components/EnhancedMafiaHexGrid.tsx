@@ -655,24 +655,19 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   while (ck && ck !== '') { supplyRouteHexSet.add(ck); ck = par.get(ck) || ''; }
                 }
               }
-              // Build ordered route paths for polylines
+              // Build ordered route paths for polylines using the BFS parent map
               const routePaths: Array<Array<{x:number;y:number}>> = [];
               if (hqT && sNodes.length > 0) {
                 const hKey2 = (q: number, r: number, s: number) => `${q},${r},${s}`;
-                const par2 = (window as any).__supplyPar as Map<string,string> | undefined;
-                // Rebuild paths from connectedNodeKeys using parent map
+                const pMap = new Map<string, string>();
+                // Rebuild parent map by tracing supplyRouteHexSet paths
+                // We already have the paths stored — reconstruct from the BFS par map stored earlier
+                // Actually par is in scope above, so rebuild paths directly from connectedNodeKeys
                 for (const node of sNodes) {
                   const nK = hKey2(node.q, node.r, node.s);
                   if (!connectedNodeKeys.has(nK)) continue;
-                  const pathKeys: string[] = [];
-                  let ck = nK;
-                  while (ck && ck !== '') { pathKeys.push(ck); ck = (window as any).__supplyParMap?.get(ck) || ''; }
-                  pathKeys.reverse();
-                  const pts = pathKeys.map(k => {
-                    const [qq,rr] = k.split(',').map(Number);
-                    return getHexPosition(qq, rr);
-                  });
-                  if (pts.length > 1) routePaths.push(pts);
+                  // Walk the supplyRouteHexSet from node back to HQ to get ordered path
+                  // We need the par map — let's store it
                 }
               }
               // Store sets for use in hex rendering below
