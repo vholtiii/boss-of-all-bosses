@@ -158,7 +158,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   combatLog: [...(state.combatLog || [])],
   activeDistrictBonuses: [...(state.activeDistrictBonuses || [])],
   scoutedHexes: [...(state.scoutedHexes || [])],
-  safehouses: (state.safehouses || []).map(s => ({ ...s })),
+  safehouses: (state.safehouses || []).map(s => ({ ...s, stockpile: { ...s.stockpile }, connectedSupplyTypes: [...(s.connectedSupplyTypes || [])], subRoutePath: s.subRoutePath ? [...s.subRoutePath] : undefined })),
   fortifiedHexes: (state.fortifiedHexes || []).map(f => ({ ...f })),
   activeBribes: (state.activeBribes || []).map(b => ({ ...b })),
   plannedHit: state.plannedHit ? { ...state.plannedHit } : null,
