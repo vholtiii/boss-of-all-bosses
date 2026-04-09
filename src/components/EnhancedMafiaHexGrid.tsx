@@ -674,6 +674,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               (window as any).__supplyRouteHexSet = supplyRouteHexSet;
               (window as any).__connectedNodeKeys = connectedNodeKeys;
               (window as any).__supplyRouteColor = pColor;
+              (window as any).__supplyRoutePaths = routePaths;
 
               const markerId = `supply-arrow-${playerFamily}`;
 
@@ -734,35 +735,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       );
                     })}
                   </g>
-                  {/* Supply route connecting polylines */}
-                  <g className="pointer-events-none">
-                    {routePaths.map((pts, idx) => (
-                      <g key={`supply-line-group-${idx}`}>
-                        <polyline
-                          points={pts.map(p => `${p.x},${p.y}`).join(' ')}
-                          fill="none"
-                          stroke={pColor}
-                          strokeWidth="6"
-                          strokeOpacity="0.2"
-                          strokeLinejoin="round"
-                          strokeLinecap="round"
-                          filter={`url(#supply-glow-${playerFamily})`}
-                        />
-                        <polyline
-                          className="supply-flow-line"
-                          points={pts.map(p => `${p.x},${p.y}`).join(' ')}
-                          fill="none"
-                          stroke={pColor}
-                          strokeWidth="4"
-                          strokeOpacity="0.8"
-                          strokeDasharray="8 4"
-                          strokeLinejoin="round"
-                          strokeLinecap="round"
-                          markerMid={`url(#${markerId})`}
-                        />
-                      </g>
-                    ))}
-                  </g>
+                  {/* Supply route polylines rendered after hex tiles — see below */}
                 </>
               );
             })()}
@@ -1210,7 +1183,43 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })}
 
-            
+            {/* Supply route connecting polylines — rendered AFTER hex tiles so they appear on top */}
+            {(() => {
+              const storedPaths = (window as any).__supplyRoutePaths as Array<Array<{x:number;y:number}>> | undefined;
+              const storedColor = (window as any).__supplyRouteColor as string | undefined;
+              if (!storedPaths || !storedColor || storedPaths.length === 0) return null;
+              const markerId = `supply-arrow-${playerFamily}`;
+              return (
+                <g className="pointer-events-none">
+                  {storedPaths.map((pts, idx) => (
+                    <g key={`supply-line-group-${idx}`}>
+                      <polyline
+                        points={pts.map(p => `${p.x},${p.y}`).join(' ')}
+                        fill="none"
+                        stroke={storedColor}
+                        strokeWidth="6"
+                        strokeOpacity="0.2"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                        filter={`url(#supply-glow-${playerFamily})`}
+                      />
+                      <polyline
+                        className="supply-flow-line"
+                        points={pts.map(p => `${p.x},${p.y}`).join(' ')}
+                        fill="none"
+                        stroke={storedColor}
+                        strokeWidth="4"
+                        strokeOpacity="0.8"
+                        strokeDasharray="8 4"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                        markerMid={`url(#${markerId})`}
+                      />
+                    </g>
+                  ))}
+                </g>
+              );
+            })()}
 
             {/* District name labels */}
             {(() => {
