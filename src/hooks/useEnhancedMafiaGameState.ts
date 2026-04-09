@@ -5854,6 +5854,10 @@ export const useEnhancedMafiaGameState = (
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         });
         tile.controllingFamily = 'neutral'; // Hit clears enemy control — player must Claim next turn
+        // Tension: territory hit on rival hex
+        addPairTension(newState, newState.playerFamily, targetFamily, TENSION_TERRITORY_HIT);
+        // Hole #4: check supply sabotage
+        checkSupplySabotage(newState, targetQ, targetR, targetS, newState.playerFamily);
         // Destroy fortification on captured hex
         state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === targetQ && f.r === targetR && f.s === targetS));
         
