@@ -443,7 +443,116 @@ const hexNeighborDirections = [
 const getHexNeighbors = (q:number,r:number,s:number) =>
   hexNeighborDirections.map(d => ({q:q+d.q, r:r+d.r, s:s+d.s}));
 
-// BFS: returns all player-owned hexes connected to HQ via owned territory
+// ============ TENSION HELPERS ============
+const addPairTension = (state: EnhancedMafiaGameState, familyA: string, familyB: string, amount: number) => {
+  if (familyA === familyB) return;
+  const key = getTensionPairKey(familyA, familyB);
+  // Check cooldown (Hole #3)
+  if ((state.tensionCooldowns[key] || 0) > 0) return;
+  state.familyTensions[key] = Math.min(100, Math.max(0, (state.familyTensions[key] || 0) + amount));
+};
+
+const addGlobalTension = (state: EnhancedMafiaGameState, amount: number) => {
+  const allPairs = getAllFamilyPairKeys();
+  allPairs.forEach(key => {
+    state.familyTensions[key] = Math.min(100, Math.max(0, (state.familyTensions[key] || 0) + amount));
+  });
+};
+
+const getPairTension = (state: EnhancedMafiaGameState, familyA: string, familyB: string): number => {
+  return state.familyTensions[getTensionPairKey(familyA, familyB)] || 0;
+};
+
+const checkAndTriggerWar = (state: EnhancedMafiaGameState, familyA: string, familyB: string, trigger: 'tension' | 'capo_hit') => {
+  // Check if already at war
+  if ((state.activeWars || []).some(w => 
+    (w.family1 === familyA && w.family2 === familyB) || (w.family1 === familyB && w.family2 === familyA)
+  )) return;
+  // Check max simultaneous wars
+  const warsA = (state.activeWars || []).filter(w => w.family1 === familyA || w.family2 === familyA).length;
+  const warsB = (state.activeWars || []).filter(w => w.family1 === familyB || w.family2 === familyB).length;
+  if (warsA >= WAR_MAX_SIMULTANEOUS || warsB >= WAR_MAX_SIMULTANEOUS) return;
+  
+  const war: WarState = {
+    family1: [familyA, familyB].sort()[0],
+    family2: [familyA, familyB].sort()[1],
+    turnsRemaining: WAR_DURATION,
+    startedOnTurn: state.turn,
+    trigger,
+  };
+  state.activeWars = [...(state.activeWars || []), war];
+  
+  // Void existing pacts between warring families
+  const playerFamily = state.playerFamily;
+  if (familyA === playerFamily || familyB === playerFamily) {
+    const otherFamily = familyA === playerFamily ? familyB : familyA;
+    state.ceasefires = (state.ceasefires || []).filter(c => !(c.active && c.family === otherFamily));
+    state.alliances = (state.alliances || []).filter(a => !(a.active && a.alliedFamily === otherFamily));
+    state.safePassagePacts = (state.safePassagePacts || []).filter(p => !(p.active && p.targetFamily === otherFamily));
+  }
+  
+  // Notification
+  const fA = familyA.charAt(0).toUpperCase() + familyA.slice(1);
+  const fB = familyB.charAt(0).toUpperCase() + familyB.slice(1);
+  const isPlayerInvolved = familyA === playerFamily || familyB === playerFamily;
+  state.pendingNotifications.push({
+    type: 'error' as const,
+    title: isPlayerInvolved ? '⚔️ WAR DECLARED!' : '⚔️ War Erupts!',
+    message: isPlayerInvolved
+      ? `War between your family and the ${familyA === playerFamily ? fB : fA}! Diplomatic lockout for ${WAR_DURATION} turns. -20% income on contested borders.`
+      : `The ${fA} and ${fB} families have gone to war! This could shift the balance of power.`,
+  });
+};
+
+// Check if two families are at war
+const areFamiliesAtWar = (state: EnhancedMafiaGameState, familyA: string, familyB: string): boolean => {
+  return (state.activeWars || []).some(w => 
+    (w.family1 === familyA && w.family2 === familyB) || (w.family1 === familyB && w.family2 === familyA)
+  );
+};
+
+// Hole #5: Check encroachment (claiming neutral hex surrounded by 3+ rival hexes)
+const checkEncroachment = (state: EnhancedMafiaGameState, q: number, r: number, s: number, claimingFamily: string) => {
+  const neighbors = getHexNeighbors(q, r, s);
+  const familyCounts: Record<string, number> = {};
+  neighbors.forEach(n => {
+    const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+    if (tile && tile.controllingFamily !== 'neutral' && tile.controllingFamily !== claimingFamily) {
+      familyCounts[tile.controllingFamily] = (familyCounts[tile.controllingFamily] || 0) + 1;
+    }
+  });
+  Object.entries(familyCounts).forEach(([rivalFamily, count]) => {
+    if (count >= ENCROACHMENT_NEIGHBOR_THRESHOLD) {
+      addPairTension(state, claimingFamily, rivalFamily, TENSION_ENCROACHMENT);
+    }
+  });
+};
+
+// Hole #4: Check supply sabotage (hex capture severs a supply route)
+const checkSupplySabotage = (state: EnhancedMafiaGameState, capturedQ: number, capturedR: number, capturedS: number, capturingFamily: string) => {
+  const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
+  const capturedKey = `${capturedQ},${capturedR},${capturedS}`;
+  
+  allFamilies.forEach(fam => {
+    if (fam === capturingFamily) return;
+    // Check if this hex was on fam's supply route
+    const connectedBefore = getConnectedTerritory(
+      state.hexMap.map(t => capturedKey === `${t.q},${t.r},${t.s}` ? { ...t, controllingFamily: fam as any } : t),
+      fam
+    );
+    const connectedAfter = getConnectedTerritory(state.hexMap, fam);
+    
+    // Check if any supply node was previously reachable but now isn't
+    (state.supplyNodes || []).forEach(node => {
+      const nodeKey = `${node.q},${node.r},${node.s}`;
+      if (connectedBefore.has(nodeKey) && !connectedAfter.has(nodeKey)) {
+        addPairTension(state, capturingFamily, fam, TENSION_SUPPLY_SABOTAGE);
+      }
+    });
+  });
+};
+
+
 const getConnectedTerritory = (hexMap: HexTile[], playerFamily: string): Set<string> => {
   const hqTile = hexMap.find(t => t.isHeadquarters === playerFamily);
   if (!hqTile) return new Set();
