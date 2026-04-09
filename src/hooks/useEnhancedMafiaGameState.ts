@@ -1295,6 +1295,18 @@ export const useEnhancedMafiaGameState = (
           return prev;
         }
 
+        if (moveAction === 'send_word') {
+          if (prev.tacticalActionsRemaining <= 0) return prev;
+          if (unitType !== 'capo') return prev;
+          if ((unit as any).woundedTurnsRemaining > 0) return prev;
+          // Show all enemy hexes as targets (excluding HQs)
+          const enemyHexes = prev.hexMap
+            .filter(t => t.controllingFamily !== prev.playerFamily && t.controllingFamily !== 'neutral' && !t.isHeadquarters)
+            .map(t => ({ q: t.q, r: t.r, s: t.s }));
+          if (enemyHexes.length === 0) return prev;
+          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: enemyHexes, deployMode: null, availableDeployHexes: [] };
+        }
+
         // No regular movement in tactical phase
         return prev;
       }
