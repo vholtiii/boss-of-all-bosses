@@ -221,4 +221,15 @@ Click any headquarters to view:
 
 ---
 
+## 12. War System & HQ
+
+During active wars:
+- **AI forced aggression**: AI prioritizes attacking the warring family and recruits every turn
+- **AI fortification**: AI fortifies HQ-adjacent hexes when at war
+- **Income penalty**: Hexes adjacent to warring enemy territory suffer -20% income (capped -30%)
+- **Diplomatic lockout**: No negotiations possible between warring families
+- Wars last **10 turns**, after which tension resets to 30 and relationship drops -50
+
+---
+
 *See also: [GAME_MECHANICS.md](./GAME_MECHANICS.md) for the full game systems overview.*

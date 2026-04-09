@@ -240,4 +240,32 @@ Weaken enemy HQ defenses by turning a rival soldier.
 
 ---
 
+## 10. Tension & War in Combat
+
+### 10.1 Combat Actions That Raise Tension
+
+| Action | Pair Tension | Global Tension |
+|---|---|---|
+| Territory hit (success or fail) | +10 | — |
+| Extortion (enemy hex) | +8 | — |
+| Plan Hit on soldier (success) | +15 | — |
+| **Plan Hit on capo (success)** | **Instant war** | — |
+| Hitman kills soldier | — | +5 all pairs |
+| Hitman kills capo | — | +15 all pairs |
+
+### 10.2 War Combat Modifiers
+
+During an active war (10 turns):
+- **Diplomatic lockout**: No negotiations between warring families
+- **AI forced aggression**: AI prioritizes attacking war opponent and recruits every turn
+- **Income penalty**: -20% on hexes adjacent to warring enemy territory (capped -30%)
+
+### 10.3 Strategic Implications
+
+- Hitman assassinations are **anonymous** — they raise global tension but don't directly trigger war between specific families
+- A successful Plan Hit on a Capo is the only combat action that triggers **instant war** regardless of tension level
+- Wars last 10 turns then resolve: tension resets to 30, relationship -50
+
+---
+
 *See also: [GAME_MECHANICS.md](./GAME_MECHANICS.md) for full game systems overview.*

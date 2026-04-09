@@ -471,6 +471,69 @@ Planned enemy hits can be detected through:
 
 ---
 
+## 22. Tension & War System
+
+### 22.1 Tension Meter
+
+Each of the 10 family pairs has a tension value (0-100). Tension **decays by 2 per turn** naturally.
+
+### 22.2 Tension Builders
+
+| Action | Pair Tension | Global Tension | Notes |
+|---|---|---|---|
+| Territory hit | +10 | — | Between attacker & defender |
+| Plan Hit on soldier | +15 | — | Between families |
+| Plan Hit on capo (success) | — | — | **Instant war trigger** |
+| Extortion (enemy hex) | +8 | — | Between families |
+| Encroachment | +12 | — | Claiming neutral hex surrounded by 3+ rival hexes |
+| Supply sabotage | +15 | — | Breaking a supply chain via territory capture |
+| Breaking pact | +30 | — | Ceasefire or alliance violation |
+| Hitman kills soldier | — | +5 all pairs | Anonymous — no pair tension |
+| Hitman kills capo | — | +15 all pairs | Anonymous — no pair tension |
+
+### 22.3 Tension Reducers
+
+| Action | Reduction | Notes |
+|---|---|---|
+| Ceasefire | -25 | Negotiation action |
+| Alliance | -35 | Negotiation action |
+| Supply deal | -15 | New negotiation type |
+| Share profits | -10 | New negotiation type |
+| Safe passage | -8 | New negotiation type |
+| Bribe for territory | -5 | Existing negotiation |
+
+A **1-turn cooling period** after any successful negotiation prevents immediate tension re-escalation.
+
+### 22.4 War Trigger
+
+War begins when:
+1. **Tension reaches 80** between two families, OR
+2. A **successful Plan Hit on a Capo** (instant war, bypasses tension threshold)
+
+### 22.5 War Effects (10 Turns)
+
+| Effect | Details |
+|---|---|
+| Duration | 10 turns |
+| Diplomatic lockout | No negotiations between warring families |
+| AI forced aggression | AI prioritizes attacking war opponent, recruits every turn |
+| Income penalty | -20% on hexes adjacent to warring enemy territory (capped -30% total) |
+| Max simultaneous wars | 2 per family |
+
+### 22.6 Post-War State
+
+- Tension resets to **30** (not 0 — lingering animosity)
+- Relationship drops by **-50**
+- 1-turn negotiation cooling period before diplomacy can resume
+
+### 22.7 AI & War
+
+- AI-vs-AI wars are tracked and notified to the player
+- AI prioritizes warring opponents for hits and territorial expansion during war
+- AI fortifies HQ-adjacent hexes during active wars
+
+---
+
 *Detailed guides:*
 - **[COMBAT_SYSTEM_GUIDE.md](./COMBAT_SYSTEM_GUIDE.md)**
 - **[HEADQUARTERS_SYSTEM_GUIDE.md](./HEADQUARTERS_SYSTEM_GUIDE.md)**
