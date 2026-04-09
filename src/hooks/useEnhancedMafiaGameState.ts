@@ -2516,6 +2516,69 @@ export const useEnhancedMafiaGameState = (
       }
       processBribes(newState);
       processPacts(newState);
+
+      // ============ WAR & TENSION LIFECYCLE ============
+      {
+        // 1. Decay tension by TENSION_DECAY_PER_TURN for all pairs
+        const allPairs = getAllFamilyPairKeys();
+        allPairs.forEach(key => {
+          if ((newState.familyTensions[key] || 0) > 0) {
+            newState.familyTensions[key] = Math.max(0, (newState.familyTensions[key] || 0) - TENSION_DECAY_PER_TURN);
+          }
+        });
+
+        // 2. Tick down tension cooldowns (Hole #3)
+        Object.keys(newState.tensionCooldowns).forEach(key => {
+          if (newState.tensionCooldowns[key] > 0) {
+            newState.tensionCooldowns[key] -= 1;
+            if (newState.tensionCooldowns[key] <= 0) delete newState.tensionCooldowns[key];
+          }
+        });
+
+        // 3. Check tension thresholds → trigger wars
+        allPairs.forEach(key => {
+          if ((newState.familyTensions[key] || 0) >= WAR_TENSION_THRESHOLD) {
+            const [fA, fB] = key.split('-');
+            checkAndTriggerWar(newState, fA, fB, 'tension');
+          }
+        });
+
+        // 4. Tick down active wars
+        newState.activeWars = (newState.activeWars || []).filter(w => {
+          w.turnsRemaining -= 1;
+          if (w.turnsRemaining <= 0) {
+            // War ends — reset tension to WAR_POST_TENSION, relationship to WAR_POST_RELATIONSHIP
+            const key = getTensionPairKey(w.family1, w.family2);
+            newState.familyTensions[key] = WAR_POST_TENSION;
+            // Update relationships
+            const isPlayerInvolved = w.family1 === newState.playerFamily || w.family2 === newState.playerFamily;
+            if (isPlayerInvolved) {
+              const otherFam = w.family1 === newState.playerFamily ? w.family2 : w.family1;
+              if (newState.reputation.familyRelationships[otherFam] !== undefined) {
+                newState.reputation.familyRelationships[otherFam] = WAR_POST_RELATIONSHIP;
+              }
+            }
+            // Update AI-AI relationships
+            newState.aiOpponents.forEach(ai => {
+              if (ai.family === w.family1 || ai.family === w.family2) {
+                const otherWar = ai.family === w.family1 ? w.family2 : w.family1;
+                if (ai.relationships[otherWar] !== undefined) {
+                  ai.relationships[otherWar] = WAR_POST_RELATIONSHIP;
+                }
+              }
+            });
+            const fA = w.family1.charAt(0).toUpperCase() + w.family1.slice(1);
+            const fB = w.family2.charAt(0).toUpperCase() + w.family2.slice(1);
+            newState.pendingNotifications.push({
+              type: 'info' as const,
+              title: '🕊️ War Ended',
+              message: `The war between ${fA} and ${fB} has ended after ${WAR_DURATION} turns. Tensions remain high.`,
+            });
+            return false; // Remove war
+          }
+          return true;
+        });
+      }
       
       newState.reputation.reputation = Math.max(0, newState.reputation.reputation - 0.5);
       newState.reputation.fear = Math.max(0, newState.reputation.fear - 1);
@@ -3141,6 +3204,23 @@ export const useEnhancedMafiaGameState = (
         if (tile.district === 'Manhattan' && hasPlayerDistrictBonus(state, 'income')) {
           tileIncome = Math.floor(tileIncome * 1.2);
         }
+        // War income penalty: -20% on hexes adjacent to warring enemy territory (capped at -30%)
+        let warPenalty = 0;
+        (state.activeWars || []).forEach(w => {
+          const isPlayerInWar = w.family1 === state.playerFamily || w.family2 === state.playerFamily;
+          if (!isPlayerInWar) return;
+          const enemyFam = w.family1 === state.playerFamily ? w.family2 : w.family1;
+          const neighbors = getHexNeighbors(tile.q, tile.r, tile.s);
+          const hasEnemyNeighbor = neighbors.some(n => {
+            const nt = state.hexMap.find(t2 => t2.q === n.q && t2.r === n.r && t2.s === n.s);
+            return nt && nt.controllingFamily === enemyFam;
+          });
+          if (hasEnemyNeighbor) warPenalty += WAR_INCOME_PENALTY;
+        });
+        if (warPenalty > 0) {
+          warPenalty = Math.min(warPenalty, WAR_INCOME_PENALTY_CAP);
+          tileIncome = Math.floor(tileIncome * (1 - warPenalty));
+        }
         
         if (tile.business.isLegal) {
           legalIncome += tileIncome;
@@ -3312,6 +3392,23 @@ export const useEnhancedMafiaGameState = (
               }
             }
           }
+          // War income penalty for AI
+          let aiWarPenalty = 0;
+          (state.activeWars || []).forEach(w => {
+            const isInWar = w.family1 === fam || w.family2 === fam;
+            if (!isInWar) return;
+            const enemyWar = w.family1 === fam ? w.family2 : w.family1;
+            const neighbors = getHexNeighbors(tile.q, tile.r, tile.s);
+            const hasEnemyNeighbor = neighbors.some(n => {
+              const nt = state.hexMap.find(t2 => t2.q === n.q && t2.r === n.r && t2.s === n.s);
+              return nt && nt.controllingFamily === enemyWar;
+            });
+            if (hasEnemyNeighbor) aiWarPenalty += WAR_INCOME_PENALTY;
+          });
+          if (aiWarPenalty > 0) {
+            aiWarPenalty = Math.min(aiWarPenalty, WAR_INCOME_PENALTY_CAP);
+            tileInc = Math.floor(tileInc * (1 - aiWarPenalty));
+          }
           aiIncome += tileInc;
         }
       });
@@ -3322,6 +3419,8 @@ export const useEnhancedMafiaGameState = (
       if (turnReport) turnReport.aiActions.push({ family: fam, action: 'income', detail: `Earned $${aiIncome.toLocaleString()} income` });
 
       // ── RECRUIT (difficulty-scaled cap) ──
+      // War recruitment boost: recruit more aggressively during war
+      const atWarBonus = (state.activeWars || []).some(w => w.family1 === fam || w.family2 === fam) ? 2 : 0;
       const isAlerted = (state.aiAlertState || {})[fam] > 0;
       const alertBonus = isAlerted ? 1 : 0;
       const capScale = state.mapSize === 'small' ? -2 : state.mapSize === 'large' ? 4 : 0;
@@ -3331,7 +3430,7 @@ export const useEnhancedMafiaGameState = (
       const wantToRecruit = Math.max(0, soldierCap - totalSoldiers);
       if (wantToRecruit > 0) {
         const canAfford = Math.floor(opponent.resources.money / SOLDIER_COST);
-        const toRecruit = Math.min(wantToRecruit, canAfford, 3 + alertBonus);
+        const toRecruit = Math.min(wantToRecruit, canAfford, 3 + alertBonus + atWarBonus);
         opponent.resources.soldiers += toRecruit;
         opponent.resources.money -= toRecruit * SOLDIER_COST;
         if (toRecruit > 0 && turnReport) {
@@ -3399,9 +3498,16 @@ export const useEnhancedMafiaGameState = (
       }
 
       // ── PERSONALITY-DRIVEN MOVEMENT & COMBAT ──
-      const personality = opponent.personality || 'aggressive';
+      let personality = opponent.personality || 'aggressive';
       const aggression = opponent.strategy.aggressionLevel || 50;
       const cooperation = opponent.strategy.cooperationTendency || 50;
+
+      // War aggression override: if at war, behave as aggressive and prioritize war target
+      const activeWarTarget = (state.activeWars || []).find(w => w.family1 === fam || w.family2 === fam);
+      const warTargetFamily = activeWarTarget ? (activeWarTarget.family1 === fam ? activeWarTarget.family2 : activeWarTarget.family1) : null;
+      if (warTargetFamily) {
+        personality = 'aggressive'; // Override personality during war
+      }
 
       // AI action budget — boosted in early game (turns 1-8) for faster expansion, scaled by map size
       const earlyGameBonus = state.turn <= 8 ? 2 : 0;
@@ -3451,6 +3557,12 @@ export const useEnhancedMafiaGameState = (
           const enemyHexes = [...playerHexes, ...otherAIHexes];
 
           let targetPool: typeof validMoves;
+
+          // War targeting: prioritize war target's hexes
+          const warTargetHexes = warTargetFamily ? validMoves.filter(n => {
+            const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+            return tile && tile.controllingFamily === warTargetFamily;
+          }) : [];
           const hasBounty = state.aiBounties.some(b => b.fromFamily === fam && b.targetFamily === state.playerFamily);
 
           // Prioritize enemy safehouse hexes for bounty + intel
@@ -3459,7 +3571,10 @@ export const useEnhancedMafiaGameState = (
             !state.hexMap.some(t => t.q === n.q && t.r === n.r && t.s === n.s && t.controllingFamily === fam)
           );
 
-          if (safehouseHexes.length > 0 && Math.random() < 0.7) {
+          if (warTargetHexes.length > 0 && Math.random() < 0.85) {
+            // War: heavily prioritize attacking the war target
+            targetPool = warTargetHexes;
+          } else if (safehouseHexes.length > 0 && Math.random() < 0.7) {
             targetPool = safehouseHexes;
           } else if ((hasBounty || isAlerted) && playerHexes.length > 0) {
             targetPool = playerHexes;
@@ -3689,6 +3804,9 @@ export const useEnhancedMafiaGameState = (
                   }
                 }
                 if (enemyUnitsHere.some(u => u.family === state.playerFamily)) {
+                  // Hole #6: AI attacks player → tension
+                  addPairTension(state, fam, state.playerFamily, TENSION_TERRITORY_HIT);
+                  checkSupplySabotage(state, target.q, target.r, target.s, fam);
                   state.pendingNotifications.push({
                     type: 'warning' as const,
                     title: `⚔️ ${fam.charAt(0).toUpperCase() + fam.slice(1)} Attack!`,
@@ -3696,11 +3814,15 @@ export const useEnhancedMafiaGameState = (
                   });
                   if (turnReport) turnReport.aiActions.push({ family: fam, action: 'attack', detail: `Attacked your units in ${tile.district}` });
                 }
-                // Log AI-to-AI combat
+                // Log AI-to-AI combat + Hole #1: AI-vs-AI tension
                 const aiVictims = enemyUnitsHere.filter(u => u.family !== state.playerFamily);
-                if (aiVictims.length > 0 && turnReport) {
+                if (aiVictims.length > 0) {
                   const victimFams = [...new Set(aiVictims.map(u => u.family))];
-                  turnReport.aiActions.push({ family: fam, action: 'ai_combat', detail: `Fought ${victimFams.join(', ')} in ${tile.district}` });
+                  victimFams.forEach(vf => {
+                    addPairTension(state, fam, vf, TENSION_TERRITORY_HIT);
+                    checkSupplySabotage(state, target.q, target.r, target.s, fam);
+                  });
+                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'ai_combat', detail: `Fought ${victimFams.join(', ')} in ${tile.district}` });
                 }
               } else {
                 // AI declined to fight — revert position
@@ -3717,6 +3839,8 @@ export const useEnhancedMafiaGameState = (
                   // Neutral hex: capos auto-claim (matches player rules), soldiers don't
                   if (unit.type === 'capo') {
                     tile.controllingFamily = fam;
+                    // Hole #5: encroachment check for neutral claims by AI
+                    checkEncroachment(state, target.q, target.r, target.s, fam);
                   }
                 } else {
                   // Territory freeze: skip claiming ceasefire family hexes
@@ -3744,6 +3868,9 @@ export const useEnhancedMafiaGameState = (
                         });
                       }
                       tile.controllingFamily = fam;
+                      // Hole #6: AI captures enemy territory → tension
+                      addPairTension(state, fam, prevOwner as string, TENSION_TERRITORY_HIT);
+                      checkSupplySabotage(state, target.q, target.r, target.s, fam);
                       if (prevOwner === state.playerFamily && turnReport) {
                         turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
                       }
@@ -3808,6 +3935,8 @@ export const useEnhancedMafiaGameState = (
         
         if (tile.controllingFamily === 'neutral' && !tile.business && !tile.isHeadquarters) {
           tile.controllingFamily = fam;
+          // Hole #5: encroachment check for AI neutral hex claims
+          checkEncroachment(state, tile.q, tile.r, tile.s, fam);
           aiActionsRemaining--;
         }
       }
@@ -3835,6 +3964,8 @@ export const useEnhancedMafiaGameState = (
           // Attempt extortion: ~50% base chance
           const successChance = 0.5 + (opponent.resources.influence || 50) / 1000;
           if (Math.random() < successChance) {
+            // Hole #6: AI extortion → tension
+            addPairTension(state, fam, enemyTile.controllingFamily as string, TENSION_EXTORT_RIVAL);
             const basePayout = enemyTile.business!.isLegal ? 1500 : 3000;
             const payout = Math.round(basePayout * 0.7); // Enemy extortion pays less
             opponent.resources.money += payout;
@@ -3894,8 +4025,9 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // ── DIPLOMATIC AI: Ceasefire proposals ──
-      if (personality === 'diplomatic' && Math.random() < (cooperation / 200)) {
+      // ── DIPLOMATIC AI: Ceasefire proposals (skip if at war with player) ──
+      const atWarWithPlayer = areFamiliesAtWar(state, fam, state.playerFamily);
+      if (!atWarWithPlayer && (opponent.personality || 'aggressive') === 'diplomatic' && Math.random() < (cooperation / 200)) {
         const hasCeasefire = state.ceasefires.some(c => c.active && c.family === fam);
         if (!hasCeasefire) {
           state.pendingNotifications.push({
@@ -6326,6 +6458,19 @@ export const useEnhancedMafiaGameState = (
       return state;
     }
 
+    // Check diplomatic lockout — warring families cannot negotiate
+    if (areFamiliesAtWar(state, state.playerFamily, enemyFamily)) {
+      state.resources.money += cost; // refund
+      if (isFamily) state.bossNegotiationCooldown = 0;
+      else state.capoNegotiationCooldown = 0;
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'error', title: '⚔️ Diplomatic Lockout',
+        message: `Cannot negotiate with the ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} family — you are at war!`,
+      }];
+      syncLegacyUnits(state);
+      return state;
+    }
+
     switch (negotiationType as NegotiationType) {
       case 'ceasefire': {
         const duration = 3 + Math.floor(Math.random() * 3); // 3-5 turns
@@ -6345,9 +6490,13 @@ export const useEnhancedMafiaGameState = (
             message: `The ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} family called off a planned hit — ceasefire agreement honored.`,
           }];
         }
+        // Tension reduction
+        addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_CEASEFIRE);
+        // Hole #3: cooling period
+        state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '🤝 Ceasefire Agreed!',
-          message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} won't attack for ${duration} turns. -${config.reputationCost} respect.`,
+          message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} won't attack for ${duration} turns. -${config.reputationCost} respect. Tension -${TENSION_REDUCE_CEASEFIRE}.`,
         }];
         break;
       }
@@ -6359,9 +6508,12 @@ export const useEnhancedMafiaGameState = (
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         });
         tile.controllingFamily = state.playerFamily;
+        // Tension reduction
+        addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_BRIBE_TERRITORY);
+        state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '💵 Territory Acquired!',
-          message: `Peacefully bribed for the hex. Cost: $${cost.toLocaleString()}.`,
+          message: `Peacefully bribed for the hex. Cost: $${cost.toLocaleString()}. Tension -${TENSION_REDUCE_BRIBE_TERRITORY}.`,
         }];
         break;
       }
@@ -6388,9 +6540,12 @@ export const useEnhancedMafiaGameState = (
             message: `The ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} family called off a planned hit — alliance pact honored.`,
           }];
         }
+        // Tension reduction
+        addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_ALLIANCE);
+        state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '⚖️ Alliance Formed!',
-          message: `Pact with ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} for ${duration} turns. Condition: ${condition.type.replace(/_/g, ' ')}.`,
+          message: `Pact with ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} for ${duration} turns. Condition: ${condition.type.replace(/_/g, ' ')}. Tension -${TENSION_REDUCE_ALLIANCE}.`,
         }];
         break;
       }
@@ -6408,9 +6563,12 @@ export const useEnhancedMafiaGameState = (
           turnFormed: state.turn,
           active: true,
         }];
+        // Tension reduction
+        addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_SHARE_PROFITS);
+        state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '💰 Profit Sharing Deal!',
-          message: `You'll earn 30% of this hex's income for ${duration} turns. Cost: $${cost.toLocaleString()}.`,
+          message: `You'll earn 30% of this hex's income for ${duration} turns. Cost: $${cost.toLocaleString()}. Tension -${TENSION_REDUCE_SHARE_PROFITS}.`,
         }];
         break;
       }
@@ -6423,9 +6581,12 @@ export const useEnhancedMafiaGameState = (
           turnFormed: state.turn,
           active: true,
         }];
+        // Tension reduction
+        addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_SAFE_PASSAGE);
+        state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '🛤️ Safe Passage Granted!',
-          message: `Free movement through ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} territory for ${duration} turns. Cost: $${cost.toLocaleString()}.`,
+          message: `Free movement through ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} territory for ${duration} turns. Cost: $${cost.toLocaleString()}. Tension -${TENSION_REDUCE_SAFE_PASSAGE}.`,
         }];
         break;
       }

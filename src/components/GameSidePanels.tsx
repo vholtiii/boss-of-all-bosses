@@ -34,7 +34,7 @@ import HitmanPanel from '@/components/HitmanPanel';
 import CapoPromotionPanel from '@/components/CapoPromotionPanel';
 import CorruptionPanel from '@/components/CorruptionPanel';
 import VictoryTracker from '@/components/VictoryTracker';
-import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType, SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, Safehouse } from '@/types/game-mechanics';
+import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType, SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, Safehouse, getTensionPairKey, WAR_TENSION_THRESHOLD } from '@/types/game-mechanics';
 import { Anchor, Wrench, Truck, Wine, Fish, Package, Link2 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 
@@ -719,6 +719,34 @@ export const RightSidePanel: React.FC<{
                     </Badge>
                   </div>
                 )}
+                {/* Tension Bar */}
+                {(() => {
+                  const tension = (gameState as any).familyTensions?.[getTensionPairKey(gameState.playerFamily, opponent.family)] || 0;
+                  const activeWar = ((gameState as any).activeWars || []).find((w: any) =>
+                    (w.family1 === gameState.playerFamily && w.family2 === opponent.family) ||
+                    (w.family1 === opponent.family && w.family2 === gameState.playerFamily)
+                  );
+                  const tensionColor = activeWar ? 'bg-red-600' : tension >= 60 ? 'bg-orange-500' : tension >= 30 ? 'bg-yellow-500' : 'bg-green-500';
+                  const tensionLabel = activeWar ? `AT WAR (${activeWar.turnsRemaining} turns)` : `Tension: ${Math.round(tension)}`;
+                  return (
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] text-muted-foreground">{tensionLabel}</span>
+                        {activeWar && (
+                          <Badge variant="destructive" className="text-[9px] h-4 animate-pulse">
+                            ⚔️ WAR
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={cn('h-full rounded-full transition-all duration-500', tensionColor)}
+                          style={{ width: `${Math.min(100, activeWar ? 100 : tension)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
