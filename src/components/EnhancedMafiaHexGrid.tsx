@@ -6,7 +6,7 @@ import { ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
-import { ScoutedHex, Safehouse, PlannedHit, SupplyNode, SUPPLY_NODE_CONFIG, SupplyNodeType } from '@/types/game-mechanics';
+import { ScoutedHex, Safehouse, PlannedHit, SupplyNode, SUPPLY_NODE_CONFIG, SupplyNodeType, FortifiedHex, FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS } from '@/types/game-mechanics';
 
 interface EnhancedMafiaHexGridProps {
   width: number;
@@ -1727,6 +1727,44 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               {hoveredHex.isHeadquarters && (
                 <p className="text-mafia-gold font-bold">🏛️ {hoveredHex.isHeadquarters.toUpperCase()} HQ</p>
               )}
+              {/* Fortification info */}
+              {(() => {
+                const fortifiedHexes: FortifiedHex[] = gameState?.fortifiedHexes || [];
+                const fort = fortifiedHexes.find((f: FortifiedHex) => f.q === hoveredHex.q && f.r === hoveredHex.r && f.s === hoveredHex.s);
+                if (!fort) return null;
+                const isOwn = fort.family === playerFamily;
+                const currentTurn = gameState?.turn || 0;
+                const age = currentTurn - fort.fortifiedOnTurn;
+                
+                if (!isOwn) {
+                  const hexRevealed = isHexRevealed(hoveredHex);
+                  if (!hexRevealed) return null;
+                  return (
+                    <div className="mt-1 p-1.5 rounded border bg-red-900/30 border-red-500/30">
+                      <p className="font-bold text-xs text-red-300">🛡️ Enemy Fortified</p>
+                    </div>
+                  );
+                }
+                
+                const isAbandoned = fort.abandonedSinceTurn != null;
+                const turnsAbandoned = isAbandoned ? currentTurn - (fort.abandonedSinceTurn || 0) : 0;
+                const turnsUntilCrumble = FORTIFY_ABANDON_TURNS - turnsAbandoned;
+                
+                return (
+                  <div className="mt-1 p-1.5 rounded border bg-emerald-900/30 border-emerald-500/30">
+                    <p className="font-bold text-xs text-emerald-300">🛡️ FORTIFIED</p>
+                    <p className="text-xs"><span className="text-muted-foreground">Built:</span> {age} turn{age !== 1 ? 's' : ''} ago</p>
+                    <p className="text-xs">
+                      <span className="text-muted-foreground">Status:</span>{' '}
+                      {isAbandoned 
+                        ? <span className="text-amber-400">Abandoned — crumbles in {turnsUntilCrumble} turn{turnsUntilCrumble !== 1 ? 's' : ''}</span>
+                        : <span className="text-emerald-400">Occupied</span>
+                      }
+                    </p>
+                    <p className="text-xs text-muted-foreground">+{FORTIFY_DEFENSE_BONUS}% defense, {FORTIFY_CASUALTY_REDUCTION}% casualty reduction</p>
+                  </div>
+                );
+              })()}
               {/* Scouted intel */}
               {(() => {
                 const scoutInfo = (gameState?.scoutedHexes || []).find((s: ScoutedHex) => s.q === hoveredHex.q && s.r === hoveredHex.r && s.s === hoveredHex.s);
