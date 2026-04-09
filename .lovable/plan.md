@@ -1,38 +1,50 @@
 
 
-# Supply Lines: Map-Wide Impact + Minimum Distance
+# Safehouse Inventory Stockpiling System (Revised Connection Logic)
 
-## Problem
-1. **Limited scope**: Several business types (casino, drug_trafficking, laundromat, prostitution) have no supply dependency — supply lines don't affect them at all. Supply lines should control inventory for ALL businesses on the map.
-2. **Too close to HQ**: Current exclusion is only 1-hex adjacent to HQ. Nodes can spawn 2 hexes away, making supply lines trivially short. Need a minimum distance of 5 hexes.
+## Key Change: Sub-Route Connection
+Safehouses no longer need to sit directly on a supply route. Two connection modes:
 
-## Changes
+1. **Auto-connect**: If the safehouse hex is adjacent to or on the BFS supply route path, it connects automatically — no player action needed
+2. **Manual sub-route**: If the safehouse is anywhere else but has an unbroken hex chain of owned/claimed territory linking it to any hex on an active supply route, the player can click "Establish Stockpile Route" to manually connect it. This creates a visible sub-route (thinner dashed line branching off the main supply line to the safehouse)
 
-### 1. Expand `SUPPLY_DEPENDENCIES` to cover ALL business types (`src/types/game-mechanics.ts`)
+Once connected (either way), the safehouse begins stockpiling based on the player's allocation slider.
 
-Add missing business types with logical supply node assignments:
+## Subtle Player-Only Indicators
+- **Connected glow**: Soft white pulse ring around safehouse icon (only visible to owning player)
+- **Stockpiling dots**: Tiny animated dots per supply type being stockpiled (player-only)
+- **Sub-route line**: Thin dashed grey line from main supply route to safehouse (player-only, hidden from rivals)
 
-| Business | Supply Node | Rationale |
-|----------|------------|-----------|
-| casino | liquor_route | Casinos need liquor supply |
-| drug_trafficking | docks | Drugs come through the docks |
-| laundromat | trucking_depot | Needs pickup/delivery logistics |
-| prostitution | trucking_depot | Transport network |
+## Core Mechanics (Unchanged from Previous Plan)
+- **Capacity**: 5 units per supply type per safehouse
+- **Allocation**: Player-configurable 0-50% slider; higher = faster fill, less current income
+- **Release**: Manual — player chooses when to tap reserves per supply type
+- **Capture**: Enemy seizes ALL stored inventory
 
-This means every business on the map now depends on at least one supply node. Losing a supply line affects all businesses of that type across the entire map — not just ones in the node's territory.
+## Technical Changes
 
-### 2. Increase minimum spawn distance to 5 hexes (`src/hooks/useEnhancedMafiaGameState.ts`)
+### `src/types/game-mechanics.ts`
+- Extend `Safehouse` interface: `stockpile`, `allocationPercent`, `connectedSupplyTypes`, `manualRouteEstablished: boolean`
+- Constants: `SAFEHOUSE_MAX_STOCKPILE = 5`, `SAFEHOUSE_MAX_ALLOCATION = 50`
 
-Replace the current "exclude HQ-adjacent hexes" filter (lines 580-592) with a proper hex distance check using the existing `hexDistance()` function:
-- For each candidate hex, compute distance to ALL HQ positions
-- Reject candidates where distance to ANY HQ is < 5
-- This ensures every supply node requires building a meaningful territorial chain to reach
+### `src/hooks/useEnhancedMafiaGameState.ts`
+- Per-turn BFS: check if safehouse hex is adjacent to any supply route hex → auto-connect
+- For non-adjacent safehouses: run secondary BFS from safehouse hex through owned territory to any supply route hex → if path exists, enable "Establish Stockpile Route" action
+- New action: `establishSafehouseRoute(safehouseId)` — sets `manualRouteEstablished = true`, stores the sub-route path for rendering
+- Stockpile accumulation, income reduction, manual release, and capture transfer logic (same as before)
+- If territory chain breaks (hex lost), sub-route severs and stockpiling stops
 
-### 3. Apply supply decay to AI families too (`src/hooks/useEnhancedMafiaGameState.ts`)
+### `src/components/EnhancedMafiaHexGrid.tsx`
+- Render sub-route lines (thin dashed grey) for manually established routes — player-family only
+- Subtle glow + animated dots on connected safehouses — player-family only
 
-The income calculation (line 2848-2865) only checks the player's `connectedNodeTypes`. Expand to also apply decay to AI family businesses using per-family connectivity — this is already tracked in `supplyStockpile` but not applied to AI income.
+### `src/components/GameSidePanels.tsx`
+- Per safehouse: connection status, "Establish Stockpile Route" button (when eligible), allocation slider, fill bars, release buttons
+- Show which supply types are flowing and current stockpile levels
 
 ## Files Modified
-- `src/types/game-mechanics.ts` — add casino, drug_trafficking, laundromat, prostitution to `SUPPLY_DEPENDENCIES`
-- `src/hooks/useEnhancedMafiaGameState.ts` — minimum 5-hex distance filter for node placement + AI supply decay in income calc
+- `src/types/game-mechanics.ts`
+- `src/hooks/useEnhancedMafiaGameState.ts`
+- `src/components/EnhancedMafiaHexGrid.tsx`
+- `src/components/GameSidePanels.tsx`
 
