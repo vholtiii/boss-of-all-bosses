@@ -3204,6 +3204,23 @@ export const useEnhancedMafiaGameState = (
         if (tile.district === 'Manhattan' && hasPlayerDistrictBonus(state, 'income')) {
           tileIncome = Math.floor(tileIncome * 1.2);
         }
+        // War income penalty: -20% on hexes adjacent to warring enemy territory (capped at -30%)
+        let warPenalty = 0;
+        (state.activeWars || []).forEach(w => {
+          const isPlayerInWar = w.family1 === state.playerFamily || w.family2 === state.playerFamily;
+          if (!isPlayerInWar) return;
+          const enemyFam = w.family1 === state.playerFamily ? w.family2 : w.family1;
+          const neighbors = getHexNeighbors(tile.q, tile.r, tile.s);
+          const hasEnemyNeighbor = neighbors.some(n => {
+            const nt = state.hexMap.find(t2 => t2.q === n.q && t2.r === n.r && t2.s === n.s);
+            return nt && nt.controllingFamily === enemyFam;
+          });
+          if (hasEnemyNeighbor) warPenalty += WAR_INCOME_PENALTY;
+        });
+        if (warPenalty > 0) {
+          warPenalty = Math.min(warPenalty, WAR_INCOME_PENALTY_CAP);
+          tileIncome = Math.floor(tileIncome * (1 - warPenalty));
+        }
         
         if (tile.business.isLegal) {
           legalIncome += tileIncome;
@@ -3883,6 +3900,8 @@ export const useEnhancedMafiaGameState = (
         
         if (tile.controllingFamily === 'neutral' && !tile.business && !tile.isHeadquarters) {
           tile.controllingFamily = fam;
+          // Hole #5: encroachment check for AI neutral hex claims
+          checkEncroachment(state, tile.q, tile.r, tile.s, fam);
           aiActionsRemaining--;
         }
       }
