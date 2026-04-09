@@ -6,7 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
-import { SITDOWN_COST, SITDOWN_DEFENSE_PER_SOLDIER } from '@/types/game-mechanics';
+import { 
+  SITDOWN_COST, SITDOWN_DEFENSE_PER_SOLDIER,
+  DECLARE_WAR_COST, MATTRESSES_COST, MATTRESSES_COOLDOWN, MATTRESSES_DURATION, MATTRESSES_DEFENSE_BONUS, MATTRESSES_HQ_BONUS, MATTRESSES_INCOME_PENALTY,
+  WAR_SUMMIT_COST, WAR_SUMMIT_COOLDOWN, WAR_SUMMIT_DURATION, WAR_SUMMIT_COMBAT_BONUS, WAR_SUMMIT_FEAR_BONUS, WAR_SUMMIT_HEAT_COST,
+  WAR_MAX_SIMULTANEOUS,
+  MattressesState, WarSummitState,
+} from '@/types/game-mechanics';
 import { 
   DollarSign, 
   Users, 
