@@ -3640,7 +3640,7 @@ export const useEnhancedMafiaGameState = (
           }
 
           // Alert: fortify chance (hex-based)
-          if (isAlerted && !isHexFortified(state.fortifiedHexes || [], unit.q, unit.r, unit.s, fam) && Math.random() < 0.3 && aiTacticalRemaining > 0) {
+          if (isAlerted && !isHexFortified(state.fortifiedHexes || [], unit.q, unit.r, unit.s, fam) && Math.random() < 0.3 && aiTacticalRemaining > 0 && (state.fortifiedHexes || []).filter(f => f.family === fam).length < MAX_FORTIFICATIONS) {
             state.fortifiedHexes = [...(state.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: fam, fortifiedOnTurn: state.turn }];
             unit.movesRemaining = 0;
             aiTacticalRemaining--;
