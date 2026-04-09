@@ -6133,6 +6133,17 @@ export const useEnhancedMafiaGameState = (
         chance += FORTIFY_DEFENSE_BONUS / 200;
       }
       
+      // War Summit combat bonus (+15% when active)
+      if ((state.warSummitState || {}).active) {
+        chance += WAR_SUMMIT_COMBAT_BONUS / 100;
+      }
+      // Mattresses defense bonus for defender (if defender's family has mattresses active — AI will use this too)
+      // For player attacks on enemies, check if enemy has mattresses (N/A — AI doesn't use mattresses)
+      // For enemies attacking player, check player mattresses
+      if ((state.mattressesState || {}).active && tile.controllingFamily !== state.playerFamily) {
+        // Player is attacking while at mattresses — this shouldn't happen (units are locked), but safety
+      }
+      
       // Family bonuses (hitmen no longer provide combat bonuses — they are external contractors)
       chance += state.familyBonuses.combatBonus / 100;
       chance += state.familyBonuses.hitSuccess / 100;
