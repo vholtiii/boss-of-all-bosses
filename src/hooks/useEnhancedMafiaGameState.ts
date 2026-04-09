@@ -5302,6 +5302,135 @@ export const useEnhancedMafiaGameState = (
           });
           return newState;
         }
+        case 'declare_war': {
+          // Boss action — costs $10K + 1 action point
+          if (newState.turnPhase !== 'action') {
+            newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'Declare War is only available during the Action phase.' });
+            return newState;
+          }
+          if (newState.resources.money < DECLARE_WAR_COST) {
+            newState.pendingNotifications.push({ type: 'error', title: 'Not Enough Money', message: `Declaring war costs $${DECLARE_WAR_COST.toLocaleString()}.` });
+            return newState;
+          }
+          if (newState.actionsRemaining <= 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ No Actions', message: 'You have no actions remaining.' });
+            return newState;
+          }
+          const warTarget = action.targetFamily as string;
+          if (!warTarget || warTarget === newState.playerFamily) return newState;
+          // Check if already at war
+          if (areFamiliesAtWar(newState, newState.playerFamily, warTarget)) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Already At War', message: `You are already at war with the ${warTarget} family.` });
+            return newState;
+          }
+          // Check max wars
+          const playerWars = (newState.activeWars || []).filter(w => w.family1 === newState.playerFamily || w.family2 === newState.playerFamily).length;
+          if (playerWars >= WAR_MAX_SIMULTANEOUS) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Max Wars', message: `You cannot fight more than ${WAR_MAX_SIMULTANEOUS} wars simultaneously.` });
+            return newState;
+          }
+          // Check active pacts
+          const hasCeasefire = (newState.ceasefires || []).some(c => c.active && c.family === warTarget);
+          const hasAlliance = (newState.alliances || []).some(a => a.active && a.alliedFamily === warTarget);
+          if (hasCeasefire || hasAlliance) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Active Pact', message: `You have an active pact with ${warTarget}. Break it first.` });
+            return newState;
+          }
+          newState.resources.money -= DECLARE_WAR_COST;
+          newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
+          // Set tension to trigger level and trigger war
+          const pairKey = getTensionPairKey(newState.playerFamily, warTarget);
+          newState.familyTensions[pairKey] = WAR_TENSION_THRESHOLD;
+          checkAndTriggerWar(newState, newState.playerFamily, warTarget, 'declared' as any);
+          return newState;
+        }
+        case 'go_to_mattresses': {
+          // Boss action — $5K + 1 action, 3-turn defensive stance
+          if (newState.turnPhase !== 'action') {
+            newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'Go to the Mattresses is only available during the Action phase.' });
+            return newState;
+          }
+          if (newState.resources.money < MATTRESSES_COST) {
+            newState.pendingNotifications.push({ type: 'error', title: 'Not Enough Money', message: `Going to the mattresses costs $${MATTRESSES_COST.toLocaleString()}.` });
+            return newState;
+          }
+          if (newState.actionsRemaining <= 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ No Actions', message: 'You have no actions remaining.' });
+            return newState;
+          }
+          if ((newState.mattressesState || {}).active) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Already Active', message: 'You are already at the mattresses.' });
+            return newState;
+          }
+          if ((newState.mattressesCooldownUntil || 0) > newState.turn) {
+            const cd = (newState.mattressesCooldownUntil || 0) - newState.turn;
+            newState.pendingNotifications.push({ type: 'warning', title: '⏳ Cooldown', message: `Mattresses available in ${cd} turns.` });
+            return newState;
+          }
+          newState.resources.money -= MATTRESSES_COST;
+          newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
+          newState.mattressesState = { active: true, turnsRemaining: MATTRESSES_DURATION };
+          // +5 loyalty to all deployed soldiers
+          newState.deployedUnits.filter(u => u.family === newState.playerFamily).forEach(u => {
+            const stats = newState.soldierStats[u.id];
+            if (stats) {
+              const cap = u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP;
+              stats.loyalty = Math.min(cap, stats.loyalty + MATTRESSES_LOYALTY_BONUS);
+            }
+          });
+          // Lock all player units — set moves to 0
+          newState.deployedUnits = newState.deployedUnits.map(u => {
+            if (u.family !== newState.playerFamily) return u;
+            return { ...u, movesRemaining: 0 };
+          });
+          newState.pendingNotifications.push({
+            type: 'info', title: '🛏️ Going to the Mattresses!',
+            message: `Your family is hunkered down for ${MATTRESSES_DURATION} turns. +${MATTRESSES_DEFENSE_BONUS}% defense, +${MATTRESSES_HQ_BONUS}% HQ defense, +${MATTRESSES_LOYALTY_BONUS} loyalty. Units locked, -50% income.`,
+          });
+          return newState;
+        }
+        case 'war_summit': {
+          // Boss action — $5K + 1 action, 2-turn offensive boost
+          if (newState.turnPhase !== 'action') {
+            newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'War Summit is only available during the Action phase.' });
+            return newState;
+          }
+          if (newState.resources.money < WAR_SUMMIT_COST) {
+            newState.pendingNotifications.push({ type: 'error', title: 'Not Enough Money', message: `War Summit costs $${WAR_SUMMIT_COST.toLocaleString()}.` });
+            return newState;
+          }
+          if (newState.actionsRemaining <= 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ No Actions', message: 'You have no actions remaining.' });
+            return newState;
+          }
+          if ((newState.warSummitState || {}).active) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Already Active', message: 'War Summit is already in effect.' });
+            return newState;
+          }
+          if ((newState.warSummitCooldownUntil || 0) > newState.turn) {
+            const cd = (newState.warSummitCooldownUntil || 0) - newState.turn;
+            newState.pendingNotifications.push({ type: 'warning', title: '⏳ Cooldown', message: `War Summit available in ${cd} turns.` });
+            return newState;
+          }
+          newState.resources.money -= WAR_SUMMIT_COST;
+          newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
+          newState.warSummitState = { active: true, turnsRemaining: WAR_SUMMIT_DURATION };
+          // Immediate effects: +10 fear, +8 heat, +3 loyalty
+          newState.reputation.fear = Math.min(100, (newState.reputation.fear || 0) + WAR_SUMMIT_FEAR_BONUS);
+          newState.policeHeat.level = Math.min(100, newState.policeHeat.level + WAR_SUMMIT_HEAT_COST);
+          newState.deployedUnits.filter(u => u.family === newState.playerFamily).forEach(u => {
+            const stats = newState.soldierStats[u.id];
+            if (stats) {
+              const cap = u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP;
+              stats.loyalty = Math.min(cap, stats.loyalty + WAR_SUMMIT_LOYALTY_BONUS);
+            }
+          });
+          newState.pendingNotifications.push({
+            type: 'success', title: '⚔️ War Summit Called!',
+            message: `The Boss rallies the family! +${WAR_SUMMIT_COMBAT_BONUS}% combat for ${WAR_SUMMIT_DURATION} turns, +${WAR_SUMMIT_FEAR_BONUS} fear, +${WAR_SUMMIT_HEAT_COST} heat, +${WAR_SUMMIT_LOYALTY_BONUS} loyalty.`,
+          });
+          return newState;
+        }
         default:
           return newState;
       }
