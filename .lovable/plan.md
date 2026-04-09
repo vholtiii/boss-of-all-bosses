@@ -1,35 +1,38 @@
 
 
-# Improve Supply Lines Panel Clarity
+# Supply Lines: Map-Wide Impact + Minimum Distance
 
-## What "Buffer" Means
-"Buffer" is a **2-turn grace period** after a supply line gets severed. During those 2 turns, your businesses keep running at full revenue from stored stockpile. After the buffer expires, revenue starts decaying (-10%/turn down to 20% floor). The label "Buffer (1t)" means "1 turn of stockpile remaining."
+## Problem
+1. **Limited scope**: Several business types (casino, drug_trafficking, laundromat, prostitution) have no supply dependency — supply lines don't affect them at all. Supply lines should control inventory for ALL businesses on the map.
+2. **Too close to HQ**: Current exclusion is only 1-hex adjacent to HQ. Nodes can spawn 2 hexes away, making supply lines trivially short. Need a minimum distance of 5 hexes.
 
-The problem: this isn't explained anywhere in the UI — it's jargon.
+## Changes
 
-## Changes to `src/components/GameSidePanels.tsx`
+### 1. Expand `SUPPLY_DEPENDENCIES` to cover ALL business types (`src/types/game-mechanics.ts`)
 
-### 1. Rename "Buffer" to something clearer
-Change the badge text from `Buffer (1t)` to `Stockpile: 1 turn left` — immediately understandable without game knowledge.
+Add missing business types with logical supply node assignments:
 
-### 2. Add a brief legend/header below "Supply Lines" title
-Add a small muted-text explanation line: *"Connect HQ to nodes via territory to supply your businesses"*
+| Business | Supply Node | Rationale |
+|----------|------------|-----------|
+| casino | liquor_route | Casinos need liquor supply |
+| drug_trafficking | docks | Drugs come through the docks |
+| laundromat | trucking_depot | Needs pickup/delivery logistics |
+| prostitution | trucking_depot | Transport network |
 
-### 3. Improve status badge labels across all states
-| Current | New |
-|---------|-----|
-| `Connected` | `✓ Active` |
-| `Buffer (Nt)` | `Stockpile: N turns left` |
-| `Severed` | `✗ Severed` |
-| `No Route` | `— No Route` |
+This means every business on the map now depends on at least one supply node. Losing a supply line affects all businesses of that type across the entire map — not just ones in the node's territory.
 
-### 4. Add a tooltip-style line for Buffer/Severed states
-- Buffer: show *"Businesses running on stored supplies"* in yellow text
-- Severed: keep existing revenue % warning but prefix with *"Supply cut — "*
+### 2. Increase minimum spawn distance to 5 hexes (`src/hooks/useEnhancedMafiaGameState.ts`)
 
-### 5. Show dependency info more prominently
-Move the "Supplies: store front, store, restaurant" line to use a slightly bolder style so users understand *why* the node matters.
+Replace the current "exclude HQ-adjacent hexes" filter (lines 580-592) with a proper hex distance check using the existing `hexDistance()` function:
+- For each candidate hex, compute distance to ALL HQ positions
+- Reject candidates where distance to ANY HQ is < 5
+- This ensures every supply node requires building a meaningful territorial chain to reach
+
+### 3. Apply supply decay to AI families too (`src/hooks/useEnhancedMafiaGameState.ts`)
+
+The income calculation (line 2848-2865) only checks the player's `connectedNodeTypes`. Expand to also apply decay to AI family businesses using per-family connectivity — this is already tracked in `supplyStockpile` but not applied to AI income.
 
 ## Files Modified
-- `src/components/GameSidePanels.tsx` — badge labels, header text, status descriptions
+- `src/types/game-mechanics.ts` — add casino, drug_trafficking, laundromat, prostitution to `SUPPLY_DEPENDENCIES`
+- `src/hooks/useEnhancedMafiaGameState.ts` — minimum 5-hex distance filter for node placement + AI supply decay in income calc
 
