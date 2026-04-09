@@ -82,6 +82,16 @@ interface HeadquartersInfoPanelProps {
     safePassages: Array<{ id: string; targetFamily: string; turnsRemaining: number; active: boolean }>;
   };
   enemyFamilies?: string[];
+  // Boss actions
+  onDeclareWar?: (targetFamily: string) => void;
+  onGoToMattresses?: () => void;
+  onWarSummit?: () => void;
+  mattressesState?: MattressesState;
+  warSummitState?: WarSummitState;
+  mattressesCooldownUntil?: number;
+  warSummitCooldownUntil?: number;
+  activeWars?: Array<{ family1: string; family2: string; turnsRemaining: number }>;
+  actionsRemaining?: number;
 }
 
 const familyColors: Record<string, string> = {
