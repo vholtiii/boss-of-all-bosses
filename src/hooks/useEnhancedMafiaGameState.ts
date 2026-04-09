@@ -204,10 +204,14 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   weather: { ...state.weather, currentWeather: { ...state.weather.currentWeather } },
   finances: { ...state.finances },
   legalStatus: { ...state.legalStatus },
-  arrestedSoldiers: [...(state.arrestedSoldiers || [])],
-  arrestedCapos: [...(state.arrestedCapos || [])],
-  businesses: (state.businesses || []).map((b: any) => ({ ...b })),
-});
+    arrestedSoldiers: [...(state.arrestedSoldiers || [])],
+    arrestedCapos: [...(state.arrestedCapos || [])],
+    businesses: (state.businesses || []).map((b: any) => ({ ...b })),
+    // Tension & War
+    familyTensions: { ...(state.familyTensions || {}) },
+    activeWars: (state.activeWars || []).map(w => ({ ...w })),
+    tensionCooldowns: { ...(state.tensionCooldowns || {}) },
+  });
 
 // ============ UNIT TYPES ============
 export interface DeployedUnit {
