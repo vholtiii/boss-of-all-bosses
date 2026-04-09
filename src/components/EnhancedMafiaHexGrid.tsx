@@ -1046,7 +1046,19 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     );
                   })()}
 
-                  {/* Supply node indicator — golden border + icon + status badge */}
+                  {/* Pending negotiation badge */}
+                  {(() => {
+                    const pendingNegs = gameState?.pendingNegotiations || [];
+                    const pending = pendingNegs.find((p: any) => p.targetQ === tile.q && p.targetR === tile.r && p.targetS === tile.s);
+                    if (!pending) return null;
+                    return (
+                      <g className="pointer-events-none">
+                        <circle cx={x + baseHexRadius * 0.6} cy={y - baseHexRadius * 0.7} r={8} fill={pending.ready ? '#D4AF37' : '#6B7280'} stroke="#ffffff" strokeWidth="1" />
+                        <text x={x + baseHexRadius * 0.6} y={y - baseHexRadius * 0.7 + 3.5} textAnchor="middle" fontSize="9" className="select-none">{pending.ready ? '🤝' : '📩'}</text>
+                      </g>
+                    );
+                  })()}
+
                   {tile.supplyNode && (() => {
                     const cfg = SUPPLY_NODE_CONFIG[tile.supplyNode];
                     const nodeKey = `${tile.q},${tile.r},${tile.s}`;
