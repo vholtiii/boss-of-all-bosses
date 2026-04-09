@@ -46,6 +46,7 @@ import {
   CEASEFIRE_VIOLATION_RESPECT_LOSS, CEASEFIRE_VIOLATION_FEAR_LOSS, TREACHERY_DEBUFF_DURATION, TREACHERY_NEGOTIATION_PENALTY, TreacheryDebuff,
   SupplyNode, SupplyNodeType, SupplyStockpileEntry, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES,
   SUPPLY_DECAY_RATE, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER,
+  SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, SAFEHOUSE_STOCKPILE_RATE,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -158,7 +159,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   combatLog: [...(state.combatLog || [])],
   activeDistrictBonuses: [...(state.activeDistrictBonuses || [])],
   scoutedHexes: [...(state.scoutedHexes || [])],
-  safehouses: (state.safehouses || []).map(s => ({ ...s })),
+  safehouses: (state.safehouses || []).map(s => ({ ...s, stockpile: { ...s.stockpile }, connectedSupplyTypes: [...(s.connectedSupplyTypes || [])], subRoutePath: s.subRoutePath ? [...s.subRoutePath] : undefined })),
   fortifiedHexes: (state.fortifiedHexes || []).map(f => ({ ...f })),
   activeBribes: (state.activeBribes || []).map(b => ({ ...b })),
   plannedHit: state.plannedHit ? { ...state.plannedHit } : null,
@@ -1559,6 +1560,10 @@ export const useEnhancedMafiaGameState = (
       q: unit.q, r: unit.r, s: unit.s,
       turnsRemaining: SAFEHOUSE_DURATION,
       createdTurn: prev.turn,
+      stockpile: {},
+      allocationPercent: 0,
+      connectedSupplyTypes: [],
+      manualRouteEstablished: false,
     };
 
     return {
@@ -2180,6 +2185,138 @@ export const useEnhancedMafiaGameState = (
             }
           });
         });
+      }
+
+      // ============ SAFEHOUSE STOCKPILE ACCUMULATION ============
+      {
+        const hk = (q: number, r: number, s: number) => `${q},${r},${s}`;
+        const dd = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
+        const allFamiliesForSafehouse = [newState.playerFamily, ...newState.aiOpponents.map(o => o.family)];
+        const supplyRouteHexSets: Record<string, Set<string>> = {};
+        const familyConnectedNodeTypes: Record<string, Set<SupplyNodeType>> = {};
+
+        allFamiliesForSafehouse.forEach(fam => {
+          const famHexSet = new Set(newState.hexMap.filter(t => t.controllingFamily === fam || t.isHeadquarters === fam).map(t => hk(t.q, t.r, t.s)));
+          const hqT = newState.hexMap.find(t => t.isHeadquarters === fam);
+          if (!hqT) { supplyRouteHexSets[fam] = new Set(); familyConnectedNodeTypes[fam] = new Set(); return; }
+          for (const node of (newState.supplyNodes || [])) {
+            const nodeKey = hk(node.q, node.r, node.s);
+            if (famHexSet.has(nodeKey)) continue;
+            const hasNeighbor = dd.some(d => famHexSet.has(hk(node.q+d.q, node.r+d.r, node.s+d.s)));
+            if (hasNeighbor) famHexSet.add(nodeKey);
+          }
+          const vis = new Set<string>();
+          const bQ: Array<{q:number;r:number;s:number}> = [{ q: hqT.q, r: hqT.r, s: hqT.s }];
+          vis.add(hk(hqT.q, hqT.r, hqT.s));
+          while (bQ.length > 0) {
+            const c = bQ.shift()!;
+            for (const d of dd) {
+              const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
+              const nk = hk(nq, nr, ns);
+              if (vis.has(nk) || !famHexSet.has(nk)) continue;
+              vis.add(nk); bQ.push({q:nq, r:nr, s:ns});
+            }
+          }
+          const connectedTypes = new Set<SupplyNodeType>();
+          for (const node of (newState.supplyNodes || [])) {
+            if (vis.has(hk(node.q, node.r, node.s))) connectedTypes.add(node.type);
+          }
+          supplyRouteHexSets[fam] = vis;
+          familyConnectedNodeTypes[fam] = connectedTypes;
+        });
+
+        for (const sh of newState.safehouses) {
+          const shKey = hk(sh.q, sh.r, sh.s);
+          const shTile = newState.hexMap.find(t => t.q === sh.q && t.r === sh.r && t.s === sh.s);
+          if (!shTile) continue;
+          const ownerFamily = shTile.controllingFamily;
+          if (ownerFamily === 'neutral') { sh.connectedSupplyTypes = []; continue; }
+          const routeSet = supplyRouteHexSets[ownerFamily] || new Set();
+          const connTypes = familyConnectedNodeTypes[ownerFamily] || new Set<SupplyNodeType>();
+          const isOnRoute = routeSet.has(shKey);
+          const isAdjToRoute = !isOnRoute && dd.some(d => routeSet.has(hk(sh.q+d.q, sh.r+d.r, sh.s+d.s)));
+          const isAutoConnected = isOnRoute || isAdjToRoute;
+
+          let isManuallyConnectable = false;
+          if (!isAutoConnected && !sh.manualRouteEstablished) {
+            const ownedSet = new Set(newState.hexMap.filter(t => t.controllingFamily === ownerFamily).map(t => hk(t.q, t.r, t.s)));
+            const mVis = new Set<string>();
+            const mQ: Array<{q:number;r:number;s:number}> = [{q: sh.q, r: sh.r, s: sh.s}];
+            mVis.add(shKey);
+            let found = false;
+            while (mQ.length > 0 && !found) {
+              const c = mQ.shift()!;
+              for (const d of dd) {
+                const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
+                const nk = hk(nq, nr, ns);
+                if (mVis.has(nk)) continue;
+                if (routeSet.has(nk)) { found = true; break; }
+                if (ownedSet.has(nk)) { mVis.add(nk); mQ.push({q:nq, r:nr, s:ns}); }
+              }
+            }
+            isManuallyConnectable = found;
+          }
+
+          let isManualConnected = false;
+          if (sh.manualRouteEstablished) {
+            const ownedSet = new Set(newState.hexMap.filter(t => t.controllingFamily === ownerFamily).map(t => hk(t.q, t.r, t.s)));
+            const mVis = new Set<string>();
+            const mQ: Array<{q:number;r:number;s:number}> = [{q: sh.q, r: sh.r, s: sh.s}];
+            mVis.add(shKey);
+            let found = false;
+            const mPar = new Map<string, string>();
+            mPar.set(shKey, '');
+            while (mQ.length > 0 && !found) {
+              const c = mQ.shift()!;
+              for (const d of dd) {
+                const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
+                const nk = hk(nq, nr, ns);
+                if (mVis.has(nk)) continue;
+                if (routeSet.has(nk)) {
+                  found = true;
+                  mPar.set(nk, hk(c.q, c.r, c.s));
+                  const subPath: Array<{q:number;r:number;s:number}> = [];
+                  let pk = nk;
+                  while (pk && pk !== '') {
+                    const [pq, pr, ps] = pk.split(',').map(Number);
+                    subPath.unshift({q: pq, r: pr, s: ps});
+                    pk = mPar.get(pk) || '';
+                  }
+                  sh.subRoutePath = subPath;
+                  break;
+                }
+                if (ownedSet.has(nk)) { mVis.add(nk); mPar.set(nk, hk(c.q, c.r, c.s)); mQ.push({q:nq, r:nr, s:ns}); }
+              }
+            }
+            if (found) {
+              isManualConnected = true;
+            } else {
+              sh.manualRouteEstablished = false;
+              sh.subRoutePath = undefined;
+              if (ownerFamily === newState.playerFamily) {
+                newState.pendingNotifications.push({
+                  type: 'warning', title: '🏠 Safehouse Disconnected',
+                  message: `Your safehouse sub-route was severed — territory chain broken. Stockpiling stopped.`,
+                });
+              }
+            }
+          }
+
+          const isConnected = isAutoConnected || isManualConnected;
+          if (isConnected) {
+            sh.connectedSupplyTypes = Array.from(connTypes);
+            const rate = (sh.allocationPercent / SAFEHOUSE_MAX_ALLOCATION) * SAFEHOUSE_STOCKPILE_RATE;
+            for (const nodeType of sh.connectedSupplyTypes) {
+              const current = sh.stockpile[nodeType] || 0;
+              if (current < SAFEHOUSE_MAX_STOCKPILE) {
+                sh.stockpile[nodeType] = Math.min(SAFEHOUSE_MAX_STOCKPILE, current + rate);
+              }
+            }
+          } else {
+            sh.connectedSupplyTypes = [];
+            (sh as any)._manuallyConnectable = isManuallyConnectable;
+          }
+        }
       }
 
       processEconomy(newState);
@@ -3383,15 +3520,17 @@ export const useEnhancedMafiaGameState = (
                   // Check if any safehouse was on this hex (player's)
                   const shIdx = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
                   if (shIdx !== -1) {
+                    const capturedSh = state.safehouses[shIdx];
+                    // Transfer stockpile to captor
+                    const stockpileDesc = Object.entries(capturedSh.stockpile || {}).filter(([,v]) => (v as number) > 0).map(([k,v]) => `${Math.floor(v as number)} ${k.replace('_',' ')}`).join(', ');
                     state.safehouses.splice(shIdx, 1);
                     if (prevOwner === state.playerFamily) {
                       state.pendingNotifications.push({
                         type: 'error' as const,
                         title: '🏠 Safehouse Destroyed',
-                        message: `The ${fam} family captured the hex and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} and intel on your operations.`,
+                        message: `The ${fam} family captured the hex and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} and intel on your operations.${stockpileDesc ? ` Seized stockpile: ${stockpileDesc}.` : ''}`,
                       });
                     }
-                    // Bounty to capturing AI family
                     const captorOpponent = state.aiOpponents.find(o => o.family === fam);
                     if (captorOpponent) captorOpponent.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
                     if (prevOwner === state.playerFamily) {
@@ -3476,16 +3615,18 @@ export const useEnhancedMafiaGameState = (
                 
                 const shIdx2 = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
                 if (shIdx2 !== -1 && tile.controllingFamily === fam) {
-                  state.safehouses.splice(shIdx2, 1);
-                  if (prevOwner === state.playerFamily) {
-                    state.pendingNotifications.push({
-                      type: 'error' as const,
-                      title: '🏠 Safehouse Destroyed',
-                      message: `The ${fam} family captured your territory and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()}.`,
-                    });
-                  }
-                  const captorOpp2 = state.aiOpponents.find(o => o.family === fam);
-                  if (captorOpp2) captorOpp2.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
+                    const capturedSh2 = state.safehouses[shIdx2];
+                    const stockpileDesc2 = Object.entries(capturedSh2.stockpile || {}).filter(([,v]) => (v as number) > 0).map(([k,v]) => `${Math.floor(v as number)} ${k.replace('_',' ')}`).join(', ');
+                    state.safehouses.splice(shIdx2, 1);
+                    if (prevOwner === state.playerFamily) {
+                      state.pendingNotifications.push({
+                        type: 'error' as const,
+                        title: '🏠 Safehouse Destroyed',
+                        message: `The ${fam} family captured your territory and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()}.${stockpileDesc2 ? ` Seized stockpile: ${stockpileDesc2}.` : ''}`,
+                      });
+                    }
+                    const captorOpp2 = state.aiOpponents.find(o => o.family === fam);
+                    if (captorOpp2) captorOpp2.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
                 }
               }
             }
@@ -3659,6 +3800,10 @@ export const useEnhancedMafiaGameState = (
             q: bestHex.q, r: bestHex.r, s: bestHex.s,
             turnsRemaining: SAFEHOUSE_DURATION,
             createdTurn: state.turn,
+            stockpile: {},
+            allocationPercent: 0,
+            connectedSupplyTypes: [],
+            manualRouteEstablished: false,
           });
           opponent.resources.money -= SAFEHOUSE_COST;
           if (turnReport) {
@@ -4194,6 +4339,52 @@ export const useEnhancedMafiaGameState = (
         }
         case 'establish_safehouse':
           return processEstablishSafehouse(newState, action);
+        case 'establish_safehouse_route': {
+          // Manual sub-route: connect a safehouse to a supply line via territory chain
+          const shIdx = newState.safehouses.findIndex(s => s.q === action.q && s.r === action.r && s.s === action.s);
+          if (shIdx === -1) return newState;
+          const sh = newState.safehouses[shIdx];
+          const shTile = newState.hexMap.find(t => t.q === sh.q && t.r === sh.r && t.s === sh.s);
+          if (!shTile || shTile.controllingFamily !== newState.playerFamily) return newState;
+          sh.manualRouteEstablished = true;
+          newState.pendingNotifications.push({
+            type: 'success', title: '🔗 Stockpile Route Established',
+            message: `Your safehouse is now connected to supply lines. Set allocation to begin stockpiling.`,
+          });
+          syncLegacyUnits(newState);
+          return newState;
+        }
+        case 'set_safehouse_allocation': {
+          const shIdx = newState.safehouses.findIndex(s => s.q === action.q && s.r === action.r && s.s === action.s);
+          if (shIdx === -1) return newState;
+          newState.safehouses[shIdx].allocationPercent = Math.max(0, Math.min(SAFEHOUSE_MAX_ALLOCATION, action.allocationPercent));
+          return newState;
+        }
+        case 'release_safehouse_stockpile': {
+          const shIdx = newState.safehouses.findIndex(s => s.q === action.q && s.r === action.r && s.s === action.s);
+          if (shIdx === -1) return newState;
+          const sh = newState.safehouses[shIdx];
+          const supplyType = action.supplyType as SupplyNodeType;
+          const current = sh.stockpile[supplyType] || 0;
+          if (current <= 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '📦 No Stockpile', message: `No ${supplyType.replace('_', ' ')} reserves to release.` });
+            return newState;
+          }
+          // Release 1 unit — sustain businesses for 1 turn
+          sh.stockpile[supplyType] = Math.max(0, current - 1);
+          // Mark the supply type as "sustained" this turn by resetting stockpile disconnect counter
+          const stockEntry = (newState.supplyStockpile || []).find(e => e.family === newState.playerFamily && e.nodeType === supplyType);
+          if (stockEntry && stockEntry.turnsSinceDisconnected > 0) {
+            stockEntry.turnsSinceDisconnected = 0; // Reset — 1 turn of full revenue
+          }
+          const cfg = SUPPLY_NODE_CONFIG[supplyType];
+          newState.pendingNotifications.push({
+            type: 'success', title: '📦 Stockpile Released',
+            message: `Released 1 unit of ${cfg.label} reserves. Businesses sustained for this turn. ${Math.max(0, current - 1)} remaining.`,
+          });
+          syncLegacyUnits(newState);
+          return newState;
+        }
         case 'plan_hit': {
           // Tactical phase action — costs 1 tactical action
           if (newState.turnPhase !== 'move') {
@@ -5304,6 +5495,10 @@ export const useEnhancedMafiaGameState = (
       q: targetQ, r: targetR, s: targetS,
       turnsRemaining: SAFEHOUSE_DURATION,
       createdTurn: state.turn,
+      stockpile: {},
+      allocationPercent: 0,
+      connectedSupplyTypes: [],
+      manualRouteEstablished: false,
     });
     state.resources.money -= SAFEHOUSE_COST;
 
@@ -5530,6 +5725,17 @@ export const useEnhancedMafiaGameState = (
         // For simplicity, any safehouse on this hex that isn't the player's gets destroyed
         const enemySafehouseIdx = state.safehouses.findIndex(s => s.q === targetQ && s.r === targetR && s.s === targetS);
         if (enemySafehouseIdx !== -1) {
+          const capturedSh = state.safehouses[enemySafehouseIdx];
+          const stockpileDesc = Object.entries(capturedSh.stockpile || {}).filter(([,v]) => (v as number) > 0).map(([k,v]) => `${Math.floor(v as number)} ${k.replace('_',' ')}`).join(', ');
+          // Transfer seized stockpile to player's supply buffer (reset disconnect counters)
+          Object.entries(capturedSh.stockpile || {}).forEach(([nodeType, amount]) => {
+            if ((amount as number) > 0) {
+              const stockEntry = (state.supplyStockpile || []).find(e => e.family === state.playerFamily && e.nodeType === nodeType);
+              if (stockEntry && stockEntry.turnsSinceDisconnected > 0) {
+                stockEntry.turnsSinceDisconnected = Math.max(0, stockEntry.turnsSinceDisconnected - Math.floor(amount as number));
+              }
+            }
+          });
           state.safehouses.splice(enemySafehouseIdx, 1);
           state.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
           // Intel: scout all hexes owned by targetFamily for 1 turn
@@ -5545,7 +5751,6 @@ export const useEnhancedMafiaGameState = (
               businessType: h.business?.type,
               businessIncome: h.business?.income,
             }));
-            // Merge — don't duplicate existing scouts
             const existingKeys = new Set(state.scoutedHexes.map(s => `${s.q},${s.r},${s.s}`));
             state.scoutedHexes = [
               ...state.scoutedHexes,
@@ -5554,7 +5759,7 @@ export const useEnhancedMafiaGameState = (
           }
           state.pendingNotifications = [...state.pendingNotifications, {
             type: 'success', title: '🏠 Enemy Safehouse Captured!',
-            message: `You raided their safehouse! +$${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} bounty and full intel on ${targetFamily} operations for 1 turn.`,
+            message: `You raided their safehouse! +$${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} bounty and full intel on ${targetFamily} operations for 1 turn.${stockpileDesc ? ` Seized stockpile: ${stockpileDesc}!` : ''}`,
           }];
         }
         

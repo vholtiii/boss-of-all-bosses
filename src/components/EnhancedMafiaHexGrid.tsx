@@ -914,12 +914,35 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   )}
 
                   {/* Safehouse indicator */}
-                  {gameState?.safehouses?.some((s: any) => s.q === tile.q && s.r === tile.r && s.s === tile.s) && (
-                    <g className="pointer-events-none">
-                      <circle cx={x - baseHexRadius * 0.55} cy={y - baseHexRadius * 0.55} r="8" fill="#F59E0B" stroke="#ffffff" strokeWidth="1" />
-                      <text x={x - baseHexRadius * 0.55} y={y - baseHexRadius * 0.55 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🏠</text>
-                    </g>
-                  )}
+                  {(() => {
+                    const safehouse = (gameState?.safehouses || []).find((s: any) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
+                    if (!safehouse) return null;
+                    const isPlayerOwned = tile.controllingFamily === playerFamily;
+                    const isConnected = safehouse.connectedSupplyTypes && safehouse.connectedSupplyTypes.length > 0;
+                    const isStockpiling = isConnected && safehouse.allocationPercent > 0;
+                    const supplyColors: Record<string, string> = {
+                      docks: '#60A5FA', union_hall: '#F59E0B', trucking_depot: '#34D399',
+                      liquor_route: '#C084FC', food_market: '#FB923C',
+                    };
+                    return (
+                      <g className="pointer-events-none">
+                        {/* Player-only connection glow */}
+                        {isPlayerOwned && isConnected && (
+                          <circle cx={x - baseHexRadius * 0.55} cy={y - baseHexRadius * 0.55} r="12"
+                            fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"
+                            className="safehouse-glow" />
+                        )}
+                        <circle cx={x - baseHexRadius * 0.55} cy={y - baseHexRadius * 0.55} r="8" fill="#F59E0B" stroke="#ffffff" strokeWidth="1" />
+                        <text x={x - baseHexRadius * 0.55} y={y - baseHexRadius * 0.55 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🏠</text>
+                        {/* Player-only stockpiling dots */}
+                        {isPlayerOwned && isStockpiling && safehouse.connectedSupplyTypes.map((st: string, i: number) => (
+                          <circle key={st} cx={x - baseHexRadius * 0.55 - 6 + i * 4} cy={y - baseHexRadius * 0.55 + 12}
+                            r="1.8" fill={supplyColors[st] || '#999'} className="stockpile-dot"
+                            style={{ animationDelay: `${i * 0.3}s` }} />
+                        ))}
+                      </g>
+                    );
+                  })()}
 
                   {/* Planned Hit crosshair indicator — original hex */}
                   {gameState?.plannedHit && gameState.plannedHit.q === tile.q && gameState.plannedHit.r === tile.r && gameState.plannedHit.s === tile.s && (() => {
@@ -1238,6 +1261,36 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       />
                     </g>
                   ))}
+                </g>
+              );
+            })()}
+
+            {/* Safehouse sub-route lines — player-only */}
+            {showSupplyLines && (() => {
+              const playerSafehouses = (gameState?.safehouses || []).filter((sh: any) => {
+                const t = hexMap.find(h => h.q === sh.q && h.r === sh.r && h.s === sh.s);
+                return t && t.controllingFamily === playerFamily && sh.manualRouteEstablished && sh.subRoutePath && sh.subRoutePath.length > 1;
+              });
+              if (playerSafehouses.length === 0) return null;
+              return (
+                <g className="pointer-events-none">
+                  {playerSafehouses.map((sh: any, idx: number) => {
+                    const pts = sh.subRoutePath.map((p: any) => getHexPosition(p.q, p.r));
+                    return (
+                      <polyline
+                        key={`sub-route-${idx}`}
+                        className="supply-flow-line"
+                        points={pts.map((p: any) => `${p.x},${p.y}`).join(' ')}
+                        fill="none"
+                        stroke="#B0B0B0"
+                        strokeWidth="2.5"
+                        strokeOpacity="0.6"
+                        strokeDasharray="4 3"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      />
+                    );
+                  })}
                 </g>
               );
             })()}
