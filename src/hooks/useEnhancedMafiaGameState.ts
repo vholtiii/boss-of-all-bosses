@@ -3392,6 +3392,23 @@ export const useEnhancedMafiaGameState = (
               }
             }
           }
+          // War income penalty for AI
+          let aiWarPenalty = 0;
+          (state.activeWars || []).forEach(w => {
+            const isInWar = w.family1 === fam || w.family2 === fam;
+            if (!isInWar) return;
+            const enemyWar = w.family1 === fam ? w.family2 : w.family1;
+            const neighbors = getHexNeighbors(tile.q, tile.r, tile.s);
+            const hasEnemyNeighbor = neighbors.some(n => {
+              const nt = state.hexMap.find(t2 => t2.q === n.q && t2.r === n.r && t2.s === n.s);
+              return nt && nt.controllingFamily === enemyWar;
+            });
+            if (hasEnemyNeighbor) aiWarPenalty += WAR_INCOME_PENALTY;
+          });
+          if (aiWarPenalty > 0) {
+            aiWarPenalty = Math.min(aiWarPenalty, WAR_INCOME_PENALTY_CAP);
+            tileInc = Math.floor(tileInc * (1 - aiWarPenalty));
+          }
           aiIncome += tileInc;
         }
       });
@@ -3402,6 +3419,8 @@ export const useEnhancedMafiaGameState = (
       if (turnReport) turnReport.aiActions.push({ family: fam, action: 'income', detail: `Earned $${aiIncome.toLocaleString()} income` });
 
       // ── RECRUIT (difficulty-scaled cap) ──
+      // War recruitment boost: recruit more aggressively during war
+      const atWarBonus = (state.activeWars || []).some(w => w.family1 === fam || w.family2 === fam) ? 2 : 0;
       const isAlerted = (state.aiAlertState || {})[fam] > 0;
       const alertBonus = isAlerted ? 1 : 0;
       const capScale = state.mapSize === 'small' ? -2 : state.mapSize === 'large' ? 4 : 0;
@@ -3411,7 +3430,7 @@ export const useEnhancedMafiaGameState = (
       const wantToRecruit = Math.max(0, soldierCap - totalSoldiers);
       if (wantToRecruit > 0) {
         const canAfford = Math.floor(opponent.resources.money / SOLDIER_COST);
-        const toRecruit = Math.min(wantToRecruit, canAfford, 3 + alertBonus);
+        const toRecruit = Math.min(wantToRecruit, canAfford, 3 + alertBonus + atWarBonus);
         opponent.resources.soldiers += toRecruit;
         opponent.resources.money -= toRecruit * SOLDIER_COST;
         if (toRecruit > 0 && turnReport) {
