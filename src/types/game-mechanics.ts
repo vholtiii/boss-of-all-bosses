@@ -258,7 +258,7 @@ export const CAPO_COST = 1500;
 export const MAX_HITMEN = 3;
 
 // ============ HITMAN CONTRACT SYSTEM ============
-export const HITMAN_CONTRACT_COST = 15000;
+export const HITMAN_CONTRACT_COST = 30000;
 export const HITMAN_BASE_SUCCESS = 90;       // open field
 export const HITMAN_FORTIFIED_SUCCESS = 65;
 export const HITMAN_SAFEHOUSE_SUCCESS = 55;
@@ -517,3 +517,58 @@ export interface SupplyStockpileEntry {
 export const SUPPLY_DECAY_RATE = 0.10;       // -10% per turn after buffer expires
 export const SUPPLY_DECAY_FLOOR = 0.20;       // minimum 20% of max revenue
 export const SUPPLY_STOCKPILE_BUFFER = 2;     // 2-turn grace period before decay starts
+
+// ============ TENSION & WAR SYSTEM ============
+export const WAR_TENSION_THRESHOLD = 80;
+export const WAR_DURATION = 10;
+export const WAR_MAX_SIMULTANEOUS = 2;
+export const TENSION_DECAY_PER_TURN = 2;
+export const WAR_INCOME_PENALTY = 0.20;       // -20% income on border hexes
+export const WAR_INCOME_PENALTY_CAP = 0.30;   // -30% max from multiple wars
+export const WAR_POST_TENSION = 40;           // tension resets to this after war
+export const WAR_POST_RELATIONSHIP = -80;     // relationship resets to this after war
+export const ENCROACHMENT_NEIGHBOR_THRESHOLD = 3; // 3+ rival hexes around a neutral claim = encroachment
+
+// Tension builder constants
+export const TENSION_TERRITORY_HIT = 10;
+export const TENSION_PLAN_HIT_SOLDIER = 15;
+// Plan hit on capo = instant war (no numeric value needed)
+export const TENSION_EXTORT_RIVAL = 8;
+export const TENSION_ENCROACHMENT = 12;
+export const TENSION_SUPPLY_SABOTAGE = 15;
+export const TENSION_HITMAN_KILL_SOLDIER_GLOBAL = 5;
+export const TENSION_HITMAN_KILL_CAPO_GLOBAL = 15;
+export const TENSION_PACT_BREAK = 30;
+
+// Tension reducer constants
+export const TENSION_REDUCE_CEASEFIRE = 25;
+export const TENSION_REDUCE_ALLIANCE = 35;
+export const TENSION_REDUCE_SUPPLY_DEAL = 15;
+export const TENSION_REDUCE_SHARE_PROFITS = 10;
+export const TENSION_REDUCE_SAFE_PASSAGE = 8;
+export const TENSION_REDUCE_BRIBE_TERRITORY = 5;
+
+export interface WarState {
+  family1: string;
+  family2: string;
+  turnsRemaining: number;
+  startedOnTurn: number;
+  trigger: 'tension' | 'capo_hit';
+}
+
+// Helper: get sorted pair key for tension tracking
+export const getTensionPairKey = (a: string, b: string): string => {
+  return [a, b].sort().join('-');
+};
+
+// Helper: get all pair keys for 5 families
+export const getAllFamilyPairKeys = (): string[] => {
+  const families = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
+  const pairs: string[] = [];
+  for (let i = 0; i < families.length; i++) {
+    for (let j = i + 1; j < families.length; j++) {
+      pairs.push(getTensionPairKey(families[i], families[j]));
+    }
+  }
+  return pairs;
+};
