@@ -2516,6 +2516,69 @@ export const useEnhancedMafiaGameState = (
       }
       processBribes(newState);
       processPacts(newState);
+
+      // ============ WAR & TENSION LIFECYCLE ============
+      {
+        // 1. Decay tension by TENSION_DECAY_PER_TURN for all pairs
+        const allPairs = getAllFamilyPairKeys();
+        allPairs.forEach(key => {
+          if ((newState.familyTensions[key] || 0) > 0) {
+            newState.familyTensions[key] = Math.max(0, (newState.familyTensions[key] || 0) - TENSION_DECAY_PER_TURN);
+          }
+        });
+
+        // 2. Tick down tension cooldowns (Hole #3)
+        Object.keys(newState.tensionCooldowns).forEach(key => {
+          if (newState.tensionCooldowns[key] > 0) {
+            newState.tensionCooldowns[key] -= 1;
+            if (newState.tensionCooldowns[key] <= 0) delete newState.tensionCooldowns[key];
+          }
+        });
+
+        // 3. Check tension thresholds → trigger wars
+        allPairs.forEach(key => {
+          if ((newState.familyTensions[key] || 0) >= WAR_TENSION_THRESHOLD) {
+            const [fA, fB] = key.split('-');
+            checkAndTriggerWar(newState, fA, fB, 'tension');
+          }
+        });
+
+        // 4. Tick down active wars
+        newState.activeWars = (newState.activeWars || []).filter(w => {
+          w.turnsRemaining -= 1;
+          if (w.turnsRemaining <= 0) {
+            // War ends — reset tension to WAR_POST_TENSION, relationship to WAR_POST_RELATIONSHIP
+            const key = getTensionPairKey(w.family1, w.family2);
+            newState.familyTensions[key] = WAR_POST_TENSION;
+            // Update relationships
+            const isPlayerInvolved = w.family1 === newState.playerFamily || w.family2 === newState.playerFamily;
+            if (isPlayerInvolved) {
+              const otherFam = w.family1 === newState.playerFamily ? w.family2 : w.family1;
+              if (newState.reputation.familyRelationships[otherFam] !== undefined) {
+                newState.reputation.familyRelationships[otherFam] = WAR_POST_RELATIONSHIP;
+              }
+            }
+            // Update AI-AI relationships
+            newState.aiOpponents.forEach(ai => {
+              if (ai.family === w.family1 || ai.family === w.family2) {
+                const otherWar = ai.family === w.family1 ? w.family2 : w.family1;
+                if (ai.relationships[otherWar] !== undefined) {
+                  ai.relationships[otherWar] = WAR_POST_RELATIONSHIP;
+                }
+              }
+            });
+            const fA = w.family1.charAt(0).toUpperCase() + w.family1.slice(1);
+            const fB = w.family2.charAt(0).toUpperCase() + w.family2.slice(1);
+            newState.pendingNotifications.push({
+              type: 'info' as const,
+              title: '🕊️ War Ended',
+              message: `The war between ${fA} and ${fB} has ended after ${WAR_DURATION} turns. Tensions remain high.`,
+            });
+            return false; // Remove war
+          }
+          return true;
+        });
+      }
       
       newState.reputation.reputation = Math.max(0, newState.reputation.reputation - 0.5);
       newState.reputation.fear = Math.max(0, newState.reputation.fear - 1);
