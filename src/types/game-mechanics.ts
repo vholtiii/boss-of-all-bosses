@@ -568,7 +568,36 @@ export interface WarState {
   family2: string;
   turnsRemaining: number;
   startedOnTurn: number;
-  trigger: 'tension' | 'capo_hit';
+  trigger: 'tension' | 'capo_hit' | 'declared';
+}
+
+// ============ BOSS ACTIONS: DECLARE WAR, MATTRESSES, WAR SUMMIT ============
+export const DECLARE_WAR_COST = 10000;
+
+export const MATTRESSES_COST = 5000;
+export const MATTRESSES_COOLDOWN = 8;
+export const MATTRESSES_DURATION = 3;
+export const MATTRESSES_DEFENSE_BONUS = 20;    // +20% unit defense
+export const MATTRESSES_HQ_BONUS = 15;          // +15% HQ assault defense
+export const MATTRESSES_INCOME_PENALTY = 0.50;  // -50% territory income
+export const MATTRESSES_LOYALTY_BONUS = 5;      // +5 loyalty to all soldiers
+
+export interface MattressesState {
+  active: boolean;
+  turnsRemaining: number;
+}
+
+export const WAR_SUMMIT_COST = 5000;
+export const WAR_SUMMIT_COOLDOWN = 5;
+export const WAR_SUMMIT_DURATION = 2;
+export const WAR_SUMMIT_COMBAT_BONUS = 15;     // +15% hit chance
+export const WAR_SUMMIT_FEAR_BONUS = 10;        // +10 fear immediately
+export const WAR_SUMMIT_HEAT_COST = 8;          // +8 police heat
+export const WAR_SUMMIT_LOYALTY_BONUS = 3;      // +3 loyalty to all soldiers
+
+export interface WarSummitState {
+  active: boolean;
+  turnsRemaining: number;
 }
 
 // Helper: get sorted pair key for tension tracking

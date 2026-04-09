@@ -6,7 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
-import { SITDOWN_COST, SITDOWN_DEFENSE_PER_SOLDIER } from '@/types/game-mechanics';
+import { 
+  SITDOWN_COST, SITDOWN_DEFENSE_PER_SOLDIER,
+  DECLARE_WAR_COST, MATTRESSES_COST, MATTRESSES_COOLDOWN, MATTRESSES_DURATION, MATTRESSES_DEFENSE_BONUS, MATTRESSES_HQ_BONUS, MATTRESSES_INCOME_PENALTY,
+  WAR_SUMMIT_COST, WAR_SUMMIT_COOLDOWN, WAR_SUMMIT_DURATION, WAR_SUMMIT_COMBAT_BONUS, WAR_SUMMIT_FEAR_BONUS, WAR_SUMMIT_HEAT_COST,
+  WAR_MAX_SIMULTANEOUS,
+  MattressesState, WarSummitState,
+} from '@/types/game-mechanics';
 import { 
   DollarSign, 
   Users, 
@@ -76,6 +82,16 @@ interface HeadquartersInfoPanelProps {
     safePassages: Array<{ id: string; targetFamily: string; turnsRemaining: number; active: boolean }>;
   };
   enemyFamilies?: string[];
+  // Boss actions
+  onDeclareWar?: (targetFamily: string) => void;
+  onGoToMattresses?: () => void;
+  onWarSummit?: () => void;
+  mattressesState?: MattressesState;
+  warSummitState?: WarSummitState;
+  mattressesCooldownUntil?: number;
+  warSummitCooldownUntil?: number;
+  activeWars?: Array<{ family1: string; family2: string; turnsRemaining: number }>;
+  actionsRemaining?: number;
 }
 
 const familyColors: Record<string, string> = {
@@ -119,11 +135,21 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   negotiationUsedThisTurn = false,
   activePacts,
   enemyFamilies = [],
+  onDeclareWar,
+  onGoToMattresses,
+  onWarSummit,
+  mattressesState,
+  warSummitState,
+  mattressesCooldownUntil = 0,
+  warSummitCooldownUntil = 0,
+  activeWars = [],
+  actionsRemaining = 0,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const [bossExpanded, setBossExpanded] = useState(false);
   const [sitdownOpen, setSitdownOpen] = useState(false);
   const [selectedSitdownIds, setSelectedSitdownIds] = useState<string[]>([]);
+  const [declareWarOpen, setDeclareWarOpen] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -751,6 +777,139 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                         </motion.div>
                       )}
                     </AnimatePresence>
+                  </div>
+                );
+              })()
+            )}
+
+            {/* Active State Badges */}
+            {isPlayerFamily && (mattressesState?.active || warSummitState?.active) && (
+              <div className="mt-2 space-y-1">
+                {mattressesState?.active && (
+                  <Badge variant="outline" className="w-full justify-center text-xs border-amber-500/50 text-amber-400 bg-amber-500/10">
+                    🛏️ At the Mattresses ({mattressesState.turnsRemaining} turn{mattressesState.turnsRemaining !== 1 ? 's' : ''})
+                  </Badge>
+                )}
+                {warSummitState?.active && (
+                  <Badge variant="outline" className="w-full justify-center text-xs border-red-500/50 text-red-400 bg-red-500/10">
+                    ⚔️ War Summit ({warSummitState.turnsRemaining} turn{warSummitState.turnsRemaining !== 1 ? 's' : ''})
+                  </Badge>
+                )}
+              </div>
+            )}
+
+            {/* Declare War — Boss Action */}
+            {isPlayerFamily && onDeclareWar && (
+              (() => {
+                const isActionPhase = turnPhase === 'action';
+                const playerWars = activeWars.filter(w => w.family1 === playerFamily || w.family2 === playerFamily).length;
+                const atMaxWars = playerWars >= WAR_MAX_SIMULTANEOUS;
+                const noActions = actionsRemaining <= 0;
+                const warTargets = enemyFamilies.filter(f => {
+                  const atWar = activeWars.some(w => (w.family1 === f && w.family2 === playerFamily) || (w.family2 === f && w.family1 === playerFamily));
+                  const hasPact = activePacts?.ceasefires?.some(c => c.active && c.family === f) || activePacts?.alliances?.some(a => a.active && a.alliedFamily === f);
+                  return !atWar && !hasPact;
+                });
+
+                return (
+                  <div className="mt-2 space-y-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs h-8 border-red-500/30 text-red-400 hover:bg-red-500/10"
+                      disabled={!isActionPhase || atMaxWars || noActions || warTargets.length === 0}
+                      onClick={() => setDeclareWarOpen(!declareWarOpen)}
+                    >
+                      ⚔️ Declare War (${ DECLARE_WAR_COST.toLocaleString()})
+                    </Button>
+                    {!isActionPhase && <p className="text-[10px] text-muted-foreground italic text-center">Available during Action phase</p>}
+                    {atMaxWars && isActionPhase && <p className="text-[10px] text-muted-foreground italic text-center">Max {WAR_MAX_SIMULTANEOUS} simultaneous wars</p>}
+                    
+                    <AnimatePresence>
+                      {declareWarOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="bg-muted/20 border border-border/50 rounded-lg p-2 space-y-1">
+                            <span className="text-[10px] font-medium text-foreground">Select target family</span>
+                            {warTargets.map(f => (
+                              <Button
+                                key={f}
+                                variant="ghost"
+                                size="sm"
+                                className="w-full text-xs h-7 justify-start hover:bg-red-500/10 text-red-300"
+                                onClick={() => {
+                                  onDeclareWar(f);
+                                  setDeclareWarOpen(false);
+                                }}
+                              >
+                                ⚔️ {f.charAt(0).toUpperCase() + f.slice(1)}
+                              </Button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })()
+            )}
+
+            {/* Go to the Mattresses — Boss Action */}
+            {isPlayerFamily && onGoToMattresses && (
+              (() => {
+                const isActionPhase = turnPhase === 'action';
+                const isActive = mattressesState?.active;
+                const onCooldown = mattressesCooldownUntil > currentTurn;
+                const cooldownLeft = mattressesCooldownUntil - currentTurn;
+                const noActions = actionsRemaining <= 0;
+
+                return (
+                  <div className="mt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs h-8 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                      disabled={!isActionPhase || !!isActive || onCooldown || noActions}
+                      onClick={onGoToMattresses}
+                    >
+                      🛏️ Go to the Mattresses {onCooldown ? `(${cooldownLeft} turns)` : `($${MATTRESSES_COST.toLocaleString()})`}
+                    </Button>
+                    <p className="text-[9px] text-muted-foreground mt-0.5 text-center">
+                      +{MATTRESSES_DEFENSE_BONUS}% defense, +{MATTRESSES_HQ_BONUS}% HQ def, -{Math.round(MATTRESSES_INCOME_PENALTY * 100)}% income · {MATTRESSES_DURATION} turns
+                    </p>
+                  </div>
+                );
+              })()
+            )}
+
+            {/* War Summit — Boss Action */}
+            {isPlayerFamily && onWarSummit && (
+              (() => {
+                const isActionPhase = turnPhase === 'action';
+                const isActive = warSummitState?.active;
+                const onCooldown = warSummitCooldownUntil > currentTurn;
+                const cooldownLeft = warSummitCooldownUntil - currentTurn;
+                const noActions = actionsRemaining <= 0;
+
+                return (
+                  <div className="mt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs h-8 border-red-500/30 text-red-300 hover:bg-red-500/10"
+                      disabled={!isActionPhase || !!isActive || onCooldown || noActions}
+                      onClick={onWarSummit}
+                    >
+                      ⚔️ War Summit {onCooldown ? `(${cooldownLeft} turns)` : `($${WAR_SUMMIT_COST.toLocaleString()})`}
+                    </Button>
+                    <p className="text-[9px] text-muted-foreground mt-0.5 text-center">
+                      +{WAR_SUMMIT_COMBAT_BONUS}% combat, +{WAR_SUMMIT_FEAR_BONUS} fear, +{WAR_SUMMIT_HEAT_COST} heat · {WAR_SUMMIT_DURATION} turns
+                    </p>
                   </div>
                 );
               })()

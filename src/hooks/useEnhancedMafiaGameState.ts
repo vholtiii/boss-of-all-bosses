@@ -58,6 +58,11 @@ import {
   TENSION_PACT_BREAK,
   TENSION_REDUCE_CEASEFIRE, TENSION_REDUCE_ALLIANCE, TENSION_REDUCE_SUPPLY_DEAL,
   TENSION_REDUCE_SHARE_PROFITS, TENSION_REDUCE_SAFE_PASSAGE, TENSION_REDUCE_BRIBE_TERRITORY,
+  // Boss actions
+  MattressesState, WarSummitState,
+  DECLARE_WAR_COST,
+  MATTRESSES_COST, MATTRESSES_COOLDOWN, MATTRESSES_DURATION, MATTRESSES_DEFENSE_BONUS, MATTRESSES_HQ_BONUS, MATTRESSES_INCOME_PENALTY, MATTRESSES_LOYALTY_BONUS,
+  WAR_SUMMIT_COST, WAR_SUMMIT_COOLDOWN, WAR_SUMMIT_DURATION, WAR_SUMMIT_COMBAT_BONUS, WAR_SUMMIT_FEAR_BONUS, WAR_SUMMIT_HEAT_COST, WAR_SUMMIT_LOYALTY_BONUS,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -211,6 +216,10 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     familyTensions: { ...(state.familyTensions || {}) },
     activeWars: (state.activeWars || []).map(w => ({ ...w })),
     tensionCooldowns: { ...(state.tensionCooldowns || {}) },
+    mattressesState: { ...(state.mattressesState || { active: false, turnsRemaining: 0 }) },
+    mattressesCooldownUntil: state.mattressesCooldownUntil || 0,
+    warSummitState: { ...(state.warSummitState || { active: false, turnsRemaining: 0 }) },
+    warSummitCooldownUntil: state.warSummitCooldownUntil || 0,
   });
 
 // ============ UNIT TYPES ============
@@ -411,6 +420,12 @@ export interface EnhancedMafiaGameState {
   familyTensions: Record<string, number>;       // keyed by sorted pair e.g. "bonanno-gambino"
   activeWars: WarState[];
   tensionCooldowns: Record<string, number>;      // pair key → turns remaining (Hole #3 fix)
+  
+  // Boss actions: Mattresses & War Summit
+  mattressesState: MattressesState;
+  mattressesCooldownUntil: number;
+  warSummitState: WarSummitState;
+  warSummitCooldownUntil: number;
   
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
@@ -851,6 +866,10 @@ const createInitialGameState = (
     familyTensions: Object.fromEntries(getAllFamilyPairKeys().map(k => [k, 0])),
     activeWars: [],
     tensionCooldowns: {},
+    mattressesState: { active: false, turnsRemaining: 0 },
+    mattressesCooldownUntil: 0,
+    warSummitState: { active: false, turnsRemaining: 0 },
+    warSummitCooldownUntil: 0,
     victoryType: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
@@ -1096,6 +1115,8 @@ export const useEnhancedMafiaGameState = (
       if (nextPhase === 'move') {
         deployedUnits = prev.deployedUnits.map(u => {
           if (u.family !== prev.playerFamily) return u;
+          // Mattresses: units are locked — 0 moves
+          if ((prev.mattressesState || {}).active) return { ...u, movesRemaining: 0 };
           const baseMoves = u.type === 'capo' ? 3 : 2;
           return { ...u, movesRemaining: baseMoves };
         });
@@ -2260,6 +2281,36 @@ export const useEnhancedMafiaGameState = (
         };
       });
 
+      // --- Mattresses & War Summit lifecycle ---
+      if (newState.mattressesState && newState.mattressesState.active) {
+        newState.mattressesState.turnsRemaining -= 1;
+        if (newState.mattressesState.turnsRemaining <= 0) {
+          newState.mattressesState = { active: false, turnsRemaining: 0 };
+          newState.mattressesCooldownUntil = newState.turn + MATTRESSES_COOLDOWN;
+          newState.pendingNotifications.push({
+            type: 'info', title: '🛏️ Mattresses Over',
+            message: 'Your family stands down from defensive posture. Units can move and attack again.',
+          });
+        } else {
+          // Lock all player unit moves during mattresses
+          newState.deployedUnits = newState.deployedUnits.map(u => {
+            if (u.family !== newState.playerFamily) return u;
+            return { ...u, movesRemaining: 0 };
+          });
+        }
+      }
+      if (newState.warSummitState && newState.warSummitState.active) {
+        newState.warSummitState.turnsRemaining -= 1;
+        if (newState.warSummitState.turnsRemaining <= 0) {
+          newState.warSummitState = { active: false, turnsRemaining: 0 };
+          newState.warSummitCooldownUntil = newState.turn + WAR_SUMMIT_COOLDOWN;
+          newState.pendingNotifications.push({
+            type: 'info', title: '⚔️ War Summit Ended',
+            message: 'The rally fades. Combat bonuses have expired.',
+          });
+        }
+      }
+
       // --- Hex fortification abandonment tick ---
       newState.fortifiedHexes = (newState.fortifiedHexes || []).filter(f => {
         const hasUnits = newState.deployedUnits.some(u => u.family === f.family && u.q === f.q && u.r === f.r && u.s === f.s);
@@ -3318,7 +3369,12 @@ export const useEnhancedMafiaGameState = (
     const communityUpkeep = communityHexCount * 150;
 
     // Store gross income before penalties
-    const grossIncome = income;
+    let grossIncome = income;
+    
+    // Mattresses income penalty (-50% territory income while hunkered down)
+    if ((state.mattressesState || {}).active) {
+      grossIncome = Math.floor(grossIncome * (1 - MATTRESSES_INCOME_PENALTY));
+    }
     const grossLegalIncome = legalIncome;
     const grossIllegalIncome = illegalIncome;
     
@@ -3787,7 +3843,11 @@ export const useEnhancedMafiaGameState = (
                   }
                   // Fortified defenders also get protection
                   const isDefHexFort2 = isHexFortified(state.fortifiedHexes || [], eu.q, eu.r, eu.s, eu.family);
-                  const killChance = isDefHexFort2 ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
+                  let killChance = isDefHexFort2 ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
+                  // Mattresses defense bonus for player units
+                  if (eu.family === state.playerFamily && (state.mattressesState || {}).active) {
+                    killChance -= MATTRESSES_DEFENSE_BONUS / 100;
+                  }
                   if (Math.random() < killChance) {
                     const idx = state.deployedUnits.indexOf(eu);
                     if (idx !== -1) {
@@ -4287,6 +4347,10 @@ export const useEnhancedMafiaGameState = (
             // Flipped soldier bonus
             const flippedCount = (state.flippedSoldiers || []).filter(f => f.family === victimFamily).length;
             chance += flippedCount * 0.10;
+            // Mattresses HQ defense bonus if victim is player
+            if (victimFamily === state.playerFamily && (state.mattressesState || {}).active) {
+              chance -= MATTRESSES_HQ_BONUS / 100;
+            }
             chance = Math.min(HQ_ASSAULT_MAX_CHANCE, Math.max(0.05, chance));
             if (Math.random() < chance) {
               state.eliminatedFamilies = [...(state.eliminatedFamilies || []), victimFamily];
@@ -4611,6 +4675,11 @@ export const useEnhancedMafiaGameState = (
       
       switch (action.type) {
         case 'hit_territory': {
+          // Block during mattresses
+          if ((newState.mattressesState || {}).active) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🛏️ At the Mattresses', message: 'Your units are hunkered down and cannot attack.' });
+            return newState;
+          }
           const result = processTerritoryHit(newState, action);
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
@@ -5280,6 +5349,135 @@ export const useEnhancedMafiaGameState = (
             type: 'success',
             title: '📋 Sitdown Called',
             message: `${recalled} unit(s) recalled to HQ. +${SITDOWN_LOYALTY_BONUS} loyalty each. HQ defense strengthened.`,
+          });
+          return newState;
+        }
+        case 'declare_war': {
+          // Boss action — costs $10K + 1 action point
+          if (newState.turnPhase !== 'action') {
+            newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'Declare War is only available during the Action phase.' });
+            return newState;
+          }
+          if (newState.resources.money < DECLARE_WAR_COST) {
+            newState.pendingNotifications.push({ type: 'error', title: 'Not Enough Money', message: `Declaring war costs $${DECLARE_WAR_COST.toLocaleString()}.` });
+            return newState;
+          }
+          if (newState.actionsRemaining <= 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ No Actions', message: 'You have no actions remaining.' });
+            return newState;
+          }
+          const warTarget = action.targetFamily as string;
+          if (!warTarget || warTarget === newState.playerFamily) return newState;
+          // Check if already at war
+          if (areFamiliesAtWar(newState, newState.playerFamily, warTarget)) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Already At War', message: `You are already at war with the ${warTarget} family.` });
+            return newState;
+          }
+          // Check max wars
+          const playerWars = (newState.activeWars || []).filter(w => w.family1 === newState.playerFamily || w.family2 === newState.playerFamily).length;
+          if (playerWars >= WAR_MAX_SIMULTANEOUS) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Max Wars', message: `You cannot fight more than ${WAR_MAX_SIMULTANEOUS} wars simultaneously.` });
+            return newState;
+          }
+          // Check active pacts
+          const hasCeasefire = (newState.ceasefires || []).some(c => c.active && c.family === warTarget);
+          const hasAlliance = (newState.alliances || []).some(a => a.active && a.alliedFamily === warTarget);
+          if (hasCeasefire || hasAlliance) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Active Pact', message: `You have an active pact with ${warTarget}. Break it first.` });
+            return newState;
+          }
+          newState.resources.money -= DECLARE_WAR_COST;
+          newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
+          // Set tension to trigger level and trigger war
+          const pairKey = getTensionPairKey(newState.playerFamily, warTarget);
+          newState.familyTensions[pairKey] = WAR_TENSION_THRESHOLD;
+          checkAndTriggerWar(newState, newState.playerFamily, warTarget, 'declared' as any);
+          return newState;
+        }
+        case 'go_to_mattresses': {
+          // Boss action — $5K + 1 action, 3-turn defensive stance
+          if (newState.turnPhase !== 'action') {
+            newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'Go to the Mattresses is only available during the Action phase.' });
+            return newState;
+          }
+          if (newState.resources.money < MATTRESSES_COST) {
+            newState.pendingNotifications.push({ type: 'error', title: 'Not Enough Money', message: `Going to the mattresses costs $${MATTRESSES_COST.toLocaleString()}.` });
+            return newState;
+          }
+          if (newState.actionsRemaining <= 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ No Actions', message: 'You have no actions remaining.' });
+            return newState;
+          }
+          if ((newState.mattressesState || {}).active) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Already Active', message: 'You are already at the mattresses.' });
+            return newState;
+          }
+          if ((newState.mattressesCooldownUntil || 0) > newState.turn) {
+            const cd = (newState.mattressesCooldownUntil || 0) - newState.turn;
+            newState.pendingNotifications.push({ type: 'warning', title: '⏳ Cooldown', message: `Mattresses available in ${cd} turns.` });
+            return newState;
+          }
+          newState.resources.money -= MATTRESSES_COST;
+          newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
+          newState.mattressesState = { active: true, turnsRemaining: MATTRESSES_DURATION };
+          // +5 loyalty to all deployed soldiers
+          newState.deployedUnits.filter(u => u.family === newState.playerFamily).forEach(u => {
+            const stats = newState.soldierStats[u.id];
+            if (stats) {
+              const cap = u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP;
+              stats.loyalty = Math.min(cap, stats.loyalty + MATTRESSES_LOYALTY_BONUS);
+            }
+          });
+          // Lock all player units — set moves to 0
+          newState.deployedUnits = newState.deployedUnits.map(u => {
+            if (u.family !== newState.playerFamily) return u;
+            return { ...u, movesRemaining: 0 };
+          });
+          newState.pendingNotifications.push({
+            type: 'info', title: '🛏️ Going to the Mattresses!',
+            message: `Your family is hunkered down for ${MATTRESSES_DURATION} turns. +${MATTRESSES_DEFENSE_BONUS}% defense, +${MATTRESSES_HQ_BONUS}% HQ defense, +${MATTRESSES_LOYALTY_BONUS} loyalty. Units locked, -50% income.`,
+          });
+          return newState;
+        }
+        case 'war_summit': {
+          // Boss action — $5K + 1 action, 2-turn offensive boost
+          if (newState.turnPhase !== 'action') {
+            newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'War Summit is only available during the Action phase.' });
+            return newState;
+          }
+          if (newState.resources.money < WAR_SUMMIT_COST) {
+            newState.pendingNotifications.push({ type: 'error', title: 'Not Enough Money', message: `War Summit costs $${WAR_SUMMIT_COST.toLocaleString()}.` });
+            return newState;
+          }
+          if (newState.actionsRemaining <= 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ No Actions', message: 'You have no actions remaining.' });
+            return newState;
+          }
+          if ((newState.warSummitState || {}).active) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Already Active', message: 'War Summit is already in effect.' });
+            return newState;
+          }
+          if ((newState.warSummitCooldownUntil || 0) > newState.turn) {
+            const cd = (newState.warSummitCooldownUntil || 0) - newState.turn;
+            newState.pendingNotifications.push({ type: 'warning', title: '⏳ Cooldown', message: `War Summit available in ${cd} turns.` });
+            return newState;
+          }
+          newState.resources.money -= WAR_SUMMIT_COST;
+          newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
+          newState.warSummitState = { active: true, turnsRemaining: WAR_SUMMIT_DURATION };
+          // Immediate effects: +10 fear, +8 heat, +3 loyalty
+          newState.reputation.fear = Math.min(100, (newState.reputation.fear || 0) + WAR_SUMMIT_FEAR_BONUS);
+          newState.policeHeat.level = Math.min(100, newState.policeHeat.level + WAR_SUMMIT_HEAT_COST);
+          newState.deployedUnits.filter(u => u.family === newState.playerFamily).forEach(u => {
+            const stats = newState.soldierStats[u.id];
+            if (stats) {
+              const cap = u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP;
+              stats.loyalty = Math.min(cap, stats.loyalty + WAR_SUMMIT_LOYALTY_BONUS);
+            }
+          });
+          newState.pendingNotifications.push({
+            type: 'success', title: '⚔️ War Summit Called!',
+            message: `The Boss rallies the family! +${WAR_SUMMIT_COMBAT_BONUS}% combat for ${WAR_SUMMIT_DURATION} turns, +${WAR_SUMMIT_FEAR_BONUS} fear, +${WAR_SUMMIT_HEAT_COST} heat, +${WAR_SUMMIT_LOYALTY_BONUS} loyalty.`,
           });
           return newState;
         }
@@ -5983,6 +6181,17 @@ export const useEnhancedMafiaGameState = (
       const attackerHexFortified = attackerUnit && isHexFortified(state.fortifiedHexes || [], attackerUnit.q, attackerUnit.r, attackerUnit.s, state.playerFamily);
       if (attackerHexFortified) {
         chance += FORTIFY_DEFENSE_BONUS / 200;
+      }
+      
+      // War Summit combat bonus (+15% when active)
+      if ((state.warSummitState || {}).active) {
+        chance += WAR_SUMMIT_COMBAT_BONUS / 100;
+      }
+      // Mattresses defense bonus for defender (if defender's family has mattresses active — AI will use this too)
+      // For player attacks on enemies, check if enemy has mattresses (N/A — AI doesn't use mattresses)
+      // For enemies attacking player, check player mattresses
+      if ((state.mattressesState || {}).active && tile.controllingFamily !== state.playerFamily) {
+        // Player is attacking while at mattresses — this shouldn't happen (units are locked), but safety
       }
       
       // Family bonuses (hitmen no longer provide combat bonuses — they are external contractors)
