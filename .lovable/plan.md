@@ -1,29 +1,35 @@
 
 
-# Show All Families' Supply Lines on Map
+# Improve Supply Lines Panel Clarity
 
-## Problem
-The supply route BFS only runs for the player's family. When the toggle is on, only the player's supply lines are visible — rival families' connected routes are hidden.
+## What "Buffer" Means
+"Buffer" is a **2-turn grace period** after a supply line gets severed. During those 2 turns, your businesses keep running at full revenue from stored stockpile. After the buffer expires, revenue starts decaying (-10%/turn down to 20% floor). The label "Buffer (1t)" means "1 turn of stockpile remaining."
 
-## Solution
-Expand the BFS computation to run for **every family** that has an HQ on the map, not just `playerFamily`. All routes render in the same uniform light grey, so rival supply lines look identical to the player's.
+The problem: this isn't explained anywhere in the UI — it's jargon.
 
-### Changes to `src/components/EnhancedMafiaHexGrid.tsx`
+## Changes to `src/components/GameSidePanels.tsx`
 
-**1. Loop BFS over all families (lines ~634-695):**
-- Find all unique families with HQs: `hexMap.filter(t => t.isHeadquarters).map(t => t.isHeadquarters)`
-- For each family, run the existing BFS logic (build hex set from that family's controlled territory, find paths to supply nodes)
-- Merge all results into the shared `supplyRouteHexSet`, `connectedNodeKeys`, and `routePaths` arrays
+### 1. Rename "Buffer" to something clearer
+Change the badge text from `Buffer (1t)` to `Stockpile: 1 turn left` — immediately understandable without game knowledge.
 
-**2. Supply node neighbor check per family:**
-- The existing check that adds supply nodes to BFS only if they have a player-controlled neighbor — apply this per-family using that family's hex set
+### 2. Add a brief legend/header below "Supply Lines" title
+Add a small muted-text explanation line: *"Connect HQ to nodes via territory to supply your businesses"*
 
-**3. HQ exclusion per family:**
-- The "stop before entering HQ" logic already uses `hqKey` — this naturally works per-family since each iteration uses its own HQ tile
+### 3. Improve status badge labels across all states
+| Current | New |
+|---------|-----|
+| `Connected` | `✓ Active` |
+| `Buffer (Nt)` | `Stockpile: N turns left` |
+| `Severed` | `✗ Severed` |
+| `No Route` | `— No Route` |
 
-**4. No changes to rendering:**
-- The polyline rendering, hex tint overlay, toggle button, and marker definitions all remain the same — they already consume the shared data structures
+### 4. Add a tooltip-style line for Buffer/Severed states
+- Buffer: show *"Businesses running on stored supplies"* in yellow text
+- Severed: keep existing revenue % warning but prefix with *"Supply cut — "*
+
+### 5. Show dependency info more prominently
+Move the "Supplies: store front, store, restaurant" line to use a slightly bolder style so users understand *why* the node matters.
 
 ## Files Modified
-- `src/components/EnhancedMafiaHexGrid.tsx`
+- `src/components/GameSidePanels.tsx` — badge labels, header text, status descriptions
 
