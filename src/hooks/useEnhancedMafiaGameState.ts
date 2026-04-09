@@ -3752,6 +3752,9 @@ export const useEnhancedMafiaGameState = (
                   }
                 }
                 if (enemyUnitsHere.some(u => u.family === state.playerFamily)) {
+                  // Hole #6: AI attacks player → tension
+                  addPairTension(state, fam, state.playerFamily, TENSION_TERRITORY_HIT);
+                  checkSupplySabotage(state, target.q, target.r, target.s, fam);
                   state.pendingNotifications.push({
                     type: 'warning' as const,
                     title: `⚔️ ${fam.charAt(0).toUpperCase() + fam.slice(1)} Attack!`,
@@ -3759,11 +3762,15 @@ export const useEnhancedMafiaGameState = (
                   });
                   if (turnReport) turnReport.aiActions.push({ family: fam, action: 'attack', detail: `Attacked your units in ${tile.district}` });
                 }
-                // Log AI-to-AI combat
+                // Log AI-to-AI combat + Hole #1: AI-vs-AI tension
                 const aiVictims = enemyUnitsHere.filter(u => u.family !== state.playerFamily);
-                if (aiVictims.length > 0 && turnReport) {
+                if (aiVictims.length > 0) {
                   const victimFams = [...new Set(aiVictims.map(u => u.family))];
-                  turnReport.aiActions.push({ family: fam, action: 'ai_combat', detail: `Fought ${victimFams.join(', ')} in ${tile.district}` });
+                  victimFams.forEach(vf => {
+                    addPairTension(state, fam, vf, TENSION_TERRITORY_HIT);
+                    checkSupplySabotage(state, target.q, target.r, target.s, fam);
+                  });
+                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'ai_combat', detail: `Fought ${victimFams.join(', ')} in ${tile.district}` });
                 }
               } else {
                 // AI declined to fight — revert position
@@ -3807,6 +3814,15 @@ export const useEnhancedMafiaGameState = (
                         });
                       }
                       tile.controllingFamily = fam;
+                      // Hole #6: AI captures enemy territory → tension
+                      if (prevOwner !== 'neutral') {
+                        addPairTension(state, fam, prevOwner, TENSION_TERRITORY_HIT);
+                        checkSupplySabotage(state, target.q, target.r, target.s, fam);
+                      }
+                      // Hole #5: encroachment check for neutral claims
+                      if (prevOwner === 'neutral') {
+                        checkEncroachment(state, target.q, target.r, target.s, fam);
+                      }
                       if (prevOwner === state.playerFamily && turnReport) {
                         turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
                       }
