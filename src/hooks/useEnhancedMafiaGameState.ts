@@ -3552,7 +3552,10 @@ export const useEnhancedMafiaGameState = (
             !state.hexMap.some(t => t.q === n.q && t.r === n.r && t.s === n.s && t.controllingFamily === fam)
           );
 
-          if (safehouseHexes.length > 0 && Math.random() < 0.7) {
+          if (warTargetHexes.length > 0 && Math.random() < 0.85) {
+            // War: heavily prioritize attacking the war target
+            targetPool = warTargetHexes;
+          } else if (safehouseHexes.length > 0 && Math.random() < 0.7) {
             targetPool = safehouseHexes;
           } else if ((hasBounty || isAlerted) && playerHexes.length > 0) {
             targetPool = playerHexes;
