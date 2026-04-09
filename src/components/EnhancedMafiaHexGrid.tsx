@@ -461,10 +461,12 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         ) && (isNeutral || isEnemy) && !tile.isHeadquarters;
         const canClaim = isNeutral && isSoldier && !tile.business && !tile.isHeadquarters;
         const isCapoWounded = isCapo && (selectedUnit as any).woundedTurnsRemaining > 0;
-        const canNegotiate = isEnemy && isCapo && !tile.isHeadquarters && !isCapoWounded;
+        // Negotiate: only available during action phase when a pending negotiation is ready on this hex
+        const readyPending = (gameState?.pendingNegotiations || []).find((p: any) => p.ready && p.targetQ === tile.q && p.targetR === tile.r && p.targetS === tile.s);
+        const canNegotiate = isEnemy && !!readyPending && !tile.isHeadquarters;
         const canSabotage = isEnemy && isSoldier && !!tile.business && !tile.isHeadquarters;
         const canSafehouse = isOwned && !tile.isHeadquarters && !isCapoWounded;
-        const negotiateCapoId = isCapo ? selectedUnit.id : undefined;
+        const negotiateCapoId = readyPending?.capoId || (isCapo ? selectedUnit.id : undefined);
         
         // HQ Assault: soldier adjacent to enemy HQ
         const isAdjacentToHQ = isEnemyHQ && isSoldier && !unitOnTargetHex;
