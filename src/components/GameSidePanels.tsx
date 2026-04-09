@@ -762,9 +762,12 @@ export const RightSidePanel: React.FC<{
                   }
                   return false;
                 })();
+                const stockEntry = ((gameState as any).supplyStockpile || []).find(
+                  (e: any) => e.family === gameState.playerFamily && e.nodeType === node.type && e.turnsSinceDisconnected > 0
+                );
                 const turnsSinceDisconnected = stockEntry?.turnsSinceDisconnected || 0;
-                const inBuffer = turnsSinceDisconnected > 0 && turnsSinceDisconnected <= SUPPLY_STOCKPILE_BUFFER;
-                const isDecaying = turnsSinceDisconnected > SUPPLY_STOCKPILE_BUFFER;
+                const inBuffer = !isConnected && turnsSinceDisconnected > 0 && turnsSinceDisconnected <= SUPPLY_STOCKPILE_BUFFER;
+                const isDecaying = !isConnected && turnsSinceDisconnected > SUPPLY_STOCKPILE_BUFFER;
                 
                 // Find dependent businesses
                 const depBizTypes = Object.entries(SUPPLY_DEPENDENCIES)
