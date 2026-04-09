@@ -135,11 +135,21 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   negotiationUsedThisTurn = false,
   activePacts,
   enemyFamilies = [],
+  onDeclareWar,
+  onGoToMattresses,
+  onWarSummit,
+  mattressesState,
+  warSummitState,
+  mattressesCooldownUntil = 0,
+  warSummitCooldownUntil = 0,
+  activeWars = [],
+  actionsRemaining = 0,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const [bossExpanded, setBossExpanded] = useState(false);
   const [sitdownOpen, setSitdownOpen] = useState(false);
   const [selectedSitdownIds, setSelectedSitdownIds] = useState<string[]>([]);
+  const [declareWarOpen, setDeclareWarOpen] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
