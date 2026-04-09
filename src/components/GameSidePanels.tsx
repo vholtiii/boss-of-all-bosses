@@ -816,6 +816,149 @@ export const RightSidePanel: React.FC<{
           </CollapsibleSection>
         )}
 
+        {/* ── Safehouse Stockpiles ── */}
+        {(() => {
+          const playerSafehouses = ((gameState as any).safehouses || []).filter((sh: Safehouse) => {
+            const t = (gameState.hexMap || []).find((h: any) => h.q === sh.q && h.r === sh.r && h.s === sh.s);
+            return t && t.controllingFamily === gameState.playerFamily;
+          });
+          if (playerSafehouses.length === 0) return null;
+
+          const supplyColors: Record<string, string> = {
+            docks: 'text-blue-400', union_hall: 'text-yellow-400', trucking_depot: 'text-green-400',
+            liquor_route: 'text-purple-400', food_market: 'text-orange-400',
+          };
+
+          return (
+            <CollapsibleSection
+              title={`Safehouse Stockpiles (${playerSafehouses.length})`}
+              icon={<Package className="h-4 w-4" />}
+              isOpen={openSection === 'safehouse_stockpile'}
+              onToggle={() => toggle('safehouse_stockpile')}
+            >
+              <p className="text-[10px] text-muted-foreground mb-2 italic">
+                Connect safehouses to supply lines to stockpile reserves
+              </p>
+              <div className="space-y-3">
+                {playerSafehouses.map((sh: Safehouse, idx: number) => {
+                  const shTile = (gameState.hexMap || []).find((t: any) => t.q === sh.q && t.r === sh.r && t.s === sh.s);
+                  const isConnected = sh.connectedSupplyTypes && sh.connectedSupplyTypes.length > 0;
+                  const isManuallyConnectable = !isConnected && !sh.manualRouteEstablished && (sh as any)._manuallyConnectable;
+
+                  return (
+                    <div key={`sh-stockpile-${idx}`} className="rounded-lg border border-border bg-card p-2.5 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🏠</span>
+                        <span className="text-xs font-bold text-foreground flex-1">
+                          Safehouse · {shTile?.district || '?'}
+                        </span>
+                        {isConnected ? (
+                          <Badge variant="default" className="text-[9px] h-4 bg-green-600">🔗 Connected</Badge>
+                        ) : sh.manualRouteEstablished ? (
+                          <Badge variant="outline" className="text-[9px] h-4 border-yellow-500 text-yellow-500">⛓️ Route Severed</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[9px] h-4">⛓️‍💥 Not Connected</Badge>
+                        )}
+                      </div>
+
+                      {/* Establish Route button */}
+                      {isManuallyConnectable && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full text-xs h-7"
+                          onClick={() => onAction({
+                            type: 'establish_safehouse_route',
+                            q: sh.q, r: sh.r, s: sh.s,
+                          })}
+                        >
+                          <Link2 className="h-3 w-3 mr-1" />
+                          Establish Stockpile Route
+                        </Button>
+                      )}
+
+                      {/* Connected supply types & stockpile bars */}
+                      {isConnected && (
+                        <>
+                          <div className="space-y-1.5">
+                            {sh.connectedSupplyTypes.map((st: SupplyNodeType) => {
+                              const cfg = SUPPLY_NODE_CONFIG[st];
+                              const current = sh.stockpile[st] || 0;
+                              const pct = (current / SAFEHOUSE_MAX_STOCKPILE) * 100;
+                              return (
+                                <div key={st} className="space-y-0.5">
+                                  <div className="flex items-center justify-between text-[10px]">
+                                    <span className={cn('font-medium', supplyColors[st] || 'text-foreground')}>
+                                      {cfg.icon} {cfg.label}
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                      {current.toFixed(1)}/{SAFEHOUSE_MAX_STOCKPILE}
+                                    </span>
+                                  </div>
+                                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full rounded-full bg-primary transition-all"
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                  {/* Release button */}
+                                  {current >= 1 && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="w-full text-[10px] h-5 mt-0.5"
+                                      onClick={() => onAction({
+                                        type: 'release_safehouse_stockpile',
+                                        q: sh.q, r: sh.r, s: sh.s,
+                                        supplyType: st,
+                                      })}
+                                    >
+                                      📦 Release 1 Unit
+                                    </Button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Allocation slider */}
+                          <div className="space-y-1 pt-1 border-t border-border">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="text-muted-foreground">Allocation</span>
+                              <span className="font-bold text-foreground">{sh.allocationPercent}%</span>
+                            </div>
+                            <Slider
+                              value={[sh.allocationPercent]}
+                              min={0}
+                              max={SAFEHOUSE_MAX_ALLOCATION}
+                              step={5}
+                              onValueChange={(val) => onAction({
+                                type: 'set_safehouse_allocation',
+                                q: sh.q, r: sh.r, s: sh.s,
+                                allocationPercent: val[0],
+                              })}
+                              className="w-full"
+                            />
+                            <p className="text-[9px] text-muted-foreground italic">
+                              {sh.allocationPercent > 0
+                                ? `Diverting ${sh.allocationPercent}% of supply flow to reserves`
+                                : 'Set allocation to begin stockpiling'}
+                            </p>
+                          </div>
+                        </>
+                      )}
+
+                      <p className="text-[9px] text-muted-foreground">
+                        ⏱️ {sh.turnsRemaining} turns remaining
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </CollapsibleSection>
+          );
+        })()}
+
         {/* ── Weather ── */}
         <div className="rounded-lg border border-border bg-card p-3">
           <div className="flex items-center gap-2 mb-1">
