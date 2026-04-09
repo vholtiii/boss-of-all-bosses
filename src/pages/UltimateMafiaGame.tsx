@@ -1073,6 +1073,15 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               safePassages: (gameState as any).safePassagePacts || [],
             } : undefined}
             enemyFamilies={isPlayerHQ ? gameState.aiOpponents.map((o: any) => o.family).filter((f: string) => !((gameState as any).eliminatedFamilies || []).includes(f)) : []}
+            onDeclareWar={isPlayerHQ ? (targetFamily) => handleAction({ type: 'declare_war', targetFamily }) : undefined}
+            onGoToMattresses={isPlayerHQ ? () => handleAction({ type: 'go_to_mattresses' }) : undefined}
+            onWarSummit={isPlayerHQ ? () => handleAction({ type: 'war_summit' }) : undefined}
+            mattressesState={(gameState as any).mattressesState}
+            warSummitState={(gameState as any).warSummitState}
+            mattressesCooldownUntil={(gameState as any).mattressesCooldownUntil || 0}
+            warSummitCooldownUntil={(gameState as any).warSummitCooldownUntil || 0}
+            activeWars={(gameState as any).activeWars || []}
+            actionsRemaining={gameState.actionsRemaining || 0}
           />
         );
       })()}
