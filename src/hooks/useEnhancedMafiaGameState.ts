@@ -1433,6 +1433,40 @@ export const useEnhancedMafiaGameState = (
         };
       }
 
+      // Handle "Send Word" action (tactical phase only) — capo requests negotiation on enemy hex
+      if (prev.turnPhase === 'move' && moveAction === 'send_word' && unit.type === 'capo') {
+        if (prev.tacticalActionsRemaining <= 0) return prev;
+        const targetTile = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
+        if (!targetTile || targetTile.controllingFamily === prev.playerFamily || targetTile.controllingFamily === 'neutral' || targetTile.isHeadquarters) return prev;
+        // Check for duplicate pending on same hex
+        const existing = (prev.pendingNegotiations || []).find(p => p.targetQ === targetLocation.q && p.targetR === targetLocation.r && p.targetS === targetLocation.s);
+        if (existing) {
+          return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '📩 Already Pending', message: 'Word has already been sent to this territory.' }] };
+        }
+        const newPending: PendingNegotiation = {
+          id: `pn-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          capoId: unit.id,
+          capoName: unit.name || 'Capo',
+          capoPersonality: (unit as any).personality || 'enforcer',
+          targetQ: targetLocation.q,
+          targetR: targetLocation.r,
+          targetS: targetLocation.s,
+          targetFamily: targetTile.controllingFamily,
+          turnRequested: prev.turn,
+          ready: false,
+        };
+        return {
+          ...prev,
+          pendingNegotiations: [...(prev.pendingNegotiations || []), newPending],
+          selectedUnitId: null, availableMoveHexes: [],
+          tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
+          pendingNotifications: [...prev.pendingNotifications, {
+            type: 'info' as const, title: '📩 Word Sent',
+            message: `${unit.name || 'Your Capo'} has sent word to ${targetTile.controllingFamily} territory. Negotiation available next turn.`,
+          }],
+        };
+      }
+
       if (!prev.availableMoveHexes.some(h => h.q === targetLocation.q && h.r === targetLocation.r && h.s === targetLocation.s)) {
         return prev;
       }
