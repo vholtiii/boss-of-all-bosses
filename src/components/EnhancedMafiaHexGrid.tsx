@@ -497,10 +497,10 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           else if (!isSoldier) reasons.sabotage = 'Need a soldier';
           else if (noActions) reasons.sabotage = 'No actions left';
         }
-        if (!canNegotiate && isEnemy && isCapo && isCapoWounded) {
-          reasons.negotiate = 'Capo is wounded';
-        } else if (!canNegotiate && isEnemy && !isCapo) {
-          reasons.negotiate = 'Need a capo';
+        if (!canNegotiate && isEnemy && !tile.isHeadquarters) {
+          const hasPending = (gameState?.pendingNegotiations || []).some((p: any) => p.targetQ === tile.q && p.targetR === tile.r && p.targetS === tile.s && !p.ready);
+          if (hasPending) reasons.negotiate = 'Word sent — available next turn';
+          else reasons.negotiate = 'Send Word first (tactical phase)';
         }
         if (!canSafehouse && isOwned && isCapoWounded) {
           reasons.safehouse = 'Capo is wounded';
