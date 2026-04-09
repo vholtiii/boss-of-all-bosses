@@ -1265,6 +1265,36 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })()}
 
+            {/* Safehouse sub-route lines — player-only */}
+            {showSupplyLines && (() => {
+              const playerSafehouses = (gameState?.safehouses || []).filter((sh: any) => {
+                const t = hexMap.find(h => h.q === sh.q && h.r === sh.r && h.s === sh.s);
+                return t && t.controllingFamily === playerFamily && sh.manualRouteEstablished && sh.subRoutePath && sh.subRoutePath.length > 1;
+              });
+              if (playerSafehouses.length === 0) return null;
+              return (
+                <g className="pointer-events-none">
+                  {playerSafehouses.map((sh: any, idx: number) => {
+                    const pts = sh.subRoutePath.map((p: any) => getHexPosition(p.q, p.r));
+                    return (
+                      <polyline
+                        key={`sub-route-${idx}`}
+                        className="supply-flow-line"
+                        points={pts.map((p: any) => `${p.x},${p.y}`).join(' ')}
+                        fill="none"
+                        stroke="#B0B0B0"
+                        strokeWidth="2.5"
+                        strokeOpacity="0.6"
+                        strokeDasharray="4 3"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      />
+                    );
+                  })}
+                </g>
+              );
+            })()}
+
             {/* District name labels */}
             {(() => {
               const districts = ['Little Italy', 'Bronx', 'Brooklyn', 'Queens', 'Manhattan', 'Staten Island'] as const;
