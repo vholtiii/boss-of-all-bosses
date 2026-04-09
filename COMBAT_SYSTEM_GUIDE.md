@@ -156,7 +156,7 @@ Neutral hexes only. Automatic success.
 ## 5. Combat Modifiers
 
 ### 5.1 Fortification
-- Defense: +25%. Attack: +12.5%. Casualty reduction: 50%. Persists until move. Hidden from enemies.
+- Defense: +25%. Attack: +12.5%. Casualty reduction: 50%. Persists until move. Hidden from enemies. **Max 4 per family.**
 
 ### 5.2 Scouting
 - +15% hit success (fresh, within 1 turn). +7% (stale, turns 2-3). Duration: 3 turns.
@@ -164,7 +164,7 @@ Neutral hexes only. Automatic success.
 - Scouted hexes can reveal enemy planned hits — see [Intel & Threat Detection](./GAME_MECHANICS.md#20-intel--threat-detection).
 
 ### 5.3 Hitman Contracts
-- External killers, NOT in regular combat. 40-90% success. No heat.
+- External killers, NOT in regular combat. **$30,000**. 40-90% success. No heat. Kills raise global tension (+5 soldier, +15 capo).
 
 ### 5.4 Family Bonuses
 - Gambino: +25% combat. Lucchese: +25% hit success. Bonanno: +20% extortion.

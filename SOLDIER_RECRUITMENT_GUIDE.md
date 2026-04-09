@@ -135,7 +135,7 @@ External contract killers — not family members.
 
 | Property | Value |
 |---|---|
-| Cost | $15,000 per contract |
+| Cost | **$30,000** per contract |
 | Max active | 3 |
 | Heat | None |
 | Bonuses gained | None (no respect, fear, or stat gains) |
@@ -163,8 +163,9 @@ Auto-fails after 5 turns total.
 
 ### 6.3 Failed Hits & AI Alert
 
-- **Refund**: 50% ($7,500 back)
+- **Refund**: 50% (**$15,000** back)
 - **AI Alert**: Target family enters alert mode for 5 turns (+1 recruit/turn, +1 move/unit, fortify priority, targets player)
+- **Global tension**: Successful hitman kills raise tension across ALL family pairs (+5 for soldier, +15 for capo). No pair tension generated (anonymous).
 
 ---
 
@@ -176,7 +177,7 @@ Auto-fails after 5 turns total.
 | Soldier (Local Recruit) | $300 | $600/turn **(deployed only)** |
 | Soldier (Undeployed) | — | **Free** |
 | Capo (Promotion) | $10,000 | — |
-| Hitman contract | $15,000 | — (one-time) |
+| Hitman contract | **$30,000** | — (one-time) |
 | Empty claimed hex | — | $150/turn (community upkeep) |
 
 **Note**: Soldiers only incur maintenance costs once deployed to the map. Undeployed soldiers in the recruitment pool are free. Once deployed (including if recalled to HQ via Sitdown or manual movement), they continue to cost $600/turn.

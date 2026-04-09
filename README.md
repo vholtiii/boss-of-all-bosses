@@ -126,7 +126,7 @@ Deploy → Tactical (Move) → Action → End Turn
 
 ### Tactical Actions
 - **Scout**: Reveal hex intel, +15% hit bonus for 3 turns. Capos scout at 2-hex range.
-- **Fortify**: +25% defense, 50% casualty reduction (persists until move)
+- **Fortify**: +25% defense, 50% casualty reduction (persists until move). **Max 4 per family.** Hover tooltip shows age, status, bonuses, and crumble countdown.
 - **Safehouse**: Capo creates secondary deploy point for 5 turns
 - **Escort**: Capo transports up to 2 soldiers across any distance
 
@@ -154,7 +154,7 @@ Four business types: Brothel ($3K), Gambling Den ($4K), Loan Sharking ($5K), Sto
 - **Mercenary soldiers**: $1,500 (available immediately)
 - **Local recruits**: $300 (requires 10+ controlled hexes)
 - **Capo promotion**: $10,000, requires victories ≥ 3, loyalty ≥ 60, training ≥ 2, toughness ≥ 3, racketeering ≥ 3
-- Max 3 capos, max 3 hitman contracts
+- Max 3 capos, max 3 hitman contracts ($30,000 each)
 
 ### Reputation & Police Heat
 - Five reputation metrics: Respect, Reputation, Loyalty, Fear, Street Influence

@@ -165,7 +165,7 @@ All families also start with 1 Capo and 1 Boss. Each HQ + 6 adjacent hexes are p
 
 ### 4.4 Hitman Contracts
 
-External contract killers. $15,000 per contract, max 3 active. Duration 3-5 turns based on target location. Success rate 40-90%. No heat, no stat gains.
+External contract killers. **$30,000** per contract, max 3 active. Duration 3-5 turns based on target location. Success rate 40-90%. No heat, no stat gains. Hitman kills raise **global tension** across all family pairs (+5 for soldier kills, +15 for capo kills). Assassinations are anonymous — no pair tension is generated.
 
 ### 4.5 Soldier Stats
 
@@ -224,7 +224,7 @@ Enemy-adjacent hexes stop movement (zone of control). Free movement within conne
 +15% hit bonus for 3 turns. Reveals enemy count, family, business details. 15% detection chance on enemy hexes. **Capos scout at 2-hex range vs soldiers' 1-hex range.**
 
 ### 7.2 Fortify
-+25% defense, 50% casualty reduction. Persists until unit moves.
++25% defense, 50% casualty reduction. Persists until unit moves. **Max 4 fortifications per family on the map.** Hover tooltip shows: age ("Built X turns ago"), occupancy status ("Occupied" or "Abandoned — crumbles in Y turns"), and combat bonuses. Abandoned fortifications (no unit present) crumble after 3 turns.
 
 ### 7.3 Safehouse
 Capo creates secondary deploy point. $2,500, lasts 5 turns. Max 2 (second requires 15+ hexes). +10% defense on hex.
