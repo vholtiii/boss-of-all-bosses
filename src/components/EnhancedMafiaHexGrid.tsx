@@ -634,33 +634,38 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             {(() => {
               const sNodes: SupplyNode[] = gameState?.supplyNodes || [];
               const pColor = '#B0B0B0'; // uniform light grey for all supply lines
-              const hqT = hexMap.find(t => t.isHeadquarters === playerFamily);
               const supplyRouteHexSet = new Set<string>();
               const connectedNodeKeys = new Set<string>();
               const routePaths: Array<Array<{x:number;y:number}>> = [];
-              if (hqT && sNodes.length > 0) {
-                const hKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
-                const pHexSet = new Set(hexMap.filter(t => t.controllingFamily === playerFamily || t.isHeadquarters === playerFamily).map(t => hKey(t.q, t.r, t.s)));
-                // Add supply node hexes as valid BFS endpoints ONLY if they have a player-controlled neighbor
+              const hKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
+              const dd = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
+
+              // Find all families that have HQs on the map
+              const familiesWithHQ = Array.from(new Set(hexMap.filter(t => t.isHeadquarters).map(t => t.isHeadquarters!)));
+
+              for (const family of familiesWithHQ) {
+                const hqT = hexMap.find(t => t.isHeadquarters === family);
+                if (!hqT || sNodes.length === 0) continue;
+
+                const famHexSet = new Set(hexMap.filter(t => t.controllingFamily === family || t.isHeadquarters === family).map(t => hKey(t.q, t.r, t.s)));
+                // Add supply node hexes as valid BFS endpoints ONLY if they have a family-controlled neighbor
                 for (const node of sNodes) {
                   const nodeKey = hKey(node.q, node.r, node.s);
-                  if (pHexSet.has(nodeKey)) continue; // already player-owned
-                  const nbs = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
-                  const hasPlayerNeighbor = nbs.some(d => pHexSet.has(hKey(node.q+d.q, node.r+d.r, node.s+d.s)));
-                  if (hasPlayerNeighbor) pHexSet.add(nodeKey);
+                  if (famHexSet.has(nodeKey)) continue;
+                  const hasNeighbor = dd.some(d => famHexSet.has(hKey(node.q+d.q, node.r+d.r, node.s+d.s)));
+                  if (hasNeighbor) famHexSet.add(nodeKey);
                 }
                 const par = new Map<string, string>();
                 const vis = new Set<string>();
                 const bQ: Array<{q:number;r:number;s:number}> = [{ q: hqT.q, r: hqT.r, s: hqT.s }];
                 const sK = hKey(hqT.q, hqT.r, hqT.s);
                 vis.add(sK); par.set(sK, '');
-                const dd = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
                 while (bQ.length > 0) {
                   const c = bQ.shift()!;
                   for (const d of dd) {
                     const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
                     const nk = hKey(nq,nr,ns);
-                    if (vis.has(nk) || !pHexSet.has(nk)) continue;
+                    if (vis.has(nk) || !famHexSet.has(nk)) continue;
                     vis.add(nk); par.set(nk, hKey(c.q,c.r,c.s)); bQ.push({q:nq,r:nr,s:ns});
                   }
                 }
@@ -668,15 +673,13 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   const nK = hKey(node.q, node.r, node.s);
                   if (!vis.has(nK)) continue;
                   connectedNodeKeys.add(nK);
-                  // Collect hex keys for tint + build ordered path for polyline
                   const pathKeys: string[] = [];
                   let ck = nK;
-                  const hqKey = hKey(hqT!.q, hqT!.r, hqT!.s);
+                  const hqKey = hKey(hqT.q, hqT.r, hqT.s);
                   while (ck && ck !== '') {
                     supplyRouteHexSet.add(ck);
                     pathKeys.push(ck);
                     const nextCk = par.get(ck) || '';
-                    // Stop before entering HQ hex — line should touch but not enter
                     if (nextCk === hqKey) break;
                     ck = nextCk;
                   }
