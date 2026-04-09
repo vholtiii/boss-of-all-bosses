@@ -4335,6 +4335,52 @@ export const useEnhancedMafiaGameState = (
         }
         case 'establish_safehouse':
           return processEstablishSafehouse(newState, action);
+        case 'establish_safehouse_route': {
+          // Manual sub-route: connect a safehouse to a supply line via territory chain
+          const shIdx = newState.safehouses.findIndex(s => s.q === action.q && s.r === action.r && s.s === action.s);
+          if (shIdx === -1) return newState;
+          const sh = newState.safehouses[shIdx];
+          const shTile = newState.hexMap.find(t => t.q === sh.q && t.r === sh.r && t.s === sh.s);
+          if (!shTile || shTile.controllingFamily !== newState.playerFamily) return newState;
+          sh.manualRouteEstablished = true;
+          newState.pendingNotifications.push({
+            type: 'success', title: '🔗 Stockpile Route Established',
+            message: `Your safehouse is now connected to supply lines. Set allocation to begin stockpiling.`,
+          });
+          syncLegacyUnits(newState);
+          return newState;
+        }
+        case 'set_safehouse_allocation': {
+          const shIdx = newState.safehouses.findIndex(s => s.q === action.q && s.r === action.r && s.s === action.s);
+          if (shIdx === -1) return newState;
+          newState.safehouses[shIdx].allocationPercent = Math.max(0, Math.min(SAFEHOUSE_MAX_ALLOCATION, action.allocationPercent));
+          return newState;
+        }
+        case 'release_safehouse_stockpile': {
+          const shIdx = newState.safehouses.findIndex(s => s.q === action.q && s.r === action.r && s.s === action.s);
+          if (shIdx === -1) return newState;
+          const sh = newState.safehouses[shIdx];
+          const supplyType = action.supplyType as SupplyNodeType;
+          const current = sh.stockpile[supplyType] || 0;
+          if (current <= 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '📦 No Stockpile', message: `No ${supplyType.replace('_', ' ')} reserves to release.` });
+            return newState;
+          }
+          // Release 1 unit — sustain businesses for 1 turn
+          sh.stockpile[supplyType] = Math.max(0, current - 1);
+          // Mark the supply type as "sustained" this turn by resetting stockpile disconnect counter
+          const stockEntry = (newState.supplyStockpile || []).find(e => e.family === newState.playerFamily && e.nodeType === supplyType);
+          if (stockEntry && stockEntry.turnsSinceDisconnected > 0) {
+            stockEntry.turnsSinceDisconnected = 0; // Reset — 1 turn of full revenue
+          }
+          const cfg = SUPPLY_NODE_CONFIG[supplyType];
+          newState.pendingNotifications.push({
+            type: 'success', title: '📦 Stockpile Released',
+            message: `Released 1 unit of ${cfg.label} reserves. Businesses sustained for this turn. ${Math.max(0, current - 1)} remaining.`,
+          });
+          syncLegacyUnits(newState);
+          return newState;
+        }
         case 'plan_hit': {
           // Tactical phase action — costs 1 tactical action
           if (newState.turnPhase !== 'move') {
