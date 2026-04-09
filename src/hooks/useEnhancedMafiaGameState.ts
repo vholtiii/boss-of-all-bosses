@@ -6326,6 +6326,19 @@ export const useEnhancedMafiaGameState = (
       return state;
     }
 
+    // Check diplomatic lockout — warring families cannot negotiate
+    if (areFamiliesAtWar(state, state.playerFamily, enemyFamily)) {
+      state.resources.money += cost; // refund
+      if (isFamily) state.bossNegotiationCooldown = 0;
+      else state.capoNegotiationCooldown = 0;
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'error', title: '⚔️ Diplomatic Lockout',
+        message: `Cannot negotiate with the ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} family — you are at war!`,
+      }];
+      syncLegacyUnits(state);
+      return state;
+    }
+
     switch (negotiationType as NegotiationType) {
       case 'ceasefire': {
         const duration = 3 + Math.floor(Math.random() * 3); // 3-5 turns
@@ -6345,9 +6358,13 @@ export const useEnhancedMafiaGameState = (
             message: `The ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} family called off a planned hit — ceasefire agreement honored.`,
           }];
         }
+        // Tension reduction
+        addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_CEASEFIRE);
+        // Hole #3: cooling period
+        state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '🤝 Ceasefire Agreed!',
-          message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} won't attack for ${duration} turns. -${config.reputationCost} respect.`,
+          message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} won't attack for ${duration} turns. -${config.reputationCost} respect. Tension -${TENSION_REDUCE_CEASEFIRE}.`,
         }];
         break;
       }
@@ -6359,9 +6376,12 @@ export const useEnhancedMafiaGameState = (
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         });
         tile.controllingFamily = state.playerFamily;
+        // Tension reduction
+        addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_BRIBE_TERRITORY);
+        state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '💵 Territory Acquired!',
-          message: `Peacefully bribed for the hex. Cost: $${cost.toLocaleString()}.`,
+          message: `Peacefully bribed for the hex. Cost: $${cost.toLocaleString()}. Tension -${TENSION_REDUCE_BRIBE_TERRITORY}.`,
         }];
         break;
       }
@@ -6388,9 +6408,12 @@ export const useEnhancedMafiaGameState = (
             message: `The ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} family called off a planned hit — alliance pact honored.`,
           }];
         }
+        // Tension reduction
+        addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_ALLIANCE);
+        state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '⚖️ Alliance Formed!',
-          message: `Pact with ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} for ${duration} turns. Condition: ${condition.type.replace(/_/g, ' ')}.`,
+          message: `Pact with ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} for ${duration} turns. Condition: ${condition.type.replace(/_/g, ' ')}. Tension -${TENSION_REDUCE_ALLIANCE}.`,
         }];
         break;
       }
@@ -6408,9 +6431,12 @@ export const useEnhancedMafiaGameState = (
           turnFormed: state.turn,
           active: true,
         }];
+        // Tension reduction
+        addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_SHARE_PROFITS);
+        state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '💰 Profit Sharing Deal!',
-          message: `You'll earn 30% of this hex's income for ${duration} turns. Cost: $${cost.toLocaleString()}.`,
+          message: `You'll earn 30% of this hex's income for ${duration} turns. Cost: $${cost.toLocaleString()}. Tension -${TENSION_REDUCE_SHARE_PROFITS}.`,
         }];
         break;
       }
@@ -6423,9 +6449,12 @@ export const useEnhancedMafiaGameState = (
           turnFormed: state.turn,
           active: true,
         }];
+        // Tension reduction
+        addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_SAFE_PASSAGE);
+        state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'success', title: '🛤️ Safe Passage Granted!',
-          message: `Free movement through ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} territory for ${duration} turns. Cost: $${cost.toLocaleString()}.`,
+          message: `Free movement through ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} territory for ${duration} turns. Cost: $${cost.toLocaleString()}. Tension -${TENSION_REDUCE_SAFE_PASSAGE}.`,
         }];
         break;
       }
