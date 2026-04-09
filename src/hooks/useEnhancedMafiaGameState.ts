@@ -1115,6 +1115,8 @@ export const useEnhancedMafiaGameState = (
       if (nextPhase === 'move') {
         deployedUnits = prev.deployedUnits.map(u => {
           if (u.family !== prev.playerFamily) return u;
+          // Mattresses: units are locked — 0 moves
+          if ((prev.mattressesState || {}).active) return { ...u, movesRemaining: 0 };
           const baseMoves = u.type === 'capo' ? 3 : 2;
           return { ...u, movesRemaining: baseMoves };
         });
