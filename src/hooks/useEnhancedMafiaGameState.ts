@@ -577,20 +577,16 @@ const createInitialGameState = (
   supplyNodeTypes.forEach(nodeType => {
     const config = SUPPLY_NODE_CONFIG[nodeType];
     // Find candidate hexes in the valid districts (no HQ, no existing supply node)
-    // Build set of hexes within range 1 of any HQ to prevent trivial turn-1 connections
-    const hqAdjacentKeys = new Set<string>();
-    allFamilies.forEach(fam => {
-      const hq = HQ_POSITIONS[fam];
-      hqAdjacentKeys.add(`${hq.q},${hq.r},${hq.s}`);
-      const ns = getHexNeighbors(hq.q, hq.r, hq.s);
-      ns.forEach(n => hqAdjacentKeys.add(`${n.q},${n.r},${n.s}`));
+    // Must be at least 5 hexes away from ALL HQs to ensure meaningful supply chains
+    const hqPositions = allFamilies.map(fam => HQ_POSITIONS[fam]);
+    const candidates = hexMap.filter(t => {
+      if (!config.districts.includes(t.district)) return false;
+      if (t.isHeadquarters) return false;
+      if (usedHexKeys.has(`${t.q},${t.r},${t.s}`)) return false;
+      // Minimum distance of 5 hexes from any HQ
+      const tooClose = hqPositions.some(hq => hexDistance(hq, t) < 5);
+      return !tooClose;
     });
-    const candidates = hexMap.filter(t =>
-      config.districts.includes(t.district) &&
-      !t.isHeadquarters &&
-      !usedHexKeys.has(`${t.q},${t.r},${t.s}`) &&
-      !hqAdjacentKeys.has(`${t.q},${t.r},${t.s}`)
-    );
     if (candidates.length > 0) {
       const idx = Math.floor(supplyRng() * candidates.length);
       const chosen = candidates[idx];
@@ -3004,6 +3000,14 @@ export const useEnhancedMafiaGameState = (
 
       // ── INCOME (difficulty-scaled) ──
       let aiIncome = 0;
+      // Compute AI family's connected supply nodes via BFS
+      const aiConnectedHexes = getConnectedTerritory(state.hexMap, fam);
+      const aiConnectedNodeTypes = new Set<SupplyNodeType>();
+      (state.supplyNodes || []).forEach(node => {
+        if (aiConnectedHexes.has(`${node.q},${node.r},${node.s}`)) {
+          aiConnectedNodeTypes.add(node.type);
+        }
+      });
       state.hexMap.forEach(tile => {
         if (tile.controllingFamily === fam && tile.business) {
           let tileInc = 0;
@@ -3015,6 +3019,22 @@ export const useEnhancedMafiaGameState = (
           // Seized player-built business runs at 50% during penalty period
           if (tile.business.seizurePenaltyTurns && tile.business.seizurePenaltyTurns > 0) {
             tileInc = Math.floor(tileInc * BUILT_BIZ_SEIZURE_INCOME_PENALTY);
+          }
+          // Apply supply line decay for AI families
+          const deps = SUPPLY_DEPENDENCIES[tile.business.type];
+          if (deps && deps.length > 0) {
+            const hasAccess = deps.some(dep => aiConnectedNodeTypes.has(dep));
+            if (!hasAccess) {
+              const stockEntry = (state.supplyStockpile || []).find(
+                e => e.family === fam && deps.includes(e.nodeType)
+              );
+              const turnsSinceDisconnected = stockEntry?.turnsSinceDisconnected ?? 0;
+              if (turnsSinceDisconnected > SUPPLY_STOCKPILE_BUFFER) {
+                const decayTurns = turnsSinceDisconnected - SUPPLY_STOCKPILE_BUFFER;
+                const decayMultiplier = Math.max(SUPPLY_DECAY_FLOOR, 1 - (SUPPLY_DECAY_RATE * decayTurns));
+                tileInc = Math.floor(tileInc * decayMultiplier);
+              }
+            }
           }
           aiIncome += tileInc;
         }
