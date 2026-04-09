@@ -4675,6 +4675,11 @@ export const useEnhancedMafiaGameState = (
       
       switch (action.type) {
         case 'hit_territory': {
+          // Block during mattresses
+          if ((newState.mattressesState || {}).active) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🛏️ At the Mattresses', message: 'Your units are hunkered down and cannot attack.' });
+            return newState;
+          }
           const result = processTerritoryHit(newState, action);
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
