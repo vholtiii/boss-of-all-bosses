@@ -2279,6 +2279,36 @@ export const useEnhancedMafiaGameState = (
         };
       });
 
+      // --- Mattresses & War Summit lifecycle ---
+      if (newState.mattressesState && newState.mattressesState.active) {
+        newState.mattressesState.turnsRemaining -= 1;
+        if (newState.mattressesState.turnsRemaining <= 0) {
+          newState.mattressesState = { active: false, turnsRemaining: 0 };
+          newState.mattressesCooldownUntil = newState.turn + MATTRESSES_COOLDOWN;
+          newState.pendingNotifications.push({
+            type: 'info', title: '🛏️ Mattresses Over',
+            message: 'Your family stands down from defensive posture. Units can move and attack again.',
+          });
+        } else {
+          // Lock all player unit moves during mattresses
+          newState.deployedUnits = newState.deployedUnits.map(u => {
+            if (u.family !== newState.playerFamily) return u;
+            return { ...u, movesRemaining: 0 };
+          });
+        }
+      }
+      if (newState.warSummitState && newState.warSummitState.active) {
+        newState.warSummitState.turnsRemaining -= 1;
+        if (newState.warSummitState.turnsRemaining <= 0) {
+          newState.warSummitState = { active: false, turnsRemaining: 0 };
+          newState.warSummitCooldownUntil = newState.turn + WAR_SUMMIT_COOLDOWN;
+          newState.pendingNotifications.push({
+            type: 'info', title: '⚔️ War Summit Ended',
+            message: 'The rally fades. Combat bonuses have expired.',
+          });
+        }
+      }
+
       // --- Hex fortification abandonment tick ---
       newState.fortifiedHexes = (newState.fortifiedHexes || []).filter(f => {
         const hasUnits = newState.deployedUnits.some(u => u.family === f.family && u.q === f.q && u.r === f.r && u.s === f.s);
@@ -3337,7 +3367,12 @@ export const useEnhancedMafiaGameState = (
     const communityUpkeep = communityHexCount * 150;
 
     // Store gross income before penalties
-    const grossIncome = income;
+    let grossIncome = income;
+    
+    // Mattresses income penalty (-50% territory income while hunkered down)
+    if ((state.mattressesState || {}).active) {
+      grossIncome = Math.floor(grossIncome * (1 - MATTRESSES_INCOME_PENALTY));
+    }
     const grossLegalIncome = legalIncome;
     const grossIllegalIncome = illegalIncome;
     
@@ -4310,6 +4345,10 @@ export const useEnhancedMafiaGameState = (
             // Flipped soldier bonus
             const flippedCount = (state.flippedSoldiers || []).filter(f => f.family === victimFamily).length;
             chance += flippedCount * 0.10;
+            // Mattresses HQ defense bonus if victim is player
+            if (victimFamily === state.playerFamily && (state.mattressesState || {}).active) {
+              chance -= MATTRESSES_HQ_BONUS / 100;
+            }
             chance = Math.min(HQ_ASSAULT_MAX_CHANCE, Math.max(0.05, chance));
             if (Math.random() < chance) {
               state.eliminatedFamilies = [...(state.eliminatedFamilies || []), victimFamily];
