@@ -3479,9 +3479,16 @@ export const useEnhancedMafiaGameState = (
       }
 
       // ── PERSONALITY-DRIVEN MOVEMENT & COMBAT ──
-      const personality = opponent.personality || 'aggressive';
+      let personality = opponent.personality || 'aggressive';
       const aggression = opponent.strategy.aggressionLevel || 50;
       const cooperation = opponent.strategy.cooperationTendency || 50;
+
+      // War aggression override: if at war, behave as aggressive and prioritize war target
+      const activeWarTarget = (state.activeWars || []).find(w => w.family1 === fam || w.family2 === fam);
+      const warTargetFamily = activeWarTarget ? (activeWarTarget.family1 === fam ? activeWarTarget.family2 : activeWarTarget.family1) : null;
+      if (warTargetFamily) {
+        personality = 'aggressive'; // Override personality during war
+      }
 
       // AI action budget — boosted in early game (turns 1-8) for faster expansion, scaled by map size
       const earlyGameBonus = state.turn <= 8 ? 2 : 0;
