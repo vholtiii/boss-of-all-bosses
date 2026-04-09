@@ -3538,6 +3538,12 @@ export const useEnhancedMafiaGameState = (
           const enemyHexes = [...playerHexes, ...otherAIHexes];
 
           let targetPool: typeof validMoves;
+
+          // War targeting: prioritize war target's hexes
+          const warTargetHexes = warTargetFamily ? validMoves.filter(n => {
+            const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+            return tile && tile.controllingFamily === warTargetFamily;
+          }) : [];
           const hasBounty = state.aiBounties.some(b => b.fromFamily === fam && b.targetFamily === state.playerFamily);
 
           // Prioritize enemy safehouse hexes for bounty + intel
