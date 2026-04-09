@@ -417,6 +417,12 @@ export interface EnhancedMafiaGameState {
   activeWars: WarState[];
   tensionCooldowns: Record<string, number>;      // pair key → turns remaining (Hole #3 fix)
   
+  // Boss actions: Mattresses & War Summit
+  mattressesState: MattressesState;
+  mattressesCooldownUntil: number;
+  warSummitState: WarSummitState;
+  warSummitCooldownUntil: number;
+  
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
   };
