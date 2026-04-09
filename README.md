@@ -156,6 +156,15 @@ Four business types: Brothel ($3K), Gambling Den ($4K), Loan Sharking ($5K), Sto
 - **Capo promotion**: $10,000, requires victories ≥ 3, loyalty ≥ 60, training ≥ 2, toughness ≥ 3, racketeering ≥ 3
 - Max 3 capos, max 3 hitman contracts ($30,000 each)
 
+### Tension & War System
+- **Tension meter** (0-100) tracked for all 10 family pairs, decays 2/turn
+- **Tension builders**: Territory hit (+10), Plan Hit on soldier (+15), Extortion (+8), Encroachment (+12), Supply sabotage (+15), Breaking pact (+30)
+- **Tension reducers**: Ceasefire (-25), Alliance (-35), Supply deal (-15), Share profits (-10), Safe passage (-8), Bribe for territory (-5)
+- **War trigger**: Tension reaches **80** between two families, OR a successful **Plan Hit on a Capo** (instant war)
+- **War duration**: 10 turns — diplomatic lockout, AI forced aggression, -20% income on border hexes (capped -30%)
+- **Hitman global tension**: Soldier kill +5, Capo kill +15 (all pairs, anonymous — no pair tension)
+- **Post-war**: Tension resets to 30, relationship drops -50, max 2 simultaneous wars per family
+
 ### Reputation & Police Heat
 - Five reputation metrics: Respect, Reputation, Loyalty, Fear, Street Influence
 - Respect scales extortion payouts (0.5x at 0 → 1.5x at 100) and recruitment discounts (up to 30%)
