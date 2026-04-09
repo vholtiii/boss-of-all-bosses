@@ -627,9 +627,12 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               const hqT = hexMap.find(t => t.isHeadquarters === playerFamily);
               const supplyRouteHexSet = new Set<string>();
               const connectedNodeKeys = new Set<string>();
+              const routePaths: Array<Array<{x:number;y:number}>> = [];
               if (hqT && sNodes.length > 0) {
                 const hKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
                 const pHexSet = new Set(hexMap.filter(t => t.controllingFamily === playerFamily || t.isHeadquarters === playerFamily).map(t => hKey(t.q, t.r, t.s)));
+                // Add supply node hexes as valid BFS endpoints so routes can reach neutral nodes
+                for (const node of sNodes) { pHexSet.add(hKey(node.q, node.r, node.s)); }
                 const par = new Map<string, string>();
                 const vis = new Set<string>();
                 const bQ: Array<{q:number;r:number;s:number}> = [{ q: hqT.q, r: hqT.r, s: hqT.s }];
@@ -649,8 +652,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   const nK = hKey(node.q, node.r, node.s);
                   if (!vis.has(nK)) continue;
                   connectedNodeKeys.add(nK);
+                  // Collect hex keys for tint + build ordered path for polyline
+                  const pathKeys: string[] = [];
                   let ck = nK;
-                  while (ck && ck !== '') { supplyRouteHexSet.add(ck); ck = par.get(ck) || ''; }
+                  while (ck && ck !== '') { supplyRouteHexSet.add(ck); pathKeys.push(ck); ck = par.get(ck) || ''; }
+                  pathKeys.reverse();
+                  const pts = pathKeys.map(k => {
+                    const [qq, rr] = k.split(',').map(Number);
+                    return getHexPosition(qq, rr);
+                  });
+                  if (pts.length > 1) routePaths.push(pts);
                 }
               }
               // Store sets for use in hex rendering below
@@ -683,17 +694,32 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       if (!supplyRouteHexSet.has(tk)) return null;
                       const { x, y } = getHexPosition(tile.q, tile.r);
                       return (
-                        <polygon
+                      <polygon
                           key={`supply-tint-${tk}`}
                           points={getHexPoints(x, y, baseHexRadius)}
                           fill={pColor}
-                          fillOpacity="0.08"
+                          fillOpacity="0.15"
                           stroke={pColor}
                           strokeWidth="1"
-                          strokeOpacity="0.15"
+                          strokeOpacity="0.30"
                         />
                       );
                     })}
+                  </g>
+                  {/* Supply route connecting polylines */}
+                  <g className="pointer-events-none">
+                    {routePaths.map((pts, idx) => (
+                      <polyline
+                        key={`supply-line-${idx}`}
+                        points={pts.map(p => `${p.x},${p.y}`).join(' ')}
+                        fill="none"
+                        stroke={pColor}
+                        strokeWidth="2.5"
+                        strokeOpacity="0.4"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      />
+                    ))}
                   </g>
                 </>
               );
