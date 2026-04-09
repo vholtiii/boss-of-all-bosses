@@ -655,6 +655,26 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   while (ck && ck !== '') { supplyRouteHexSet.add(ck); ck = par.get(ck) || ''; }
                 }
               }
+              // Build ordered route paths for polylines
+              const routePaths: Array<Array<{x:number;y:number}>> = [];
+              if (hqT && sNodes.length > 0) {
+                const hKey2 = (q: number, r: number, s: number) => `${q},${r},${s}`;
+                const par2 = (window as any).__supplyPar as Map<string,string> | undefined;
+                // Rebuild paths from connectedNodeKeys using parent map
+                for (const node of sNodes) {
+                  const nK = hKey2(node.q, node.r, node.s);
+                  if (!connectedNodeKeys.has(nK)) continue;
+                  const pathKeys: string[] = [];
+                  let ck = nK;
+                  while (ck && ck !== '') { pathKeys.push(ck); ck = (window as any).__supplyParMap?.get(ck) || ''; }
+                  pathKeys.reverse();
+                  const pts = pathKeys.map(k => {
+                    const [qq,rr] = k.split(',').map(Number);
+                    return getHexPosition(qq, rr);
+                  });
+                  if (pts.length > 1) routePaths.push(pts);
+                }
+              }
               // Store sets for use in hex rendering below
               (window as any).__supplyRouteHexSet = supplyRouteHexSet;
               (window as any).__connectedNodeKeys = connectedNodeKeys;
@@ -696,6 +716,21 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         />
                       );
                     })}
+                  </g>
+                  {/* Supply route connecting polylines */}
+                  <g className="pointer-events-none">
+                    {routePaths.map((pts, idx) => (
+                      <polyline
+                        key={`supply-line-${idx}`}
+                        points={pts.map(p => `${p.x},${p.y}`).join(' ')}
+                        fill="none"
+                        stroke={pColor}
+                        strokeWidth="2.5"
+                        strokeOpacity="0.4"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      />
+                    ))}
                   </g>
                 </>
               );
