@@ -6171,6 +6171,10 @@ export const useEnhancedMafiaGameState = (
         const respectGain = isEnemy ? 3 : 5;
         state.resources.money += moneyGain;
         syncRespect(state, Math.min(100, state.reputation.respect + respectGain));
+        // Tension: extorting rival territory
+        if (isEnemy) {
+          addPairTension(state, state.playerFamily, tile.controllingFamily, TENSION_EXTORT_RIVAL);
+        }
         
         // Only the acting unit (first soldier, or first capo if no soldiers) gets stat rewards
         const actingSoldiers = allPlayerUnits.filter(u => u.type === 'soldier');
