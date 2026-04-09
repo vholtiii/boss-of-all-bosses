@@ -733,6 +733,10 @@ const createInitialGameState = (
     sitdownCooldownUntil: 0,
     supplyNodes,
     supplyStockpile: [],
+    // Tension & War system
+    familyTensions: Object.fromEntries(getAllFamilyPairKeys().map(k => [k, 0])),
+    activeWars: [],
+    tensionCooldowns: {},
     victoryType: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
