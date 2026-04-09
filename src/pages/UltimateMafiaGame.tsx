@@ -136,6 +136,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     targetS: number;
     capoId: string;
     scope: 'territory';
+    pendingNegotiationId?: string;
   } | {
     open: boolean;
     scope: 'family';
@@ -158,6 +159,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         targetS: action.targetS,
         capoId: action.capoId,
         scope: 'territory',
+        pendingNegotiationId: action.pendingNegotiationId,
       });
       return;
     }
