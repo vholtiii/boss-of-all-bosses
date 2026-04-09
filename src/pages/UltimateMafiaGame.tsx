@@ -296,7 +296,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       id: 'intel',
       label: 'Intel',
       icon: <Eye className="h-4 w-4" />,
-      content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} />
+      content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} />
     },
   ];
 
@@ -475,7 +475,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   );
 
   const rightSidebar = (
-    <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} />
+    <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} />
   );
 
   const topBar = (
