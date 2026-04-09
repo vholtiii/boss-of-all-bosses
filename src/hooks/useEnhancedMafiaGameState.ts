@@ -5208,6 +5208,12 @@ export const useEnhancedMafiaGameState = (
         case 'negotiate': {
           const result = processNegotiation(newState, action);
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          // Consume the pending negotiation entry
+          if (action.pendingNegotiationId) {
+            result.pendingNegotiations = (result.pendingNegotiations || []).filter(
+              (p: PendingNegotiation) => p.id !== action.pendingNegotiationId
+            );
+          }
           return result;
         }
         case 'boss_negotiate': {
