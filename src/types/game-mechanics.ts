@@ -319,7 +319,18 @@ export interface Safehouse {
   s: number;
   turnsRemaining: number;
   createdTurn: number;
+  // Stockpile system
+  stockpile: Partial<Record<SupplyNodeType, number>>; // 0-5 per type
+  allocationPercent: number; // 0-50, player-configured
+  connectedSupplyTypes: SupplyNodeType[]; // derived each turn from BFS
+  manualRouteEstablished: boolean; // true if player manually connected via sub-route
+  subRoutePath?: Array<{ q: number; r: number; s: number }>; // hex chain for sub-route rendering
 }
+
+// Safehouse stockpile constants
+export const SAFEHOUSE_MAX_STOCKPILE = 5;
+export const SAFEHOUSE_MAX_ALLOCATION = 50;
+export const SAFEHOUSE_STOCKPILE_RATE = 1; // units per turn at 50% allocation per node type
 
 export type MoveAction = 'move' | 'scout' | 'fortify' | 'escort' | 'safehouse';
 

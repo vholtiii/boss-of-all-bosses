@@ -158,4 +158,22 @@ All colors MUST be HSL.
       stroke-dashoffset: -24;
     }
   }
+
+  /* Safehouse connection glow pulse */
+  .safehouse-glow {
+    animation: safehouseGlow 2s ease-in-out infinite;
+  }
+  @keyframes safehouseGlow {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.35; }
+  }
+
+  /* Safehouse stockpiling dots animation */
+  .stockpile-dot {
+    animation: stockpilePulse 1.8s ease-in-out infinite;
+  }
+  @keyframes stockpilePulse {
+    0%, 100% { opacity: 0.3; r: 1.5; }
+    50% { opacity: 0.9; r: 2.2; }
+  }
 }
