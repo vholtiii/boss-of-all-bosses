@@ -719,6 +719,34 @@ export const RightSidePanel: React.FC<{
                     </Badge>
                   </div>
                 )}
+                {/* Tension Bar */}
+                {(() => {
+                  const tension = (gameState as any).familyTensions?.[getTensionPairKey(gameState.playerFamily, opponent.family)] || 0;
+                  const activeWar = ((gameState as any).activeWars || []).find((w: any) =>
+                    (w.family1 === gameState.playerFamily && w.family2 === opponent.family) ||
+                    (w.family1 === opponent.family && w.family2 === gameState.playerFamily)
+                  );
+                  const tensionColor = activeWar ? 'bg-red-600' : tension >= 60 ? 'bg-orange-500' : tension >= 30 ? 'bg-yellow-500' : 'bg-green-500';
+                  const tensionLabel = activeWar ? `AT WAR (${activeWar.turnsRemaining} turns)` : `Tension: ${Math.round(tension)}`;
+                  return (
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] text-muted-foreground">{tensionLabel}</span>
+                        {activeWar && (
+                          <Badge variant="destructive" className="text-[9px] h-4 animate-pulse">
+                            ⚔️ WAR
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={cn('h-full rounded-full transition-all duration-500', tensionColor)}
+                          style={{ width: `${Math.min(100, activeWar ? 100 : tension)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
