@@ -381,6 +381,24 @@ Active bribes can also reveal enemy planned hits — see [Intel & Threat Detecti
 - Recalled soldiers: +5 loyalty
 - Recalled soldiers lose fortification, cannot act again this turn
 
+### 15.2 Declare War
+- **Cost**: $10,000 + 1 action point
+- Instantly sets tension to 80 with a chosen family, triggering a 10-turn war
+- Cannot declare war on a family you have a ceasefire/alliance with
+- Max 2 simultaneous wars
+
+### 15.3 Go to the Mattresses (Defensive Stance)
+- **Cost**: $5,000 + 1 action point. **Cooldown**: 8 turns. **Duration**: 3 turns.
+- **Buffs**: +20% unit defense, +15% HQ assault defense, +5 loyalty to all soldiers
+- **Penalties**: Units locked (cannot move or attack), -50% territory income
+- Strategic use: hunker down when under heavy assault or expecting an HQ attack
+
+### 15.4 War Summit (Offensive Rally)
+- **Cost**: $5,000 + 1 action point. **Cooldown**: 5 turns. **Duration**: 2 turns.
+- **Immediate**: +10 fear, +8 police heat, +3 loyalty to all soldiers
+- **Ongoing**: +15% combat (hit) bonus for all deployed soldiers
+- **Tradeoff**: Heat increase risks arrests at high heat levels — weigh combat edge vs police attention
+
 ---
 
 ## 16. Victory Conditions
