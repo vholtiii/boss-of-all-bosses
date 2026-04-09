@@ -3910,6 +3910,8 @@ export const useEnhancedMafiaGameState = (
           // Attempt extortion: ~50% base chance
           const successChance = 0.5 + (opponent.resources.influence || 50) / 1000;
           if (Math.random() < successChance) {
+            // Hole #6: AI extortion → tension
+            addPairTension(state, fam, enemyTile.controllingFamily as string, TENSION_EXTORT_RIVAL);
             const basePayout = enemyTile.business!.isLegal ? 1500 : 3000;
             const payout = Math.round(basePayout * 0.7); // Enemy extortion pays less
             opponent.resources.money += payout;
