@@ -1077,8 +1077,14 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
       {negotiationState && (() => {
         if (negotiationState.scope === 'territory') {
           const tile = gameState.hexMap.find((t: any) => t.q === negotiationState.targetQ && t.r === negotiationState.targetR && t.s === negotiationState.targetS);
+          if (!tile) return null;
           const capo = gameState.deployedUnits.find((u: any) => u.id === negotiationState.capoId);
-          if (!tile || !capo) return null;
+          // For pending negotiations, capo may be anywhere or even dead — use pending data as fallback
+          const pendingEntry = (negotiationState as any).pendingNegotiationId 
+            ? ((gameState as any).pendingNegotiations || []).find((p: any) => p.id === (negotiationState as any).pendingNegotiationId) 
+            : null;
+          const capoName = capo?.name || pendingEntry?.capoName || 'Capo';
+          const capoPersonality = capo?.personality || pendingEntry?.capoPersonality || 'diplomat';
           const enemyFamily = tile.controllingFamily;
           const enemyUnitsOnHex = gameState.deployedUnits.filter((u: any) => u.family === enemyFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s);
           return (
@@ -1100,8 +1106,8 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
                 });
                 setNegotiationState(null);
               }}
-              capoName={capo.name || 'Capo'}
-              capoPersonality={capo.personality || 'diplomat'}
+              capoName={capoName}
+              capoPersonality={capoPersonality}
               enemyFamily={enemyFamily}
               playerReputation={gameState.reputation.respect}
               playerMoney={gameState.resources.money}
