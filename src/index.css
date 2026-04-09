@@ -147,4 +147,15 @@ All colors MUST be HSL.
     -moz-user-select: none;
     -ms-user-select: none;
   }
+
+  /* Animated supply flow dashes */
+  .supply-flow-line {
+    animation: supplyFlow 1.5s linear infinite;
+  }
+
+  @keyframes supplyFlow {
+    to {
+      stroke-dashoffset: -24;
+    }
+  }
 }
