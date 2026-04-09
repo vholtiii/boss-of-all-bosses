@@ -2024,6 +2024,14 @@ export const useEnhancedMafiaGameState = (
       newState.policeHeat.arrests = newState.policeHeat.arrests || [];
       newState.policeHeat.bribedOfficials = newState.policeHeat.bribedOfficials || [];
       newState.aiAlertState = newState.aiAlertState || {};
+      
+      // ============ PENDING NEGOTIATIONS LIFECYCLE ============
+      newState.pendingNegotiations = newState.pendingNegotiations || [];
+      // Expire "ready" negotiations that weren't used last turn
+      newState.pendingNegotiations = newState.pendingNegotiations.filter(p => !p.ready);
+      // Promote "pending" (from last turn) to "ready"
+      newState.pendingNegotiations = newState.pendingNegotiations.map(p => ({ ...p, ready: true }));
+      
       newState.turn += 1;
       
       // Snapshot before-state for turn report
