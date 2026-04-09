@@ -336,6 +336,7 @@ export type MoveAction = 'move' | 'scout' | 'fortify' | 'escort' | 'safehouse';
 
 export const FORTIFY_DEFENSE_BONUS = 25; // +25% defense
 export const FORTIFY_ABANDON_TURNS = 3; // turns with no friendly units before fortification crumbles
+export const MAX_FORTIFICATIONS = 4; // max fortifications per family on the map
 
 export interface FortifiedHex {
   q: number;
