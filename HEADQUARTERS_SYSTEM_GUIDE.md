@@ -13,6 +13,7 @@
 - [9. Flip Soldier](#9-flip-soldier)
 - [10. HQ Information Panel](#10-hq-information-panel)
 - [11. Visual Indicators](#11-visual-indicators)
+- [12. War System & HQ](#12-war-system--hq)
 
 ---
 

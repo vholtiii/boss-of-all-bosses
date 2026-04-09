@@ -11,6 +11,7 @@
 - [7. HQ Assault](#7-hq-assault)
 - [8. Flip Soldier](#8-flip-soldier)
 - [9. Victory Conditions](#9-victory-conditions)
+- [10. Tension & War in Combat](#10-tension--war-in-combat)
 
 ---
 

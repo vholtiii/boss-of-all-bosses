@@ -23,6 +23,7 @@
 - [19. AI Opponents](#19-ai-opponents)
 - [20. Intel & Threat Detection](#20-intel--threat-detection)
 - [21. Strategic Tips](#21-strategic-tips)
+- [22. Tension & War System](#22-tension--war-system)
 
 ---
 
