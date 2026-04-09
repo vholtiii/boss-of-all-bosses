@@ -3615,16 +3615,18 @@ export const useEnhancedMafiaGameState = (
                 
                 const shIdx2 = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
                 if (shIdx2 !== -1 && tile.controllingFamily === fam) {
-                  state.safehouses.splice(shIdx2, 1);
-                  if (prevOwner === state.playerFamily) {
-                    state.pendingNotifications.push({
-                      type: 'error' as const,
-                      title: '🏠 Safehouse Destroyed',
-                      message: `The ${fam} family captured your territory and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()}.`,
-                    });
-                  }
-                  const captorOpp2 = state.aiOpponents.find(o => o.family === fam);
-                  if (captorOpp2) captorOpp2.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
+                    const capturedSh2 = state.safehouses[shIdx2];
+                    const stockpileDesc2 = Object.entries(capturedSh2.stockpile || {}).filter(([,v]) => (v as number) > 0).map(([k,v]) => `${Math.floor(v as number)} ${k.replace('_',' ')}`).join(', ');
+                    state.safehouses.splice(shIdx2, 1);
+                    if (prevOwner === state.playerFamily) {
+                      state.pendingNotifications.push({
+                        type: 'error' as const,
+                        title: '🏠 Safehouse Destroyed',
+                        message: `The ${fam} family captured your territory and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()}.${stockpileDesc2 ? ` Seized stockpile: ${stockpileDesc2}.` : ''}`,
+                      });
+                    }
+                    const captorOpp2 = state.aiOpponents.find(o => o.family === fam);
+                    if (captorOpp2) captorOpp2.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
                 }
               }
             }
