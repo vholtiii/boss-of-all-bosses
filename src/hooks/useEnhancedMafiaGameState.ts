@@ -2876,7 +2876,7 @@ export const useEnhancedMafiaGameState = (
             else if (isAtSafehouse) successRate = HITMAN_SAFEHOUSE_SUCCESS;
             else if (isFort) successRate = HITMAN_FORTIFIED_SUCCESS;
 
-            if (Math.random() < successRate) {
+            if (Math.random() * 100 < successRate) {
               // Kill the target
               newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== contract.targetUnitId);
               delete newState.soldierStats[contract.targetUnitId];
@@ -2885,6 +2885,12 @@ export const useEnhancedMafiaGameState = (
                 type: 'success' as const, title: '🎯 Contract Fulfilled',
                 message: `Your hitman successfully eliminated a ${contract.targetFamily} ${targetUnit.type}. No heat generated.`,
               });
+              // Tension: hitman kills are anonymous — only global tension, no pair tension
+              if (targetUnit.type === 'capo') {
+                addGlobalTension(newState, TENSION_HITMAN_KILL_CAPO_GLOBAL);
+              } else {
+                addGlobalTension(newState, TENSION_HITMAN_KILL_SOLDIER_GLOBAL);
+              }
             } else {
               // Failed — refund 50%, alert target family
               newState.resources.money += Math.round(contract.cost * HITMAN_REFUND_RATE);
