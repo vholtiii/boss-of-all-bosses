@@ -483,6 +483,10 @@ export const SUPPLY_DEPENDENCIES: Record<string, SupplyNodeType[]> = {
   construction: ['union_hall'],
   store: ['food_market', 'docks'],
   restaurant: ['food_market', 'docks'],
+  casino: ['liquor_route'],
+  drug_trafficking: ['docks'],
+  laundromat: ['trucking_depot'],
+  prostitution: ['trucking_depot'],
 };
 
 export interface SupplyNode {
