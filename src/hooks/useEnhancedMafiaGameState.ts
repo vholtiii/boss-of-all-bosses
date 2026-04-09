@@ -3806,7 +3806,11 @@ export const useEnhancedMafiaGameState = (
                   }
                   // Fortified defenders also get protection
                   const isDefHexFort2 = isHexFortified(state.fortifiedHexes || [], eu.q, eu.r, eu.s, eu.family);
-                  const killChance = isDefHexFort2 ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
+                  let killChance = isDefHexFort2 ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
+                  // Mattresses defense bonus for player units
+                  if (eu.family === state.playerFamily && (state.mattressesState || {}).active) {
+                    killChance -= MATTRESSES_DEFENSE_BONUS / 100;
+                  }
                   if (Math.random() < killChance) {
                     const idx = state.deployedUnits.indexOf(eu);
                     if (idx !== -1) {
