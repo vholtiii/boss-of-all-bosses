@@ -675,8 +675,30 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               (window as any).__connectedNodeKeys = connectedNodeKeys;
               (window as any).__supplyRouteColor = pColor;
 
+              const markerId = `supply-arrow-${playerFamily}`;
+
               return (
                 <>
+                  <defs>
+                    <filter id={`supply-glow-${playerFamily}`} x="-50%" y="-50%" width="200%" height="200%">
+                      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                    <marker
+                      id={markerId}
+                      viewBox="0 0 10 6"
+                      refX="5"
+                      refY="3"
+                      markerWidth="8"
+                      markerHeight="5"
+                      orient="auto"
+                    >
+                      <path d="M0,0 L10,3 L0,6 Z" fill={pColor} fillOpacity="0.7" />
+                    </marker>
+                  </defs>
                   {/* District background tint layer */}
                   <g className="pointer-events-none">
                     {hexMap.map(tile => {
@@ -700,14 +722,14 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       if (!supplyRouteHexSet.has(tk)) return null;
                       const { x, y } = getHexPosition(tile.q, tile.r);
                       return (
-                      <polygon
+                        <polygon
                           key={`supply-tint-${tk}`}
                           points={getHexPoints(x, y, baseHexRadius)}
                           fill={pColor}
-                          fillOpacity="0.15"
+                          fillOpacity="0.25"
                           stroke={pColor}
-                          strokeWidth="1"
-                          strokeOpacity="0.30"
+                          strokeWidth="1.5"
+                          strokeOpacity="0.50"
                         />
                       );
                     })}
@@ -715,16 +737,30 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   {/* Supply route connecting polylines */}
                   <g className="pointer-events-none">
                     {routePaths.map((pts, idx) => (
-                      <polyline
-                        key={`supply-line-${idx}`}
-                        points={pts.map(p => `${p.x},${p.y}`).join(' ')}
-                        fill="none"
-                        stroke={pColor}
-                        strokeWidth="2.5"
-                        strokeOpacity="0.4"
-                        strokeLinejoin="round"
-                        strokeLinecap="round"
-                      />
+                      <g key={`supply-line-group-${idx}`}>
+                        <polyline
+                          points={pts.map(p => `${p.x},${p.y}`).join(' ')}
+                          fill="none"
+                          stroke={pColor}
+                          strokeWidth="6"
+                          strokeOpacity="0.2"
+                          strokeLinejoin="round"
+                          strokeLinecap="round"
+                          filter={`url(#supply-glow-${playerFamily})`}
+                        />
+                        <polyline
+                          className="supply-flow-line"
+                          points={pts.map(p => `${p.x},${p.y}`).join(' ')}
+                          fill="none"
+                          stroke={pColor}
+                          strokeWidth="4"
+                          strokeOpacity="0.8"
+                          strokeDasharray="8 4"
+                          strokeLinejoin="round"
+                          strokeLinecap="round"
+                          markerMid={`url(#${markerId})`}
+                        />
+                      </g>
                     ))}
                   </g>
                 </>
