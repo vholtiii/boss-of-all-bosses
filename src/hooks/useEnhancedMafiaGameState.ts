@@ -402,6 +402,11 @@ export interface EnhancedMafiaGameState {
   supplyNodes: SupplyNode[];
   supplyStockpile: SupplyStockpileEntry[];
   
+  // Tension & War system
+  familyTensions: Record<string, number>;       // keyed by sorted pair e.g. "bonanno-gambino"
+  activeWars: WarState[];
+  tensionCooldowns: Record<string, number>;      // pair key → turns remaining (Hole #3 fix)
+  
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
   };
