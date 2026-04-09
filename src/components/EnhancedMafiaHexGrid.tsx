@@ -1780,6 +1780,24 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   </div>
                 );
               })()}
+              {/* Pending negotiation info */}
+              {(() => {
+                const pending = (gameState?.pendingNegotiations || []).find((p: any) => p.targetQ === hoveredHex.q && p.targetR === hoveredHex.r && p.targetS === hoveredHex.s);
+                if (!pending) return null;
+                return (
+                  <div className={cn("mt-1 p-1.5 rounded border", pending.ready ? "bg-yellow-900/30 border-yellow-500/30" : "bg-gray-800/30 border-gray-500/30")}>
+                    <p className="font-bold text-xs" style={{ color: pending.ready ? '#D4AF37' : '#9CA3AF' }}>
+                      {pending.ready ? '🤝 Sitdown Ready' : '📩 Word Sent'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Sent by <span className="text-foreground">{pending.capoName}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {pending.ready ? 'Available to negotiate this turn' : 'Negotiation available next turn'}
+                    </p>
+                  </div>
+                );
+              })()}
               {/* Scouted intel */}
               {(() => {
                 const scoutInfo = (gameState?.scoutedHexes || []).find((s: ScoutedHex) => s.q === hoveredHex.q && s.r === hoveredHex.r && s.s === hoveredHex.s);
