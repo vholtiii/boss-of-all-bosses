@@ -523,7 +523,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           if (actionMenu && actionMenu.tile.q === tile.q && actionMenu.tile.r === tile.r) {
             setActionMenu(null);
           } else {
-            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, canAssaultHQ, canFlipSoldier, negotiateCapoId, reasons });
+            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, canAssaultHQ, canFlipSoldier, negotiateCapoId, pendingNegotiationId: readyPending?.id, reasons });
           }
           return;
         }
@@ -1465,6 +1465,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             targetR: actionMenu.tile.r,
                             targetS: actionMenu.tile.s,
                             capoId: actionMenu.negotiateCapoId,
+                            pendingNegotiationId: actionMenu.pendingNegotiationId,
                           });
                           setActionMenu(null);
                         }}
