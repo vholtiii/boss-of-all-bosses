@@ -1095,6 +1095,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
                   targetR: negotiationState.targetR,
                   targetS: negotiationState.targetS,
                   capoId: negotiationState.capoId,
+                  pendingNegotiationId: (negotiationState as any).pendingNegotiationId,
                   extraData,
                 });
                 setNegotiationState(null);
