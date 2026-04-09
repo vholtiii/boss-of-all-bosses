@@ -612,7 +612,8 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
 export const RightSidePanel: React.FC<{
   gameState: EnhancedMafiaGameState;
   onEventChoice: (eventId: string, choiceId: string) => void;
-}> = ({ gameState, onEventChoice }) => {
+  onAction?: (action: any) => void;
+}> = ({ gameState, onEventChoice, onAction }) => {
   const [openSection, setOpenSection] = useState<string>('rivals');
   const toggle = (id: string) => setOpenSection(prev => (prev === id ? '' : id));
 
