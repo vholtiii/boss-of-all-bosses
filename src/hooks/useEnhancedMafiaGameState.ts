@@ -572,6 +572,7 @@ const createInitialGameState = (
   const supplyNodeTypes: SupplyNodeType[] = ['docks', 'union_hall', 'trucking_depot', 'liquor_route', 'food_market'];
   const supplyNodes: SupplyNode[] = [];
   const usedHexKeys = new Set<string>();
+  const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'] as const;
   
   supplyNodeTypes.forEach(nodeType => {
     const config = SUPPLY_NODE_CONFIG[nodeType];
@@ -598,8 +599,6 @@ const createInitialGameState = (
       supplyNodes.push({ type: nodeType, q: chosen.q, r: chosen.r, s: chosen.s, district: chosen.district });
     }
   });
-
-  const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'] as const;
   
   allFamilies.forEach(fam => {
     const hq = HQ_POSITIONS[fam];
