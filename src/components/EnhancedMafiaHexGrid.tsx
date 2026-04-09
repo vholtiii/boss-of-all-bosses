@@ -614,6 +614,15 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           {showSoldiers ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
           Units
         </Button>
+        <Button
+          variant={showSupplyLines ? "default" : "outline"}
+          size="sm"
+          onClick={() => setShowSupplyLines(s => !s)}
+          className="font-medium"
+        >
+          {showSupplyLines ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+          Supply Lines
+        </Button>
       </div>
 
       {/* Grid */}
@@ -623,7 +632,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             {/* Compute supply route hex set for tint overlay */}
             {(() => {
               const sNodes: SupplyNode[] = gameState?.supplyNodes || [];
-              const pColor = familyColors[playerFamily] || '#D4AF37';
+              const pColor = '#B0B0B0'; // uniform light grey for all supply lines
               const hqT = hexMap.find(t => t.isHeadquarters === playerFamily);
               const supplyRouteHexSet = new Set<string>();
               const connectedNodeKeys = new Set<string>();
@@ -661,7 +670,15 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   // Collect hex keys for tint + build ordered path for polyline
                   const pathKeys: string[] = [];
                   let ck = nK;
-                  while (ck && ck !== '') { supplyRouteHexSet.add(ck); pathKeys.push(ck); ck = par.get(ck) || ''; }
+                  const hqKey = hKey(hqT!.q, hqT!.r, hqT!.s);
+                  while (ck && ck !== '') {
+                    supplyRouteHexSet.add(ck);
+                    pathKeys.push(ck);
+                    const nextCk = par.get(ck) || '';
+                    // Stop before entering HQ hex — line should touch but not enter
+                    if (nextCk === hqKey) break;
+                    ck = nextCk;
+                  }
                   pathKeys.reverse();
                   const pts = pathKeys.map(k => {
                     const [qq, rr] = k.split(',').map(Number);
