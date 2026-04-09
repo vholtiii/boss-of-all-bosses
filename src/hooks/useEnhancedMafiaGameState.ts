@@ -216,6 +216,10 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     familyTensions: { ...(state.familyTensions || {}) },
     activeWars: (state.activeWars || []).map(w => ({ ...w })),
     tensionCooldowns: { ...(state.tensionCooldowns || {}) },
+    mattressesState: { ...(state.mattressesState || { active: false, turnsRemaining: 0 }) },
+    mattressesCooldownUntil: state.mattressesCooldownUntil || 0,
+    warSummitState: { ...(state.warSummitState || { active: false, turnsRemaining: 0 }) },
+    warSummitCooldownUntil: state.warSummitCooldownUntil || 0,
   });
 
 // ============ UNIT TYPES ============
