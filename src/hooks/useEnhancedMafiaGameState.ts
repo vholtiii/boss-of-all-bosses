@@ -3787,6 +3787,8 @@ export const useEnhancedMafiaGameState = (
                   // Neutral hex: capos auto-claim (matches player rules), soldiers don't
                   if (unit.type === 'capo') {
                     tile.controllingFamily = fam;
+                    // Hole #5: encroachment check for neutral claims by AI
+                    checkEncroachment(state, target.q, target.r, target.s, fam);
                   }
                 } else {
                   // Territory freeze: skip claiming ceasefire family hexes
@@ -3815,14 +3817,8 @@ export const useEnhancedMafiaGameState = (
                       }
                       tile.controllingFamily = fam;
                       // Hole #6: AI captures enemy territory → tension
-                      if (prevOwner !== 'neutral') {
-                        addPairTension(state, fam, prevOwner, TENSION_TERRITORY_HIT);
-                        checkSupplySabotage(state, target.q, target.r, target.s, fam);
-                      }
-                      // Hole #5: encroachment check for neutral claims
-                      if (prevOwner === 'neutral') {
-                        checkEncroachment(state, target.q, target.r, target.s, fam);
-                      }
+                      addPairTension(state, fam, prevOwner as string, TENSION_TERRITORY_HIT);
+                      checkSupplySabotage(state, target.q, target.r, target.s, fam);
                       if (prevOwner === state.playerFamily && turnReport) {
                         turnReport.aiActions.push({ family: fam, action: 'capture', detail: `Captured your territory in ${tile.district}` });
                       }
