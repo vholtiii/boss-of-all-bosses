@@ -631,8 +631,14 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               if (hqT && sNodes.length > 0) {
                 const hKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
                 const pHexSet = new Set(hexMap.filter(t => t.controllingFamily === playerFamily || t.isHeadquarters === playerFamily).map(t => hKey(t.q, t.r, t.s)));
-                // Add supply node hexes as valid BFS endpoints so routes can reach neutral nodes
-                for (const node of sNodes) { pHexSet.add(hKey(node.q, node.r, node.s)); }
+                // Add supply node hexes as valid BFS endpoints ONLY if they have a player-controlled neighbor
+                for (const node of sNodes) {
+                  const nodeKey = hKey(node.q, node.r, node.s);
+                  if (pHexSet.has(nodeKey)) continue; // already player-owned
+                  const nbs = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
+                  const hasPlayerNeighbor = nbs.some(d => pHexSet.has(hKey(node.q+d.q, node.r+d.r, node.s+d.s)));
+                  if (hasPlayerNeighbor) pHexSet.add(nodeKey);
+                }
                 const par = new Map<string, string>();
                 const vis = new Set<string>();
                 const bQ: Array<{q:number;r:number;s:number}> = [{ q: hqT.q, r: hqT.r, s: hqT.s }];
