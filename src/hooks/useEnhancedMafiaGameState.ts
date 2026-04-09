@@ -2187,6 +2187,138 @@ export const useEnhancedMafiaGameState = (
         });
       }
 
+      // ============ SAFEHOUSE STOCKPILE ACCUMULATION ============
+      {
+        const hk = (q: number, r: number, s: number) => `${q},${r},${s}`;
+        const dd = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
+        const allFamiliesForSafehouse = [newState.playerFamily, ...newState.aiOpponents.map(o => o.family)];
+        const supplyRouteHexSets: Record<string, Set<string>> = {};
+        const familyConnectedNodeTypes: Record<string, Set<SupplyNodeType>> = {};
+
+        allFamiliesForSafehouse.forEach(fam => {
+          const famHexSet = new Set(newState.hexMap.filter(t => t.controllingFamily === fam || t.isHeadquarters === fam).map(t => hk(t.q, t.r, t.s)));
+          const hqT = newState.hexMap.find(t => t.isHeadquarters === fam);
+          if (!hqT) { supplyRouteHexSets[fam] = new Set(); familyConnectedNodeTypes[fam] = new Set(); return; }
+          for (const node of (newState.supplyNodes || [])) {
+            const nodeKey = hk(node.q, node.r, node.s);
+            if (famHexSet.has(nodeKey)) continue;
+            const hasNeighbor = dd.some(d => famHexSet.has(hk(node.q+d.q, node.r+d.r, node.s+d.s)));
+            if (hasNeighbor) famHexSet.add(nodeKey);
+          }
+          const vis = new Set<string>();
+          const bQ: Array<{q:number;r:number;s:number}> = [{ q: hqT.q, r: hqT.r, s: hqT.s }];
+          vis.add(hk(hqT.q, hqT.r, hqT.s));
+          while (bQ.length > 0) {
+            const c = bQ.shift()!;
+            for (const d of dd) {
+              const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
+              const nk = hk(nq, nr, ns);
+              if (vis.has(nk) || !famHexSet.has(nk)) continue;
+              vis.add(nk); bQ.push({q:nq, r:nr, s:ns});
+            }
+          }
+          const connectedTypes = new Set<SupplyNodeType>();
+          for (const node of (newState.supplyNodes || [])) {
+            if (vis.has(hk(node.q, node.r, node.s))) connectedTypes.add(node.type);
+          }
+          supplyRouteHexSets[fam] = vis;
+          familyConnectedNodeTypes[fam] = connectedTypes;
+        });
+
+        for (const sh of newState.safehouses) {
+          const shKey = hk(sh.q, sh.r, sh.s);
+          const shTile = newState.hexMap.find(t => t.q === sh.q && t.r === sh.r && t.s === sh.s);
+          if (!shTile) continue;
+          const ownerFamily = shTile.controllingFamily;
+          if (ownerFamily === 'neutral') { sh.connectedSupplyTypes = []; continue; }
+          const routeSet = supplyRouteHexSets[ownerFamily] || new Set();
+          const connTypes = familyConnectedNodeTypes[ownerFamily] || new Set<SupplyNodeType>();
+          const isOnRoute = routeSet.has(shKey);
+          const isAdjToRoute = !isOnRoute && dd.some(d => routeSet.has(hk(sh.q+d.q, sh.r+d.r, sh.s+d.s)));
+          const isAutoConnected = isOnRoute || isAdjToRoute;
+
+          let isManuallyConnectable = false;
+          if (!isAutoConnected && !sh.manualRouteEstablished) {
+            const ownedSet = new Set(newState.hexMap.filter(t => t.controllingFamily === ownerFamily).map(t => hk(t.q, t.r, t.s)));
+            const mVis = new Set<string>();
+            const mQ: Array<{q:number;r:number;s:number}> = [{q: sh.q, r: sh.r, s: sh.s}];
+            mVis.add(shKey);
+            let found = false;
+            while (mQ.length > 0 && !found) {
+              const c = mQ.shift()!;
+              for (const d of dd) {
+                const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
+                const nk = hk(nq, nr, ns);
+                if (mVis.has(nk)) continue;
+                if (routeSet.has(nk)) { found = true; break; }
+                if (ownedSet.has(nk)) { mVis.add(nk); mQ.push({q:nq, r:nr, s:ns}); }
+              }
+            }
+            isManuallyConnectable = found;
+          }
+
+          let isManualConnected = false;
+          if (sh.manualRouteEstablished) {
+            const ownedSet = new Set(newState.hexMap.filter(t => t.controllingFamily === ownerFamily).map(t => hk(t.q, t.r, t.s)));
+            const mVis = new Set<string>();
+            const mQ: Array<{q:number;r:number;s:number}> = [{q: sh.q, r: sh.r, s: sh.s}];
+            mVis.add(shKey);
+            let found = false;
+            const mPar = new Map<string, string>();
+            mPar.set(shKey, '');
+            while (mQ.length > 0 && !found) {
+              const c = mQ.shift()!;
+              for (const d of dd) {
+                const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
+                const nk = hk(nq, nr, ns);
+                if (mVis.has(nk)) continue;
+                if (routeSet.has(nk)) {
+                  found = true;
+                  mPar.set(nk, hk(c.q, c.r, c.s));
+                  const subPath: Array<{q:number;r:number;s:number}> = [];
+                  let pk = nk;
+                  while (pk && pk !== '') {
+                    const [pq, pr, ps] = pk.split(',').map(Number);
+                    subPath.unshift({q: pq, r: pr, s: ps});
+                    pk = mPar.get(pk) || '';
+                  }
+                  sh.subRoutePath = subPath;
+                  break;
+                }
+                if (ownedSet.has(nk)) { mVis.add(nk); mPar.set(nk, hk(c.q, c.r, c.s)); mQ.push({q:nq, r:nr, s:ns}); }
+              }
+            }
+            if (found) {
+              isManualConnected = true;
+            } else {
+              sh.manualRouteEstablished = false;
+              sh.subRoutePath = undefined;
+              if (ownerFamily === newState.playerFamily) {
+                newState.pendingNotifications.push({
+                  type: 'warning', title: '🏠 Safehouse Disconnected',
+                  message: `Your safehouse sub-route was severed — territory chain broken. Stockpiling stopped.`,
+                });
+              }
+            }
+          }
+
+          const isConnected = isAutoConnected || isManualConnected;
+          if (isConnected) {
+            sh.connectedSupplyTypes = Array.from(connTypes);
+            const rate = (sh.allocationPercent / SAFEHOUSE_MAX_ALLOCATION) * SAFEHOUSE_STOCKPILE_RATE;
+            for (const nodeType of sh.connectedSupplyTypes) {
+              const current = sh.stockpile[nodeType] || 0;
+              if (current < SAFEHOUSE_MAX_STOCKPILE) {
+                sh.stockpile[nodeType] = Math.min(SAFEHOUSE_MAX_STOCKPILE, current + rate);
+              }
+            }
+          } else {
+            sh.connectedSupplyTypes = [];
+            (sh as any)._manuallyConnectable = isManuallyConnectable;
+          }
+        }
+      }
+
       processEconomy(newState);
       turnReport.income = newState.finances.totalIncome;
       turnReport.maintenance = newState.finances.totalExpenses;
