@@ -5435,6 +5435,8 @@ export const useEnhancedMafiaGameState = (
     if (playerUnits.length === 0) return state;
 
     tile.controllingFamily = state.playerFamily;
+    // Hole #5: check encroachment on neutral hex claims
+    checkEncroachment(state, targetQ, targetR, targetS, state.playerFamily);
 
     // Auto-move: move the selected soldier to the claimed hex (fall back to first adjacent soldier)
     const selectedSoldier = action.unitId 
