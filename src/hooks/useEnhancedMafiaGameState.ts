@@ -47,6 +47,17 @@ import {
   SupplyNode, SupplyNodeType, SupplyStockpileEntry, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES,
   SUPPLY_DECAY_RATE, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER,
   SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, SAFEHOUSE_STOCKPILE_RATE,
+  // Tension & War
+  WarState, getTensionPairKey, getAllFamilyPairKeys,
+  WAR_TENSION_THRESHOLD, WAR_DURATION, WAR_MAX_SIMULTANEOUS, TENSION_DECAY_PER_TURN,
+  WAR_INCOME_PENALTY, WAR_INCOME_PENALTY_CAP, WAR_POST_TENSION, WAR_POST_RELATIONSHIP,
+  ENCROACHMENT_NEIGHBOR_THRESHOLD,
+  TENSION_TERRITORY_HIT, TENSION_PLAN_HIT_SOLDIER, TENSION_EXTORT_RIVAL,
+  TENSION_ENCROACHMENT, TENSION_SUPPLY_SABOTAGE,
+  TENSION_HITMAN_KILL_SOLDIER_GLOBAL, TENSION_HITMAN_KILL_CAPO_GLOBAL,
+  TENSION_PACT_BREAK,
+  TENSION_REDUCE_CEASEFIRE, TENSION_REDUCE_ALLIANCE, TENSION_REDUCE_SUPPLY_DEAL,
+  TENSION_REDUCE_SHARE_PROFITS, TENSION_REDUCE_SAFE_PASSAGE, TENSION_REDUCE_BRIBE_TERRITORY,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -193,10 +204,14 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   weather: { ...state.weather, currentWeather: { ...state.weather.currentWeather } },
   finances: { ...state.finances },
   legalStatus: { ...state.legalStatus },
-  arrestedSoldiers: [...(state.arrestedSoldiers || [])],
-  arrestedCapos: [...(state.arrestedCapos || [])],
-  businesses: (state.businesses || []).map((b: any) => ({ ...b })),
-});
+    arrestedSoldiers: [...(state.arrestedSoldiers || [])],
+    arrestedCapos: [...(state.arrestedCapos || [])],
+    businesses: (state.businesses || []).map((b: any) => ({ ...b })),
+    // Tension & War
+    familyTensions: { ...(state.familyTensions || {}) },
+    activeWars: (state.activeWars || []).map(w => ({ ...w })),
+    tensionCooldowns: { ...(state.tensionCooldowns || {}) },
+  });
 
 // ============ UNIT TYPES ============
 export interface DeployedUnit {
@@ -391,6 +406,11 @@ export interface EnhancedMafiaGameState {
   supplyNodes: SupplyNode[];
   supplyStockpile: SupplyStockpileEntry[];
   
+  // Tension & War system
+  familyTensions: Record<string, number>;       // keyed by sorted pair e.g. "bonanno-gambino"
+  activeWars: WarState[];
+  tensionCooldowns: Record<string, number>;      // pair key → turns remaining (Hole #3 fix)
+  
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
   };
@@ -423,7 +443,116 @@ const hexNeighborDirections = [
 const getHexNeighbors = (q:number,r:number,s:number) =>
   hexNeighborDirections.map(d => ({q:q+d.q, r:r+d.r, s:s+d.s}));
 
-// BFS: returns all player-owned hexes connected to HQ via owned territory
+// ============ TENSION HELPERS ============
+const addPairTension = (state: EnhancedMafiaGameState, familyA: string, familyB: string, amount: number) => {
+  if (familyA === familyB) return;
+  const key = getTensionPairKey(familyA, familyB);
+  // Check cooldown (Hole #3)
+  if ((state.tensionCooldowns[key] || 0) > 0) return;
+  state.familyTensions[key] = Math.min(100, Math.max(0, (state.familyTensions[key] || 0) + amount));
+};
+
+const addGlobalTension = (state: EnhancedMafiaGameState, amount: number) => {
+  const allPairs = getAllFamilyPairKeys();
+  allPairs.forEach(key => {
+    state.familyTensions[key] = Math.min(100, Math.max(0, (state.familyTensions[key] || 0) + amount));
+  });
+};
+
+const getPairTension = (state: EnhancedMafiaGameState, familyA: string, familyB: string): number => {
+  return state.familyTensions[getTensionPairKey(familyA, familyB)] || 0;
+};
+
+const checkAndTriggerWar = (state: EnhancedMafiaGameState, familyA: string, familyB: string, trigger: 'tension' | 'capo_hit') => {
+  // Check if already at war
+  if ((state.activeWars || []).some(w => 
+    (w.family1 === familyA && w.family2 === familyB) || (w.family1 === familyB && w.family2 === familyA)
+  )) return;
+  // Check max simultaneous wars
+  const warsA = (state.activeWars || []).filter(w => w.family1 === familyA || w.family2 === familyA).length;
+  const warsB = (state.activeWars || []).filter(w => w.family1 === familyB || w.family2 === familyB).length;
+  if (warsA >= WAR_MAX_SIMULTANEOUS || warsB >= WAR_MAX_SIMULTANEOUS) return;
+  
+  const war: WarState = {
+    family1: [familyA, familyB].sort()[0],
+    family2: [familyA, familyB].sort()[1],
+    turnsRemaining: WAR_DURATION,
+    startedOnTurn: state.turn,
+    trigger,
+  };
+  state.activeWars = [...(state.activeWars || []), war];
+  
+  // Void existing pacts between warring families
+  const playerFamily = state.playerFamily;
+  if (familyA === playerFamily || familyB === playerFamily) {
+    const otherFamily = familyA === playerFamily ? familyB : familyA;
+    state.ceasefires = (state.ceasefires || []).filter(c => !(c.active && c.family === otherFamily));
+    state.alliances = (state.alliances || []).filter(a => !(a.active && a.alliedFamily === otherFamily));
+    state.safePassagePacts = (state.safePassagePacts || []).filter(p => !(p.active && p.targetFamily === otherFamily));
+  }
+  
+  // Notification
+  const fA = familyA.charAt(0).toUpperCase() + familyA.slice(1);
+  const fB = familyB.charAt(0).toUpperCase() + familyB.slice(1);
+  const isPlayerInvolved = familyA === playerFamily || familyB === playerFamily;
+  state.pendingNotifications.push({
+    type: 'error' as const,
+    title: isPlayerInvolved ? '⚔️ WAR DECLARED!' : '⚔️ War Erupts!',
+    message: isPlayerInvolved
+      ? `War between your family and the ${familyA === playerFamily ? fB : fA}! Diplomatic lockout for ${WAR_DURATION} turns. -20% income on contested borders.`
+      : `The ${fA} and ${fB} families have gone to war! This could shift the balance of power.`,
+  });
+};
+
+// Check if two families are at war
+const areFamiliesAtWar = (state: EnhancedMafiaGameState, familyA: string, familyB: string): boolean => {
+  return (state.activeWars || []).some(w => 
+    (w.family1 === familyA && w.family2 === familyB) || (w.family1 === familyB && w.family2 === familyA)
+  );
+};
+
+// Hole #5: Check encroachment (claiming neutral hex surrounded by 3+ rival hexes)
+const checkEncroachment = (state: EnhancedMafiaGameState, q: number, r: number, s: number, claimingFamily: string) => {
+  const neighbors = getHexNeighbors(q, r, s);
+  const familyCounts: Record<string, number> = {};
+  neighbors.forEach(n => {
+    const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+    if (tile && tile.controllingFamily !== 'neutral' && tile.controllingFamily !== claimingFamily) {
+      familyCounts[tile.controllingFamily] = (familyCounts[tile.controllingFamily] || 0) + 1;
+    }
+  });
+  Object.entries(familyCounts).forEach(([rivalFamily, count]) => {
+    if (count >= ENCROACHMENT_NEIGHBOR_THRESHOLD) {
+      addPairTension(state, claimingFamily, rivalFamily, TENSION_ENCROACHMENT);
+    }
+  });
+};
+
+// Hole #4: Check supply sabotage (hex capture severs a supply route)
+const checkSupplySabotage = (state: EnhancedMafiaGameState, capturedQ: number, capturedR: number, capturedS: number, capturingFamily: string) => {
+  const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
+  const capturedKey = `${capturedQ},${capturedR},${capturedS}`;
+  
+  allFamilies.forEach(fam => {
+    if (fam === capturingFamily) return;
+    // Check if this hex was on fam's supply route
+    const connectedBefore = getConnectedTerritory(
+      state.hexMap.map(t => capturedKey === `${t.q},${t.r},${t.s}` ? { ...t, controllingFamily: fam as any } : t),
+      fam
+    );
+    const connectedAfter = getConnectedTerritory(state.hexMap, fam);
+    
+    // Check if any supply node was previously reachable but now isn't
+    (state.supplyNodes || []).forEach(node => {
+      const nodeKey = `${node.q},${node.r},${node.s}`;
+      if (connectedBefore.has(nodeKey) && !connectedAfter.has(nodeKey)) {
+        addPairTension(state, capturingFamily, fam, TENSION_SUPPLY_SABOTAGE);
+      }
+    });
+  });
+};
+
+
 const getConnectedTerritory = (hexMap: HexTile[], playerFamily: string): Set<string> => {
   const hqTile = hexMap.find(t => t.isHeadquarters === playerFamily);
   if (!hqTile) return new Set();
@@ -717,6 +846,10 @@ const createInitialGameState = (
     sitdownCooldownUntil: 0,
     supplyNodes,
     supplyStockpile: [],
+    // Tension & War system
+    familyTensions: Object.fromEntries(getAllFamilyPairKeys().map(k => [k, 0])),
+    activeWars: [],
+    tensionCooldowns: {},
     victoryType: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
@@ -2743,7 +2876,7 @@ export const useEnhancedMafiaGameState = (
             else if (isAtSafehouse) successRate = HITMAN_SAFEHOUSE_SUCCESS;
             else if (isFort) successRate = HITMAN_FORTIFIED_SUCCESS;
 
-            if (Math.random() < successRate) {
+            if (Math.random() * 100 < successRate) {
               // Kill the target
               newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== contract.targetUnitId);
               delete newState.soldierStats[contract.targetUnitId];
@@ -2752,6 +2885,12 @@ export const useEnhancedMafiaGameState = (
                 type: 'success' as const, title: '🎯 Contract Fulfilled',
                 message: `Your hitman successfully eliminated a ${contract.targetFamily} ${targetUnit.type}. No heat generated.`,
               });
+              // Tension: hitman kills are anonymous — only global tension, no pair tension
+              if (targetUnit.type === 'capo') {
+                addGlobalTension(newState, TENSION_HITMAN_KILL_CAPO_GLOBAL);
+              } else {
+                addGlobalTension(newState, TENSION_HITMAN_KILL_SOLDIER_GLOBAL);
+              }
             } else {
               // Failed — refund 50%, alert target family
               newState.resources.money += Math.round(contract.cost * HITMAN_REFUND_RATE);
@@ -5296,6 +5435,8 @@ export const useEnhancedMafiaGameState = (
     if (playerUnits.length === 0) return state;
 
     tile.controllingFamily = state.playerFamily;
+    // Hole #5: check encroachment on neutral hex claims
+    checkEncroachment(state, targetQ, targetR, targetS, state.playerFamily);
 
     // Auto-move: move the selected soldier to the claimed hex (fall back to first adjacent soldier)
     const selectedSoldier = action.unitId 
@@ -5715,6 +5856,10 @@ export const useEnhancedMafiaGameState = (
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         });
         tile.controllingFamily = 'neutral'; // Hit clears enemy control — player must Claim next turn
+        // Tension: territory hit on rival hex
+        addPairTension(state, state.playerFamily, targetFamily, TENSION_TERRITORY_HIT);
+        // Hole #4: check supply sabotage
+        checkSupplySabotage(state, targetQ, targetR, targetS, state.playerFamily);
         // Destroy fortification on captured hex
         state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === targetQ && f.r === targetR && f.s === targetS));
         
@@ -6026,6 +6171,10 @@ export const useEnhancedMafiaGameState = (
         const respectGain = isEnemy ? 3 : 5;
         state.resources.money += moneyGain;
         syncRespect(state, Math.min(100, state.reputation.respect + respectGain));
+        // Tension: extorting rival territory
+        if (isEnemy) {
+          addPairTension(state, state.playerFamily, tile.controllingFamily, TENSION_EXTORT_RIVAL);
+        }
         
         // Only the acting unit (first soldier, or first capo if no soldiers) gets stat rewards
         const actingSoldiers = allPlayerUnits.filter(u => u.type === 'soldier');
