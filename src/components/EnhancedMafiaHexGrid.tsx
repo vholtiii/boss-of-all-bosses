@@ -735,7 +735,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     })}
                   </g>
                   {/* Supply route hex-chain tint overlay */}
-                  <g className="pointer-events-none">
+                  {showSupplyLines && <g className="pointer-events-none">
                     {hexMap.map(tile => {
                       const tk = `${tile.q},${tile.r},${tile.s}`;
                       if (!supplyRouteHexSet.has(tk)) return null;
@@ -752,7 +752,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         />
                       );
                     })}
-                  </g>
+                  </g>}
                   {/* Supply route polylines rendered after hex tiles — see below */}
                 </>
               );
@@ -1202,7 +1202,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             })}
 
             {/* Supply route connecting polylines — rendered AFTER hex tiles so they appear on top */}
-            {(() => {
+            {showSupplyLines && (() => {
               const storedPaths = (window as any).__supplyRoutePaths as Array<Array<{x:number;y:number}>> | undefined;
               const storedColor = (window as any).__supplyRouteColor as string | undefined;
               if (!storedPaths || !storedColor || storedPaths.length === 0) return null;
