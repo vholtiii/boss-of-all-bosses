@@ -101,7 +101,7 @@ Deploy → Tactical (Move) → Action → End Turn
 - **Soldiers**: 1-hex movement (or free within connected territory), 2 moves/turn, $1,500 (mercenary) or $300 (local recruit, requires 10+ hexes). **Only deployed soldiers cost $600/turn maintenance — undeployed reserves are free.**
 - **Capos**: 5-hex flying movement, 3 moves/turn, 100% territory income, negotiation abilities. Auto-claim neutral territory on arrival. **Wound mechanic**: immune to death in regular combat — wounded instead (-10 loyalty, -1 move for 1 turn). Can only be killed via hitman or planned hit. Scout at 2-hex range.
 - **Boss**: Permanent HQ presence. Can call a Sitdown.
-- **Hitmen**: External contract killers ($15,000), 40-90% success based on target location
+- **Hitmen**: External contract killers ($30,000), 40-90% success based on target location. Kills raise global tension (+5 soldier, +15 capo).
 
 ### Combat (Hit, Extort, Claim)
 - **Hit**: Attack enemy territory. Success based on force ratio, modifiers, and luck (10–95% range). Territory set to neutral on success.
