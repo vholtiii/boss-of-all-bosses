@@ -23,7 +23,7 @@ import {
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType, NegotiationScope, PERSONALITY_BONUSES,
   NEGOTIATION_TYPES, NEGOTIATION_REFUND_RATE, ShareProfitsPact, SafePassagePact,
   ScoutedHex, Safehouse, MoveAction, PlannedHit,
-  FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, FortifiedHex, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
+  FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, MAX_FORTIFICATIONS, FortifiedHex, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
   SAFEHOUSE_COST, SAFEHOUSE_DEFENSE_BONUS, SAFEHOUSE_CAPTURE_BOUNTY, SAFEHOUSE_CAPTURE_INTEL_DURATION, SAFEHOUSE_TERRITORY_THRESHOLD, MAX_SAFEHOUSES,
   PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_FAIL_REPUTATION, PLAN_HIT_FAIL_LOYALTY,
   PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN,
@@ -1238,7 +1238,11 @@ export const useEnhancedMafiaGameState = (
 
         if (moveAction === 'fortify') {
           if (prev.tacticalActionsRemaining <= 0) return prev;
-          if (isHexFortified(prev.fortifiedHexes || [], unit.q, unit.r, unit.s, prev.playerFamily)) return prev; // Hex already fortified
+          if (isHexFortified(prev.fortifiedHexes || [], unit.q, unit.r, unit.s, prev.playerFamily)) return prev;
+          const playerFortCount = (prev.fortifiedHexes || []).filter(f => f.family === prev.playerFamily).length;
+          if (playerFortCount >= MAX_FORTIFICATIONS) {
+            return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🛡️ Max Fortifications', message: `Maximum fortifications reached (${MAX_FORTIFICATIONS}/${MAX_FORTIFICATIONS}). Remove or lose one before building more.` }] };
+          }
           return {
             ...prev,
             fortifiedHexes: [...(prev.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: prev.playerFamily, fortifiedOnTurn: prev.turn }],
@@ -1583,6 +1587,10 @@ export const useEnhancedMafiaGameState = (
       if (!unit) return prev;
       if (unit.family !== prev.playerFamily) return prev;
       if (isHexFortified(prev.fortifiedHexes || [], unit.q, unit.r, unit.s, prev.playerFamily)) return prev;
+      const playerFortCount = (prev.fortifiedHexes || []).filter(f => f.family === prev.playerFamily).length;
+      if (playerFortCount >= MAX_FORTIFICATIONS) {
+        return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🛡️ Max Fortifications', message: `Maximum fortifications reached (${MAX_FORTIFICATIONS}/${MAX_FORTIFICATIONS}). Remove or lose one before building more.` }] };
+      }
 
       return {
         ...prev,
@@ -3632,7 +3640,7 @@ export const useEnhancedMafiaGameState = (
           }
 
           // Alert: fortify chance (hex-based)
-          if (isAlerted && !isHexFortified(state.fortifiedHexes || [], unit.q, unit.r, unit.s, fam) && Math.random() < 0.3 && aiTacticalRemaining > 0) {
+          if (isAlerted && !isHexFortified(state.fortifiedHexes || [], unit.q, unit.r, unit.s, fam) && Math.random() < 0.3 && aiTacticalRemaining > 0 && (state.fortifiedHexes || []).filter(f => f.family === fam).length < MAX_FORTIFICATIONS) {
             state.fortifiedHexes = [...(state.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: fam, fortifiedOnTurn: state.turn }];
             unit.movesRemaining = 0;
             aiTacticalRemaining--;
