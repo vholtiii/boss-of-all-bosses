@@ -101,7 +101,7 @@ Deploy → Tactical (Move) → Action → End Turn
 - **Soldiers**: 1-hex movement (or free within connected territory), 2 moves/turn, $1,500 (mercenary) or $300 (local recruit, requires 10+ hexes). **Only deployed soldiers cost $600/turn maintenance — undeployed reserves are free.**
 - **Capos**: 5-hex flying movement, 3 moves/turn, 100% territory income, negotiation abilities. Auto-claim neutral territory on arrival. **Wound mechanic**: immune to death in regular combat — wounded instead (-10 loyalty, -1 move for 1 turn). Can only be killed via hitman or planned hit. Scout at 2-hex range.
 - **Boss**: Permanent HQ presence. Can call a Sitdown.
-- **Hitmen**: External contract killers ($15,000), 40-90% success based on target location
+- **Hitmen**: External contract killers ($30,000), 40-90% success based on target location. Kills raise global tension (+5 soldier, +15 capo).
 
 ### Combat (Hit, Extort, Claim)
 - **Hit**: Attack enemy territory. Success based on force ratio, modifiers, and luck (10–95% range). Territory set to neutral on success.
@@ -126,7 +126,7 @@ Deploy → Tactical (Move) → Action → End Turn
 
 ### Tactical Actions
 - **Scout**: Reveal hex intel, +15% hit bonus for 3 turns. Capos scout at 2-hex range.
-- **Fortify**: +25% defense, 50% casualty reduction (persists until move)
+- **Fortify**: +25% defense, 50% casualty reduction (persists until move). **Max 4 per family.** Hover tooltip shows age, status, bonuses, and crumble countdown.
 - **Safehouse**: Capo creates secondary deploy point for 5 turns
 - **Escort**: Capo transports up to 2 soldiers across any distance
 
@@ -154,7 +154,16 @@ Four business types: Brothel ($3K), Gambling Den ($4K), Loan Sharking ($5K), Sto
 - **Mercenary soldiers**: $1,500 (available immediately)
 - **Local recruits**: $300 (requires 10+ controlled hexes)
 - **Capo promotion**: $10,000, requires victories ≥ 3, loyalty ≥ 60, training ≥ 2, toughness ≥ 3, racketeering ≥ 3
-- Max 3 capos, max 3 hitman contracts
+- Max 3 capos, max 3 hitman contracts ($30,000 each)
+
+### Tension & War System
+- **Tension meter** (0-100) tracked for all 10 family pairs, decays 2/turn
+- **Tension builders**: Territory hit (+10), Plan Hit on soldier (+15), Extortion (+8), Encroachment (+12), Supply sabotage (+15), Breaking pact (+30)
+- **Tension reducers**: Ceasefire (-25), Alliance (-35), Supply deal (-15), Share profits (-10), Safe passage (-8), Bribe for territory (-5)
+- **War trigger**: Tension reaches **80** between two families, OR a successful **Plan Hit on a Capo** (instant war)
+- **War duration**: 10 turns — diplomatic lockout, AI forced aggression, -20% income on border hexes (capped -30%)
+- **Hitman global tension**: Soldier kill +5, Capo kill +15 (all pairs, anonymous — no pair tension)
+- **Post-war**: Tension resets to 30, relationship drops -50, max 2 simultaneous wars per family
 
 ### Reputation & Police Heat
 - Five reputation metrics: Respect, Reputation, Loyalty, Fear, Street Influence

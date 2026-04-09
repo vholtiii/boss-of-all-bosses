@@ -11,6 +11,7 @@
 - [7. HQ Assault](#7-hq-assault)
 - [8. Flip Soldier](#8-flip-soldier)
 - [9. Victory Conditions](#9-victory-conditions)
+- [10. Tension & War in Combat](#10-tension--war-in-combat)
 
 ---
 
@@ -156,7 +157,7 @@ Neutral hexes only. Automatic success.
 ## 5. Combat Modifiers
 
 ### 5.1 Fortification
-- Defense: +25%. Attack: +12.5%. Casualty reduction: 50%. Persists until move. Hidden from enemies.
+- Defense: +25%. Attack: +12.5%. Casualty reduction: 50%. Persists until move. Hidden from enemies. **Max 4 per family.**
 
 ### 5.2 Scouting
 - +15% hit success (fresh, within 1 turn). +7% (stale, turns 2-3). Duration: 3 turns.
@@ -164,7 +165,7 @@ Neutral hexes only. Automatic success.
 - Scouted hexes can reveal enemy planned hits — see [Intel & Threat Detection](./GAME_MECHANICS.md#20-intel--threat-detection).
 
 ### 5.3 Hitman Contracts
-- External killers, NOT in regular combat. 40-90% success. No heat.
+- External killers, NOT in regular combat. **$30,000**. 40-90% success. No heat. Kills raise global tension (+5 soldier, +15 capo).
 
 ### 5.4 Family Bonuses
 - Gambino: +25% combat. Lucchese: +25% hit success. Bonanno: +20% extortion.
@@ -237,6 +238,34 @@ Weaken enemy HQ defenses by turning a rival soldier.
 | Economic Empire | $50,000/month | $50,000/month | $50,000/month |
 | Legacy of Power | Beat rival by 25% after turn 15 | Same | Same |
 | **Total Domination** | **Eliminate all 4 rival families via HQ Assault** | Same | Same |
+
+---
+
+## 10. Tension & War in Combat
+
+### 10.1 Combat Actions That Raise Tension
+
+| Action | Pair Tension | Global Tension |
+|---|---|---|
+| Territory hit (success or fail) | +10 | — |
+| Extortion (enemy hex) | +8 | — |
+| Plan Hit on soldier (success) | +15 | — |
+| **Plan Hit on capo (success)** | **Instant war** | — |
+| Hitman kills soldier | — | +5 all pairs |
+| Hitman kills capo | — | +15 all pairs |
+
+### 10.2 War Combat Modifiers
+
+During an active war (10 turns):
+- **Diplomatic lockout**: No negotiations between warring families
+- **AI forced aggression**: AI prioritizes attacking war opponent and recruits every turn
+- **Income penalty**: -20% on hexes adjacent to warring enemy territory (capped -30%)
+
+### 10.3 Strategic Implications
+
+- Hitman assassinations are **anonymous** — they raise global tension but don't directly trigger war between specific families
+- A successful Plan Hit on a Capo is the only combat action that triggers **instant war** regardless of tension level
+- Wars last 10 turns then resolve: tension resets to 30, relationship -50
 
 ---
 
