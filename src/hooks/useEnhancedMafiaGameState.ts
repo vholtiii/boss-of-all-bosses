@@ -5725,6 +5725,17 @@ export const useEnhancedMafiaGameState = (
         // For simplicity, any safehouse on this hex that isn't the player's gets destroyed
         const enemySafehouseIdx = state.safehouses.findIndex(s => s.q === targetQ && s.r === targetR && s.s === targetS);
         if (enemySafehouseIdx !== -1) {
+          const capturedSh = state.safehouses[enemySafehouseIdx];
+          const stockpileDesc = Object.entries(capturedSh.stockpile || {}).filter(([,v]) => (v as number) > 0).map(([k,v]) => `${Math.floor(v as number)} ${k.replace('_',' ')}`).join(', ');
+          // Transfer seized stockpile to player's supply buffer (reset disconnect counters)
+          Object.entries(capturedSh.stockpile || {}).forEach(([nodeType, amount]) => {
+            if ((amount as number) > 0) {
+              const stockEntry = (state.supplyStockpile || []).find(e => e.family === state.playerFamily && e.nodeType === nodeType);
+              if (stockEntry && stockEntry.turnsSinceDisconnected > 0) {
+                stockEntry.turnsSinceDisconnected = Math.max(0, stockEntry.turnsSinceDisconnected - Math.floor(amount as number));
+              }
+            }
+          });
           state.safehouses.splice(enemySafehouseIdx, 1);
           state.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
           // Intel: scout all hexes owned by targetFamily for 1 turn
@@ -5740,7 +5751,6 @@ export const useEnhancedMafiaGameState = (
               businessType: h.business?.type,
               businessIncome: h.business?.income,
             }));
-            // Merge — don't duplicate existing scouts
             const existingKeys = new Set(state.scoutedHexes.map(s => `${s.q},${s.r},${s.s}`));
             state.scoutedHexes = [
               ...state.scoutedHexes,
@@ -5749,7 +5759,7 @@ export const useEnhancedMafiaGameState = (
           }
           state.pendingNotifications = [...state.pendingNotifications, {
             type: 'success', title: '🏠 Enemy Safehouse Captured!',
-            message: `You raided their safehouse! +$${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} bounty and full intel on ${targetFamily} operations for 1 turn.`,
+            message: `You raided their safehouse! +$${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} bounty and full intel on ${targetFamily} operations for 1 turn.${stockpileDesc ? ` Seized stockpile: ${stockpileDesc}!` : ''}`,
           }];
         }
         
