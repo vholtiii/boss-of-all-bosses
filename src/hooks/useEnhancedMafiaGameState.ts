@@ -5285,7 +5285,11 @@ export const useEnhancedMafiaGameState = (
           return newState;
         case 'bribe_corruption': {
           const tier = action.tier as BribeTier;
-          // Phase gate: Captain+ bribes require Phase 3
+          // Phase gate: Patrol Officer requires Phase 2, Captain+ requires Phase 3
+          if (tier === 'patrol_officer' && (newState.gamePhase || 1) < 2) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Patrol Officer bribes unlock in Phase 2: Establishing Territory.' });
+            return newState;
+          }
           if (tier !== 'patrol_officer' && (newState.gamePhase || 1) < 3) {
             newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: `${tier === 'police_captain' ? 'Police Captain' : tier === 'police_chief' ? 'Police Chief' : 'Mayor'} bribes unlock in Phase 3: Controlling Territory.` });
             return newState;
@@ -5342,6 +5346,11 @@ export const useEnhancedMafiaGameState = (
           return newState;
         }
         case 'hire_hitman': {
+          // Phase gate: Phase 3+
+          if ((newState.gamePhase || 1) < 3) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Hitman Contracts unlock in Phase 3: Controlling Territory.' });
+            return newState;
+          }
           const targetUnitId = action.targetUnitId as string;
           const targetFamily = action.targetFamily as string;
           if ((newState.hitmanContracts || []).length >= MAX_HITMEN) return newState;
@@ -5583,16 +5592,31 @@ export const useEnhancedMafiaGameState = (
           return result;
         }
         case 'assault_hq': {
+          // Phase gate: Phase 4+
+          if ((newState.gamePhase || 1) < 4) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'HQ Assault unlocks in Phase 4: Boss of All Bosses.' });
+            return newState;
+          }
           const result = processHQAssault(newState, action);
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
         }
         case 'flip_soldier': {
-          const result = processFlipSoldier(newState, action);
-          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
-          return result;
+          // Phase gate: Phase 3+
+          if ((newState.gamePhase || 1) < 3) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Flip Soldier unlocks in Phase 3: Controlling Territory.' });
+            return newState;
+          }
+          const result2 = processFlipSoldier(newState, action);
+          result2.actionsRemaining = Math.max(0, result2.actionsRemaining - 1);
+          return result2;
         }
         case 'call_sitdown': {
+          // Phase gate: Phase 2+
+          if ((newState.gamePhase || 1) < 2) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Boss Sitdown unlocks in Phase 2: Establishing Territory.' });
+            return newState;
+          }
           // Boss action — does NOT consume action budget
           const hq = newState.headquarters[newState.playerFamily];
           if (!hq) return newState;
@@ -5692,6 +5716,11 @@ export const useEnhancedMafiaGameState = (
           return newState;
         }
         case 'go_to_mattresses': {
+          // Phase gate: Phase 3+
+          if ((newState.gamePhase || 1) < 3) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Go to the Mattresses unlocks in Phase 3: Controlling Territory.' });
+            return newState;
+          }
           // Boss action — $5K + 1 action, 3-turn defensive stance
           if (newState.turnPhase !== 'action') {
             newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'Go to the Mattresses is only available during the Action phase.' });
@@ -5737,6 +5766,11 @@ export const useEnhancedMafiaGameState = (
           return newState;
         }
         case 'war_summit': {
+          // Phase gate: Phase 3+
+          if ((newState.gamePhase || 1) < 3) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'War Summit unlocks in Phase 3: Controlling Territory.' });
+            return newState;
+          }
           // Boss action — $5K + 1 action, 2-turn offensive boost
           if (newState.turnPhase !== 'action') {
             newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'War Summit is only available during the Action phase.' });
