@@ -291,6 +291,14 @@ export interface ShareProfitsPact {
   active: boolean;
 }
 
+export interface SupplyDealPact {
+  id: string;
+  targetFamily: string;
+  turnsRemaining: number;
+  turnFormed: number;
+  active: boolean;
+}
+
 export interface SafePassagePact {
   id: string;
   targetFamily: string;
@@ -616,7 +624,8 @@ export const TENSION_PACT_BREAK = 30;
 // Tension reducer constants
 export const TENSION_REDUCE_CEASEFIRE = 25;
 export const TENSION_REDUCE_ALLIANCE = 35;
-export const TENSION_REDUCE_SUPPLY_DEAL = 15;
+export const TENSION_REDUCE_SUPPLY_DEAL = 5;
+export const TENSION_SUPPLY_DEAL_EXPIRY = 5;
 export const TENSION_REDUCE_SHARE_PROFITS = 10;
 export const TENSION_REDUCE_SAFE_PASSAGE = 8;
 export const TENSION_REDUCE_BRIBE_TERRITORY = 5;
