@@ -1,43 +1,42 @@
 
 
-# Rename Turn Steps to Avoid "Phase" Collision
+# Add Phase Progress Tooltip to HUD Banner
 
-## Problem
-The word "phase" is used for both turn steps (Deploy, Tactical, Action) and game stages (Making Your Bones, etc.), creating confusion. Game stages should own the word "Phase"; turn steps need a different label.
+## What
+Wrap the "Phase X: Name" line in the top HUD banner with a Tooltip that shows a breakdown of requirements for the **next** phase, with current progress vs targets. If already at Phase 4, show "Max phase reached."
 
-## Approach
-Rename the three turn steps from "phases" to **"steps"** throughout the UI. The internal `turnPhase` state variable stays unchanged to avoid a massive refactor -- only user-facing labels change.
+## Implementation
 
-### UI Label Changes
+### File: `src/pages/UltimateMafiaGame.tsx`
 
-| Current | New |
-|---------|-----|
-| `DEPLOY` phase | `📦 DEPLOY STEP` |
-| `TACTICAL PHASE` | `📋 TACTICAL STEP` |
-| `ACTION PHASE` | `⚔️ ACTION STEP` |
-| `END TURN` phase | `⏳ END TURN` (unchanged) |
-| Phase indicator pill strip: `deploy / tactical / action` | `deploy / tactical / action` (keep short, remove "phase" context) |
-| Button: "Next Phase" | "End Turn" |
-| Button: "End Deploy" / "End Tactical" | "Next Step" |
-| Button: "Skip to Action" | "Skip to Action" (unchanged) |
-| "Available during Action phase" tooltips | "Available during Action step" |
-| Banner sub-line: "Phase 1: Making Your Bones" | "🔫 Phase 1: Making Your Bones" (keep -- this IS a phase) |
+1. Import `Tooltip, TooltipTrigger, TooltipContent, TooltipProvider` from `@/components/ui/tooltip`
+
+2. Compute next-phase progress data near line 836:
+   - Get `nextPhaseConfig = PHASE_CONFIGS[gp]` (if `gp < 4`)
+   - Calculate current values: player hex count, turn, respect, capo count, built business count, income — all from `gameState`
+   - Build an array of requirement rows with `{label, current, target, met}` for each requirement in the next phase config
+
+3. Wrap the Phase line (line 870-872) in a Tooltip:
+   - Trigger: the existing `<span>` showing phase icon/number/name
+   - Content: a compact panel listing each next-phase requirement with green checkmarks or red X indicators, plus "Unlocks: ..." list
+
+### UI Design
+```text
+┌─────────────────────────────┐
+│ Next: Phase 2 — Establishing│
+│ Territory                   │
+│                             │
+│ ✅ Turn 9+     (current: 12)│
+│ ❌ 8+ hexes    (current: 5) │
+│ ✅ 20+ respect (current: 25)│
+│                             │
+│ Unlocks: Scouting, Plan Hits│
+│ Capo Promotion, Safehouses  │
+└─────────────────────────────┘
+```
+
+For Phase 4's OR-condition, show all three paths with indicators.
 
 ### Files Modified
-
-**`src/pages/UltimateMafiaGame.tsx`** (~5 spots)
-- Line 839-842: Rename `phaseConfig` labels from `DEPLOY` / `TACTICAL PHASE` / `ACTION PHASE` to `DEPLOY STEP` / `TACTICAL STEP` / `ACTION STEP`
-- Line 596: Pill strip labels (already short, keep as-is)
-- Line 609: Button text "Next Phase" → "End Turn", "End Tactical" → "Next Step"
-
-**`src/components/HeadquartersInfoPanel.tsx`** (~6 spots)
-- Lines 665, 703, 825: "Available during Action phase" → "Available during Action step"
-
-**`src/components/GameSidePanels.tsx`** (~2 spots)
-- Any "Action phase" references in tooltips → "Action step"
-
-### Not Changed
-- `turnPhase` state variable name (internal, not user-facing)
-- Game stage "Phase 1/2/3/4" labels (these correctly use "Phase")
-- Phase-locked tooltips like "Unlocks in Phase 2" (correct usage)
+- `src/pages/UltimateMafiaGame.tsx` — tooltip around phase line (~20 lines added)
 
