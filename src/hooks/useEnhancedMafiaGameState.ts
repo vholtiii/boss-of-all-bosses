@@ -741,10 +741,16 @@ const createInitialGameState = (
   const supplyNodes: SupplyNode[] = [];
   const usedHexKeys = new Set<string>();
   const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'] as const;
+  const hqPositions = Object.values(HQ_POSITIONS);
   
   supplyNodeTypes.forEach(nodeType => {
     const config = SUPPLY_NODE_CONFIG[nodeType];
-    // Find candidate hexes in the valid districts (no HQ, no existing supply node)
+    // Filter valid tiles: not an HQ hex and not already used for another supply node
+    const validTiles = hexMap.filter(t => {
+      const isHQ = hqPositions.some(hq => hq.q === t.q && hq.r === t.r && hq.s === t.s);
+      const isUsed = usedHexKeys.has(`${t.q},${t.r},${t.s}`);
+      return !isHQ && !isUsed && config.validDistricts.includes(t.district);
+    });
     // Minimum distance scales with map size (small=4, medium=6, large=8)
     const minSupplyDistance = Math.max(4, Math.floor(mapRadius * 0.6));
     // Must be at least minSupplyDistance hexes away from ALL HQs to ensure meaningful supply chains
