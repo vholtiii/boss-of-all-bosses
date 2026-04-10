@@ -98,6 +98,7 @@ const CorruptionPanel: React.FC<CorruptionPanelProps> = ({
           const needsTarget = config.tier !== 'patrol_officer';
           const alreadyActive = activeBribes.some(b => b.tier === config.tier && b.active);
           const canAfford = money >= config.cost;
+          const tierPhaseLocked = (config.tier === 'patrol_officer' && gamePhase < 2) || (config.tier !== 'patrol_officer' && gamePhase < 3);
 
           return (
             <div
@@ -123,15 +124,19 @@ const CorruptionPanel: React.FC<CorruptionPanelProps> = ({
                   )}>{modSuccess}%</span>
                   {' · '}{config.duration} turns
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs"
-                  disabled={!canAfford || alreadyActive}
-                  onClick={() => onBribe(config.tier, needsTarget ? selectedTarget : undefined)}
-                >
-                  {alreadyActive ? 'Active' : 'Bribe'}
-                </Button>
+                {tierPhaseLocked ? (
+                  <span className="text-[10px] text-muted-foreground italic">🔒 Phase {config.tier === 'patrol_officer' ? '2' : '3'}</span>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    disabled={!canAfford || alreadyActive}
+                    onClick={() => onBribe(config.tier, needsTarget ? selectedTarget : undefined)}
+                  >
+                    {alreadyActive ? 'Active' : 'Bribe'}
+                  </Button>
+                )}
               </div>
             </div>
           );
