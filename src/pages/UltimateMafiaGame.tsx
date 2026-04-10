@@ -1395,9 +1395,6 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
           );
         })()}
       </AnimatePresence>
-    </>
-  );
-};
 
       {/* Commission Vote Modal */}
       <CommissionVoteModal
@@ -1406,8 +1403,9 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
         result={gameState.commissionVoteResult}
         playSound={playSound}
       />
-
-
+    </>
+  );
+};
 
 const UltimateMafiaGame: React.FC = () => {
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
