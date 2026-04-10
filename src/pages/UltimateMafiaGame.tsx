@@ -1037,18 +1037,33 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         const hasDistrictBonus = (bonusType: string) =>
           activeDistrictBonuses.some((b: any) => b.family === hqFamily && b.bonusType === bonusType);
 
+        // Compute connected supply node types for this family
+        const familyHexSet = new Set((gameState.hexMap || [])
+          .filter((t: any) => t.controllingFamily === hqFamily)
+          .map((t: any) => `${t.q},${t.r},${t.s}`));
+        const connectedNodeTypes = new Set<SupplyNodeType>();
+        ((gameState as any).supplyNodes || []).forEach((node: any) => {
+          if (familyHexSet.has(`${node.q},${node.r},${node.s}`)) {
+            connectedNodeTypes.add(node.type as SupplyNodeType);
+          }
+        });
+
         const hexBusinesses = (gameState.hexMap || [])
           .filter((tile: any) => tile.controllingFamily === hqFamily && tile.business)
           .map((tile: any) => {
             const baseIncome = tile.business.income || 0;
             const underConstruction = tile.business.constructionProgress !== undefined &&
               tile.business.constructionProgress < (tile.business.constructionGoal || 3);
+            const bizType = tile.business.type || tile.business.businessType || 'Business';
+            const deps = SUPPLY_DEPENDENCIES[bizType];
+            const supplyDependency = deps && deps.length > 0 ? deps.join(',') : undefined;
+            const supplyConnected = supplyDependency ? deps!.some(d => connectedNodeTypes.has(d)) : undefined;
 
             if (underConstruction || !isPlayerHQ) {
               return {
                 q: tile.q, r: tile.r, s: tile.s,
                 district: tile.district || 'Unknown',
-                businessType: tile.business.type || tile.business.businessType || 'Business',
+                businessType: bizType,
                 income: underConstruction ? 0 : baseIncome,
                 baseIncome,
                 isLegal: tile.business.isLegal !== false,
@@ -1056,6 +1071,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 underConstruction,
                 collectionRate: underConstruction ? 0 : 100,
                 collectionReason: underConstruction ? 'Under construction' : '',
+                supplyConnected,
+                supplyDependency,
               };
             }
 
