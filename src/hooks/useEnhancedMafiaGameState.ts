@@ -3439,7 +3439,7 @@ export const useEnhancedMafiaGameState = (
 
     // ============ UNIVERSAL: TURF TAX (all families) ============
     // Enemy units on hexes in ANY family's controlled districts lose 5 loyalty/turn
-    const allFamilies = [state.playerFamily, ...state.aiFamilies.map(f => f.name)];
+    const allFamilies = [state.playerFamily, ...state.aiOpponents.map(o => o.family)];
     const familyControlledDistricts: Record<string, Set<string>> = {};
     allFamilies.forEach(fam => {
       familyControlledDistricts[fam] = new Set(
