@@ -224,6 +224,11 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
                       {personalityInfo.icon} +{personalityBonuses[config.type]}% from {personalityInfo.label}
                     </p>
                   )}
+                  {config.type === 'supply_deal' && (playerFear || 0) > 0 && (
+                    <p className="text-xs text-red-400 mt-1">
+                      😈 +{Math.floor((playerFear || 0) / 5)}% from Fear ({playerFear})
+                    </p>
+                  )}
                 </motion.button>
               );
             })}
