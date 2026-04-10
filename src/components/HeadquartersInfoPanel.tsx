@@ -13,6 +13,8 @@ import {
   WAR_MAX_SIMULTANEOUS,
   MattressesState, WarSummitState,
 } from '@/types/game-mechanics';
+import { SUPPLY_NODE_CONFIG, SupplyNodeType } from '@/types/game-mechanics';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { 
   DollarSign, 
   Users, 
@@ -24,7 +26,9 @@ import {
   ChevronUp,
   MapPin,
   Store,
-  Map
+  Map,
+  Link2,
+  Unlink
 } from 'lucide-react';
 
 interface HexBusiness {
@@ -41,6 +45,8 @@ interface HexBusiness {
   underConstruction?: boolean;
   collectionRate?: number;
   collectionReason?: string;
+  supplyConnected?: boolean;
+  supplyDependency?: string; // e.g. 'liquor_route', 'docks'
 }
 
 interface HeadquartersInfoPanelProps {
@@ -569,6 +575,29 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                                         <Badge variant="outline" className="text-[9px] h-4 text-blue-400 border-blue-400/30">
                                           🏗️ Built
                                         </Badge>
+                                      )}
+                                      {biz.supplyDependency != null && (
+                                        biz.supplyConnected ? (
+                                          <Badge variant="outline" className="text-[9px] h-4 text-green-400 border-green-400/30 flex items-center gap-0.5">
+                                            <Link2 className="h-2.5 w-2.5" /> Supplied
+                                          </Badge>
+                                        ) : (
+                                          <TooltipProvider delayDuration={200}>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Badge variant="outline" className="text-[9px] h-4 text-orange-400 border-orange-400/30 flex items-center gap-0.5 cursor-help">
+                                                  <Unlink className="h-2.5 w-2.5" /> No Supply
+                                                </Badge>
+                                              </TooltipTrigger>
+                                              <TooltipContent side="top" className="text-xs">
+                                                Needs: {(() => {
+                                                  const deps = biz.supplyDependency!.split(',');
+                                                  return deps.map(d => SUPPLY_NODE_CONFIG[d.trim() as SupplyNodeType]?.label || d).join(' or ');
+                                                })()}
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        )
                                       )}
                                     </div>
                                     <div className="text-[10px] text-muted-foreground flex items-center gap-1">
