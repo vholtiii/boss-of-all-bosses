@@ -702,7 +702,10 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                       📋 Call a Sitdown {onCooldown ? `(${cooldownLeft} turns)` : `($${SITDOWN_COST.toLocaleString()})`}
                     </Button>
 
-                    {!isActionPhase && !sitdownOpen && (
+                    {sitdownPhaseLocked && !sitdownOpen && (
+                       <p className="text-[10px] text-muted-foreground italic text-center">🔒 Unlocks in Phase 2</p>
+                    )}
+                    {!sitdownPhaseLocked && !isActionPhase && !sitdownOpen && (
                        <p className="text-[10px] text-muted-foreground italic text-center">Available during Action step</p>
                     )}
 
@@ -877,14 +880,18 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                       variant="outline"
                       size="sm"
                       className="w-full text-xs h-8 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-                      disabled={!isActionPhase || !!isActive || onCooldown || noActions}
+                      disabled={!isActionPhase || !!isActive || onCooldown || noActions || gamePhase < 3}
                       onClick={onGoToMattresses}
                     >
                       🛏️ Go to the Mattresses {onCooldown ? `(${cooldownLeft} turns)` : `($${MATTRESSES_COST.toLocaleString()})`}
                     </Button>
-                    <p className="text-[9px] text-muted-foreground mt-0.5 text-center">
-                      +{MATTRESSES_DEFENSE_BONUS}% defense, +{MATTRESSES_HQ_BONUS}% HQ def, -{Math.round(MATTRESSES_INCOME_PENALTY * 100)}% income · {MATTRESSES_DURATION} turns
-                    </p>
+                    {gamePhase < 3 ? (
+                      <p className="text-[9px] text-muted-foreground italic mt-0.5 text-center">🔒 Unlocks in Phase 3</p>
+                    ) : (
+                      <p className="text-[9px] text-muted-foreground mt-0.5 text-center">
+                        +{MATTRESSES_DEFENSE_BONUS}% defense, +{MATTRESSES_HQ_BONUS}% HQ def, -{Math.round(MATTRESSES_INCOME_PENALTY * 100)}% income · {MATTRESSES_DURATION} turns
+                      </p>
+                    )}
                   </div>
                 );
               })()
@@ -905,14 +912,18 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                       variant="outline"
                       size="sm"
                       className="w-full text-xs h-8 border-red-500/30 text-red-300 hover:bg-red-500/10"
-                      disabled={!isActionPhase || !!isActive || onCooldown || noActions}
+                      disabled={!isActionPhase || !!isActive || onCooldown || noActions || gamePhase < 3}
                       onClick={onWarSummit}
                     >
                       ⚔️ War Summit {onCooldown ? `(${cooldownLeft} turns)` : `($${WAR_SUMMIT_COST.toLocaleString()})`}
                     </Button>
-                    <p className="text-[9px] text-muted-foreground mt-0.5 text-center">
-                      +{WAR_SUMMIT_COMBAT_BONUS}% combat, +{WAR_SUMMIT_FEAR_BONUS} fear, +{WAR_SUMMIT_HEAT_COST} heat · {WAR_SUMMIT_DURATION} turns
-                    </p>
+                    {gamePhase < 3 ? (
+                      <p className="text-[9px] text-muted-foreground italic mt-0.5 text-center">🔒 Unlocks in Phase 3</p>
+                    ) : (
+                      <p className="text-[9px] text-muted-foreground mt-0.5 text-center">
+                        +{WAR_SUMMIT_COMBAT_BONUS}% combat, +{WAR_SUMMIT_FEAR_BONUS} fear, +{WAR_SUMMIT_HEAT_COST} heat · {WAR_SUMMIT_DURATION} turns
+                      </p>
+                    )}
                   </div>
                 );
               })()
