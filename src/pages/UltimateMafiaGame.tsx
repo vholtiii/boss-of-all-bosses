@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import NegotiationDialog from '@/components/NegotiationDialog';
 import { NotificationProvider, useMafiaNotifications } from '@/components/ui/notification-system';
@@ -33,6 +33,7 @@ import {
   Lock
 } from 'lucide-react';
 import { PHASE_CONFIGS, COMMISSION_VOTE_COST } from '@/types/game-mechanics';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import SoundSettingsDialog from '@/components/SoundSettingsDialog';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
@@ -843,6 +844,30 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   };
   const currentPhaseConfig = phaseConfig[gameState.turnPhase] || phaseConfig.waiting;
 
+  const phaseProgressRows = useMemo(() => {
+    if (gp >= 4) return null;
+    const next = PHASE_CONFIGS[gp];
+    const playerHexes = gameState.hexMap?.filter((h: any) => h.controllingFamily === config.family).length || 0;
+    const playerRespect = gameState.resources?.respect ?? 0;
+    const playerCapos = gameState.units?.[config.family]?.capos?.length ?? 0;
+    const playerBuilt = gameState.hexMap?.filter((h: any) => h.controllingFamily === config.family && h.business).length ?? 0;
+    const playerIncome = gameState.lastTurnIncome ?? 0;
+    const reqs = next.requirements;
+    const rows: { label: string; current: number; target: number; met: boolean }[] = [];
+    rows.push({ label: `Turn ${next.minTurn}+`, current: gameState.turn, target: next.minTurn, met: gameState.turn >= next.minTurn });
+    if (reqs.minHexes) rows.push({ label: `${reqs.minHexes}+ hexes`, current: playerHexes, target: reqs.minHexes, met: playerHexes >= reqs.minHexes });
+    if (reqs.minRespect) rows.push({ label: `${reqs.minRespect}+ respect`, current: playerRespect, target: reqs.minRespect, met: playerRespect >= reqs.minRespect });
+    if (reqs.minCapos) rows.push({ label: `${reqs.minCapos}+ capos`, current: playerCapos, target: reqs.minCapos, met: playerCapos >= reqs.minCapos });
+    if (reqs.minBuiltBusinesses) rows.push({ label: `${reqs.minBuiltBusinesses}+ businesses`, current: playerBuilt, target: reqs.minBuiltBusinesses, met: playerBuilt >= reqs.minBuiltBusinesses });
+    if (reqs.minIncomeOrHexesOrRespect) {
+      const or = reqs.minIncomeOrHexesOrRespect;
+      rows.push({ label: `${or.hexes}+ hexes`, current: playerHexes, target: or.hexes, met: playerHexes >= or.hexes });
+      rows.push({ label: `$${(or.income/1000).toFixed(0)}k+ income`, current: playerIncome, target: or.income, met: playerIncome >= or.income });
+      rows.push({ label: `${or.respect}+ respect`, current: playerRespect, target: or.respect, met: playerRespect >= or.respect });
+    }
+    return { next, rows, hasOrCondition: !!reqs.minIncomeOrHexesOrRespect };
+  }, [gp, gameState.turn, gameState.hexMap, gameState.resources?.respect, gameState.units, gameState.lastTurnIncome, config.family]);
+
   const deselectUnit = () => {
     handleAction({ type: 'deselect_unit' });
   };
@@ -867,9 +892,43 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             {currentPhaseConfig.hint}
           </span>
         </div>
-        <span className="text-[10px] text-white/50">
-          {gpConfig.icon} Phase {gp}: {gpConfig.name}
-        </span>
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-[10px] text-white/50 cursor-help underline decoration-dotted underline-offset-2">
+                {gpConfig.icon} Phase {gp}: {gpConfig.name}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs bg-black/95 border-border/50 p-3">
+              {!phaseProgressRows ? (
+                <p className="text-xs text-amber-400 font-semibold">👑 Max phase reached — Boss of All Bosses</p>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-white">
+                    Next: {phaseProgressRows.next.icon} Phase {phaseProgressRows.next.phase} — {phaseProgressRows.next.name}
+                  </p>
+                  {phaseProgressRows.hasOrCondition && (
+                    <p className="text-[10px] text-amber-400/80 italic">Any one path below unlocks this phase:</p>
+                  )}
+                  <div className="space-y-0.5">
+                    {phaseProgressRows.rows.map((row, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-[11px]">
+                        <span>{row.met ? '✅' : '❌'}</span>
+                        <span className={row.met ? 'text-green-400' : 'text-red-400'}>
+                          {row.label}
+                        </span>
+                        <span className="text-white/40 ml-auto">(current: {typeof row.current === 'number' && row.current >= 1000 ? `$${(row.current/1000).toFixed(0)}k` : row.current})</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-white/50 pt-1 border-t border-white/10">
+                    Unlocks: {phaseProgressRows.next.unlocks.join(', ')}
+                  </p>
+                </div>
+              )}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </motion.div>
 
       {/* Enhanced background with seasonal effects */}
