@@ -1253,13 +1253,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
         onClose={() => setShowTurnSummary(false)}
       />
 
-      {/* Commission Vote Modal */}
-      <CommissionVoteModal
-        open={!!gameState.commissionVoteResult}
-        onClose={() => handleAction({ type: 'clear_commission_vote_result' })}
-        result={gameState.commissionVoteResult}
-        playSound={playSound}
-      />
+      
 
       {/* Plan Hit Step 2: Instruction Banner + Target List */}
       <AnimatePresence>
