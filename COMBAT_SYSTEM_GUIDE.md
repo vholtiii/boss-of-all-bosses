@@ -89,6 +89,8 @@ Clamped: 10%–95%
 | Capo kill bonus | +15 influence |
 | Attacker casualties | **Zero** |
 
+### 2.5 Standard Victory Outcome (Scouted/Blind)
+
 | Effect | Value |
 |---|---|
 | Territory | Set to **neutral** (must Claim next turn) |
