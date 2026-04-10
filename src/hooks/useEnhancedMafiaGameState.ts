@@ -21,7 +21,7 @@ import {
   MAX_CAPOS, CAPO_PROMOTION_COST, CAPO_PROMOTION_REQUIREMENTS, isCapoPromotionEligible, getCapoPromotionCost,
   SOLDIER_LOYALTY_CAP, CAPO_LOYALTY_CAP,
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType, NegotiationScope, PERSONALITY_BONUSES,
-  NEGOTIATION_TYPES, NEGOTIATION_REFUND_RATE, ShareProfitsPact, SafePassagePact,
+  NEGOTIATION_TYPES, NEGOTIATION_REFUND_RATE, ShareProfitsPact, SafePassagePact, SupplyDealPact,
   ScoutedHex, Safehouse, MoveAction, PlannedHit, PendingNegotiation,
   FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, MAX_FORTIFICATIONS, FortifiedHex, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
   SAFEHOUSE_COST, SAFEHOUSE_DEFENSE_BONUS, SAFEHOUSE_CAPTURE_BOUNTY, SAFEHOUSE_CAPTURE_INTEL_DURATION, SAFEHOUSE_TERRITORY_THRESHOLD, MAX_SAFEHOUSES,
@@ -57,7 +57,7 @@ import {
   TENSION_ENCROACHMENT, TENSION_SUPPLY_SABOTAGE,
   TENSION_HITMAN_KILL_SOLDIER_GLOBAL, TENSION_HITMAN_KILL_CAPO_GLOBAL,
   TENSION_PACT_BREAK,
-  TENSION_REDUCE_CEASEFIRE, TENSION_REDUCE_ALLIANCE, TENSION_REDUCE_SUPPLY_DEAL,
+  TENSION_REDUCE_CEASEFIRE, TENSION_REDUCE_ALLIANCE, TENSION_REDUCE_SUPPLY_DEAL, TENSION_SUPPLY_DEAL_EXPIRY,
   TENSION_REDUCE_SHARE_PROFITS, TENSION_REDUCE_SAFE_PASSAGE, TENSION_REDUCE_BRIBE_TERRITORY,
   // Boss actions
   MattressesState, WarSummitState,
@@ -189,6 +189,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   ceasefires: (state.ceasefires || []).map(c => ({ ...c })),
   shareProfitsPacts: (state.shareProfitsPacts || []).map(p => ({ ...p })),
   safePassagePacts: (state.safePassagePacts || []).map(p => ({ ...p })),
+  supplyDealPacts: (state.supplyDealPacts || []).map(p => ({ ...p })),
   bossNegotiationCooldown: state.bossNegotiationCooldown || 0,
   capoNegotiationCooldown: state.capoNegotiationCooldown || 0,
   events: [...(state.events || [])],
@@ -338,6 +339,7 @@ export interface EnhancedMafiaGameState {
   ceasefires: CeasefirePact[];
   shareProfitsPacts: ShareProfitsPact[];
   safePassagePacts: SafePassagePact[];
+  supplyDealPacts: SupplyDealPact[];
   bossNegotiationCooldown: number;
   capoNegotiationCooldown: number;
   treacheryDebuff?: TreacheryDebuff;
@@ -886,6 +888,7 @@ const createInitialGameState = (
     sitdownCooldownUntil: 0,
     supplyNodes,
     supplyStockpile: [],
+    supplyDealPacts: [],
     // Tension & War system
     familyTensions: Object.fromEntries(getAllFamilyPairKeys().map(k => [k, 0])),
     activeWars: [],
@@ -2580,7 +2583,21 @@ export const useEnhancedMafiaGameState = (
           supplyNodeTypes.forEach(nodeType => {
             const node = (newState.supplyNodes || []).find(n => n.type === nodeType);
             if (!node) return;
-            const isConnected = famConnected.has(`${node.q},${node.r},${node.s}`);
+            let isConnected = famConnected.has(`${node.q},${node.r},${node.s}`);
+            // Supply Deal: check if any active pact partner has this node connected
+            if (!isConnected) {
+              // Player's pacts: stored on state.supplyDealPacts (player buys from targetFamily)
+              // AI pacts with player as supplier: stored as separate entries where AI is buyer
+              // We use a unified list: supplyDealPacts entries where this fam benefits
+              const famPacts = (newState.supplyDealPacts || []).filter(p => p.active && p.buyerFamily === fam);
+              for (const pact of famPacts) {
+                const partnerConnected = getConnectedTerritory(newState.hexMap, pact.targetFamily);
+                if (partnerConnected.has(`${node.q},${node.r},${node.s}`)) {
+                  isConnected = true;
+                  break;
+                }
+              }
+            }
             const existing = newState.supplyStockpile.find(e => e.family === fam && e.nodeType === nodeType);
             if (isConnected) {
               // Connected — reset stockpile
@@ -4430,7 +4447,52 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // ── AI SAFEHOUSE ESTABLISHMENT ──
+      // ── AI SUPPLY DEAL INITIATION ──
+      // AI families propose supply deals when they have disconnected supply nodes and can afford it
+      if (aiPhase >= 2 && opponent.resources.money >= 7500 && !atWarWithPlayer) {
+        const aiConnected = getConnectedTerritory(state.hexMap, fam);
+        const supplyNodeTypes: SupplyNodeType[] = ['docks', 'union_hall', 'trucking_depot', 'liquor_route', 'food_market'];
+        const hasExistingDeal = (state.supplyDealPacts || []).some(p => p.active && p.buyerFamily === fam);
+        if (!hasExistingDeal) {
+          const disconnectedNodes = supplyNodeTypes.filter(nodeType => {
+            const node = (state.supplyNodes || []).find(n => n.type === nodeType);
+            if (!node) return false;
+            return !aiConnected.has(`${node.q},${node.r},${node.s}`);
+          });
+          if (disconnectedNodes.length > 0 && Math.random() < 0.20) {
+            // Check if player has any of these nodes connected
+            const playerConnected = getConnectedTerritory(state.hexMap, state.playerFamily);
+            const playerCanSupply = disconnectedNodes.some(nodeType => {
+              const node = (state.supplyNodes || []).find(n => n.type === nodeType);
+              return node && playerConnected.has(`${node.q},${node.r},${node.s}`);
+            });
+            if (playerCanSupply) {
+              // AI strikes the deal — pays player $7,500
+              const duration = 5 + Math.floor(Math.random() * 3);
+              opponent.resources.money -= 7500;
+              state.resources.money += 7500;
+              state.supplyDealPacts = [...(state.supplyDealPacts || []), {
+                id: `supply-deal-ai-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                buyerFamily: fam,
+                targetFamily: state.playerFamily,
+                turnsRemaining: duration,
+                turnFormed: state.turn,
+                active: true,
+              }];
+              addPairTension(state, fam, state.playerFamily, -TENSION_REDUCE_SUPPLY_DEAL);
+              state.tensionCooldowns[getTensionPairKey(fam, state.playerFamily)] = 1;
+              const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
+              state.pendingNotifications.push({
+                type: 'info' as const,
+                title: `🚚 ${famLabel} Struck a Supply Deal`,
+                message: `The ${famLabel} family is paying you $7,500 for access to your supply lines for ${duration} turns.`,
+              });
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'supply_deal', detail: `Struck a supply deal with player for ${duration} turns` });
+            }
+          }
+        }
+      }
+
       const aiFamHexes = state.hexMap.filter(t => t.controllingFamily === fam && !t.isHeadquarters);
       const aiCapos = state.deployedUnits.filter(u => u.family === fam && u.type === 'capo');
       // AI builds safehouse if: 8+ territories, $5000+, has a capo, and doesn't already have one on their territory
@@ -7234,6 +7296,10 @@ export const useEnhancedMafiaGameState = (
     }
     totalChance += (state.resources.influence / 100) * 10;
     totalChance += Math.floor(state.reputation.respect / 5);
+    // Fear bonus for supply deals
+    if (negotiationType === 'supply_deal') {
+      totalChance += Math.floor((state.reputation.fear || 0) / 5);
+    }
     // Treachery debuff reduces negotiation success
     if (state.treacheryDebuff && state.treacheryDebuff.turnsRemaining > 0) {
       totalChance -= TREACHERY_NEGOTIATION_PENALTY;
@@ -7385,6 +7451,31 @@ export const useEnhancedMafiaGameState = (
         }];
         break;
       }
+      case 'supply_deal': {
+        const duration = 5 + Math.floor(Math.random() * 3); // 5-7 turns
+        // Transfer money to target family
+        const targetOpp = state.aiOpponents.find(o => o.family === enemyFamily);
+        if (targetOpp) {
+          targetOpp.resources.money += cost;
+        }
+        state.supplyDealPacts = [...(state.supplyDealPacts || []), {
+          id: `supply-deal-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          buyerFamily: state.playerFamily,
+          targetFamily: enemyFamily,
+          turnsRemaining: duration,
+          turnFormed: state.turn,
+          active: true,
+        }];
+        // Tension reduction (minor — necessity deal)
+        addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_SUPPLY_DEAL);
+        state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
+        const famLabel = enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1);
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: '🚚 Supply Deal Struck!',
+          message: `Access to ${famLabel}'s supply lines for ${duration} turns. $${cost.toLocaleString()} paid to ${famLabel}. Tension -${TENSION_REDUCE_SUPPLY_DEAL}.`,
+        }];
+        break;
+      }
     }
 
     syncLegacyUnits(state);
@@ -7511,6 +7602,27 @@ export const useEnhancedMafiaGameState = (
           type: 'info', title: '🛤️ Safe Passage Expired',
           message: `Safe passage through ${p.targetFamily.charAt(0).toUpperCase() + p.targetFamily.slice(1)} territory has ended.`,
         }];
+        return { ...p, turnsRemaining: 0, active: false };
+      }
+      return { ...p, turnsRemaining: remaining };
+    }).filter(p => p.active);
+
+    // Tick down supply deal pacts
+    state.supplyDealPacts = (state.supplyDealPacts || []).map(p => {
+      if (!p.active) return p;
+      const remaining = p.turnsRemaining - 1;
+      if (remaining <= 0) {
+        // Tension goes UP when deal expires (business necessity ending = friction)
+        addPairTension(state, p.buyerFamily, p.targetFamily, TENSION_SUPPLY_DEAL_EXPIRY);
+        const isPlayerBuyer = p.buyerFamily === state.playerFamily;
+        const isPlayerSeller = p.targetFamily === state.playerFamily;
+        if (isPlayerBuyer || isPlayerSeller) {
+          const otherFam = isPlayerBuyer ? p.targetFamily : p.buyerFamily;
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'warning', title: '🚚 Supply Deal Expired',
+            message: `Supply deal with ${otherFam.charAt(0).toUpperCase() + otherFam.slice(1)} has ended. Tension +${TENSION_SUPPLY_DEAL_EXPIRY}.`,
+          }];
+        }
         return { ...p, turnsRemaining: 0, active: false };
       }
       return { ...p, turnsRemaining: remaining };

@@ -881,6 +881,79 @@ export const RightSidePanel: React.FC<{
                 );
               })}
             </div>
+            {/* Active Supply Deals */}
+            {(() => {
+              const activeDeals = ((gameState as any).supplyDealPacts || []).filter((p: any) => p.active && (p.buyerFamily === gameState.playerFamily || p.targetFamily === gameState.playerFamily));
+              if (activeDeals.length === 0) return null;
+              return (
+                <div className="mt-3 border-t border-border pt-2">
+                  <p className="text-[10px] font-bold text-muted-foreground mb-1.5">📜 Active Supply Deals</p>
+                  <div className="space-y-1.5">
+                    {activeDeals.map((deal: any) => {
+                      const isPlayerBuyer = deal.buyerFamily === gameState.playerFamily;
+                      const otherFam = isPlayerBuyer ? deal.targetFamily : deal.buyerFamily;
+                      const otherFamLabel = otherFam.charAt(0).toUpperCase() + otherFam.slice(1);
+                      // Determine which supply types the deal partner has connected
+                      const partnerConnected = (() => {
+                        const hMap = gameState.hexMap || [];
+                        const hqTile = hMap.find((t: any) => t.isHeadquarters === (isPlayerBuyer ? deal.targetFamily : deal.buyerFamily));
+                        if (!hqTile) return new Set<string>();
+                        const hk = (q: number, r: number, s: number) => `${q},${r},${s}`;
+                        const visited = new Set<string>();
+                        const queue: Array<{q:number;r:number;s:number}> = [{ q: hqTile.q, r: hqTile.r, s: hqTile.s }];
+                        visited.add(hk(hqTile.q, hqTile.r, hqTile.s));
+                        const dirs = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
+                        const supplierFam = isPlayerBuyer ? deal.targetFamily : deal.buyerFamily;
+                        while (queue.length > 0) {
+                          const c = queue.shift()!;
+                          for (const d of dirs) {
+                            const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
+                            const nk = hk(nq, nr, ns);
+                            if (visited.has(nk)) continue;
+                            const t = hMap.find((h: any) => h.q === nq && h.r === nr && h.s === ns);
+                            if (t && (t.controllingFamily === supplierFam || t.isHeadquarters === supplierFam)) {
+                              visited.add(nk);
+                              queue.push({q:nq, r:nr, s:ns});
+                            }
+                          }
+                        }
+                        const connTypes = new Set<string>();
+                        ((gameState as any).supplyNodes || []).forEach((node: any) => {
+                          if (visited.has(hk(node.q, node.r, node.s))) {
+                            connTypes.add(node.type);
+                          }
+                        });
+                        return connTypes;
+                      })();
+                      return (
+                        <div key={deal.id} className="rounded border border-amber-500/30 bg-amber-500/5 p-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-amber-400">
+                              🚚 {otherFamLabel}
+                            </span>
+                            <Badge variant="outline" className="text-[9px] h-4 border-amber-500/50 text-amber-400">
+                              {deal.turnsRemaining}t · {isPlayerBuyer ? 'Buying' : 'Selling'}
+                            </Badge>
+                          </div>
+                          {partnerConnected.size > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {Array.from(partnerConnected).map((nodeType: string) => {
+                                const cfg = SUPPLY_NODE_CONFIG[nodeType as SupplyNodeType];
+                                return cfg ? (
+                                  <span key={nodeType} className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300">
+                                    {cfg.icon} {cfg.label}
+                                  </span>
+                                ) : null;
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </CollapsibleSection>
         )}
 

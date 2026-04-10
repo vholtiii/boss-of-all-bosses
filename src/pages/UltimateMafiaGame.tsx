@@ -550,6 +550,11 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           ((gameState as any).safePassagePacts || []).filter((p: any) => p.active && p.turnsRemaining <= 1).forEach((p: any) => {
             expiringPacts.push({ label: `Passage w/ ${p.targetFamily.charAt(0).toUpperCase() + p.targetFamily.slice(1)}`, emoji: '🛤️' });
           });
+          ((gameState as any).supplyDealPacts || []).filter((p: any) => p.active && p.turnsRemaining <= 1).forEach((p: any) => {
+            const isPlayerBuyer = p.buyerFamily === gameState.playerFamily;
+            const otherFam = isPlayerBuyer ? p.targetFamily : p.buyerFamily;
+            expiringPacts.push({ label: `Supply Deal w/ ${otherFam.charAt(0).toUpperCase() + otherFam.slice(1)}`, emoji: '🚚' });
+          });
 
           const deployedCount = (gameState.deployedUnits || []).filter((u: any) => u.family === gameState.playerFamily && u.type === 'soldier').length;
           const totalSoldiers = deployedCount + (gameState.resources?.soldiers || 0);
@@ -826,12 +831,21 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             🛤️ {p.targetFamily.charAt(0).toUpperCase() + p.targetFamily.slice(1)} ({p.turnsRemaining}t)
           </span>
         ))}
+        {(gameState as any).supplyDealPacts?.filter((p: any) => p.active).map((p: any) => {
+          const isPlayerBuyer = p.buyerFamily === gameState.playerFamily;
+          const otherFam = isPlayerBuyer ? p.targetFamily : p.buyerFamily;
+          return (
+            <span key={p.id} className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-400">
+              🚚 {otherFam.charAt(0).toUpperCase() + otherFam.slice(1)} {isPlayerBuyer ? '(buying)' : '(selling)'} ({p.turnsRemaining}t)
+            </span>
+          );
+        })}
         {(gameState as any).treacheryDebuff?.turnsRemaining > 0 && (
           <span className="px-2 py-0.5 rounded-full bg-destructive/20 border border-destructive/30 text-destructive animate-pulse">
             🗡️ Treachery (-{20}% neg, {(gameState as any).treacheryDebuff.turnsRemaining}t)
           </span>
         )}
-        {(!gameState.ceasefires?.length && !gameState.alliances?.length && !(gameState as any).shareProfitsPacts?.length && !(gameState as any).safePassagePacts?.length && !((gameState as any).treacheryDebuff?.turnsRemaining > 0)) && (
+        {(!gameState.ceasefires?.length && !gameState.alliances?.length && !(gameState as any).shareProfitsPacts?.length && !(gameState as any).safePassagePacts?.length && !(gameState as any).supplyDealPacts?.length && !((gameState as any).treacheryDebuff?.turnsRemaining > 0)) && (
           <span className="text-muted-foreground font-playfair italic">"Strategy Rules the Underworld"</span>
         )}
       </div>
@@ -1244,6 +1258,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               }}
               enemyFamily={targetFam}
               playerReputation={gameState.reputation.respect}
+              playerFear={(gameState.reputation as any).fear || 0}
               playerMoney={gameState.resources.money}
               enemyStrength={0}
               hexIncome={0}

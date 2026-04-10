@@ -229,7 +229,7 @@ export const PERSONALITY_LABELS: Record<CapoPersonality, { label: string; icon: 
 };
 
 // ============ NEGOTIATION TYPES ============
-export type NegotiationType = 'ceasefire' | 'bribe_territory' | 'alliance' | 'share_profits' | 'safe_passage';
+export type NegotiationType = 'ceasefire' | 'bribe_territory' | 'alliance' | 'share_profits' | 'safe_passage' | 'supply_deal';
 
 export type NegotiationScope = 'family' | 'territory';
 
@@ -250,6 +250,7 @@ export const NEGOTIATION_TYPES: NegotiationConfig[] = [
   { type: 'bribe_territory', label: 'Bribe for Territory', icon: '💵', description: 'Pay to peacefully claim this hex. Cost scales with enemy strength.', baseSuccess: 40, baseCost: 8000, reputationCost: 0, scope: 'territory' },
   { type: 'share_profits', label: 'Share Profits', icon: '💰', description: 'Don\'t take the hex — earn 30% of its income each turn for 5 turns.', baseSuccess: 55, baseCost: 3000, reputationCost: 0, scope: 'territory' },
   { type: 'safe_passage', label: 'Safe Passage', icon: '🛤️', description: 'Buy 3 turns of free movement through this family\'s territory without combat.', baseSuccess: 60, baseCost: 2000, reputationCost: 0, scope: 'territory' },
+  { type: 'supply_deal', label: 'Supply Deal', icon: '🚚', description: 'Pay $7,500 to access their supply connections for 5-7 turns. Fear improves chances.', baseSuccess: 45, baseCost: 7500, reputationCost: 0, scope: 'family' },
 ];
 
 export const NEGOTIATION_REFUND_RATE = 0.5; // 50% refund on failure
@@ -285,6 +286,15 @@ export interface ShareProfitsPact {
   hexR: number;
   hexS: number;
   incomeShare: number; // 0.3 = 30%
+  turnsRemaining: number;
+  turnFormed: number;
+  active: boolean;
+}
+
+export interface SupplyDealPact {
+  id: string;
+  buyerFamily: string;    // family gaining supply access
+  targetFamily: string;   // family providing supply access (gets paid)
   turnsRemaining: number;
   turnFormed: number;
   active: boolean;
@@ -615,7 +625,8 @@ export const TENSION_PACT_BREAK = 30;
 // Tension reducer constants
 export const TENSION_REDUCE_CEASEFIRE = 25;
 export const TENSION_REDUCE_ALLIANCE = 35;
-export const TENSION_REDUCE_SUPPLY_DEAL = 15;
+export const TENSION_REDUCE_SUPPLY_DEAL = 5;
+export const TENSION_SUPPLY_DEAL_EXPIRY = 5;
 export const TENSION_REDUCE_SHARE_PROFITS = 10;
 export const TENSION_REDUCE_SAFE_PASSAGE = 8;
 export const TENSION_REDUCE_BRIBE_TERRITORY = 5;

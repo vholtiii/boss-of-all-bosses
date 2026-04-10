@@ -17,6 +17,7 @@ interface NegotiationDialogProps {
   capoPersonality?: CapoPersonality;
   enemyFamily: string;
   playerReputation: number;
+  playerFear?: number;
   playerMoney: number;
   enemyStrength: number;
   hexIncome: number;
@@ -29,7 +30,7 @@ interface NegotiationDialogProps {
 
 const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   open, onClose, onNegotiate, scope, capoName, capoPersonality,
-  enemyFamily, playerReputation, playerMoney, enemyStrength, hexIncome,
+  enemyFamily, playerReputation, playerFear, playerMoney, enemyStrength, hexIncome,
   negotiationUsedThisTurn, treacheryTurnsRemaining, availableEnemyFamilies, onSelectTargetFamily,
 }) => {
   const [selectedType, setSelectedType] = useState<NegotiationType | null>(null);
@@ -54,9 +55,12 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
       chance += personalityBonuses.all || 0;
     }
     chance += Math.floor(playerReputation / 5);
+    if (type === 'supply_deal') {
+      chance += Math.floor((playerFear || 0) / 5);
+    }
     if (type === 'bribe_territory') chance -= enemyStrength * 5;
     return Math.max(5, Math.min(95, chance));
-  }, [personalityBonuses, playerReputation, enemyStrength, scope]);
+  }, [personalityBonuses, playerReputation, playerFear, enemyStrength, scope]);
 
   const getCost = useCallback((type: NegotiationType) => {
     const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
@@ -218,6 +222,11 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
                   {scope === 'territory' && personalityBonuses[config.type] > 0 && (
                     <p className="text-xs text-primary mt-1">
                       {personalityInfo.icon} +{personalityBonuses[config.type]}% from {personalityInfo.label}
+                    </p>
+                  )}
+                  {config.type === 'supply_deal' && (playerFear || 0) > 0 && (
+                    <p className="text-xs text-red-400 mt-1">
+                      😈 +{Math.floor((playerFear || 0) / 5)}% from Fear ({playerFear})
                     </p>
                   )}
                 </motion.button>
