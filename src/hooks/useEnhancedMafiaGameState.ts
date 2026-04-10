@@ -5001,6 +5001,12 @@ export const useEnhancedMafiaGameState = (
           return result;
         }
         case 'extort_territory': {
+          // Phase gate: Enemy extortion requires Phase 2+
+          const extortTile = newState.hexMap.find((t: any) => t.q === action.targetQ && t.r === action.targetR && t.s === action.targetS);
+          if (extortTile && extortTile.controllingFamily !== 'neutral' && extortTile.controllingFamily !== newState.playerFamily && (newState.gamePhase || 1) < 2) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Enemy extortion unlocks in Phase 2: Establishing Territory. You can only extort neutral businesses for now.' });
+            return newState;
+          }
           const result = processTerritoryExtortion(newState, action);
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
