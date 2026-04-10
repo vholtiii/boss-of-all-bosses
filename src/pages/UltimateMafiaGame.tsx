@@ -1116,7 +1116,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             return {
               q: tile.q, r: tile.r, s: tile.s,
               district: tile.district || 'Unknown',
-              businessType: tile.business.type || tile.business.businessType || 'Business',
+              businessType: bizType,
               income: tileIncome,
               baseIncome,
               isLegal: tile.business.isLegal !== false,
@@ -1125,6 +1125,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               underConstruction,
               collectionRate,
               collectionReason,
+              supplyConnected,
+              supplyDependency,
             };
           });
         const territoryCount = (gameState.hexMap || []).filter((tile: any) => tile.controllingFamily === hqFamily).length;
