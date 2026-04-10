@@ -1,32 +1,27 @@
 
 
-# Show Hex Info on Soldier/Capo Click + Make Hex Info Clickable
+# Make Pinned Hex Info Persist Until Click
 
-## What Changes
+## Problem
 
-Two behaviors:
+When you click a soldier/capo, the hex info panel appears (pinned), but it disappears as soon as you hover over any other hex because `onMouseEnter` calls `setPinnedHex(null)`.
 
-1. **Clicking a soldier/capo shows hex info**: When you click on a soldier or capo icon, the hex info panel (bottom-left) will appear for that unit's hex, just as if you were hovering over it. Currently, clicking a unit only selects it but the hover info disappears since your mouse leaves the hex polygon.
-
-2. **Clicking the hex info panel selects/clicks that hex**: The hex info display becomes clickable. Clicking it triggers the same logic as clicking the hex itself (opening the action menu, selecting units, etc.).
-
-## Technical Details
+## Fix
 
 **File: `src/components/EnhancedMafiaHexGrid.tsx`**
 
-1. **New state**: Add `pinnedHex` state (`HexTile | null`) alongside `hoveredHex`. The hex info panel renders from `pinnedHex || hoveredHex`.
+1. **Line 859** — Remove `setPinnedHex(null)` from the hex polygon's `onMouseEnter`. The hovered hex info should layer under the pinned hex, not replace it. Change the display priority to `pinnedHex || hoveredHex` (already correct on line 1820).
 
-2. **Soldier/Capo onClick handlers** (~lines 1309-1314 for soldiers, similar for capos): After calling `onSelectUnit`, also set `pinnedHex` to the tile the unit is on. This makes the hex info persist even after the mouse leaves.
+2. **Line 1820** — Change display priority to `pinnedHex || hoveredHex` so pinned always wins when set. (Already correct, no change needed.)
 
-3. **Hex info panel** (~line 1815): 
-   - Render based on `pinnedHex || hoveredHex`
-   - Add `cursor-pointer` and an `onClick` handler that calls `handleHexClick(displayedHex)` when the panel is clicked
-   - Add a subtle visual cue (e.g. border highlight or "Click for actions" hint) to indicate it's interactive
+3. **Line 859** — Keep `setHoveredHex(tile)` but do NOT clear pinnedHex on hover. The pinned hex will only clear on explicit clicks.
 
-4. **Clear pinnedHex**: Reset `pinnedHex` to null when:
-   - The user hovers a different hex (so hoveredHex takes over naturally)
-   - The user clicks elsewhere on the map background
-   - An action menu opens
+4. **Clearing pinnedHex** — It should ONLY clear when:
+   - User clicks a hex (already in `handleHexClick`, line 270)
+   - User clicks the info panel itself (already on line 1828)
+   - User clicks the SVG background (add `onClick={() => setPinnedHex(null)}` to the SVG background click handler)
 
-This is a lightweight change -- one new state variable and small tweaks to existing click/render logic.
+5. **Display logic** (line 1820) — Change from `hoveredHex || pinnedHex` to `pinnedHex || hoveredHex` so that while a hex is pinned, hovering other hexes does NOT replace the displayed info.
+
+One-line removal + one priority swap. Minimal change.
 
