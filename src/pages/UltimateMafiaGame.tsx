@@ -833,6 +833,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     </div>
   );
 
+  const gp = (gameState as any).gamePhase || 1;
+  const gpConfig = PHASE_CONFIGS[gp - 1];
   const phaseConfig: Record<string, { label: string; hint: string; color: string }> = {
     deploy: { label: '📦 DEPLOY', hint: 'Deploy units from HQ & move them across the map', color: 'bg-blue-600/80' },
     move: { label: '📋 TACTICAL PHASE', hint: `Scout, Fortify, Escort, Safehouse, Send Word (${gameState.tacticalActionsRemaining}/${gameState.maxTacticalActions} left) — no movement`, color: 'bg-amber-600/80' },
@@ -853,15 +855,20 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className={cn(
-          "absolute top-2 left-1/2 -translate-x-1/2 z-20 px-6 py-2 rounded-full backdrop-blur-sm border border-border/30 shadow-lg flex items-center gap-3",
+          "absolute top-2 left-1/2 -translate-x-1/2 z-20 px-6 py-2 rounded-full backdrop-blur-sm border border-border/30 shadow-lg flex flex-col items-center gap-0.5",
           currentPhaseConfig.color
         )}
       >
-        <span className="text-sm font-bold text-white font-playfair tracking-wide">
-          {currentPhaseConfig.label}
-        </span>
-        <span className="text-xs text-white/70">
-          {currentPhaseConfig.hint}
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-bold text-white font-playfair tracking-wide">
+            {currentPhaseConfig.label}
+          </span>
+          <span className="text-xs text-white/70">
+            {currentPhaseConfig.hint}
+          </span>
+        </div>
+        <span className="text-[10px] text-white/50">
+          {gpConfig.icon} Phase {gp}: {gpConfig.name}
         </span>
       </motion.div>
 
