@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSoundSystem } from '@/hooks/useSoundSystem';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -624,6 +625,7 @@ export const RightSidePanel: React.FC<{
   highlightedSupplyHex?: { q: number; r: number; s: number } | null;
 }> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex }) => {
   const [openSection, setOpenSection] = useState<string>('rivals');
+  const { playSound } = useSoundSystem();
   const toggle = (id: string) => {
     if (id !== 'supply') onHighlightSupplyNode?.(null);
     setOpenSection(prev => (prev === id ? '' : id));
@@ -827,6 +829,7 @@ export const RightSidePanel: React.FC<{
                         : "border-border hover:border-muted-foreground/50"
                     )}
                     onClick={() => {
+                      playSound('click');
                       if (onHighlightSupplyNode) {
                         const isSelected = highlightedSupplyHex && highlightedSupplyHex.q === node.q && highlightedSupplyHex.r === node.r && highlightedSupplyHex.s === node.s;
                         onHighlightSupplyNode(isSelected ? null : { q: node.q, r: node.r, s: node.s });
