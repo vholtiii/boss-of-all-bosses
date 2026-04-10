@@ -7561,6 +7561,27 @@ export const useEnhancedMafiaGameState = (
       }
       return { ...p, turnsRemaining: remaining };
     }).filter(p => p.active);
+
+    // Tick down supply deal pacts
+    state.supplyDealPacts = (state.supplyDealPacts || []).map(p => {
+      if (!p.active) return p;
+      const remaining = p.turnsRemaining - 1;
+      if (remaining <= 0) {
+        // Tension goes UP when deal expires (business necessity ending = friction)
+        addPairTension(state, p.buyerFamily, p.targetFamily, TENSION_SUPPLY_DEAL_EXPIRY);
+        const isPlayerBuyer = p.buyerFamily === state.playerFamily;
+        const isPlayerSeller = p.targetFamily === state.playerFamily;
+        if (isPlayerBuyer || isPlayerSeller) {
+          const otherFam = isPlayerBuyer ? p.targetFamily : p.buyerFamily;
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'warning', title: '🚚 Supply Deal Expired',
+            message: `Supply deal with ${otherFam.charAt(0).toUpperCase() + otherFam.slice(1)} has ended. Tension +${TENSION_SUPPLY_DEAL_EXPIRY}.`,
+          }];
+        }
+        return { ...p, turnsRemaining: 0, active: false };
+      }
+      return { ...p, turnsRemaining: remaining };
+    }).filter(p => p.active);
 };
 
 
