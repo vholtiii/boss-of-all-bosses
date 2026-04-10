@@ -1,21 +1,20 @@
 
 
-# Clear Supply Node Highlight on Map Click or Section Switch
+# Add Click Sound to Supply Node Selection
 
-## Changes
+## Problem
+The global click sound listener in `UltimateMafiaGame.tsx` only fires for `button` elements. Supply node cards in the side panel are `div` elements, so clicking them is silent.
 
-### 1. `src/components/EnhancedMafiaHexGrid.tsx`
-- Add `onClearHighlight?: () => void` prop
-- Call `onClearHighlight?.()` at the top of `handleHexClick` so any hex click on the map clears the supply highlight
+## Solution
+Add `playSound('click')` directly in the supply node card's `onClick` handler in `GameSidePanels.tsx`. This requires:
 
-### 2. `src/pages/UltimateMafiaGame.tsx`
-- Pass `onClearHighlight={() => setBossHighlightHex(null)}` to both `EnhancedMafiaHexGrid` instances
+1. **`src/components/GameSidePanels.tsx`**:
+   - Import `useSoundSystem` from `@/hooks/useSoundSystem`
+   - Call `useSoundSystem()` inside `RightSidePanel` to get `playSound`
+   - Add `playSound('click')` at the top of the supply node card's `onClick` handler (~line 829)
 
-### 3. `src/components/GameSidePanels.tsx`
-- In `RightSidePanel`'s `toggle` function, call `onHighlightSupplyNode?.(null)` when switching away from the supply section (i.e., when the new section is not `'supply'`)
+Single file, ~3 lines of changes.
 
 ## Files Modified
-- `src/components/EnhancedMafiaHexGrid.tsx`
-- `src/pages/UltimateMafiaGame.tsx`
 - `src/components/GameSidePanels.tsx`
 
