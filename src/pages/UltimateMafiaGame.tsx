@@ -15,6 +15,7 @@ import SaveLoadDialog from '@/components/SaveLoadDialog';
 import TutorialSystem from '@/components/TutorialSystem';
 import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
 import TurnSummaryModal from '@/components/TurnSummaryModal';
+import CommissionVoteModal from '@/components/CommissionVoteModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
 import { Button } from '@/components/ui/button';
 import { 
@@ -1252,6 +1253,8 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
         onClose={() => setShowTurnSummary(false)}
       />
 
+      
+
       {/* Plan Hit Step 2: Instruction Banner + Target List */}
       <AnimatePresence>
         {planHitMode && planHitStep === 'selectTarget' && planHitPlannerId && (() => {
@@ -1386,11 +1389,17 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
           );
         })()}
       </AnimatePresence>
+
+      {/* Commission Vote Modal */}
+      <CommissionVoteModal
+        open={!!gameState.commissionVoteResult}
+        onClose={() => handleAction({ type: 'clear_commission_vote_result' })}
+        result={gameState.commissionVoteResult}
+        playSound={playSound}
+      />
     </>
   );
 };
-
-
 
 const UltimateMafiaGame: React.FC = () => {
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
