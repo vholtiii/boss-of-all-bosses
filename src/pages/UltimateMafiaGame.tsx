@@ -288,6 +288,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onPlanHitSelectSoldier={(unitId) => handleAction({ type: 'plan_hit_select_soldier', unitId })}
             onCancelPlanHit={() => handleAction({ type: 'cancel_plan_hit_mode' })}
             bossHighlightHex={bossHighlightHex}
+            onClearHighlight={() => setBossHighlightHex(null)}
           />
         </div>
       )
@@ -986,6 +987,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onPlanHitSelectSoldier={(unitId) => handleAction({ type: 'plan_hit_select_soldier', unitId })}
             onCancelPlanHit={() => handleAction({ type: 'cancel_plan_hit_mode' })}
             bossHighlightHex={bossHighlightHex}
+            onClearHighlight={() => setBossHighlightHex(null)}
           />
     </div>
   );

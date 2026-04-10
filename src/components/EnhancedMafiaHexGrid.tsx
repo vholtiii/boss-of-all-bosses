@@ -28,6 +28,7 @@ interface EnhancedMafiaHexGridProps {
   onPlanHitSelectSoldier?: (unitId: string) => void;
   onCancelPlanHit?: () => void;
   bossHighlightHex?: { q: number; r: number; s: number } | null;
+  onClearHighlight?: () => void;
 }
 
 const familyColors: Record<string, string> = {
@@ -263,6 +264,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   };
 
   const handleHexClick = (tile: HexTile) => {
+    onClearHighlight?.();
     const turnPhase = gameState?.turnPhase || 'waiting';
 
     // Plan Hit mode — 2-step selection
