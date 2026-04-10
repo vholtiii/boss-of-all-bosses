@@ -525,7 +525,7 @@ AI families in Phase 4 can also call Commission Meetings:
 
 ---
 
-## 17. Bankruptcy
+## 19. Bankruptcy
 
 - If money < 0: 1 random soldier deserts per $10K in debt each turn
 - If money < -$50,000: **Game over**
@@ -533,7 +533,7 @@ AI families in Phase 4 can also call Commission Meetings:
 
 ---
 
-## 18. Difficulty & Map Size
+## 20. Difficulty & Map Size
 
 ### 18.1 Difficulty Modes
 
@@ -549,7 +549,7 @@ Selected at game start alongside difficulty. Affects hex count, HQ positions, di
 
 ---
 
-## 19. AI Opponents
+## 21. AI Opponents
 
 - AI personality system: aggressive, defensive, balanced, opportunistic, diplomatic
 - Early game boost: +2 actions, +2 tactical for turns 1-8
@@ -557,10 +557,11 @@ Selected at game start alongside difficulty. Affects hex count, HQ positions, di
 - AI respect grows with territory and combat activity
 - Aggressive AI attempts HQ assault after turn 12
 - **Map-scaled AI**: Recruitment caps, action budgets, and income floors scale with map size to ensure AI fills the map appropriately
+- **Phase progression**: AI follows the same 4-phase gates as the player. AI income, business count, and capo promotions are tracked for phase calculation. AI can force-promote soldiers to Capos (at double cost) if standard stat requirements aren't met by Phase 3.
 
 ---
 
-## 20. Intel & Threat Detection
+## 22. Intel & Threat Detection
 
 ### 20.1 Sources
 
@@ -581,7 +582,7 @@ Planned enemy hits can be detected through:
 
 ---
 
-## 21. Strategic Tips
+## 23. Strategic Tips
 
 ### Early Game (Turns 1–5)
 1. Claim adjacent neutral territory for free respect/influence
@@ -600,10 +601,12 @@ Planned enemy hits can be detected through:
 2. Use Sitdown to consolidate HQ defense against assault
 3. Flip enemy soldiers to weaken rival HQ before assault
 4. Use escort to rapidly reposition forces
+5. **Watch for AI phase notifications** — if a rival enters Phase 4, they may attempt a Commission Vote
+6. Build relationships with AI families (ceasefires, alliances) to secure YES votes for your own Commission bid
 
 ---
 
-## 22. Tension & War System
+## 24. Tension & War System
 
 ### 22.1 Tension Meter
 
