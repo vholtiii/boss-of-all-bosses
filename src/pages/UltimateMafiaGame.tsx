@@ -33,6 +33,7 @@ import {
   Lock
 } from 'lucide-react';
 import { PHASE_CONFIGS, COMMISSION_VOTE_COST } from '@/types/game-mechanics';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import SoundSettingsDialog from '@/components/SoundSettingsDialog';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
