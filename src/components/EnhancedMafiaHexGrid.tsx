@@ -60,6 +60,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [showSupplyLines, setShowSupplyLines] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
+  const [pinnedHex, setPinnedHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; canAssaultHQ?: boolean; canFlipSoldier?: boolean; negotiateCapoId?: string; pendingNegotiationId?: string; reasons?: Record<string, string> } | null>(null);
   const [planHitUnitMenu, setPlanHitUnitMenu] = useState<{ tile: HexTile; enemyUnits: DeployedUnit[] } | null>(null);
   const [expandedHQKey, setExpandedHQKey] = useState<string | null>(null);
@@ -266,6 +267,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
   const handleHexClick = (tile: HexTile) => {
     onClearHighlight?.();
+    setPinnedHex(null);
     const turnPhase = gameState?.turnPhase || 'waiting';
 
     // Plan Hit mode — 2-step selection
@@ -854,7 +856,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           opacity={getHexOpacity(tile)}
                           className="cursor-pointer transition-all duration-150"
                           onClick={() => handleHexClick(tile)}
-                          onMouseEnter={() => setHoveredHex(tile)}
+                          onMouseEnter={() => { setHoveredHex(tile); setPinnedHex(null); }}
                           onMouseLeave={() => setHoveredHex(null)}
                         />
                         {showBuiltIndicator && (
@@ -1282,6 +1284,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             wounded={(capo as any).woundedTurnsRemaining > 0}
                             onClick={isClickable ? (e) => {
                               e.stopPropagation();
+                              setPinnedHex(tile);
                               if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
                                 onSelectUnit('capo', { q: tile.q, r: tile.r, s: tile.s });
                               }
@@ -1308,6 +1311,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             selected={isSelected}
                             onClick={isClickable ? (e) => {
                               e.stopPropagation();
+                              setPinnedHex(tile);
                               if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
                                 onSelectUnit('soldier', { q: tile.q, r: tile.r, s: tile.s });
                               }
@@ -1812,62 +1816,66 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
       {/* Hover Info */}
       <AnimatePresence>
-        {hoveredHex && (
+        {(hoveredHex || pinnedHex) && (() => {
+          const displayHex = hoveredHex || pinnedHex!;
+          return (
           <motion.div
+            key={`${displayHex.q},${displayHex.r},${displayHex.s}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="absolute bottom-4 left-4 bg-noir-dark/90 backdrop-blur-sm border border-noir-light rounded-lg p-4 text-white max-w-xs"
+            className="absolute bottom-4 left-4 bg-noir-dark/90 backdrop-blur-sm border border-noir-light rounded-lg p-4 text-white max-w-xs cursor-pointer hover:border-mafia-gold/60 transition-colors"
+            onClick={() => { handleHexClick(displayHex); setPinnedHex(null); }}
           >
-            <h3 className="font-semibold text-mafia-gold mb-2">{hoveredHex.district}</h3>
+            <h3 className="font-semibold text-mafia-gold mb-2">{displayHex.district}</h3>
             <div className="space-y-1 text-sm">
-              <p><span className="text-muted-foreground">Control:</span> {(hoveredHex.controllingFamily || 'neutral').toUpperCase()}</p>
-              <p><span className="text-muted-foreground">Terrain:</span> {hoveredHex.terrain}</p>
-              {hoveredHex.business && (() => {
-                const isUnderConstruction = hoveredHex.business.constructionGoal && (hoveredHex.business.constructionProgress ?? 0) < hoveredHex.business.constructionGoal;
-                const hexKey = `${hoveredHex.q},${hoveredHex.r},${hoveredHex.s}`;
+              <p><span className="text-muted-foreground">Control:</span> {(displayHex.controllingFamily || 'neutral').toUpperCase()}</p>
+              <p><span className="text-muted-foreground">Terrain:</span> {displayHex.terrain}</p>
+              {displayHex.business && (() => {
+                const isUnderConstruction = displayHex.business.constructionGoal && (displayHex.business.constructionProgress ?? 0) < displayHex.business.constructionGoal;
+                const hexKey = `${displayHex.q},${displayHex.r},${displayHex.s}`;
                 const hexUnits = unitsByHex.get(hexKey) || [];
                 const hasCapoH = hexUnits.some(u => u.family === playerFamily && u.type === 'capo');
                 const hasSoldierH = hexUnits.some(u => u.family === playerFamily && u.type === 'soldier');
                 return (
                   <>
-                    <p><span className="text-muted-foreground">Business:</span> {hoveredHex.business.type.replace('_', ' ').toUpperCase()}</p>
-                    <p><span className="text-muted-foreground">Type:</span> {hoveredHex.business.isLegal ? 'Legal' : 'Illegal'}</p>
+                    <p><span className="text-muted-foreground">Business:</span> {displayHex.business.type.replace('_', ' ').toUpperCase()}</p>
+                    <p><span className="text-muted-foreground">Type:</span> {displayHex.business.isLegal ? 'Legal' : 'Illegal'}</p>
                     {isUnderConstruction ? (
                       <div className="mt-1 p-1.5 rounded bg-yellow-900/40 border border-yellow-500/30">
                         <p className="text-yellow-300 font-bold text-xs">🚧 UNDER CONSTRUCTION</p>
-                        <p><span className="text-muted-foreground">Progress:</span> {(hoveredHex.business.constructionProgress ?? 0).toFixed(1)} / {hoveredHex.business.constructionGoal!.toFixed(1)}</p>
+                        <p><span className="text-muted-foreground">Progress:</span> {(displayHex.business.constructionProgress ?? 0).toFixed(1)} / {displayHex.business.constructionGoal!.toFixed(1)}</p>
                         <p><span className="text-muted-foreground">Speed:</span> {hasCapoH ? '⚡ Capo: 50% faster' : hasSoldierH ? '🐢 Soldier: 25% slower' : '⏸️ Paused — no unit'}</p>
                         {(hasCapoH || hasSoldierH) && (() => {
                           const rate = hasCapoH ? 1.5 : 0.75;
-                          const rem = hoveredHex.business.constructionGoal! - (hoveredHex.business.constructionProgress ?? 0);
+                          const rem = displayHex.business.constructionGoal! - (displayHex.business.constructionProgress ?? 0);
                           return <p><span className="text-muted-foreground">Est. turns:</span> {Math.ceil(rem / rate)}</p>;
                         })()}
                       </div>
                     ) : (
-                      <p><span className="text-muted-foreground">Income:</span> ${hoveredHex.business.income.toLocaleString()}/turn</p>
+                      <p><span className="text-muted-foreground">Income:</span> ${displayHex.business.income.toLocaleString()}/turn</p>
                     )}
                   </>
                 );
               })()}
-              {hoveredHex.supplyNode && (() => {
-                const cfg = SUPPLY_NODE_CONFIG[hoveredHex.supplyNode];
+              {displayHex.supplyNode && (() => {
+                const cfg = SUPPLY_NODE_CONFIG[displayHex.supplyNode];
                 return <p className="text-yellow-400 font-bold">{cfg.icon} Supply Node: {cfg.label}</p>;
               })()}
-              {hoveredHex.isHeadquarters && (
-                <p className="text-mafia-gold font-bold">🏛️ {hoveredHex.isHeadquarters.toUpperCase()} HQ</p>
+              {displayHex.isHeadquarters && (
+                <p className="text-mafia-gold font-bold">🏛️ {displayHex.isHeadquarters.toUpperCase()} HQ</p>
               )}
               {/* Fortification info */}
               {(() => {
                 const fortifiedHexes: FortifiedHex[] = gameState?.fortifiedHexes || [];
-                const fort = fortifiedHexes.find((f: FortifiedHex) => f.q === hoveredHex.q && f.r === hoveredHex.r && f.s === hoveredHex.s);
+                const fort = fortifiedHexes.find((f: FortifiedHex) => f.q === displayHex.q && f.r === displayHex.r && f.s === displayHex.s);
                 if (!fort) return null;
                 const isOwn = fort.family === playerFamily;
                 const currentTurn = gameState?.turn || 0;
                 const age = currentTurn - fort.fortifiedOnTurn;
                 
                 if (!isOwn) {
-                  const hexRevealed = isHexRevealed(hoveredHex);
+                  const hexRevealed = isHexRevealed(displayHex);
                   if (!hexRevealed) return null;
                   return (
                     <div className="mt-1 p-1.5 rounded border bg-red-900/30 border-red-500/30">
@@ -1897,7 +1905,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               })()}
               {/* Pending negotiation info */}
               {(() => {
-                const pending = (gameState?.pendingNegotiations || []).find((p: any) => p.targetQ === hoveredHex.q && p.targetR === hoveredHex.r && p.targetS === hoveredHex.s);
+                const pending = (gameState?.pendingNegotiations || []).find((p: any) => p.targetQ === displayHex.q && p.targetR === displayHex.r && p.targetS === displayHex.s);
                 if (!pending) return null;
                 return (
                   <div className={cn("mt-1 p-1.5 rounded border", pending.ready ? "bg-yellow-900/30 border-yellow-500/30" : "bg-gray-800/30 border-gray-500/30")}>
@@ -1915,14 +1923,14 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               })()}
               {/* Scouted intel */}
               {(() => {
-                const scoutInfo = (gameState?.scoutedHexes || []).find((s: ScoutedHex) => s.q === hoveredHex.q && s.r === hoveredHex.r && s.s === hoveredHex.s);
+                const scoutInfo = (gameState?.scoutedHexes || []).find((s: ScoutedHex) => s.q === displayHex.q && s.r === displayHex.r && s.s === displayHex.s);
                 if (!scoutInfo) return null;
                 const currentTurn = gameState?.turn || 0;
                 const isFresh = currentTurn <= scoutInfo.freshUntilTurn;
                 
                 // For fresh intel, show live unit count from deployedUnits
                 const liveEnemyCount = isFresh
-                  ? deployedUnits.filter(u => u.q === hoveredHex.q && u.r === hoveredHex.r && u.s === hoveredHex.s && u.family !== playerFamily).length
+                  ? deployedUnits.filter(u => u.q === displayHex.q && u.r === displayHex.r && u.s === displayHex.s && u.family !== playerFamily).length
                   : scoutInfo.enemySoldierCount;
 
                 return (
@@ -1944,12 +1952,12 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 );
               })()}
               {(() => {
-                const key = `${hoveredHex.q},${hoveredHex.r},${hoveredHex.s}`;
+                const key = `${displayHex.q},${displayHex.r},${displayHex.s}`;
                 const units = unitsByHex.get(key) || [];
-                const hexRevealed = isHexRevealed(hoveredHex);
+                const hexRevealed = isHexRevealed(displayHex);
                 
                 // Fog of War: show mystery text for unrevealed rival hexes with units
-                if (!hexRevealed && hoveredHex.controllingFamily !== 'neutral' && hoveredHex.controllingFamily !== playerFamily) {
+                if (!hexRevealed && displayHex.controllingFamily !== 'neutral' && displayHex.controllingFamily !== playerFamily) {
                   return (
                     <p className="text-muted-foreground italic">
                       👁️‍🗨️ Intel unknown — scout or bribe to reveal
@@ -1965,9 +1973,11 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   </p>
                 ));
               })()}
+              <p className="text-[10px] text-muted-foreground/60 mt-2 italic">Click for actions</p>
             </div>
           </motion.div>
-        )}
+          );
+        })()}
       </AnimatePresence>
 
       {/* Map Legend */}
