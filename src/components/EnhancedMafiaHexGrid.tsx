@@ -286,11 +286,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           const unitsHere = unitsByHex.get(key) || [];
           const enemyUnits = unitsHere.filter(u => u.family !== playerFamily);
           if (enemyUnits.length === 1) {
-            // Only one unit — select directly
             onPlanHitSelect(tile.q, tile.r, tile.s, enemyUnits[0].id);
           } else if (enemyUnits.length > 1) {
-            // Show unit picker
             setPlanHitUnitMenu({ tile, enemyUnits });
+          } else {
+            // Empty scouted hex — give feedback
+            import('sonner').then(({ toast }) => {
+              toast.warning('No enemy units here', {
+                description: 'This hex is scouted but has no soldiers or capos to target.',
+              });
+            });
           }
         }
         return;
@@ -1018,17 +1023,39 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== playerFamily;
                     const isScouted = scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
                     if (isEnemy && isScouted) {
-                      return (
-                        <polygon
-                          points={getHexPoints(x, y, baseHexRadius + 3)}
-                          fill="none"
-                          stroke="#DC2626"
-                          strokeWidth="2.5"
-                          opacity="0.8"
-                          strokeDasharray="6,3"
-                          className="pointer-events-none animate-pulse"
-                        />
-                      );
+                      const key = `${tile.q},${tile.r},${tile.s}`;
+                      const unitsHere = unitsByHex.get(key) || [];
+                      const hasEnemyUnits = unitsHere.some(u => u.family !== playerFamily);
+                      if (hasEnemyUnits) {
+                        // Targetable: bright red pulsing + crosshair
+                        return (
+                          <g className="pointer-events-none">
+                            <polygon
+                              points={getHexPoints(x, y, baseHexRadius + 3)}
+                              fill="none"
+                              stroke="#DC2626"
+                              strokeWidth="2.5"
+                              opacity="0.9"
+                              strokeDasharray="6,3"
+                              className="animate-pulse"
+                            />
+                            <text x={x} y={y - baseHexRadius * 0.75} textAnchor="middle" fontSize="10" className="select-none" opacity="0.9">🎯</text>
+                          </g>
+                        );
+                      } else {
+                        // Scouted but empty: dim dashed border
+                        return (
+                          <polygon
+                            points={getHexPoints(x, y, baseHexRadius + 3)}
+                            fill="none"
+                            stroke="#6B7280"
+                            strokeWidth="1.5"
+                            opacity="0.5"
+                            strokeDasharray="4,4"
+                            className="pointer-events-none"
+                          />
+                        );
+                      }
                     }
                     return null;
                   })()}
