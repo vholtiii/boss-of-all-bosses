@@ -1591,6 +1591,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       >
                         🐀 Flip Soldier ($5K)
                       </button>
+                    ) : reasons.flip_soldier ? (
+                      <DisabledAction icon="🐀" label="Flip Soldier" reason={reasons.flip_soldier} />
                     ) : null}
                   </div>
                 </foreignObject>
