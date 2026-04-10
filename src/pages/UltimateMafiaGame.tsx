@@ -769,7 +769,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 <p><span className="text-foreground font-semibold">🏠 Safehouse:</span> Select a capo on your territory to establish a secondary deploy point lasting 5 turns.</p>
               )}
               {gameState.selectedMoveAction === 'send_word' && (
-                <p><span className="text-foreground font-semibold">📩 Send Word:</span> Select a capo, then click an enemy hex to request a sitdown. Costs 1 tactical action. The negotiation becomes available next turn during the Action phase — the capo doesn't need to stay nearby.</p>
+                <p><span className="text-foreground font-semibold">📩 Send Word:</span> Select a capo, then click an enemy hex to request a sitdown. Costs 1 tactical action. The negotiation becomes available next turn during the Action step — the capo doesn't need to stay nearby.</p>
               )}
               {gameState.selectedMoveAction === 'move' && (
                 <p className="italic">Select a tactical action above to see its description. No regular movement in this phase.</p>
