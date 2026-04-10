@@ -699,7 +699,14 @@ export const RightSidePanel: React.FC<{
             {gameState.aiOpponents.map((opponent: any) => (
               <div
                 key={opponent.family}
-                className="rounded-lg border border-border bg-card p-3"
+                className={cn(
+                  "rounded-lg border bg-card p-3 cursor-pointer transition-colors",
+                  highlightedFamily === opponent.family ? "border-primary ring-1 ring-primary/50" : "border-border hover:border-primary/30"
+                )}
+                onClick={() => {
+                  playSound('click');
+                  onHighlightFamily?.(highlightedFamily === opponent.family ? null : opponent.family);
+                }}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-bold capitalize text-foreground">{opponent.family}</span>
