@@ -844,6 +844,30 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   };
   const currentPhaseConfig = phaseConfig[gameState.turnPhase] || phaseConfig.waiting;
 
+  const phaseProgressRows = useMemo(() => {
+    if (gp >= 4) return null;
+    const next = PHASE_CONFIGS[gp]; // next phase config (0-indexed, gp is current 1-based)
+    const playerHexes = gameState.hexes?.filter((h: any) => h.owner === config.family).length || 0;
+    const playerRespect = gameState.resources?.respect ?? 0;
+    const playerCapos = gameState.capos?.length ?? 0;
+    const playerBuilt = gameState.businesses?.filter((b: any) => b.built && b.owner === config.family).length ?? 0;
+    const playerIncome = gameState.lastTurnIncome ?? 0;
+    const reqs = next.requirements;
+    const rows: { label: string; current: number; target: number; met: boolean }[] = [];
+    rows.push({ label: `Turn ${next.minTurn}+`, current: gameState.turn, target: next.minTurn, met: gameState.turn >= next.minTurn });
+    if (reqs.minHexes) rows.push({ label: `${reqs.minHexes}+ hexes`, current: playerHexes, target: reqs.minHexes, met: playerHexes >= reqs.minHexes });
+    if (reqs.minRespect) rows.push({ label: `${reqs.minRespect}+ respect`, current: playerRespect, target: reqs.minRespect, met: playerRespect >= reqs.minRespect });
+    if (reqs.minCapos) rows.push({ label: `${reqs.minCapos}+ capos`, current: playerCapos, target: reqs.minCapos, met: playerCapos >= reqs.minCapos });
+    if (reqs.minBuiltBusinesses) rows.push({ label: `${reqs.minBuiltBusinesses}+ businesses`, current: playerBuilt, target: reqs.minBuiltBusinesses, met: playerBuilt >= reqs.minBuiltBusinesses });
+    if (reqs.minIncomeOrHexesOrRespect) {
+      const or = reqs.minIncomeOrHexesOrRespect;
+      rows.push({ label: `${or.hexes}+ hexes`, current: playerHexes, target: or.hexes, met: playerHexes >= or.hexes });
+      rows.push({ label: `$${(or.income/1000).toFixed(0)}k+ income`, current: playerIncome, target: or.income, met: playerIncome >= or.income });
+      rows.push({ label: `${or.respect}+ respect`, current: playerRespect, target: or.respect, met: playerRespect >= or.respect });
+    }
+    return { next, rows };
+  }, [gp, gameState.turn, gameState.hexes, gameState.resources?.respect, gameState.capos, gameState.businesses, gameState.lastTurnIncome, config.family]);
+
   const deselectUnit = () => {
     handleAction({ type: 'deselect_unit' });
   };
