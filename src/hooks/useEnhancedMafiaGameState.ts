@@ -1103,8 +1103,13 @@ export const useEnhancedMafiaGameState = (
     const isPlayer = family === state.playerFamily;
     const respect = isPlayer ? state.reputation.respect : (state.aiOpponents.find(o => o.family === family)?.resources.respect || 0);
     const capoCount = state.deployedUnits.filter(u => u.family === family && u.type === 'capo').length;
-    const builtBusinessCount = state.hexMap.filter(t => t.controllingFamily === family && t.business && !t.business.isExtorted).length;
-    const income = isPlayer ? state.lastTurnIncome : 0;
+    // For AI, count any hex with a business (extorted or not) since AI doesn't build businesses
+    const builtBusinessCount = isPlayer
+      ? state.hexMap.filter(t => t.controllingFamily === family && t.business && !t.business.isExtorted).length
+      : state.hexMap.filter(t => t.controllingFamily === family && t.business).length;
+    const income = isPlayer
+      ? state.lastTurnIncome
+      : (state.aiOpponents.find(o => o.family === family)?.resources.lastTurnIncome || 0);
 
     // Check from highest phase down
     for (let p = 3; p >= 0; p--) {
@@ -3691,6 +3696,7 @@ export const useEnhancedMafiaGameState = (
       const minIncome = Math.floor((2000 + state.turn * 500) * diffMods.aiIncomeMult * mapScale);
       aiIncome = Math.max(aiIncome, minIncome);
       opponent.resources.money += aiIncome;
+      opponent.resources.lastTurnIncome = aiIncome; // Track for phase calculation
       if (turnReport) turnReport.aiActions.push({ family: fam, action: 'income', detail: `Earned $${aiIncome.toLocaleString()} income` });
 
       // ── RECRUIT (difficulty-scaled cap) ──
@@ -4300,8 +4306,27 @@ export const useEnhancedMafiaGameState = (
           opponent.resources.money -= CAPO_PROMOTION_COST;
           if (turnReport) {
             turnReport.aiActions.push({ family: fam, action: 'promote', detail: `Promoted a soldier to Capo` });
+        }
+        // Fallback: forced promotion if AI has territory/money but no eligible soldiers
+        if (!bestCandidate && aiCapoCount < 2 && state.hexMap.filter(t => t.controllingFamily === fam).length >= 15 && opponent.resources.money >= CAPO_PROMOTION_COST * 2) {
+          const anyAiSoldier = state.deployedUnits.find(u => u.family === fam && u.type === 'soldier');
+          if (anyAiSoldier) {
+            // Boost stats to meet threshold, then promote
+            const stats = state.soldierStats[anyAiSoldier.id] || { loyalty: 50, training: 1, hits: 0, extortions: 2, victories: 3, toughness: 2, racketeering: 3, turnsDeployed: 10, toughnessProgress: 0 };
+            stats.victories = Math.max(stats.victories, 3);
+            stats.racketeering = Math.max(stats.racketeering, 3);
+            stats.loyalty = Math.max(stats.loyalty, 60);
+            state.soldierStats[anyAiSoldier.id] = stats;
+            anyAiSoldier.type = 'capo' as any;
+            anyAiSoldier.maxMoves = 3;
+            anyAiSoldier.movesRemaining = 3;
+            (anyAiSoldier as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
+            (anyAiSoldier as any).name = `${fam.charAt(0).toUpperCase() + fam.slice(1)} Capo`;
+            opponent.resources.money -= CAPO_PROMOTION_COST * 2; // Costs double for forced promotion
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'promote', detail: `Force-promoted a soldier to Capo` });
           }
         }
+      }
       }
 
       // ── DIPLOMATIC AI: Ceasefire proposals (skip if at war with player) ──
@@ -4528,6 +4553,100 @@ export const useEnhancedMafiaGameState = (
             break; // Only one attempt per turn
           }
           break; // Only one soldier attempts per turn
+        }
+      }
+
+      // ── TRACK AI PHASE TRANSITIONS ──
+      const cachedPhase = (opponent.resources.cachedPhase || 1) as GamePhase;
+      if (aiPhase > cachedPhase) {
+        opponent.resources.cachedPhase = aiPhase;
+        const phaseCfg = PHASE_CONFIGS[aiPhase - 1];
+        state.pendingNotifications.push({
+          type: 'warning' as const,
+          title: `${phaseCfg.icon} ${fam.charAt(0).toUpperCase() + fam.slice(1)} Advancing!`,
+          message: `The ${fam} family has entered Phase ${aiPhase}: ${phaseCfg.name}.`,
+        });
+        if (turnReport) turnReport.aiActions.push({ family: fam, action: 'phase_up', detail: `Entered Phase ${aiPhase}: ${phaseCfg.name}` });
+      }
+
+      // ── AI COMMISSION VOTE (Phase 4 only) ──
+      if (aiPhase >= 4 && opponent.resources.money >= COMMISSION_VOTE_COST) {
+        const aiCooldown = opponent.resources.commissionCooldownUntil || 0;
+        const survivingRivals = state.aiOpponents
+          .filter(o => o.family !== fam && !(state.eliminatedFamilies || []).includes(o.family));
+        const playerAlive = !(state.eliminatedFamilies || []).includes(state.playerFamily);
+        const totalSurvivors = survivingRivals.length + (playerAlive ? 1 : 0);
+        
+        if (totalSurvivors >= COMMISSION_MIN_SURVIVORS && state.turn >= aiCooldown) {
+          // AI decides to call vote if diplomatic or if it has high relationships
+          const shouldCallVote = (personality === 'diplomatic' && Math.random() < 0.4) ||
+            (personality === 'opportunistic' && Math.random() < 0.2) ||
+            (Math.random() < 0.1);
+          
+          if (shouldCallVote) {
+            opponent.resources.money -= COMMISSION_VOTE_COST;
+            const needed = totalSurvivors === 2 ? 2 : totalSurvivors - 1;
+            let yesVotes = 0;
+            const voteResults: Array<{ family: string; vote: boolean }> = [];
+            
+            // Other AI families vote
+            for (const otherAi of survivingRivals) {
+              const rel = otherAi.relationships[fam] || 0;
+              const hasPact = state.alliances.some(a => a.active && 
+                ((a.alliedFamily === fam && otherAi.family === state.playerFamily) || 
+                 (a.alliedFamily === otherAi.family))) ||
+                state.ceasefires.some(c => c.active && c.family === fam);
+              // AI-to-AI: use relationship threshold
+              if (rel >= COMMISSION_VOTE_RELATIONSHIP_THRESHOLD && hasPact) {
+                yesVotes++;
+                voteResults.push({ family: otherAi.family, vote: true });
+              } else {
+                voteResults.push({ family: otherAi.family, vote: false });
+              }
+            }
+            
+            // Player votes toward AI caller
+            if (playerAlive) {
+              const playerRelWithCaller = state.reputation.familyRelationships[fam] || 0;
+              const playerHasPact = state.alliances.some(a => a.active && a.alliedFamily === fam) ||
+                state.ceasefires.some(c => c.active && c.family === fam);
+              if (playerRelWithCaller >= COMMISSION_VOTE_RELATIONSHIP_THRESHOLD && playerHasPact) {
+                yesVotes++;
+                voteResults.push({ family: state.playerFamily, vote: true });
+              } else {
+                voteResults.push({ family: state.playerFamily, vote: false });
+              }
+            }
+            
+            if (yesVotes >= needed) {
+              // AI wins via commission vote!
+              state.victoryType = 'commission';
+              state.pendingNotifications.push({
+                type: 'error', title: `👑 ${fam.charAt(0).toUpperCase() + fam.slice(1)} is Boss of All Bosses!`,
+                message: `The ${fam} family called a Commission Meeting and won ${yesVotes}/${totalSurvivors} votes. You have lost.`,
+              });
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'commission_vote_win', detail: `Won Commission Vote ${yesVotes}/${needed}!` });
+            } else {
+              // Failed — cooldown + relationship penalty
+              opponent.resources.commissionCooldownUntil = state.turn + COMMISSION_VOTE_COOLDOWN;
+              for (const result of voteResults) {
+                if (!result.vote) {
+                  const otherAi = state.aiOpponents.find(o => o.family === result.family);
+                  if (otherAi) {
+                    otherAi.relationships[fam] = (otherAi.relationships[fam] || 0) - COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY;
+                  }
+                  if (result.family === state.playerFamily) {
+                    state.reputation.familyRelationships[fam] = (state.reputation.familyRelationships[fam] || 0) - COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY;
+                  }
+                }
+              }
+              state.pendingNotifications.push({
+                type: 'info', title: `👑 ${fam.charAt(0).toUpperCase() + fam.slice(1)} Commission Vote Failed`,
+                message: `The ${fam} family called a Commission Meeting but only got ${yesVotes}/${needed} votes needed.`,
+              });
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'commission_vote_fail', detail: `Failed Commission Vote ${yesVotes}/${needed}` });
+            }
+          }
         }
       }
     });
