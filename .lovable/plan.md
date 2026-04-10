@@ -1,36 +1,27 @@
 
 
-# Fix: Supply Line Decay Not Reflected in Business Income Display
+# Territorial Zone of Control — Phase 3 Gate + Implementation
 
-## The Problem
+## Summary
 
-There are actually **two issues**:
+Two changes in one file (`src/hooks/useEnhancedMafiaGameState.ts`):
 
-1. **UI display is misleading**: The Boss Overview (HQ panel) shows player-built businesses at 100% collection rate even when their supply is disconnected. The `supplyConnected` field is computed but only shown as a badge — it doesn't reduce the displayed income amount.
+1. **New helper** `isAdjacentToEnemyTerritory(q, r, s, hexMap, playerFamily)` — returns true if any neighbor hex is controlled by a rival family.
 
-2. **Actual income calculation is correct**: The turn-end income logic in `useEnhancedMafiaGameState.ts` (lines 3583-3601) properly applies supply decay (-10%/turn after 2-turn buffer, floor at 20%). So you ARE losing income, but the UI doesn't show it.
+2. **Update ZoC block** (line 1686-1690) — wrap the existing enemy-unit ZoC AND the new territorial ZoC in a **Phase 3+ gate** (`currentPhase >= 3`). Before Phase 3, neither unit-based nor territorial ZoC applies to soldiers.
 
-## What Will Change
+```text
+// Pseudocode for the updated block:
+if (unit.type === 'soldier' && currentPhase >= 3) {
+  if (isAdjacentToEnemy(...) || isAdjacentToEnemyTerritory(...)) {
+    remainingMoves = 0;
+  }
+}
+```
 
-### File: `src/pages/UltimateMafiaGame.tsx` (~lines 1112-1149)
+This means:
+- **Phase 1-2**: Soldiers move freely near enemies and rival borders — early expansion is unhindered.
+- **Phase 3+**: Moving adjacent to enemy units OR rival-claimed territory stops the soldier (0 remaining moves). Capos remain exempt.
 
-In the Boss Overview business list builder, after computing `tileIncome`, apply the same supply decay logic that the actual income calculator uses:
-
-- Check if business has supply dependencies (`SUPPLY_DEPENDENCIES`)
-- If disconnected (`supplyConnected === false`), look up the stockpile entry to get `turnsSinceDisconnected`
-- Apply the same decay formula: after 2-turn buffer, -10%/turn (floor 20%)
-- Update `collectionRate` and `collectionReason` to reflect the penalty (e.g. "No Supply -30%")
-
-This ensures the displayed income per business matches what actually gets collected each turn.
-
-### File: `src/hooks/useEnhancedMafiaGameState.ts` (no change needed)
-
-The actual income calculation is already correct — supply decay applies to all businesses including player-built ones.
-
-## Result
-
-When a business has no supply connection:
-- The income shown in the HQ panel will reflect the decay penalty
-- The collection rate will show the reduced percentage
-- The existing "No Supply" badge will be accompanied by accurate income numbers
+No UI changes needed — the soldier simply stops when it enters the ZoC hex, same as the current behavior.
 
