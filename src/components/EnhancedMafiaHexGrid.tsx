@@ -1066,11 +1066,37 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     const isPlayerFortified = fortifiedHexes.some((f: any) => 
                       f.family === gameState?.playerFamily && f.q === tile.q && f.r === tile.r && f.s === tile.s
                     );
-                    if (!isPlayerFortified) return null;
+                    if (isPlayerFortified) {
+                      return (
+                        <g className="pointer-events-none">
+                          <circle cx={x} cy={y - baseHexRadius * 0.7} r={8} fill="#10B981" stroke="#ffffff" strokeWidth="1" />
+                          <text x={x} y={y - baseHexRadius * 0.7 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🛡️</text>
+                        </g>
+                      );
+                    }
+                    // Show red shield for scouted enemy fortifications
+                    const scoutInfo = scoutedHexes.find((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
+                    if (scoutInfo?.isFortified) {
+                      return (
+                        <g className="pointer-events-none">
+                          <circle cx={x} cy={y - baseHexRadius * 0.7} r={8} fill="#DC2626" stroke="#ffffff" strokeWidth="1" />
+                          <text x={x} y={y - baseHexRadius * 0.7 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🛡️</text>
+                        </g>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Scouted enemy safehouse indicator */}
+                  {(() => {
+                    const scoutInfo = scoutedHexes.find((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
+                    if (!scoutInfo?.hasSafehouse) return null;
+                    // Don't show on player's own hexes
+                    if (tile.controllingFamily === gameState?.playerFamily) return null;
                     return (
-                      <g className="pointer-events-none">
-                        <circle cx={x} cy={y - baseHexRadius * 0.7} r={8} fill="#10B981" stroke="#ffffff" strokeWidth="1" />
-                        <text x={x} y={y - baseHexRadius * 0.7 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🛡️</text>
+                      <g className="pointer-events-none" opacity="0.7">
+                        <circle cx={x + baseHexRadius * 0.6} cy={y + baseHexRadius * 0.5} r={8} fill="#92400E" stroke="#ffffff" strokeWidth="1" />
+                        <text x={x + baseHexRadius * 0.6} y={y + baseHexRadius * 0.5 + 3.5} textAnchor="middle" fontSize="9" className="select-none">🏠</text>
                       </g>
                     );
                   })()}
@@ -1849,6 +1875,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     </p>
                     <p><span className="text-muted-foreground">Enemy:</span> {liveEnemyCount} units ({scoutInfo.enemyFamily})</p>
                     {scoutInfo.businessType && <p><span className="text-muted-foreground">Business:</span> {scoutInfo.businessType} (${scoutInfo.businessIncome?.toLocaleString()}/turn)</p>}
+                    {scoutInfo.isFortified && <p className="text-red-400 font-bold text-xs">🛡️ FORTIFIED — +{FORTIFY_DEFENSE_BONUS}% defense</p>}
+                    {scoutInfo.hasSafehouse && <p className="text-amber-400 font-bold text-xs">🏠 Enemy Safehouse — deploy point</p>}
                     {!isFresh && <p className="text-amber-400/70 text-xs italic">Unit count may be outdated</p>}
                   </div>
                 );

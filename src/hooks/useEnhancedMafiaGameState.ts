@@ -6325,6 +6325,8 @@ export const useEnhancedMafiaGameState = (
               enemyFamily: targetFamily,
               businessType: h.business?.type,
               businessIncome: h.business?.income,
+              isFortified: (state.fortifiedHexes || []).some(f => f.q === h.q && f.r === h.r && f.s === h.s && f.family === targetFamily) || undefined,
+              hasSafehouse: (state.safehouses || []).some(s => s.q === h.q && s.r === h.r && s.s === h.s) || undefined,
             }));
             const existingKeys = new Set(state.scoutedHexes.map(s => `${s.q},${s.r},${s.s}`));
             state.scoutedHexes = [
