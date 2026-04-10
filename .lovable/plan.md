@@ -1,73 +1,37 @@
 
 
-# Revised Plan — Boss Actions: Declare War, Go to the Mattresses, War Summit
+# Fix: Plan Hit Target Selection
 
-## Actions 1 & 2: Unchanged
+## Problem
+The Plan Hit flow has two bugs:
 
-**Declare War** and **Go to the Mattresses** remain as previously approved.
+1. **Step 2 silently fails on empty hexes**: When clicking a scouted enemy hex that has no enemy units garrisoned, nothing happens — no feedback. Most enemy territory won't have units on every hex, so this makes the feature feel broken.
 
-## Action 3: "War Summit" (Renamed from War Council)
+2. **No clear guidance after soldier selection**: After picking your soldier from the modal, the map highlights scouted enemy hexes in red, but there's no on-screen instruction telling the player "Now click a scouted enemy hex with units." If no scouted hexes have enemy units, the player is stuck with no feedback.
 
-A Boss calls a War Summit to rally the family, project power, and prepare for conflict. It signals to rivals and law enforcement alike that the family means business.
+## Fix
 
-### Why Call a War Summit?
+### 1. Add feedback when clicking a scouted hex with no units
+**File**: `src/components/EnhancedMafiaHexGrid.tsx` (line ~284-295)
+- When `isEnemy && isScouted` but `enemyUnits.length === 0`, show a toast: "No enemy units on this hex — target a hex with soldiers or capos"
 
-Strategic situations where it shines:
-- **Pre-war preparation**: Call it the turn before declaring war to maximize opening aggression
-- **Deterrence**: The fear spike discourages rivals from attacking your territory
-- **Heat tradeoff**: You gain combat power and intimidation, but draw police attention — forces a risk/reward decision
+### 2. Add a floating instruction banner during step 2
+**File**: `src/components/EnhancedMafiaHexGrid.tsx` or `src/pages/UltimateMafiaGame.tsx`
+- When `planHitMode && planHitStep === 'selectTarget'`, render a fixed banner at top: "🎯 Click a scouted enemy hex (red outline) with enemy units to plan the hit"
+- Include the selected soldier's name and a Cancel button
 
-### Stats
+### 3. Visually distinguish targetable vs empty scouted hexes
+**File**: `src/components/EnhancedMafiaHexGrid.tsx` (line ~1018-1032)
+- During step 2 highlighting: check if scouted enemy hexes actually have enemy units
+- Hexes WITH enemy units: bright red pulsing border (current style) + crosshair icon
+- Hexes WITHOUT enemy units: dim grey dashed border (scouted but no valid targets)
 
-| Property | Value |
-|---|---|
-| **Cost** | $5,000 + 1 action point |
-| **Cooldown** | 5 turns |
-| **Duration** | 2 turns |
-
-### Effects While Active
-
-| Effect | Value | Reasoning |
-|---|---|---|
-| Combat bonus | +15% hit chance for all deployed soldiers | Soldiers are rallied and coordinated |
-| Fear boost | +10 fear immediately | The streets hear the family is mobilizing |
-| Heat increase | +8 police heat | A summit of known criminals draws federal attention |
-| Loyalty boost | +3 loyalty to all soldiers | Morale surge from Boss showing leadership |
-
-### Strategic Tension
-
-The heat increase is the key tradeoff. At high heat levels (70+), calling a War Summit could push you into capo arrest territory or toward RICO. Players must weigh "do I need the combat edge enough to risk the heat?"
-
-## Changes
-
-### `src/types/game-mechanics.ts`
-- Rename constants: `WAR_SUMMIT_COST = 5000`, `WAR_SUMMIT_COOLDOWN = 5`, `WAR_SUMMIT_DURATION = 2`, `WAR_SUMMIT_COMBAT_BONUS = 15`, `WAR_SUMMIT_FEAR_BONUS = 10`, `WAR_SUMMIT_HEAT_COST = 8`, `WAR_SUMMIT_LOYALTY_BONUS = 3`
-- Add `WarSummitState` interface: `{ active: boolean, turnsRemaining: number }`
-
-### `src/hooks/useEnhancedMafiaGameState.ts`
-- Add `warSummitState`, `warSummitCooldownUntil` to state
-- Handler: deduct $5K + 1 action, set active for 2 turns, apply +10 fear, +8 heat, +3 loyalty to all soldiers immediately
-- Combat calculation: add +15% hit bonus while active
-- End-turn: decrement turns, expire after 0
-- Add all 3 Boss actions (Declare War, Mattresses, War Summit) in this implementation pass
-
-### `src/components/HeadquartersInfoPanel.tsx`
-- 3 new Boss action buttons with cooldown timers
-- Active state badges: "🛏️ At the Mattresses (X turns)", "⚔️ War Summit (X turns)"
-- Tooltips explaining cost, cooldown, and effects
-
-### `src/pages/UltimateMafiaGame.tsx`
-- Wire all 3 action types through `handleAction`
-- Pass state to HQ panel
-- Warning banners for active states
-
-### `GAME_MECHANICS.md`
-- Document all 3 new Boss actions
+### 4. Show a list of valid targets as fallback
+**File**: `src/pages/UltimateMafiaGame.tsx`
+- During step 2, if there are scouted enemy hexes with units, show a small floating panel listing targetable units (name, family, hex location) as an alternative to map clicking
+- Clicking a unit in the list triggers `onPlanHitSelect` directly
 
 ## Files Modified
-- `src/types/game-mechanics.ts`
-- `src/hooks/useEnhancedMafiaGameState.ts`
-- `src/components/HeadquartersInfoPanel.tsx`
-- `src/pages/UltimateMafiaGame.tsx`
-- `GAME_MECHANICS.md`
+- `src/components/EnhancedMafiaHexGrid.tsx` — feedback toast, hex highlighting split, crosshair icon
+- `src/pages/UltimateMafiaGame.tsx` — instruction banner, target list panel
 
