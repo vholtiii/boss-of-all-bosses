@@ -17,13 +17,15 @@
 - [13. Recruitment & Promotion](#13-recruitment--promotion)
 - [14. HQ Assault & Elimination](#14-hq-assault--elimination)
 - [15. Boss Actions](#15-boss-actions)
-- [16. Victory Conditions](#16-victory-conditions)
-- [17. Bankruptcy](#17-bankruptcy)
-- [18. Difficulty & Map Size](#18-difficulty--map-size)
-- [19. AI Opponents](#19-ai-opponents)
-- [20. Intel & Threat Detection](#20-intel--threat-detection)
-- [21. Strategic Tips](#21-strategic-tips)
-- [22. Tension & War System](#22-tension--war-system)
+- [16. Gameplay Phases](#16-gameplay-phases)
+- [17. Victory Conditions](#17-victory-conditions)
+- [18. Commission Vote](#18-commission-vote)
+- [19. Bankruptcy](#19-bankruptcy)
+- [20. Difficulty & Map Size](#20-difficulty--map-size)
+- [21. AI Opponents](#21-ai-opponents)
+- [22. Intel & Threat Detection](#22-intel--threat-detection)
+- [23. Strategic Tips](#23-strategic-tips)
+- [24. Tension & War System](#24-tension--war-system)
 
 ---
 
