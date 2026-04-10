@@ -1,62 +1,29 @@
 
 
-# Commission Vote Reveal Modal
+# Add Supply Line Indicator to Boss Menu Businesses
 
 ## What
-A dramatic modal that shows each family's vote being revealed one-by-one with staggered animations when a Commission Meeting is called (by player or AI). Instead of dumping results into a notification, the vote plays out visually.
-
-## Design
-
-```text
-┌─────────────────────────────────────┐
-│     👑 THE COMMISSION MEETS         │
-│     "Who shall lead us all?"        │
-│                                     │
-│  ┌─────────────────────────────┐    │
-│  │ 🟢 Gambino    ✅ YES        │    │
-│  │     "We support you."       │    │
-│  └─────────────────────────────┘    │
-│  ┌─────────────────────────────┐    │
-│  │ 🔴 Lucchese   ❌ NO         │    │
-│  │     "Relationship too low"  │    │
-│  └─────────────────────────────┘    │
-│  ┌─────────────────────────────┐    │
-│  │ ⏳ Bonanno    ...revealing  │    │
-│  └─────────────────────────────┘    │
-│                                     │
-│  Result: 2/3 votes (need 3)        │
-│  [Continue]                         │
-└─────────────────────────────────────┘
-```
-
-Each vote card fades in with a 1-second delay between reveals. Final result appears after all votes shown.
+Add a small badge/icon next to each business in the Boss Overview's business list showing whether that business has an active supply line feeding it. Businesses with a connected supply node show a green "✓ Supply" badge; disconnected ones show an orange "⚠ No Supply" badge. Businesses with no dependency show nothing.
 
 ## Implementation
 
-### New file: `src/components/CommissionVoteModal.tsx`
-- Props: `open`, `onClose`, `voteResults: {family, vote, reason}[]`, `needed`, `callerFamily`, `isPlayerCaller`, `won`
-- Uses `framer-motion` for staggered card animations
-- Each vote card reveals after a delay using `AnimatePresence` + sequential state updates via `useEffect` timers
-- Family-colored borders matching existing `familyColors` pattern
-- Sound effects on each reveal (`playSound('notification')` for YES, `playSound('danger')` for NO)
-- Final result banner: gold glow for win, red for loss
+### 1. Extend `HexBusiness` interface (`HeadquartersInfoPanel.tsx`)
+Add an optional `supplyStatus` field:
+```ts
+supplyConnected?: boolean;    // true = connected, false = disconnected
+supplyDependency?: string;    // e.g. 'liquor_route', 'docks' — null if no dependency
+```
 
-### Modified: `src/hooks/useEnhancedMafiaGameState.ts`
-- In `processCommissionVote`: Instead of pushing notifications with results, store vote data in a new state field `commissionVoteResult: {callerFamily, voteResults, needed, won, isPlayerCaller}`
-- In AI commission vote section (~line 4620): Same -- store results in `commissionVoteResult`
-- The notification is still pushed but simplified (modal handles the detail)
+### 2. Compute supply status when building `hexBusinesses` (`UltimateMafiaGame.tsx`)
+Where `hexBusinesses` is constructed for the HQ panel, look up `SUPPLY_DEPENDENCIES[biz.type]` and check if the player's connected territory reaches any of the required supply nodes. Pass the result as `supplyConnected` and `supplyDependency` on each business entry.
 
-### Modified: `src/pages/UltimateMafiaGame.tsx`
-- Import and render `CommissionVoteModal`
-- Read `gameState.commissionVoteResult`, pass to modal
-- On modal close, clear the result from state
-- Pass `playSound` to modal for vote reveal sounds
+### 3. Show badge in business list (`HeadquartersInfoPanel.tsx`, ~line 555-572)
+After the existing "Built"/"Extorted" badges, add:
+- **Connected**: green badge `✓ Supplied` (or just a small ✓ icon)
+- **Disconnected**: orange/red badge `⚠ No Supply` with a tooltip showing which node is needed (e.g., "Needs: Liquor Route")
+- **No dependency**: no badge shown
 
-### State type addition in `useEnhancedMafiaGameState.ts`
-- Add `commissionVoteResult` field to `EnhancedMafiaGameState` interface
-
-## Files
-- **New**: `src/components/CommissionVoteModal.tsx`
-- **Edit**: `src/hooks/useEnhancedMafiaGameState.ts` (store vote results in state instead of only notifications)
-- **Edit**: `src/pages/UltimateMafiaGame.tsx` (render modal, handle close)
+## Files Modified
+- `src/components/HeadquartersInfoPanel.tsx` — extend `HexBusiness`, render supply badge
+- `src/pages/UltimateMafiaGame.tsx` — compute `supplyConnected`/`supplyDependency` when building `hexBusinesses` array
 
