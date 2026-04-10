@@ -311,6 +311,8 @@ export interface ScoutedHex {
   enemyFamily: string;
   businessType?: string;
   businessIncome?: number;
+  isFortified?: boolean;
+  hasSafehouse?: boolean;
 }
 
 export interface Safehouse {

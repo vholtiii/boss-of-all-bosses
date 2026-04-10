@@ -1690,6 +1690,14 @@ export const useEnhancedMafiaGameState = (
       u.family !== prev.playerFamily
     );
 
+    const hexIsFortified = (prev.fortifiedHexes || []).some(f =>
+      f.q === targetLocation.q && f.r === targetLocation.r && f.s === targetLocation.s && f.family !== prev.playerFamily
+    );
+    const hexHasSafehouse = (prev.safehouses || []).some(s =>
+      s.q === targetLocation.q && s.r === targetLocation.r && s.s === targetLocation.s &&
+      !prev.deployedUnits.some(u => u.type === 'capo' && u.family === prev.playerFamily && u.q === s.q && u.r === s.r && u.s === s.s)
+    );
+
     const scoutInfo: ScoutedHex = {
       q: targetLocation.q, r: targetLocation.r, s: targetLocation.s,
       scoutedTurn: prev.turn,
@@ -1699,6 +1707,8 @@ export const useEnhancedMafiaGameState = (
       enemyFamily: tile.controllingFamily,
       businessType: tile.business?.type,
       businessIncome: tile.business?.income,
+      isFortified: hexIsFortified || undefined,
+      hasSafehouse: hexHasSafehouse || undefined,
     };
 
     const newScoutedHexes = prev.scoutedHexes.filter(s => !(s.q === targetLocation.q && s.r === targetLocation.r && s.s === targetLocation.s));
@@ -1709,7 +1719,7 @@ export const useEnhancedMafiaGameState = (
       type: 'info' as const, title: '👁️ Hex Scouted',
       message: tile.controllingFamily === 'neutral'
         ? `Neutral territory${tile.business ? `: ${tile.business.type} generating $${tile.business.income}/turn` : ': no businesses'}.`
-        : `${tile.controllingFamily.toUpperCase()} territory: ${enemyUnitsOnHex.length} units${tile.business ? `, ${tile.business.type} ($${tile.business.income}/turn)` : ''}.`,
+        : `${tile.controllingFamily.toUpperCase()} territory: ${enemyUnitsOnHex.length} units${tile.business ? `, ${tile.business.type} ($${tile.business.income}/turn)` : ''}${hexIsFortified ? ' ⚠️ FORTIFIED' : ''}${hexHasSafehouse ? ' 🏠 Enemy Safehouse detected!' : ''}.`,
     }];
 
     // Detection chance on enemy-controlled hexes (no heat, but AI gets reinforcement flag)
