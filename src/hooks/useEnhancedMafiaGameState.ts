@@ -4306,8 +4306,27 @@ export const useEnhancedMafiaGameState = (
           opponent.resources.money -= CAPO_PROMOTION_COST;
           if (turnReport) {
             turnReport.aiActions.push({ family: fam, action: 'promote', detail: `Promoted a soldier to Capo` });
+        }
+        // Fallback: forced promotion if AI has territory/money but no eligible soldiers
+        if (!bestCandidate && aiCapoCount < 2 && hexCount >= 15 && opponent.resources.money >= CAPO_PROMOTION_COST * 2) {
+          const anyAiSoldier = state.deployedUnits.find(u => u.family === fam && u.type === 'soldier');
+          if (anyAiSoldier) {
+            // Boost stats to meet threshold, then promote
+            const stats = state.soldierStats[anyAiSoldier.id] || { loyalty: 50, training: 1, hits: 0, extortions: 2, victories: 3, toughness: 2, racketeering: 3, turnsDeployed: 10, toughnessProgress: 0 };
+            stats.victories = Math.max(stats.victories, 3);
+            stats.racketeering = Math.max(stats.racketeering, 3);
+            stats.loyalty = Math.max(stats.loyalty, 60);
+            state.soldierStats[anyAiSoldier.id] = stats;
+            anyAiSoldier.type = 'capo' as any;
+            anyAiSoldier.maxMoves = 3;
+            anyAiSoldier.movesRemaining = 3;
+            (anyAiSoldier as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
+            (anyAiSoldier as any).name = `${fam.charAt(0).toUpperCase() + fam.slice(1)} Capo`;
+            opponent.resources.money -= CAPO_PROMOTION_COST * 2; // Costs double for forced promotion
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'promote', detail: `Force-promoted a soldier to Capo` });
           }
         }
+      }
       }
 
       // ── DIPLOMATIC AI: Ceasefire proposals (skip if at war with player) ──
