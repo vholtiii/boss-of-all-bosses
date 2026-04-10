@@ -3398,7 +3398,7 @@ export const useEnhancedMafiaGameState = (
     );
     if (playerControlledDistricts.size > 0) {
       state.deployedUnits.forEach(u => {
-        if (u.family === state.playerFamily || u.family === 'neutral') return;
+        if (u.family === state.playerFamily || (u.family as string) === 'neutral') return;
         const unitTile = state.hexMap.find(t => t.q === u.q && t.r === u.r && t.s === u.s);
         if (unitTile && playerControlledDistricts.has(unitTile.district)) {
           const stats = state.soldierStats[u.id];
