@@ -60,6 +60,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [showSupplyLines, setShowSupplyLines] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
+  const [pinnedHex, setPinnedHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; canAssaultHQ?: boolean; canFlipSoldier?: boolean; negotiateCapoId?: string; pendingNegotiationId?: string; reasons?: Record<string, string> } | null>(null);
   const [planHitUnitMenu, setPlanHitUnitMenu] = useState<{ tile: HexTile; enemyUnits: DeployedUnit[] } | null>(null);
   const [expandedHQKey, setExpandedHQKey] = useState<string | null>(null);
@@ -1282,6 +1283,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             wounded={(capo as any).woundedTurnsRemaining > 0}
                             onClick={isClickable ? (e) => {
                               e.stopPropagation();
+                              setPinnedHex(tile);
                               if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
                                 onSelectUnit('capo', { q: tile.q, r: tile.r, s: tile.s });
                               }
@@ -1308,6 +1310,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             selected={isSelected}
                             onClick={isClickable ? (e) => {
                               e.stopPropagation();
+                              setPinnedHex(tile);
                               if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
                                 onSelectUnit('soldier', { q: tile.q, r: tile.r, s: tile.s });
                               }
@@ -1812,14 +1815,18 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
       {/* Hover Info */}
       <AnimatePresence>
-        {hoveredHex && (
+        {(hoveredHex || pinnedHex) && (() => {
+          const displayHex = hoveredHex || pinnedHex!;
+          return (
           <motion.div
+            key={`${displayHex.q},${displayHex.r},${displayHex.s}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="absolute bottom-4 left-4 bg-noir-dark/90 backdrop-blur-sm border border-noir-light rounded-lg p-4 text-white max-w-xs"
+            className="absolute bottom-4 left-4 bg-noir-dark/90 backdrop-blur-sm border border-noir-light rounded-lg p-4 text-white max-w-xs cursor-pointer hover:border-mafia-gold/60 transition-colors"
+            onClick={() => { handleHexClick(displayHex); setPinnedHex(null); }}
           >
-            <h3 className="font-semibold text-mafia-gold mb-2">{hoveredHex.district}</h3>
+            <h3 className="font-semibold text-mafia-gold mb-2">{displayHex.district}</h3>
             <div className="space-y-1 text-sm">
               <p><span className="text-muted-foreground">Control:</span> {(hoveredHex.controllingFamily || 'neutral').toUpperCase()}</p>
               <p><span className="text-muted-foreground">Terrain:</span> {hoveredHex.terrain}</p>
