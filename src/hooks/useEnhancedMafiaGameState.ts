@@ -745,14 +745,12 @@ const createInitialGameState = (
   supplyNodeTypes.forEach(nodeType => {
     const config = SUPPLY_NODE_CONFIG[nodeType];
     // Find candidate hexes in the valid districts (no HQ, no existing supply node)
-    // Must be at least 7 hexes away from ALL HQs to ensure meaningful supply chains
-    const hqPositions = allFamilies.map(fam => HQ_POSITIONS[fam]);
-    const candidates = hexMap.filter(t => {
-      if (!config.districts.includes(t.district)) return false;
-      if (t.isHeadquarters) return false;
-      if (usedHexKeys.has(`${t.q},${t.r},${t.s}`)) return false;
-      // Minimum distance of 7 hexes from any HQ
-      const tooClose = hqPositions.some(hq => hexDistance(hq, t) < 7);
+    // Minimum distance scales with map size (small=4, medium=6, large=8)
+    const minSupplyDistance = Math.max(4, Math.floor(mapRadius * 0.6));
+    // Must be at least minSupplyDistance hexes away from ALL HQs to ensure meaningful supply chains
+...
+      // Minimum distance of minSupplyDistance hexes from any HQ
+      const tooClose = hqPositions.some(hq => hexDistance(hq, t) < minSupplyDistance);
       return !tooClose;
     });
     if (candidates.length > 0) {
