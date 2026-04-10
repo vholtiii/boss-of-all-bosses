@@ -41,7 +41,7 @@ The primary offensive action. Attacks an enemy-controlled hex to clear it (terri
 | Capo kill bonus | — | — | +15 influence (decapitation strike) |
 | Soldier stat boost | Normal (+1 each) | Bounded (+4 tough, +2 vic, +30 loyalty) | Normal (+1 each) |
 | Bounty placed | No | Yes — targeted family attacks for 3 turns | No |
-| Target family penalty | None | −10 influence | None |
+| Target family penalty | None | −15 influence | None |
 | Fail penalty | Standard | Civ hit risk | −5 reputation, −10 planner loyalty |
 
 ### 2.1 Civilian Hit (Blind Hit Only)
