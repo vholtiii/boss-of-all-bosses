@@ -855,7 +855,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           opacity={getHexOpacity(tile)}
                           className="cursor-pointer transition-all duration-150"
                           onClick={() => handleHexClick(tile)}
-                          onMouseEnter={() => setHoveredHex(tile)}
+                          onMouseEnter={() => { setHoveredHex(tile); setPinnedHex(null); }}
                           onMouseLeave={() => setHoveredHex(null)}
                         />
                         {showBuiltIndicator && (
