@@ -60,9 +60,58 @@ export interface VictoryProgress {
   economic: { current: number; target: number; met: boolean };
   legacy: { current: number; highestRival: number; met: boolean };
   domination: { eliminated: number; target: number; met: boolean };
+  commission: { supporting: number; needed: number; met: boolean };
 }
 
-export type VictoryType = 'territory' | 'economic' | 'legacy' | 'domination' | null;
+export type VictoryType = 'territory' | 'economic' | 'legacy' | 'domination' | 'commission' | null;
+
+// ============ GAMEPLAY PHASES ============
+export type GamePhase = 1 | 2 | 3 | 4;
+
+export interface PhaseConfig {
+  phase: GamePhase;
+  name: string;
+  icon: string;
+  minTurn: number;
+  requirements: {
+    minHexes?: number;
+    minRespect?: number;
+    minCapos?: number;
+    minBuiltBusinesses?: number;
+    minIncomeOrHexesOrRespect?: { hexes: number; income: number; respect: number }; // OR condition
+  };
+  unlocks: string[];
+}
+
+export const PHASE_CONFIGS: PhaseConfig[] = [
+  {
+    phase: 1, name: 'Making Your Bones', icon: '🔫', minTurn: 1,
+    requirements: {},
+    unlocks: ['Move', 'Extort', 'Claim', 'Recruit', 'Blind Hits'],
+  },
+  {
+    phase: 2, name: 'Establishing Territory', icon: '🏴', minTurn: 9,
+    requirements: { minHexes: 8, minRespect: 20 },
+    unlocks: ['Scouting', 'Plan Hits', 'Capo Promotion', 'Safehouses', 'Fortification'],
+  },
+  {
+    phase: 3, name: 'Controlling Territory', icon: '🏛️', minTurn: 18,
+    requirements: { minHexes: 20, minCapos: 2, minBuiltBusinesses: 1 },
+    unlocks: ['Boss Diplomacy', 'Alliances', 'Ceasefires', 'Captain+ Bribes'],
+  },
+  {
+    phase: 4, name: 'Boss of All Bosses', icon: '👑', minTurn: 30,
+    requirements: { minIncomeOrHexesOrRespect: { hexes: 35, income: 40000, respect: 80 } },
+    unlocks: ['Commission Vote'],
+  },
+];
+
+// ============ COMMISSION VOTE ============
+export const COMMISSION_VOTE_COST = 15000;
+export const COMMISSION_VOTE_COOLDOWN = 10;
+export const COMMISSION_MIN_SURVIVORS = 2;
+export const COMMISSION_VOTE_RELATIONSHIP_THRESHOLD = 60;
+export const COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY = 10;
 
 // ============ HQ ASSAULT & FLIP SOLDIER ============
 // ============ SITDOWN (BOSS ACTION) ============
