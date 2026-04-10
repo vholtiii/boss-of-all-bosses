@@ -4279,7 +4279,7 @@ export const useEnhancedMafiaGameState = (
 
       // ── PROMOTE SOLDIERS TO CAPOS ──
       const aiCapoCount = state.deployedUnits.filter(u => u.family === fam && u.type === 'capo').length;
-      if (aiCapoCount < MAX_CAPOS && opponent.resources.money >= CAPO_PROMOTION_COST) {
+      if (aiPhase >= 2 && aiCapoCount < MAX_CAPOS && opponent.resources.money >= CAPO_PROMOTION_COST) {
         const aiSoldierUnits = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
         let bestCandidate: { unit: typeof aiSoldierUnits[0]; stats: SoldierStats } | null = null;
         for (const solUnit of aiSoldierUnits) {
