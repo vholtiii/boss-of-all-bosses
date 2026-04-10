@@ -1,20 +1,32 @@
 
 
-# Add Click Sound to Supply Node Selection
+# Highlight Rival Family Hexes on Click + Clear on Background Click
 
-## Problem
-The global click sound listener in `UltimateMafiaGame.tsx` only fires for `button` elements. Supply node cards in the side panel are `div` elements, so clicking them is silent.
+## Overview
+Clicking a rival family card in the "Rival Families" section highlights all hexes belonging to that family on the map. Clicking the grey map background (outside any hex) clears the highlight and deselects the family.
 
-## Solution
-Add `playSound('click')` directly in the supply node card's `onClick` handler in `GameSidePanels.tsx`. This requires:
+## Changes
 
-1. **`src/components/GameSidePanels.tsx`**:
-   - Import `useSoundSystem` from `@/hooks/useSoundSystem`
-   - Call `useSoundSystem()` inside `RightSidePanel` to get `playSound`
-   - Add `playSound('click')` at the top of the supply node card's `onClick` handler (~line 829)
+### 1. `src/pages/UltimateMafiaGame.tsx`
+- Add `highlightedFamily` / `setHighlightedFamily` state (`string | null`)
+- Pass `highlightedFamily` to `EnhancedMafiaHexGrid` (both desktop and mobile instances)
+- Pass `onHighlightFamily={setHighlightedFamily}` and `highlightedFamily` to `RightSidePanel` instances
+- Pass `onClearHighlight` to also clear `highlightedFamily` (extend existing clear to reset both `bossHighlightHex` and `highlightedFamily`)
 
-Single file, ~3 lines of changes.
+### 2. `src/components/EnhancedMafiaHexGrid.tsx`
+- Add `highlightedFamily?: string | null` prop
+- When `highlightedFamily` is set and a hex's `controllingFamily` matches, render a pulsing highlight ring around it (similar to the gold `bossHighlightHex` ring but in a distinct color, e.g. the family's own color)
+- Add an invisible background `<rect>` in the SVG (covering the full viewBox) that calls `onClearHighlight?.()` on click — this handles clicking the grey/empty area
+
+### 3. `src/components/GameSidePanels.tsx`
+- Add `onHighlightFamily?: (family: string | null) => void` and `highlightedFamily?: string | null` props to `RightSidePanel`
+- Make each rival family card clickable: toggle `highlightedFamily` (click same family again to deselect)
+- Add `cursor-pointer` and a selected border style when the family is highlighted
+- Play click sound on selection
+- Clear `highlightedFamily` when switching away from the 'rivals' section (extend existing `toggle` logic)
 
 ## Files Modified
+- `src/components/EnhancedMafiaHexGrid.tsx`
 - `src/components/GameSidePanels.tsx`
+- `src/pages/UltimateMafiaGame.tsx`
 
