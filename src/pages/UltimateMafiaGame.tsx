@@ -1124,6 +1124,22 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               collectionReason = 'Soldier';
             }
 
+            // Apply supply line decay to displayed income (mirrors turn-end calculation)
+            if (supplyConnected === false && deps && deps.length > 0) {
+              const stockEntry = ((gameState as any).supplyStockpile || []).find(
+                (e: any) => e.family === hqFamily && deps!.includes(e.nodeType)
+              );
+              const turnsSinceDisconnected = stockEntry?.turnsSinceDisconnected ?? 0;
+              if (turnsSinceDisconnected > 2) {
+                const decayTurns = turnsSinceDisconnected - 2;
+                const decayMultiplier = Math.max(0.2, 1 - (0.1 * decayTurns));
+                tileIncome = Math.floor(tileIncome * decayMultiplier);
+                const decayPct = Math.round((1 - decayMultiplier) * 100);
+                collectionRate = Math.round(collectionRate * decayMultiplier);
+                collectionReason = collectionReason ? `${collectionReason}, No Supply -${decayPct}%` : `No Supply -${decayPct}%`;
+              }
+            }
+
             if ((bonuses as any).businessIncome > 0) tileIncome = Math.floor(tileIncome * (1 + (bonuses as any).businessIncome / 100));
             if ((bonuses as any).territoryIncome > 0) tileIncome = Math.floor(tileIncome * (1 + (bonuses as any).territoryIncome / 100));
             if ((bonuses as any).income > 0) tileIncome = Math.floor(tileIncome * (1 + (bonuses as any).income / 100));
