@@ -235,11 +235,14 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               icon={<Target className="h-4 w-4" />}
               label="Plan Hit"
               sublabel={
-                gameState.turn < (gameState.planHitCooldownUntil || 0)
+                (gameState as any).gamePhase < 2
+                  ? '🔒 Unlocks Phase 2'
+                  : gameState.turn < (gameState.planHitCooldownUntil || 0)
                   ? `⏳ Cooldown: ${(gameState.planHitCooldownUntil || 0) - gameState.turn} turn(s)`
                   : `🎯 +${PLAN_HIT_BONUS}% bonus · 1 tactical · ${PLAN_HIT_DURATION}t`
               }
               disabled={
+                (gameState as any).gamePhase < 2 ||
                 gameState.turn < (gameState.planHitCooldownUntil || 0) ||
                 gameState.tacticalActionsRemaining <= 0 || 
                 !(gameState.scoutedHexes || []).some((s: any) => {
@@ -248,7 +251,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 })
               }
               disabledReason={
-                gameState.turn < (gameState.planHitCooldownUntil || 0)
+                (gameState as any).gamePhase < 2
+                  ? '🔒 Unlocks in Phase 2: Establishing Territory'
+                  : gameState.turn < (gameState.planHitCooldownUntil || 0)
                   ? `Cooldown: ${(gameState.planHitCooldownUntil || 0) - gameState.turn} turn(s) remaining`
                   : gameState.tacticalActionsRemaining <= 0 ? 'No tactical actions' : 'Scout an enemy hex first'
               }
