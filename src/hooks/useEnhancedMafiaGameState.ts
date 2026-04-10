@@ -4555,6 +4555,100 @@ export const useEnhancedMafiaGameState = (
           break; // Only one soldier attempts per turn
         }
       }
+
+      // ── TRACK AI PHASE TRANSITIONS ──
+      const cachedPhase = (opponent.resources.cachedPhase || 1) as GamePhase;
+      if (aiPhase > cachedPhase) {
+        opponent.resources.cachedPhase = aiPhase;
+        const phaseCfg = PHASE_CONFIGS[aiPhase - 1];
+        state.pendingNotifications.push({
+          type: 'warning' as const,
+          title: `${phaseCfg.icon} ${fam.charAt(0).toUpperCase() + fam.slice(1)} Advancing!`,
+          message: `The ${fam} family has entered Phase ${aiPhase}: ${phaseCfg.name}.`,
+        });
+        if (turnReport) turnReport.aiActions.push({ family: fam, action: 'phase_up', detail: `Entered Phase ${aiPhase}: ${phaseCfg.name}` });
+      }
+
+      // ── AI COMMISSION VOTE (Phase 4 only) ──
+      if (aiPhase >= 4 && opponent.resources.money >= COMMISSION_VOTE_COST) {
+        const aiCooldown = opponent.resources.commissionCooldownUntil || 0;
+        const survivingRivals = state.aiOpponents
+          .filter(o => o.family !== fam && !(state.eliminatedFamilies || []).includes(o.family));
+        const playerAlive = !(state.eliminatedFamilies || []).includes(state.playerFamily);
+        const totalSurvivors = survivingRivals.length + (playerAlive ? 1 : 0);
+        
+        if (totalSurvivors >= COMMISSION_MIN_SURVIVORS && state.turn >= aiCooldown) {
+          // AI decides to call vote if diplomatic or if it has high relationships
+          const shouldCallVote = (personality === 'diplomatic' && Math.random() < 0.4) ||
+            (personality === 'opportunistic' && Math.random() < 0.2) ||
+            (Math.random() < 0.1);
+          
+          if (shouldCallVote) {
+            opponent.resources.money -= COMMISSION_VOTE_COST;
+            const needed = totalSurvivors === 2 ? 2 : totalSurvivors - 1;
+            let yesVotes = 0;
+            const voteResults: Array<{ family: string; vote: boolean }> = [];
+            
+            // Other AI families vote
+            for (const otherAi of survivingRivals) {
+              const rel = otherAi.relationships[fam] || 0;
+              const hasPact = state.alliances.some(a => a.active && 
+                ((a.alliedFamily === fam && otherAi.family === state.playerFamily) || 
+                 (a.alliedFamily === otherAi.family))) ||
+                state.ceasefires.some(c => c.active && c.family === fam);
+              // AI-to-AI: use relationship threshold
+              if (rel >= COMMISSION_VOTE_RELATIONSHIP_THRESHOLD && hasPact) {
+                yesVotes++;
+                voteResults.push({ family: otherAi.family, vote: true });
+              } else {
+                voteResults.push({ family: otherAi.family, vote: false });
+              }
+            }
+            
+            // Player votes toward AI caller
+            if (playerAlive) {
+              const playerRelWithCaller = state.reputation.familyRelationships[fam] || 0;
+              const playerHasPact = state.alliances.some(a => a.active && a.alliedFamily === fam) ||
+                state.ceasefires.some(c => c.active && c.family === fam);
+              if (playerRelWithCaller >= COMMISSION_VOTE_RELATIONSHIP_THRESHOLD && playerHasPact) {
+                yesVotes++;
+                voteResults.push({ family: state.playerFamily, vote: true });
+              } else {
+                voteResults.push({ family: state.playerFamily, vote: false });
+              }
+            }
+            
+            if (yesVotes >= needed) {
+              // AI wins via commission vote!
+              state.victoryType = 'commission';
+              state.pendingNotifications.push({
+                type: 'error', title: `👑 ${fam.charAt(0).toUpperCase() + fam.slice(1)} is Boss of All Bosses!`,
+                message: `The ${fam} family called a Commission Meeting and won ${yesVotes}/${totalSurvivors} votes. You have lost.`,
+              });
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'commission_vote_win', detail: `Won Commission Vote ${yesVotes}/${needed}!` });
+            } else {
+              // Failed — cooldown + relationship penalty
+              opponent.resources.commissionCooldownUntil = state.turn + COMMISSION_VOTE_COOLDOWN;
+              for (const result of voteResults) {
+                if (!result.vote) {
+                  const otherAi = state.aiOpponents.find(o => o.family === result.family);
+                  if (otherAi) {
+                    otherAi.relationships[fam] = (otherAi.relationships[fam] || 0) - COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY;
+                  }
+                  if (result.family === state.playerFamily) {
+                    state.reputation.familyRelationships[fam] = (state.reputation.familyRelationships[fam] || 0) - COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY;
+                  }
+                }
+              }
+              state.pendingNotifications.push({
+                type: 'info', title: `👑 ${fam.charAt(0).toUpperCase() + fam.slice(1)} Commission Vote Failed`,
+                message: `The ${fam} family called a Commission Meeting but only got ${yesVotes}/${needed} votes needed.`,
+              });
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'commission_vote_fail', detail: `Failed Commission Vote ${yesVotes}/${needed}` });
+            }
+          }
+        }
+      }
     });
 
     // ── RE-CHECK UNDETECTED PLANNED HITS FOR NEW INTEL ──
