@@ -550,6 +550,11 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           ((gameState as any).safePassagePacts || []).filter((p: any) => p.active && p.turnsRemaining <= 1).forEach((p: any) => {
             expiringPacts.push({ label: `Passage w/ ${p.targetFamily.charAt(0).toUpperCase() + p.targetFamily.slice(1)}`, emoji: '🛤️' });
           });
+          ((gameState as any).supplyDealPacts || []).filter((p: any) => p.active && p.turnsRemaining <= 1).forEach((p: any) => {
+            const isPlayerBuyer = p.buyerFamily === gameState.playerFamily;
+            const otherFam = isPlayerBuyer ? p.targetFamily : p.buyerFamily;
+            expiringPacts.push({ label: `Supply Deal w/ ${otherFam.charAt(0).toUpperCase() + otherFam.slice(1)}`, emoji: '🚚' });
+          });
 
           const deployedCount = (gameState.deployedUnits || []).filter((u: any) => u.family === gameState.playerFamily && u.type === 'soldier').length;
           const totalSoldiers = deployedCount + (gameState.resources?.soldiers || 0);
