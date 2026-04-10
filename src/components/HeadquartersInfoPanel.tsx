@@ -13,6 +13,8 @@ import {
   WAR_MAX_SIMULTANEOUS,
   MattressesState, WarSummitState,
 } from '@/types/game-mechanics';
+import { SUPPLY_NODE_CONFIG, SupplyNodeType } from '@/types/game-mechanics';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { 
   DollarSign, 
   Users, 
@@ -24,7 +26,9 @@ import {
   ChevronUp,
   MapPin,
   Store,
-  Map
+  Map,
+  Link2,
+  Unlink
 } from 'lucide-react';
 
 interface HexBusiness {
@@ -41,6 +45,8 @@ interface HexBusiness {
   underConstruction?: boolean;
   collectionRate?: number;
   collectionReason?: string;
+  supplyConnected?: boolean;
+  supplyDependency?: string; // e.g. 'liquor_route', 'docks'
 }
 
 interface HeadquartersInfoPanelProps {
