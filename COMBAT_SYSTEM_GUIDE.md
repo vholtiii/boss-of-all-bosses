@@ -70,13 +70,24 @@ chance = 50% + (attackers - defenders) × 15%
        + scout bonus (+15% if scouted, +7% if stale)
        + fortified attacker bonus (+12.5%)
        - fortified defender penalty (-25%)
-       - blind hit penalty (-20% if unscouted)
-       + planned hit bonus (+20% if planned)
+        - blind hit penalty (-20% if unscouted)
+        + planned hit bonus (+20% if planned, +10% if target relocated)
+        [Plan Hit bypasses fortified defender penalty entirely]
 
 Clamped: 10%–95%
 ```
 
-### 2.4 Victory Outcome
+### 2.4 Plan Hit Victory Bonuses
+
+| Effect | Value |
+|---|---|
+| Territory | Set to **neutral** (must Claim next turn) |
+| Enemy units on hex | Removed (target unit **guaranteed** killed) |
+| Respect gained | +10 |
+| Fear gained | +10 |
+| Loot | +$5,000 |
+| Capo kill bonus | +15 influence |
+| Attacker casualties | **Zero** |
 
 | Effect | Value |
 |---|---|
@@ -98,7 +109,11 @@ Clamped: 10%–95%
 ### 2.6 Police Heat from Hits
 
 ```
-heatGain = min(25, 8 + totalUnitsInvolved × 2)
+baseHeat = min(25, 8 + totalUnitsInvolved × 2)
+
+Scouted hit:  heatGain = floor(baseHeat / 2)     — 50% (clean operation)
+Blind hit:    heatGain = floor(baseHeat × 1.5)   — 150% (reckless)
+Planned hit:  heatGain = baseHeat                 — normal
 ```
 
 ### 2.7 Diplomacy Interactions
