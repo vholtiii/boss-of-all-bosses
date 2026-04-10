@@ -216,7 +216,7 @@ AI families follow the same four-phase gates as the player, with five distinct p
 - **Recharts** for data visualization
 
 ### State Management
-- Custom hooks (`useEnhancedMafiaGameState`) for centralized game logic (~5,400+ lines)
+- Custom hooks (`useEnhancedMafiaGameState`) for centralized game logic (~7,500+ lines)
 - Local storage for save/load
 
 ---
