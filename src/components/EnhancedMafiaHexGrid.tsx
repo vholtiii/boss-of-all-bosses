@@ -720,6 +720,18 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         y: hq.y + (dy / dist) * baseHexRadius
                       };
                     }
+                    // Offset last point (supply node) to hex boundary
+                    const last = pts[pts.length - 1];
+                    const prev = pts[pts.length - 2];
+                    const dx2 = prev.x - last.x;
+                    const dy2 = prev.y - last.y;
+                    const dist2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+                    if (dist2 > 0) {
+                      pts[pts.length - 1] = {
+                        x: last.x + (dx2 / dist2) * baseHexRadius,
+                        y: last.y + (dy2 / dist2) * baseHexRadius
+                      };
+                    }
                     rawRoutePaths.push(pts);
                   }
                 }
