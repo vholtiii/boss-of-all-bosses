@@ -64,6 +64,10 @@ import {
   DECLARE_WAR_COST,
   MATTRESSES_COST, MATTRESSES_COOLDOWN, MATTRESSES_DURATION, MATTRESSES_DEFENSE_BONUS, MATTRESSES_HQ_BONUS, MATTRESSES_INCOME_PENALTY, MATTRESSES_LOYALTY_BONUS,
   WAR_SUMMIT_COST, WAR_SUMMIT_COOLDOWN, WAR_SUMMIT_DURATION, WAR_SUMMIT_COMBAT_BONUS, WAR_SUMMIT_FEAR_BONUS, WAR_SUMMIT_HEAT_COST, WAR_SUMMIT_LOYALTY_BONUS,
+  // Phases & Commission
+  GamePhase, PHASE_CONFIGS,
+  COMMISSION_VOTE_COST, COMMISSION_VOTE_COOLDOWN, COMMISSION_MIN_SURVIVORS,
+  COMMISSION_VOTE_RELATIONSHIP_THRESHOLD, COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -221,6 +225,8 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     mattressesCooldownUntil: state.mattressesCooldownUntil || 0,
     warSummitState: { ...(state.warSummitState || { active: false, turnsRemaining: 0 }) },
     warSummitCooldownUntil: state.warSummitCooldownUntil || 0,
+    gamePhase: state.gamePhase || 1,
+    commissionVoteCooldownUntil: state.commissionVoteCooldownUntil || 0,
   });
 
 // ============ UNIT TYPES ============
@@ -428,6 +434,9 @@ export interface EnhancedMafiaGameState {
   warSummitState: WarSummitState;
   warSummitCooldownUntil: number;
   
+  // Gameplay phases & commission vote
+  gamePhase: GamePhase;
+  commissionVoteCooldownUntil: number;
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
   };
@@ -857,7 +866,10 @@ const createInitialGameState = (
       economic: { current: 0, target: 50000, met: false },
       legacy: { current: 0, highestRival: 0, met: false },
       domination: { eliminated: 0, target: 4, met: false },
+      commission: { supporting: 0, needed: 0, met: false },
     },
+    gamePhase: 1 as GamePhase,
+    commissionVoteCooldownUntil: 0,
     flippedSoldiers: [],
     eliminatedFamilies: [],
     sitdownCooldownUntil: 0,
@@ -1060,6 +1072,7 @@ export const useEnhancedMafiaGameState = (
       economic: { current: income, target: ECONOMIC_TARGET, met: income >= ECONOMIC_TARGET },
       legacy: { current: playerRep, highestRival, met: legacyMet },
       domination: { eliminated: eliminatedCount, target: 4, met: eliminatedCount >= 4 },
+      commission: state.victoryProgress.commission || { supporting: 0, needed: 0, met: false },
     };
 
     const prevVictory = state.victoryType;
@@ -1084,7 +1097,133 @@ export const useEnhancedMafiaGameState = (
     }
   };
 
-  // ============ HELPER: check if hex is adjacent to enemy ============
+  // ============ GAMEPLAY PHASE CALCULATION ============
+  const calculatePhaseForFamily = (state: EnhancedMafiaGameState, family: string): GamePhase => {
+    const hexCount = state.hexMap.filter(t => t.controllingFamily === family).length;
+    const isPlayer = family === state.playerFamily;
+    const respect = isPlayer ? state.reputation.respect : (state.aiOpponents.find(o => o.family === family)?.resources.respect || 0);
+    const capoCount = state.deployedUnits.filter(u => u.family === family && u.type === 'capo').length;
+    const builtBusinessCount = state.hexMap.filter(t => t.controllingFamily === family && t.business && !t.business.isExtorted).length;
+    const income = isPlayer ? state.lastTurnIncome : 0;
+
+    // Check from highest phase down
+    for (let p = 3; p >= 0; p--) {
+      const cfg = PHASE_CONFIGS[p];
+      if (state.turn < cfg.minTurn) continue;
+      const reqs = cfg.requirements;
+      if (reqs.minHexes && hexCount < reqs.minHexes) continue;
+      if (reqs.minRespect && respect < reqs.minRespect) continue;
+      if (reqs.minCapos && capoCount < reqs.minCapos) continue;
+      if (reqs.minBuiltBusinesses && builtBusinessCount < reqs.minBuiltBusinesses) continue;
+      if (reqs.minIncomeOrHexesOrRespect) {
+        const or = reqs.minIncomeOrHexesOrRespect;
+        if (hexCount < or.hexes && income < or.income && respect < or.respect) continue;
+      }
+      return cfg.phase;
+    }
+    return 1;
+  };
+
+  const updateGamePhase = (state: EnhancedMafiaGameState) => {
+    const newPhase = calculatePhaseForFamily(state, state.playerFamily);
+    // No regression — once reached, stays
+    if (newPhase > (state.gamePhase || 1)) {
+      const oldPhase = state.gamePhase || 1;
+      state.gamePhase = newPhase;
+      const cfg = PHASE_CONFIGS[newPhase - 1];
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'success' as const,
+        title: `${cfg.icon} Phase ${newPhase}: ${cfg.name}`,
+        message: `New abilities unlocked: ${cfg.unlocks.join(', ')}`,
+      }];
+    }
+  };
+
+  // ============ COMMISSION VOTE ============
+  const processCommissionVote = (state: EnhancedMafiaGameState): EnhancedMafiaGameState => {
+    if ((state.gamePhase || 1) < 4) {
+      state.pendingNotifications.push({ type: 'warning', title: '👑 Not Ready', message: 'Commission Vote requires Phase 4: Boss of All Bosses.' });
+      return state;
+    }
+    if (state.resources.money < COMMISSION_VOTE_COST) {
+      state.pendingNotifications.push({ type: 'warning', title: '💰 Not Enough Money', message: `Commission Meeting costs $${COMMISSION_VOTE_COST.toLocaleString()}.` });
+      return state;
+    }
+    if (state.actionsRemaining <= 0) {
+      state.pendingNotifications.push({ type: 'warning', title: '⚠️ No Actions', message: 'No actions remaining.' });
+      return state;
+    }
+    if ((state.commissionVoteCooldownUntil || 0) > state.turn) {
+      const cd = (state.commissionVoteCooldownUntil || 0) - state.turn;
+      state.pendingNotifications.push({ type: 'warning', title: '⏳ Cooldown', message: `Commission Vote available in ${cd} turns.` });
+      return state;
+    }
+    const survivingRivals = state.aiOpponents.filter(o => !(state.eliminatedFamilies || []).includes(o.family));
+    if (survivingRivals.length < COMMISSION_MIN_SURVIVORS) {
+      state.pendingNotifications.push({ type: 'warning', title: '👑 Too Few Families', message: `Need at least ${COMMISSION_MIN_SURVIVORS} surviving rival families for a legitimate Commission.` });
+      return state;
+    }
+    
+    state.resources.money -= COMMISSION_VOTE_COST;
+    state.actionsRemaining = Math.max(0, state.actionsRemaining - 1);
+    
+    // Unanimous minus one: need all minus one
+    const needed = Math.max(survivingRivals.length - 1, survivingRivals.length === 2 ? 2 : survivingRivals.length - 1);
+    const hasTreachery = !!(state.treacheryDebuff && state.treacheryDebuff.turnsRemaining > 0);
+    
+    let yesVotes = 0;
+    const voteResults: Array<{ family: string; vote: boolean; reason: string }> = [];
+    
+    for (const rival of survivingRivals) {
+      if (hasTreachery) {
+        voteResults.push({ family: rival.family, vote: false, reason: 'Treachery debuff — automatic NO' });
+        continue;
+      }
+      const relationship = state.reputation.familyRelationships[rival.family] || 0;
+      const hasAlliance = (state.alliances || []).some(a => a.active && a.alliedFamily === rival.family);
+      const hasCeasefire = (state.ceasefires || []).some(c => c.active && c.family === rival.family);
+      const hasPact = hasAlliance || hasCeasefire;
+      
+      if (relationship >= COMMISSION_VOTE_RELATIONSHIP_THRESHOLD && hasPact) {
+        yesVotes++;
+        voteResults.push({ family: rival.family, vote: true, reason: `Relationship ${relationship} + active pact` });
+      } else {
+        const reason = relationship < COMMISSION_VOTE_RELATIONSHIP_THRESHOLD 
+          ? `Relationship too low (${relationship}/${COMMISSION_VOTE_RELATIONSHIP_THRESHOLD})` 
+          : 'No active alliance or ceasefire';
+        voteResults.push({ family: rival.family, vote: false, reason });
+      }
+    }
+    
+    // Update victory progress
+    state.victoryProgress.commission = { supporting: yesVotes, needed, met: yesVotes >= needed };
+    
+    if (yesVotes >= needed) {
+      state.victoryType = 'commission';
+      state.pendingNotifications.push({
+        type: 'success', title: '👑 BOSS OF ALL BOSSES!',
+        message: `The Commission has voted! ${yesVotes}/${survivingRivals.length} families support your leadership. You are the Boss of All Bosses!`,
+      });
+    } else {
+      // Failed — penalty
+      state.commissionVoteCooldownUntil = state.turn + COMMISSION_VOTE_COOLDOWN;
+      for (const result of voteResults) {
+        if (!result.vote) {
+          const rel = state.reputation.familyRelationships[result.family] || 0;
+          state.reputation.familyRelationships[result.family] = rel - COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY;
+        }
+      }
+      const voteDetail = voteResults.map(r => `${r.family}: ${r.vote ? '✅ YES' : '❌ NO'} (${r.reason})`).join('. ');
+      state.pendingNotifications.push({
+        type: 'error', title: '👑 Commission Vote Failed',
+        message: `${yesVotes}/${needed} votes needed. ${voteDetail}. -${COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY} relationship with NO voters. Cooldown: ${COMMISSION_VOTE_COOLDOWN} turns.`,
+      });
+    }
+    
+    return state;
+  };
+
+
   const isAdjacentToEnemy = (q: number, r: number, s: number, hexMap: HexTile[], deployedUnits: DeployedUnit[], playerFamily: string): boolean => {
     const neighbors = getHexNeighbors(q, r, s);
     return neighbors.some(n => {
@@ -1407,6 +1546,7 @@ export const useEnhancedMafiaGameState = (
 
       // Handle scout action (tactical phase only)
       if (prev.turnPhase === 'move' && moveAction === 'scout' && (unit.type === 'soldier' || unit.type === 'capo')) {
+        if ((prev.gamePhase || 1) < 2) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🔒 Phase Locked', message: 'Scouting unlocks in Phase 2: Establishing Territory.' }] };
         if (prev.tacticalActionsRemaining <= 0) return prev;
         const result = processScout(prev, unit, targetLocation);
         return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
@@ -1414,6 +1554,7 @@ export const useEnhancedMafiaGameState = (
 
       // Handle safehouse action (tactical phase only) — blocked for wounded capos
       if (prev.turnPhase === 'move' && moveAction === 'safehouse' && unit.type === 'capo') {
+        if ((prev.gamePhase || 1) < 2) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🔒 Phase Locked', message: 'Safehouses unlock in Phase 2: Establishing Territory.' }] };
         if ((unit.woundedTurnsRemaining || 0) > 0) {
           return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
             type: 'warning' as const, title: '🩸 Capo Wounded',
@@ -1651,6 +1792,7 @@ export const useEnhancedMafiaGameState = (
   const fortifyUnit = useCallback(() => {
     setGameState(prev => {
       if (prev.turnPhase !== 'move') return prev;
+      if ((prev.gamePhase || 1) < 2) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🔒 Phase Locked', message: 'Fortification unlocks in Phase 2: Establishing Territory.' }] };
       if (prev.tacticalActionsRemaining <= 0) return prev;
       if (!prev.selectedUnitId) return prev;
       const unit = prev.deployedUnits.find(u => u.id === prev.selectedUnitId);
@@ -3133,6 +3275,7 @@ export const useEnhancedMafiaGameState = (
       syncLegacyUnits(newState);
       newState.territories = buildLegacyTerritories(newState.hexMap);
       updateVictoryProgress(newState);
+      updateGamePhase(newState);
       
       return newState;
     });
@@ -3484,6 +3627,7 @@ export const useEnhancedMafiaGameState = (
       const fam = opponent.family as any;
       const hq = state.headquarters[fam];
       if (!hq) return;
+      const aiPhase = calculatePhaseForFamily(state, fam);
 
       // ── INCOME (difficulty-scaled) ──
       let aiIncome = 0;
@@ -3763,7 +3907,7 @@ export const useEnhancedMafiaGameState = (
           }
 
           // Alert: fortify chance (hex-based)
-          if (isAlerted && !isHexFortified(state.fortifiedHexes || [], unit.q, unit.r, unit.s, fam) && Math.random() < 0.3 && aiTacticalRemaining > 0 && (state.fortifiedHexes || []).filter(f => f.family === fam).length < MAX_FORTIFICATIONS) {
+          if (aiPhase >= 2 && isAlerted && !isHexFortified(state.fortifiedHexes || [], unit.q, unit.r, unit.s, fam) && Math.random() < 0.3 && aiTacticalRemaining > 0 && (state.fortifiedHexes || []).filter(f => f.family === fam).length < MAX_FORTIFICATIONS) {
             state.fortifiedHexes = [...(state.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: fam, fortifiedOnTurn: state.turn }];
             unit.movesRemaining = 0;
             aiTacticalRemaining--;
@@ -4135,7 +4279,7 @@ export const useEnhancedMafiaGameState = (
 
       // ── PROMOTE SOLDIERS TO CAPOS ──
       const aiCapoCount = state.deployedUnits.filter(u => u.family === fam && u.type === 'capo').length;
-      if (aiCapoCount < MAX_CAPOS && opponent.resources.money >= CAPO_PROMOTION_COST) {
+      if (aiPhase >= 2 && aiCapoCount < MAX_CAPOS && opponent.resources.money >= CAPO_PROMOTION_COST) {
         const aiSoldierUnits = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
         let bestCandidate: { unit: typeof aiSoldierUnits[0]; stats: SoldierStats } | null = null;
         for (const solUnit of aiSoldierUnits) {
@@ -4162,7 +4306,7 @@ export const useEnhancedMafiaGameState = (
 
       // ── DIPLOMATIC AI: Ceasefire proposals (skip if at war with player) ──
       const atWarWithPlayer = areFamiliesAtWar(state, fam, state.playerFamily);
-      if (!atWarWithPlayer && (opponent.personality || 'aggressive') === 'diplomatic' && Math.random() < (cooperation / 200)) {
+      if (aiPhase >= 3 && !atWarWithPlayer && (opponent.personality || 'aggressive') === 'diplomatic' && Math.random() < (cooperation / 200)) {
         const hasCeasefire = state.ceasefires.some(c => c.active && c.family === fam);
         if (!hasCeasefire) {
           state.pendingNotifications.push({
@@ -4182,7 +4326,7 @@ export const useEnhancedMafiaGameState = (
         const shTile = state.hexMap.find(t => t.q === s.q && t.r === s.r && t.s === s.s);
         return shTile && shTile.controllingFamily === fam;
       });
-      if (aiFamHexes.length >= 8 && opponent.resources.money >= 5000 && aiCapos.length > 0 && !aiHasSafehouse) {
+      if (aiPhase >= 2 && aiFamHexes.length >= 8 && opponent.resources.money >= 5000 && aiCapos.length > 0 && !aiHasSafehouse) {
         // Pick a border hex (adjacent to enemy territory) with most friendly neighbors
         const borderHexes = aiFamHexes.filter(h => {
           const neighbors = getHexNeighbors(h.q, h.r, h.s);
@@ -4227,7 +4371,7 @@ export const useEnhancedMafiaGameState = (
       const hasAllianceWithPlayer = (state.alliances || []).some(p => p.alliedFamily === fam && p.active);
       if (hasCeasefireWithPlayer || hasAllianceWithPlayer) {
         // Skip plan hit — active pact with player
-      } else if ((personality === 'aggressive' || personality === 'opportunistic') && Math.random() < AI_PLAN_HIT_CHANCE) {
+      } else if (aiPhase >= 2 && (personality === 'aggressive' || personality === 'opportunistic') && Math.random() < AI_PLAN_HIT_CHANCE) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
         const availableTargets = playerCapos.filter(c => !alreadyTargeted.has(c.id));
@@ -4801,6 +4945,11 @@ export const useEnhancedMafiaGameState = (
           return newState;
         }
         case 'plan_hit': {
+          // Phase gate: Phase 2+
+          if ((newState.gamePhase || 1) < 2) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Plan Hit unlocks in Phase 2: Establishing Territory.' });
+            return newState;
+          }
           // Tactical phase action — costs 1 tactical action
           if (newState.turnPhase !== 'move') {
             newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -4968,6 +5117,10 @@ export const useEnhancedMafiaGameState = (
         }
         // recruit_capo case removed — capos are only obtainable via promote_capo
         case 'promote_capo': {
+          if ((newState.gamePhase || 1) < 2) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Capo Promotion unlocks in Phase 2: Establishing Territory.' });
+            return newState;
+          }
           const unitId = action.unitId as string;
           const unit = newState.deployedUnits.find(u => u.id === unitId);
           if (!unit || unit.type !== 'soldier' || unit.family !== newState.playerFamily) return newState;
@@ -5013,6 +5166,11 @@ export const useEnhancedMafiaGameState = (
           return newState;
         case 'bribe_corruption': {
           const tier = action.tier as BribeTier;
+          // Phase gate: Captain+ bribes require Phase 3
+          if (tier !== 'patrol_officer' && (newState.gamePhase || 1) < 3) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: `${tier === 'police_captain' ? 'Police Captain' : tier === 'police_chief' ? 'Police Chief' : 'Mayor'} bribes unlock in Phase 3: Controlling Territory.` });
+            return newState;
+          }
           const config = BRIBE_TIERS.find(t => t.tier === tier);
           if (!config || newState.resources.money < config.cost) return newState;
           
@@ -5297,6 +5455,10 @@ export const useEnhancedMafiaGameState = (
           return result;
         }
         case 'boss_negotiate': {
+          if ((newState.gamePhase || 1) < 3) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Boss Diplomacy unlocks in Phase 3: Controlling Territory.' });
+            return newState;
+          }
           const result = processNegotiation(newState, { ...action, isBossNegotiation: true });
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
@@ -5364,6 +5526,11 @@ export const useEnhancedMafiaGameState = (
           return newState;
         }
         case 'declare_war': {
+          // Phase gate: Phase 3+
+          if ((newState.gamePhase || 1) < 3) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Declare War unlocks in Phase 3: Controlling Territory.' });
+            return newState;
+          }
           // Boss action — costs $10K + 1 action point
           if (newState.turnPhase !== 'action') {
             newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'Declare War is only available during the Action phase.' });
@@ -5491,6 +5658,9 @@ export const useEnhancedMafiaGameState = (
             message: `The Boss rallies the family! +${WAR_SUMMIT_COMBAT_BONUS}% combat for ${WAR_SUMMIT_DURATION} turns, +${WAR_SUMMIT_FEAR_BONUS} fear, +${WAR_SUMMIT_HEAT_COST} heat, +${WAR_SUMMIT_LOYALTY_BONUS} loyalty.`,
           });
           return newState;
+        }
+        case 'commission_vote': {
+          return processCommissionVote(newState);
         }
         default:
           return newState;

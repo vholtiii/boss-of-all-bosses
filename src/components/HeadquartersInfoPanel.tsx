@@ -798,7 +798,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
               </div>
             )}
 
-            {/* Declare War — Boss Action */}
+            {/* Declare War — Boss Action (Phase 3+) */}
             {isPlayerFamily && onDeclareWar && (
               (() => {
                 const isActionPhase = turnPhase === 'action';
