@@ -2896,9 +2896,9 @@ export const useEnhancedMafiaGameState = (
       {
         let loyaltyDelta = 0.5; // baseline recovery
         
-        // District control bonus: Little Italy +15% loyalty retention (reduce decay)
+        // District control bonus: Little Italy +20% loyalty retention (reduce decay)
         if (hasPlayerDistrictBonus(newState, 'loyalty')) {
-          loyaltyDelta += 0.5; // extra baseline = less net decay
+          loyaltyDelta += 0.7; // extra baseline = less net decay (boosted from +0.5)
         }
         
         // +0.5 per successful extortion this turn (check turn report events)
@@ -3205,18 +3205,22 @@ export const useEnhancedMafiaGameState = (
       const respectDecay = 0.5;
       newState.reputation.respect = Math.min(100, Math.max(0, newState.reputation.respect + respectGain - respectDecay));
       
-      // District control bonus: Staten Island +2 respect/turn
+      // District control bonus: Staten Island +3 respect/turn
       if (hasPlayerDistrictBonus(newState, 'respect')) {
-        newState.reputation.respect = Math.min(100, newState.reputation.respect + 2);
+        newState.reputation.respect = Math.min(100, newState.reputation.respect + 3);
+      }
+      // Secondary: Staten Island +1 influence/turn
+      if (hasPlayerDistrictBonus(newState, 'influence_gain')) {
+        newState.resources.influence = Math.min(100, (newState.resources.influence || 0) + 1);
       }
       // FIX #3: Sync resources.respect with reputation.respect (single source of truth)
       syncRespect(newState, newState.reputation.respect);
       
       // --- Heat decay (after arrests) ---
       let heatReduction = newState.policeHeat.reductionPerTurn;
-      // District control bonus: Brooklyn -3 heat/turn
+      // District control bonus: Brooklyn -5 heat/turn
       if (hasPlayerDistrictBonus(newState, 'heat')) {
-        heatReduction += 3;
+        heatReduction += 5;
       }
       newState.policeHeat.level = Math.max(0, newState.policeHeat.level - heatReduction);
       
@@ -3539,9 +3543,9 @@ export const useEnhancedMafiaGameState = (
           }
         }
         
-        // District control bonus: Manhattan +20% income
+        // District control bonus: Manhattan +25% income
         if (tile.district === 'Manhattan' && hasPlayerDistrictBonus(state, 'income')) {
-          tileIncome = Math.floor(tileIncome * 1.2);
+          tileIncome = Math.floor(tileIncome * 1.25);
         }
         // War income penalty: -20% on hexes adjacent to warring enemy territory (capped at -30%)
         let warPenalty = 0;
@@ -5413,8 +5417,8 @@ export const useEnhancedMafiaGameState = (
           if (newState.tacticalActionsRemaining <= 0) return newState;
           const respectDiscount = (newState.reputation.respect / 100) * 0.3;
           const cost = Math.floor(SOLDIER_COST * (1 - discount) * (1 - respectDiscount));
-          // District control bonus: Bronx -$500 recruit discount
-          const bronxDiscount = hasPlayerDistrictBonus(newState, 'recruit_discount') ? 500 : 0;
+          // District control bonus: Bronx -$750 recruit discount
+          const bronxDiscount = hasPlayerDistrictBonus(newState, 'recruit_discount') ? 750 : 0;
           const finalCost = Math.max(100, cost - bronxDiscount);
           if (newState.resources.money >= finalCost) {
             newState.resources.money -= finalCost;
@@ -5459,7 +5463,7 @@ export const useEnhancedMafiaGameState = (
           }
           const respectDiscount2 = (newState.reputation.respect / 100) * 0.3;
           const cost2 = Math.floor(LOCAL_SOLDIER_COST * (1 - discount) * (1 - respectDiscount2));
-          const bronxDiscount2 = hasPlayerDistrictBonus(newState, 'recruit_discount') ? 500 : 0;
+          const bronxDiscount2 = hasPlayerDistrictBonus(newState, 'recruit_discount') ? 750 : 0;
           const finalCost2 = Math.max(100, cost2 - bronxDiscount2);
           if (newState.resources.money >= finalCost2) {
             newState.resources.money -= finalCost2;
@@ -7208,9 +7212,9 @@ export const useEnhancedMafiaGameState = (
       // Neutral: 90% success, claims territory. Enemy: 50% success, steals income only.
       let chance = isNeutral ? 0.9 : 0.5;
       chance += state.familyBonuses.extortion / 100;
-      // District control bonus: Queens +10% extortion success
+      // District control bonus: Queens +15% extortion success
       if (hasPlayerDistrictBonus(state, 'extortion')) {
-        chance += 0.10;
+        chance += 0.15;
       }
       chance -= state.policeHeat.level / 1000;
       chance += (state.resources.influence / 100) * 0.15;
