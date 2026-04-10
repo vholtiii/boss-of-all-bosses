@@ -768,14 +768,8 @@ const createInitialGameState = (
     }
   });
 
-  const _debugMinDist = Math.max(4, Math.floor(mapRadius * 0.6));
-  console.log(`[Supply Nodes] Map radius=${mapRadius}, minDist=${_debugMinDist}`);
-  const _hqPos = Object.values(HQ_POSITIONS);
-  supplyNodes.forEach(node => {
-    const dists = _hqPos.map((hq: any) => hexDistance(hq, { q: node.q, r: node.r, s: node.s }));
-    console.log(`  ${node.type}: min HQ dist = ${Math.min(...dists)}`);
-  });
-   
+
+
   allFamilies.forEach(fam => {
     const hq = HQ_POSITIONS[fam];
     const hqTile = hexMap.find(t => t.q === hq.q && t.r === hq.r && t.s === hq.s);
