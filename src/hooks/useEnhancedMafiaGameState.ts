@@ -189,6 +189,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   ceasefires: (state.ceasefires || []).map(c => ({ ...c })),
   shareProfitsPacts: (state.shareProfitsPacts || []).map(p => ({ ...p })),
   safePassagePacts: (state.safePassagePacts || []).map(p => ({ ...p })),
+  supplyDealPacts: (state.supplyDealPacts || []).map(p => ({ ...p })),
   bossNegotiationCooldown: state.bossNegotiationCooldown || 0,
   capoNegotiationCooldown: state.capoNegotiationCooldown || 0,
   events: [...(state.events || [])],
