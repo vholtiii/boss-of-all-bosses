@@ -6778,6 +6778,14 @@ export const useEnhancedMafiaGameState = (
       if (isDefenderBuiltBiz) {
         chance -= BUILT_BUSINESS_DEFENSE_BONUS / 100;
       }
+      // Secondary: Brooklyn +10% combat defense — defender bonus when attacking INTO Brooklyn
+      if (tile.district === 'Brooklyn' && hasFamilyDistrictBonus(state, tile.controllingFamily, 'combat_defense')) {
+        chance -= 0.10;
+      }
+      // Secondary: Brooklyn +10% combat defense — attacker bonus when attacking FROM Brooklyn
+      if (tile.district === 'Brooklyn' && hasPlayerDistrictBonus(state, 'combat_defense')) {
+        // Player units in Brooklyn get defense bonus, not attack bonus — handled above
+      }
       // Attacker bonus: attacking FROM a fortified hex
       const attackerUnit = playerUnits[0];
       const attackerHexFortified = attackerUnit && isHexFortified(state.fortifiedHexes || [], attackerUnit.q, attackerUnit.r, attackerUnit.s, state.playerFamily);
