@@ -762,9 +762,11 @@ const createInitialGameState = (
     }
   });
 
-  console.log(`[Supply Nodes] Map radius=${mapRadius}, minDist=${minSupplyDistance}`);
+  const _debugMinDist = Math.max(4, Math.floor(mapRadius * 0.6));
+  console.log(`[Supply Nodes] Map radius=${mapRadius}, minDist=${_debugMinDist}`);
+  const _hqPos = Object.values(HQ_POSITIONS);
   supplyNodes.forEach(node => {
-    const dists = hqPositions.map(hq => hexDistance(hq, { q: node.q, r: node.r, s: node.s }));
+    const dists = _hqPos.map((hq: any) => hexDistance(hq, { q: node.q, r: node.r, s: node.s }));
     console.log(`  ${node.type}: min HQ dist = ${Math.min(...dists)}`);
   });
    
