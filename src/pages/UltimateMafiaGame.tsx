@@ -892,9 +892,43 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             {currentPhaseConfig.hint}
           </span>
         </div>
-        <span className="text-[10px] text-white/50">
-          {gpConfig.icon} Phase {gp}: {gpConfig.name}
-        </span>
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-[10px] text-white/50 cursor-help underline decoration-dotted underline-offset-2">
+                {gpConfig.icon} Phase {gp}: {gpConfig.name}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs bg-black/95 border-border/50 p-3">
+              {!phaseProgressRows ? (
+                <p className="text-xs text-amber-400 font-semibold">👑 Max phase reached — Boss of All Bosses</p>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-white">
+                    Next: {phaseProgressRows.next.icon} Phase {phaseProgressRows.next.phase} — {phaseProgressRows.next.name}
+                  </p>
+                  {phaseProgressRows.hasOrCondition && (
+                    <p className="text-[10px] text-amber-400/80 italic">Any one path below unlocks this phase:</p>
+                  )}
+                  <div className="space-y-0.5">
+                    {phaseProgressRows.rows.map((row, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-[11px]">
+                        <span>{row.met ? '✅' : '❌'}</span>
+                        <span className={row.met ? 'text-green-400' : 'text-red-400'}>
+                          {row.label}
+                        </span>
+                        <span className="text-white/40 ml-auto">(current: {typeof row.current === 'number' && row.current >= 1000 ? `$${(row.current/1000).toFixed(0)}k` : row.current})</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-white/50 pt-1 border-t border-white/10">
+                    Unlocks: {phaseProgressRows.next.unlocks.join(', ')}
+                  </p>
+                </div>
+              )}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </motion.div>
 
       {/* Enhanced background with seasonal effects */}
