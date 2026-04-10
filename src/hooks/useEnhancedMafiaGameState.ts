@@ -6377,6 +6377,46 @@ export const useEnhancedMafiaGameState = (
             details: hitDetails,
             timestamp: Date.now(),
           };
+        } else if (isExecutingPlanHit) {
+          // ===== PLAN HIT VICTORY: Surgical precision rewards =====
+          syncRespect(state, Math.min(100, (state.reputation.respect || 0) + PLAN_HIT_RESPECT));
+          state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + PLAN_HIT_FEAR);
+          state.resources.money += PLAN_HIT_LOOT;
+          
+          // Check if target was a capo — decapitation strike bonus
+          const planTargetUnit = enemyUnits.find(u => u.id === state.plannedHit?.targetUnitId);
+          if (planTargetUnit && planTargetUnit.type === 'capo') {
+            state.resources.influence = Math.min(100, (state.resources.influence || 0) + PLAN_HIT_CAPO_INFLUENCE);
+            state.pendingNotifications = [...state.pendingNotifications, {
+              type: 'success', title: '👑 Decapitation Strike!',
+              message: `You took out an enemy capo! +${PLAN_HIT_CAPO_INFLUENCE} influence from the power vacuum.`,
+            }];
+          }
+          
+          playerUnits.forEach(u => {
+            if (state.soldierStats[u.id]) {
+              state.soldierStats[u.id].hits += 1;
+              state.soldierStats[u.id].victories = Math.min(5, state.soldierStats[u.id].victories + 1);
+              state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
+              state.soldierStats[u.id].loyalty = Math.min(
+                u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
+                state.soldierStats[u.id].loyalty + LOYALTY_ACTION_BONUS + LOYALTY_COMBAT_BONUS
+              );
+            }
+          });
+          
+          const hitDetails = `+${PLAN_HIT_RESPECT} respect, +${PLAN_HIT_FEAR} fear, +$${PLAN_HIT_LOOT.toLocaleString()} loot. Zero casualties.`;
+          state.lastCombatResult = {
+            q: targetQ, r: targetR, s: targetS,
+            success: true, type: 'hit',
+            title: '🎯 PLAN HIT EXECUTED!',
+            details: hitDetails,
+            timestamp: Date.now(),
+          };
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'success', title: '🎯 Plan Hit Executed!',
+            message: `Surgical strike successful — clean execution. ${hitDetails}`,
+          }];
         } else {
           // ===== SCOUTED HIT VICTORY: Standard rewards =====
           syncRespect(state, Math.min(100, (state.reputation.respect || 0) + 5));
