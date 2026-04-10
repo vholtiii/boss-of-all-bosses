@@ -761,7 +761,13 @@ const createInitialGameState = (
       supplyNodes.push({ type: nodeType, q: chosen.q, r: chosen.r, s: chosen.s, district: chosen.district });
     }
   });
-  
+
+  console.log(`[Supply Nodes] Map radius=${mapRadius}, minDist=${minSupplyDistance}`);
+  supplyNodes.forEach(node => {
+    const dists = hqPositions.map(hq => hexDistance(hq, { q: node.q, r: node.r, s: node.s }));
+    console.log(`  ${node.type}: min HQ dist = ${Math.min(...dists)}`);
+  });
+   
   allFamilies.forEach(fam => {
     const hq = HQ_POSITIONS[fam];
     const hqTile = hexMap.find(t => t.q === hq.q && t.r === hq.r && t.s === hq.s);
