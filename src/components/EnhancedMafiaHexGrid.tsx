@@ -267,6 +267,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
   const handleHexClick = (tile: HexTile) => {
     onClearHighlight?.();
+    setPinnedHex(null);
     const turnPhase = gameState?.turnPhase || 'waiting';
 
     // Plan Hit mode — 2-step selection
