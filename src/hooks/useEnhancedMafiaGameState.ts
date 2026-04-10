@@ -748,7 +748,7 @@ const createInitialGameState = (
     // Minimum distance scales with map size (small=4, medium=6, large=8)
     const minSupplyDistance = Math.max(4, Math.floor(mapRadius * 0.6));
     // Must be at least minSupplyDistance hexes away from ALL HQs to ensure meaningful supply chains
-...
+    const candidates = validTiles.filter(t => {
       // Minimum distance of minSupplyDistance hexes from any HQ
       const tooClose = hqPositions.some(hq => hexDistance(hq, t) < minSupplyDistance);
       return !tooClose;
