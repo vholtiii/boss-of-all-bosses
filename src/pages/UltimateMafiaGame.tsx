@@ -29,8 +29,10 @@ import {
   Eye,
   SkipForward,
   LogOut,
-  Settings
+  Settings,
+  Lock
 } from 'lucide-react';
+import { PHASE_CONFIGS, COMMISSION_VOTE_COST } from '@/types/game-mechanics';
 import SoundSettingsDialog from '@/components/SoundSettingsDialog';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
