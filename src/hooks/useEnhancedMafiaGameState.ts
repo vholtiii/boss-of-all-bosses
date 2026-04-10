@@ -5658,6 +5658,9 @@ export const useEnhancedMafiaGameState = (
           });
           return newState;
         }
+        case 'commission_vote': {
+          return processCommissionVote(newState);
+        }
         default:
           return newState;
       }
