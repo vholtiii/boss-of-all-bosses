@@ -222,14 +222,14 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
       ref={panelRef}
       drag
       dragMomentum={false}
-      dragConstraints={{ left: -(window.innerWidth - 340), right: 0, top: 0, bottom: window.innerHeight - 200 }}
+      dragConstraints={{ left: -(window.innerWidth - 400), right: 0, top: 0, bottom: window.innerHeight - 200 }}
       onDragStart={() => { isDraggingRef.current = true; }}
       onDragEnd={() => { setTimeout(() => { isDraggingRef.current = false; }, 100); }}
       initial={{ opacity: 0, x: 80 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 80 }}
       transition={{ type: 'tween', duration: 0.25 }}
-      className="fixed top-4 right-4 z-40 w-80 max-h-[calc(100vh-2rem)] overflow-y-auto"
+      className="fixed top-4 right-4 z-40 w-96 max-h-[calc(100vh-2rem)] overflow-y-auto"
       style={{ cursor: 'grab' }}
       whileDrag={{ cursor: 'grabbing' }}
     >
