@@ -649,7 +649,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       <div className="absolute inset-0 flex items-center justify-center">
         <svg width="100%" height="100%" viewBox={viewBox} className="overflow-visible">
           {/* Invisible background rect to capture clicks on empty area */}
-          <rect x={viewBox.split(' ').map(Number)[0]} y={viewBox.split(' ').map(Number)[1]} width={viewBox.split(' ').map(Number)[2]} height={viewBox.split(' ').map(Number)[3]} fill="transparent" onClick={() => onClearHighlight?.()} />
+          <rect x={viewBox.split(' ').map(Number)[0]} y={viewBox.split(' ').map(Number)[1]} width={viewBox.split(' ').map(Number)[2]} height={viewBox.split(' ').map(Number)[3]} fill="transparent" onClick={() => { onClearHighlight?.(); setPinnedHex(null); }} />
           <g transform={`scale(${zoom})`}>
             {/* Compute supply route hex set for tint overlay */}
             {(() => {
