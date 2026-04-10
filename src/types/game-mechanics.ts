@@ -482,11 +482,12 @@ export interface AIBounty {
 }
 
 export const BLIND_HIT_PENALTY = 0.20;     // -20% success on unscouted hits
-export const BLIND_HIT_RESPECT = 15;        // respect gained on unscouted hit victory
-export const BLIND_HIT_FEAR = 15;           // fear gained on unscouted hit victory
+export const BLIND_HIT_RESPECT = 20;        // respect gained on unscouted hit victory
+export const BLIND_HIT_FEAR = 20;           // fear gained on unscouted hit victory
 export const HIDING_DURATION = 3;           // turns a soldier hides after civilian hit
 export const BOUNTY_DURATION = 3;           // turns AI prioritizes revenge
-export const BLIND_HIT_INFLUENCE_LOSS = 10; // influence lost by targeted family
+export const BLIND_HIT_INFLUENCE_LOSS = 15; // influence lost by targeted family
+export const BLIND_HIT_INFLUENCE_GAIN = 5;  // influence gained by attacker on blind hit victory
 
 // ============ INTERNAL FAMILY HIT ============
 export const INTERNAL_HIT_LOYALTY_THRESHOLD = 70;  // loyalty below this = eliminated after hiding

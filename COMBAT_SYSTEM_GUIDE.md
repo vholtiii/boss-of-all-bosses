@@ -33,15 +33,15 @@ The primary offensive action. Attacks an enemy-controlled hex to clear it (terri
 |---|---|---|---|
 | **Niche** | Low-heat reliable | High-risk gamble | Surgical precision |
 | Success modifier | +15% (fresh scout) | −20% | +20% (+10% if relocated), bypasses fortification |
-| Respect/Fear | +5/+5 | +15/+15 | +10/+10 |
+| Respect/Fear | +5/+5 | +20/+20 | +10/+10 |
 | Police heat | **50% normal** | **150% normal** | Normal |
 | Attacker casualties | Standard (20%) | Standard (20%) | **Zero on success** |
 | Civilian risk | None | Yes — if no enemies on hex | None |
-| Special | Clean operation | Stat boost, bounty, civ risk | Guaranteed target kill, +$5K loot |
+| Special | Clean operation | Stat boost, bounty, civ risk, +5 influence | Guaranteed target kill, +$5K loot |
 | Capo kill bonus | — | — | +15 influence (decapitation strike) |
-| Soldier stat boost | Normal (+1 each) | Bounded (+3 tough, +2 vic, +15 loyalty) | Normal (+1 each) |
+| Soldier stat boost | Normal (+1 each) | Bounded (+4 tough, +2 vic, +30 loyalty) | Normal (+1 each) |
 | Bounty placed | No | Yes — targeted family attacks for 3 turns | No |
-| Target family penalty | None | −10 influence | None |
+| Target family penalty | None | −15 influence | None |
 | Fail penalty | Standard | Civ hit risk | −5 reputation, −10 planner loyalty |
 
 ### 2.1 Civilian Hit (Blind Hit Only)

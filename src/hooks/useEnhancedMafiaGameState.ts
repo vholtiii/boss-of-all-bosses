@@ -31,7 +31,7 @@ import {
   BASE_ACTIONS_PER_TURN, BONUS_ACTION_RESPECT_THRESHOLD, BONUS_ACTION_INFLUENCE_THRESHOLD,
   TACTICAL_ACTIONS_PER_TURN,
   HiddenUnit, AIBounty,
-  BLIND_HIT_PENALTY, BLIND_HIT_RESPECT, BLIND_HIT_FEAR, HIDING_DURATION, BOUNTY_DURATION, BLIND_HIT_INFLUENCE_LOSS,
+  BLIND_HIT_PENALTY, BLIND_HIT_RESPECT, BLIND_HIT_FEAR, HIDING_DURATION, BOUNTY_DURATION, BLIND_HIT_INFLUENCE_LOSS, BLIND_HIT_INFLUENCE_GAIN,
   INTERNAL_HIT_LOYALTY_THRESHOLD, INTERNAL_HIT_HEAT_REDUCTION, INTERNAL_HIT_MORALE_RISK, INTERNAL_HIT_MORALE_PENALTY,
   LOYALTY_ACTION_BONUS, LOYALTY_COMBAT_BONUS, LOYALTY_INCOME_HEX_BONUS, LOYALTY_INCOME_HEX_THRESHOLD, LOYALTY_UNPAID_PENALTY,
   CAPO_WOUND_LOYALTY_PENALTY, CAPO_WOUND_MOVE_PENALTY, CAPO_WOUND_DURATION, CAPO_WOUND_COMBAT_PENALTY,
@@ -6902,9 +6902,9 @@ export const useEnhancedMafiaGameState = (
           // Boost the initiating soldier's stats (bounded, not maxed)
           playerUnits.forEach(u => {
             if (state.soldierStats[u.id]) {
-              state.soldierStats[u.id].toughness = Math.min(5, (state.soldierStats[u.id].toughness || 1) + 3);
+              state.soldierStats[u.id].toughness = Math.min(5, (state.soldierStats[u.id].toughness || 1) + 4);
               state.soldierStats[u.id].victories = Math.min(5, (state.soldierStats[u.id].victories || 0) + 2);
-              state.soldierStats[u.id].loyalty = Math.min(SOLDIER_LOYALTY_CAP, (state.soldierStats[u.id].loyalty || 50) + 15);
+              state.soldierStats[u.id].loyalty = Math.min(SOLDIER_LOYALTY_CAP, (state.soldierStats[u.id].loyalty || 50) + 30);
               state.soldierStats[u.id].hits += 1;
             }
           });
@@ -6929,13 +6929,16 @@ export const useEnhancedMafiaGameState = (
               rivalOpponent.resources.influence = Math.max(0, rivalOpponent.resources.influence - BLIND_HIT_INFLUENCE_LOSS);
             }
             
+            // Player gains influence from bold move
+            state.resources.influence = Math.min(100, (state.resources.influence || 0) + BLIND_HIT_INFLUENCE_GAIN);
+            
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'warning', title: `🎯 Bounty Placed by ${targetFamily.charAt(0).toUpperCase() + targetFamily.slice(1)}!`,
               message: `The ${targetFamily} family has placed a bounty on you! They will aggressively target your territory for ${BOUNTY_DURATION} turns.`,
             }];
           }
           
-          const hitDetails = `+${BLIND_HIT_RESPECT} respect, +${BLIND_HIT_FEAR} fear, soldier stats boosted!`;
+          const hitDetails = `+${BLIND_HIT_RESPECT} respect, +${BLIND_HIT_FEAR} fear, +${BLIND_HIT_INFLUENCE_GAIN} influence, soldier stats boosted!`;
           state.lastCombatResult = {
             q: targetQ, r: targetR, s: targetS,
             success: true, type: 'hit',
