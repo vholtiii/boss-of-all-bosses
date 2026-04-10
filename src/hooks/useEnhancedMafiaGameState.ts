@@ -3696,6 +3696,7 @@ export const useEnhancedMafiaGameState = (
       const minIncome = Math.floor((2000 + state.turn * 500) * diffMods.aiIncomeMult * mapScale);
       aiIncome = Math.max(aiIncome, minIncome);
       opponent.resources.money += aiIncome;
+      opponent.resources.lastTurnIncome = aiIncome; // Track for phase calculation
       if (turnReport) turnReport.aiActions.push({ family: fam, action: 'income', detail: `Earned $${aiIncome.toLocaleString()} income` });
 
       // ── RECRUIT (difficulty-scaled cap) ──
