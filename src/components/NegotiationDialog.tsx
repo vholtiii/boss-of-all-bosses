@@ -55,9 +55,12 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
       chance += personalityBonuses.all || 0;
     }
     chance += Math.floor(playerReputation / 5);
+    if (type === 'supply_deal') {
+      chance += Math.floor((playerFear || 0) / 5);
+    }
     if (type === 'bribe_territory') chance -= enemyStrength * 5;
     return Math.max(5, Math.min(95, chance));
-  }, [personalityBonuses, playerReputation, enemyStrength, scope]);
+  }, [personalityBonuses, playerReputation, playerFear, enemyStrength, scope]);
 
   const getCost = useCallback((type: NegotiationType) => {
     const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
