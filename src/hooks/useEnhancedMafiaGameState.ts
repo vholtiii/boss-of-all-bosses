@@ -2586,36 +2586,21 @@ export const useEnhancedMafiaGameState = (
             let isConnected = famConnected.has(`${node.q},${node.r},${node.s}`);
             // Supply Deal: check if any active pact partner has this node connected
             if (!isConnected) {
-              const activePacts = (newState.supplyDealPacts || []).filter(p => p.active && p.targetFamily !== fam);
-              // Player's pacts target AI families; also check AI-to-player pacts
-              const relevantPacts = fam === newState.playerFamily
-                ? activePacts
-                : []; // AI pacts handled below
-              // Check pacts where this family is the buyer
-              const buyerPacts = (newState.supplyDealPacts || []).filter(p => p.active);
-              // For player: their own pacts
-              if (fam === newState.playerFamily) {
-                for (const pact of buyerPacts) {
-                  const partnerConnected = getConnectedTerritory(newState.hexMap, pact.targetFamily);
-                  if (partnerConnected.has(`${node.q},${node.r},${node.s}`)) {
-                    isConnected = true;
-                    break;
-                  }
-                }
-              }
-              // For AI: check if any family has a supply deal giving them access
-              // (AI-initiated deals stored on state too)
-              if (!isConnected && fam !== newState.playerFamily) {
-                // Check if player has a supply deal where AI is paying player
-                // These are stored as AI-initiated pacts with targetFamily = playerFamily
-                // We need to check reverse: does any pact exist where this AI fam is the "buyer"?
-                // AI supply deals are stored with the AI as implicit buyer — we store them with targetFamily = supplier
-                const aiPacts = (newState.supplyDealPacts || []).filter(p => p.active);
-                for (const pact of aiPacts) {
-                  // If this pact was initiated by fam (check turnFormed context)
-                  // Simplification: supply deal pacts list who you're buying FROM
-                  // For AI families, we check if any pact has targetFamily that connects to this node
-                  // This won't be stored on supplyDealPacts unless AI creates them
+              // Player's pacts: stored on state.supplyDealPacts (player buys from targetFamily)
+              // AI pacts with player as supplier: stored as separate entries where AI is buyer
+              // We use a unified list: supplyDealPacts entries where this fam benefits
+              const famPacts = (newState.supplyDealPacts || []).filter(p => p.active);
+              for (const pact of famPacts) {
+                // Pact format: the buyer family benefits from the targetFamily's supply connections
+                // We need to know who the buyer is. Convention: player-initiated pacts are on the global list.
+                // AI-initiated pacts also go on the global list with a buyerFamily field or we infer:
+                // If targetFamily != fam, then fam is the buyer
+                // If targetFamily == fam, then someone else is buying from us (we don't benefit)
+                if (pact.targetFamily === fam) continue; // we're the seller, not buyer
+                const partnerConnected = getConnectedTerritory(newState.hexMap, pact.targetFamily);
+                if (partnerConnected.has(`${node.q},${node.r},${node.s}`)) {
+                  isConnected = true;
+                  break;
                 }
               }
             }
