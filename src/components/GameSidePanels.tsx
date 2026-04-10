@@ -623,11 +623,14 @@ export const RightSidePanel: React.FC<{
   onAction?: (action: any) => void;
   onHighlightSupplyNode?: (hex: { q: number; r: number; s: number } | null) => void;
   highlightedSupplyHex?: { q: number; r: number; s: number } | null;
-}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex }) => {
+  onHighlightFamily?: (family: string | null) => void;
+  highlightedFamily?: string | null;
+}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily }) => {
   const [openSection, setOpenSection] = useState<string>('rivals');
   const { playSound } = useSoundSystem();
   const toggle = (id: string) => {
     if (id !== 'supply') onHighlightSupplyNode?.(null);
+    if (id !== 'rivals') onHighlightFamily?.(null);
     setOpenSection(prev => (prev === id ? '' : id));
   };
 

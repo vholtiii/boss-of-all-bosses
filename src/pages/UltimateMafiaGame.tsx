@@ -289,7 +289,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onPlanHitSelectSoldier={(unitId) => handleAction({ type: 'plan_hit_select_soldier', unitId })}
             onCancelPlanHit={() => handleAction({ type: 'cancel_plan_hit_mode' })}
             bossHighlightHex={bossHighlightHex}
-            onClearHighlight={() => setBossHighlightHex(null)}
+            highlightedFamily={highlightedFamily}
+            onClearHighlight={() => { setBossHighlightHex(null); setHighlightedFamily(null); }}
           />
         </div>
       )
@@ -304,7 +305,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       id: 'intel',
       label: 'Intel',
       icon: <Eye className="h-4 w-4" />,
-      content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} />
+      content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} onHighlightFamily={setHighlightedFamily} highlightedFamily={highlightedFamily} />
     },
   ];
 
