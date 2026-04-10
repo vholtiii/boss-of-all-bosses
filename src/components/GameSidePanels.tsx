@@ -526,38 +526,53 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           <div className="space-y-1.5">
             {(() => {
               const districts = ['Manhattan', 'Little Italy', 'Brooklyn', 'Bronx', 'Queens', 'Staten Island'];
-              const bonusLabels: Record<string, string> = {
-                'Manhattan': '+20% income',
-                'Little Italy': '+15% loyalty',
-                'Brooklyn': '-3 heat/turn',
-                'Bronx': '-$500 recruits',
-                'Queens': '+10% extortion',
-                'Staten Island': '+2 respect/turn',
+              const bonusLabels: Record<string, { primary: string; secondary: string }> = {
+                'Manhattan': { primary: '+25% income', secondary: '+1 action point' },
+                'Little Italy': { primary: '+20% loyalty', secondary: 'Faster hiding return' },
+                'Brooklyn': { primary: '-5 heat/turn', secondary: '+10% combat defense' },
+                'Bronx': { primary: '-$750 recruits', secondary: 'Free recruit / 3 turns' },
+                'Queens': { primary: '+15% extortion', secondary: '+5% hit success' },
+                'Staten Island': { primary: '+3 respect/turn', secondary: '+1 influence/turn' },
               };
               const activeBonuses = (gameState as any).activeDistrictBonuses || [];
-              return districts.map(district => {
-                const districtHexes = (gameState.hexMap || []).filter((t: any) => t.district === district);
-                const playerHexes = districtHexes.filter((t: any) => t.controllingFamily === gameState.playerFamily);
-                const pct = districtHexes.length > 0 ? Math.round((playerHexes.length / districtHexes.length) * 100) : 0;
-                const isActive = activeBonuses.some((b: any) => b.district === district && b.family === gameState.playerFamily);
-                return (
-                  <div key={district} className={cn(
-                    "rounded-md border px-2.5 py-1.5 text-xs",
-                    isActive ? "border-primary/50 bg-primary/10" : "border-border/30 bg-muted/30"
-                  )}>
-                    <div className="flex items-center justify-between">
-                      <span className={cn("font-medium", isActive ? "text-primary" : "text-muted-foreground")}>
-                        {isActive && '✅ '}{district}
-                      </span>
-                      <span className="text-muted-foreground">{pct}% / 60%</span>
+              const playerControlsAny = activeBonuses.some((b: any) => b.family === gameState.playerFamily);
+              return (
+                <>
+                  {districts.map(district => {
+                    const districtHexes = (gameState.hexMap || []).filter((t: any) => t.district === district);
+                    const playerHexes = districtHexes.filter((t: any) => t.controllingFamily === gameState.playerFamily);
+                    const pct = districtHexes.length > 0 ? Math.round((playerHexes.length / districtHexes.length) * 100) : 0;
+                    const isActive = activeBonuses.some((b: any) => b.district === district && b.family === gameState.playerFamily);
+                    const labels = bonusLabels[district];
+                    return (
+                      <div key={district} className={cn(
+                        "rounded-md border px-2.5 py-1.5 text-xs",
+                        isActive ? "border-primary/50 bg-primary/10" : "border-border/30 bg-muted/30"
+                      )}>
+                        <div className="flex items-center justify-between">
+                          <span className={cn("font-medium", isActive ? "text-primary" : "text-muted-foreground")}>
+                            {isActive && '✅ '}{district}
+                          </span>
+                          <span className="text-muted-foreground">{pct}% / 60%</span>
+                        </div>
+                        <Progress value={Math.min(100, (pct / 60) * 100)} className="h-1.5 mt-1" />
+                        <div className={cn("text-[10px] mt-0.5", isActive ? "text-primary/80" : "text-muted-foreground/60")}>
+                          {labels.primary} · {labels.secondary}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {playerControlsAny && (
+                    <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-xs mt-1">
+                      <span className="font-medium text-amber-400">🌐 Universal Bonuses Active</span>
+                      <div className="text-[10px] text-amber-300/70 mt-0.5">
+                        💰 Turf Tax: Enemy units in your districts lose 5 loyalty/turn<br/>
+                        🛤️ Safe Passage: +1 move range in controlled districts
+                      </div>
                     </div>
-                    <Progress value={Math.min(100, (pct / 60) * 100)} className="h-1.5 mt-1" />
-                    <div className={cn("text-[10px] mt-0.5", isActive ? "text-primary/80" : "text-muted-foreground/60")}>
-                      {bonusLabels[district]}
-                    </div>
-                  </div>
-                );
-              });
+                  )}
+                </>
+              );
             })()}
           </div>
         </CollapsibleSection>
