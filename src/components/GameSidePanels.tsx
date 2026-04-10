@@ -624,7 +624,10 @@ export const RightSidePanel: React.FC<{
   highlightedSupplyHex?: { q: number; r: number; s: number } | null;
 }> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex }) => {
   const [openSection, setOpenSection] = useState<string>('rivals');
-  const toggle = (id: string) => setOpenSection(prev => (prev === id ? '' : id));
+  const toggle = (id: string) => {
+    if (id !== 'supply') onHighlightSupplyNode?.(null);
+    setOpenSection(prev => (prev === id ? '' : id));
+  };
 
   return (
     <ScrollArea className="h-full">
