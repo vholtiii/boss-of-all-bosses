@@ -171,6 +171,18 @@ Four business types: Brothel ($3K), Gambling Den ($4K), Loan Sharking ($5K), Sto
 - Influence boosts extortion success (+15%) and bribe success (+12%)
 - Police heat from combat/extortion, reducible via bribe tiers (Patrol Officer → Mayor)
 
+### AI Personality Traits
+
+AI families follow the same four-phase gates as the player, with five distinct personality-driven behavior profiles:
+
+| Family | Trait | Behavior |
+|---|---|---|
+| **Gambino** | Diplomatic 🕊️ | Avoids combat, signals ceasefires/alliances early, never Plan Hits or HQ Assaults |
+| **Genovese** | Aggressive ⚔️ | Frequent attacks, +1 recruit/batch, 2× Plan Hit chance, 15% HQ Assault chance |
+| **Lucchese** | Opportunistic 🎯 | Prefers extortion, fights only when advantaged, signals ceasefire when losing |
+| **Bonanno** | Defensive 🛡️ | Never initiates Plan Hits or HQ Assaults, fortifies proactively (40% chance) |
+| **Colombo** | Unpredictable 🎲 | Randomly shifts between all behavior modes each turn for tactical variety |
+
 ### Difficulty Modes
 - **Easy**: 1.5x player money, 0.7x AI aggression
 - **Normal**: Standard balance
@@ -204,7 +216,7 @@ Four business types: Brothel ($3K), Gambling Den ($4K), Loan Sharking ($5K), Sto
 - **Recharts** for data visualization
 
 ### State Management
-- Custom hooks (`useEnhancedMafiaGameState`) for centralized game logic (~5,400+ lines)
+- Custom hooks (`useEnhancedMafiaGameState`) for centralized game logic (~7,500+ lines)
 - Local storage for save/load
 
 ---

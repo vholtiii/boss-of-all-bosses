@@ -551,13 +551,74 @@ Selected at game start alongside difficulty. Affects hex count, HQ positions, di
 
 ## 21. AI Opponents
 
-- AI personality system: aggressive, defensive, balanced, opportunistic, diplomatic
-- Early game boost: +2 actions, +2 tactical for turns 1-8
-- AI respects stacking limits, ceasefires, alliances
-- AI respect grows with territory and combat activity
-- Aggressive AI attempts HQ assault after turn 12
-- **Map-scaled AI**: Recruitment caps, action budgets, and income floors scale with map size to ensure AI fills the map appropriately
-- **Phase progression**: AI follows the same 4-phase gates as the player. AI income, business count, and capo promotions are tracked for phase calculation. AI can force-promote soldiers to Capos (at double cost) if standard stat requirements aren't met by Phase 3.
+### 21.1 Overview
+
+AI families follow the **same four-phase gates** as the player and act according to five distinct personality traits. Each personality shapes recruitment, fortification, combat, diplomacy, and special actions.
+
+- **Map-scaled AI**: Recruitment caps, action budgets, and income floors scale with map size
+- **Phase progression**: AI tracks income, business count, and capo promotions for phase calculation. AI can force-promote soldiers to Capos (at double cost) if standard stat requirements aren't met by Phase 3
+- **Early game boost**: +2 actions, +2 tactical for turns 1–8
+- AI respects stacking limits, ceasefires, alliances, and pact territory freezes
+
+### 21.2 Personality Traits
+
+| Family | Trait | Description |
+|---|---|---|
+| **Gambino** | Diplomatic 🕊️ | Avoids initiating combat. Never uses Plan Hit or HQ Assault. Signals ceasefires (Phase 2+) and alliances (Phase 3+, relationship > 30). Recruits conservatively (-1 per batch). Fortifies border hexes (25% chance). |
+| **Genovese** | Aggressive ⚔️ | High-frequency attacks and territorial expansion. Recruits aggressively (+1 per batch). 2× Plan Hit chance. 15% HQ Assault chance (Phase 4). Rarely fortifies (10% chance). |
+| **Lucchese** | Opportunistic 🎯 | Prefers extortion over direct combat. Only initiates fights when strength exceeds enemy by +1. Moderate Plan Hit chance (isolated targets only). Signals ceasefire when losing territory (< 6 hexes). Fortifies high-value business hexes (20% chance). |
+| **Bonanno** | Defensive 🛡️ | Never initiates Plan Hits or HQ Assaults. Proactively fortifies HQ-adjacent hexes (40% chance) even when not alerted. Only attacks enemy hexes when outnumbering by +2. Signals ceasefire at Phase 3+. Recruits conservatively (-1 per batch). |
+| **Colombo** | Unpredictable 🎲 | Randomly assigns a temporary behavior mode each turn: Aggressive (30%), Defensive (20%), Diplomatic (20%), or Opportunistic (30%). 1.5× Plan Hit chance. 12% HQ Assault chance. Fortification chance 30%. Recruitment varies randomly (±1). |
+
+### 21.3 Personality-Driven Behaviors
+
+**Recruitment**: Aggressive families recruit +1 more per batch. Defensive and Diplomatic families recruit -1 (minimum 1). Unpredictable families randomly adjust ±1.
+
+**Fortification** (Phase 2+, proactive — not just when alerted):
+
+| Trait | Chance | Strategy |
+|---|---|---|
+| Defensive | 40% | HQ-adjacent hexes |
+| Unpredictable | 30% | Random hexes |
+| Diplomatic | 25% | Border hexes |
+| Opportunistic | 20% | High-value business hexes |
+| Aggressive | 10% | Rarely fortifies |
+
+**Plan Hit** (Phase 2+):
+
+| Trait | Chance Multiplier | Notes |
+|---|---|---|
+| Aggressive | 2.0× base | Initiates frequently |
+| Unpredictable | 1.5× base | Moderate frequency |
+| Opportunistic | 1.0× base | Only against isolated targets |
+| Defensive | Never | Blocked by personality |
+| Diplomatic | Never | Blocked by personality |
+
+**HQ Assault** (Phase 4+):
+
+| Trait | Chance | Notes |
+|---|---|---|
+| Aggressive | 15% | Most likely to attempt |
+| Unpredictable | 12% | Moderate chance |
+| Opportunistic | 8% | Only if 2+ flipped soldiers present |
+| Defensive | Never | Blocked by personality |
+| Diplomatic | Never | Blocked by personality |
+
+**Diplomacy**:
+- **Diplomatic**: Signals ceasefire at Phase 2+, alliance at Phase 3+ (if relationship > 30)
+- **Defensive**: Signals ceasefire at Phase 3+ (cooperation-based chance)
+- **Opportunistic**: Signals ceasefire at Phase 2+ when losing territory (< 6 hexes)
+- **Aggressive**: Does not initiate diplomacy
+- **Unpredictable**: Depends on randomly assigned mode each turn
+
+### 21.4 Phase Gates for AI Actions
+
+| Action | Required Phase | Old (Removed) |
+|---|---|---|
+| Enemy Extortion | Phase 2+ | Was ungated |
+| Plan Hit | Phase 2+ | — |
+| Flip Soldier | Phase 3+ | Was turn > 8 |
+| HQ Assault | Phase 4+ | Was turn > 12 |
 
 ---
 
