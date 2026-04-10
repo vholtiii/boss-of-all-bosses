@@ -4944,6 +4944,11 @@ export const useEnhancedMafiaGameState = (
           return newState;
         }
         case 'plan_hit': {
+          // Phase gate: Phase 2+
+          if ((newState.gamePhase || 1) < 2) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Plan Hit unlocks in Phase 2: Establishing Territory.' });
+            return newState;
+          }
           // Tactical phase action — costs 1 tactical action
           if (newState.turnPhase !== 'move') {
             newState.pendingNotifications = [...newState.pendingNotifications, {
