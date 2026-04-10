@@ -28,6 +28,7 @@ interface EnhancedMafiaHexGridProps {
   onPlanHitSelectSoldier?: (unitId: string) => void;
   onCancelPlanHit?: () => void;
   bossHighlightHex?: { q: number; r: number; s: number } | null;
+  highlightedFamily?: string | null;
   onClearHighlight?: () => void;
 }
 
@@ -53,7 +54,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   width, height, onBusinessClick, selectedBusiness, playerFamily,
   gameState, onAction, onSelectUnit, onMoveUnit, onSelectHeadquarters,
   onSelectUnitFromHeadquarters, onDeployUnit, planHitMode, planHitStep, planHitPlannerId, onPlanHitSelect, onPlanHitSelectSoldier, onCancelPlanHit,
-  bossHighlightHex, onClearHighlight
+  bossHighlightHex, highlightedFamily, onClearHighlight
 }) => {
   const [zoom, setZoom] = useState(1);
   const [showSoldiers, setShowSoldiers] = useState(true);
@@ -645,6 +646,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       {/* Grid */}
       <div className="absolute inset-0 flex items-center justify-center">
         <svg width="100%" height="100%" viewBox={viewBox} className="overflow-visible">
+          {/* Invisible background rect to capture clicks on empty area */}
+          <rect x={viewBox.split(' ').map(Number)[0]} y={viewBox.split(' ').map(Number)[1]} width={viewBox.split(' ').map(Number)[2]} height={viewBox.split(' ').map(Number)[3]} fill="transparent" onClick={() => onClearHighlight?.()} />
           <g transform={`scale(${zoom})`}>
             {/* Compute supply route hex set for tint overlay */}
             {(() => {
@@ -1200,6 +1203,20 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       points={getHexPoints(x, y, baseHexRadius + 5)}
                       fill="none"
                       stroke="#D4AF37"
+                      strokeWidth="3"
+                      opacity="0.9"
+                      strokeDasharray="8,4"
+                      className="pointer-events-none animate-pulse"
+                    />
+                  )}
+
+
+                  {/* Family highlight — pulsing ring in family color */}
+                  {highlightedFamily && tile.controllingFamily === highlightedFamily && (
+                    <polygon
+                      points={getHexPoints(x, y, baseHexRadius + 5)}
+                      fill="none"
+                      stroke={familyColors[highlightedFamily] || '#D4AF37'}
                       strokeWidth="3"
                       opacity="0.9"
                       strokeDasharray="8,4"
