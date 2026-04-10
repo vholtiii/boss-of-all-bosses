@@ -1,27 +1,32 @@
 
 
-# Territorial Zone of Control — Phase 3 Gate + Implementation
+# Show Hex Info on Soldier/Capo Click + Make Hex Info Clickable
 
-## Summary
+## What Changes
 
-Two changes in one file (`src/hooks/useEnhancedMafiaGameState.ts`):
+Two behaviors:
 
-1. **New helper** `isAdjacentToEnemyTerritory(q, r, s, hexMap, playerFamily)` — returns true if any neighbor hex is controlled by a rival family.
+1. **Clicking a soldier/capo shows hex info**: When you click on a soldier or capo icon, the hex info panel (bottom-left) will appear for that unit's hex, just as if you were hovering over it. Currently, clicking a unit only selects it but the hover info disappears since your mouse leaves the hex polygon.
 
-2. **Update ZoC block** (line 1686-1690) — wrap the existing enemy-unit ZoC AND the new territorial ZoC in a **Phase 3+ gate** (`currentPhase >= 3`). Before Phase 3, neither unit-based nor territorial ZoC applies to soldiers.
+2. **Clicking the hex info panel selects/clicks that hex**: The hex info display becomes clickable. Clicking it triggers the same logic as clicking the hex itself (opening the action menu, selecting units, etc.).
 
-```text
-// Pseudocode for the updated block:
-if (unit.type === 'soldier' && currentPhase >= 3) {
-  if (isAdjacentToEnemy(...) || isAdjacentToEnemyTerritory(...)) {
-    remainingMoves = 0;
-  }
-}
-```
+## Technical Details
 
-This means:
-- **Phase 1-2**: Soldiers move freely near enemies and rival borders — early expansion is unhindered.
-- **Phase 3+**: Moving adjacent to enemy units OR rival-claimed territory stops the soldier (0 remaining moves). Capos remain exempt.
+**File: `src/components/EnhancedMafiaHexGrid.tsx`**
 
-No UI changes needed — the soldier simply stops when it enters the ZoC hex, same as the current behavior.
+1. **New state**: Add `pinnedHex` state (`HexTile | null`) alongside `hoveredHex`. The hex info panel renders from `pinnedHex || hoveredHex`.
+
+2. **Soldier/Capo onClick handlers** (~lines 1309-1314 for soldiers, similar for capos): After calling `onSelectUnit`, also set `pinnedHex` to the tile the unit is on. This makes the hex info persist even after the mouse leaves.
+
+3. **Hex info panel** (~line 1815): 
+   - Render based on `pinnedHex || hoveredHex`
+   - Add `cursor-pointer` and an `onClick` handler that calls `handleHexClick(displayedHex)` when the panel is clicked
+   - Add a subtle visual cue (e.g. border highlight or "Click for actions" hint) to indicate it's interactive
+
+4. **Clear pinnedHex**: Reset `pinnedHex` to null when:
+   - The user hovers a different hex (so hoveredHex takes over naturally)
+   - The user clicks elsewhere on the map background
+   - An action menu opens
+
+This is a lightweight change -- one new state variable and small tweaks to existing click/render logic.
 
