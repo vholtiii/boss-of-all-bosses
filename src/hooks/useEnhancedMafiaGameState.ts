@@ -27,6 +27,7 @@ import {
   SAFEHOUSE_COST, SAFEHOUSE_DEFENSE_BONUS, SAFEHOUSE_CAPTURE_BOUNTY, SAFEHOUSE_CAPTURE_INTEL_DURATION, SAFEHOUSE_TERRITORY_THRESHOLD, MAX_SAFEHOUSES,
   PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_FAIL_REPUTATION, PLAN_HIT_FAIL_LOYALTY,
   PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN,
+  PLAN_HIT_RESPECT, PLAN_HIT_FEAR, PLAN_HIT_LOOT, PLAN_HIT_CAPO_INFLUENCE,
   BASE_ACTIONS_PER_TURN, BONUS_ACTION_RESPECT_THRESHOLD, BONUS_ACTION_INFLUENCE_THRESHOLD,
   TACTICAL_ACTIONS_PER_TURN,
   HiddenUnit, AIBounty,
@@ -6255,9 +6256,16 @@ export const useEnhancedMafiaGameState = (
       
       chance = Math.max(0.1, Math.min(0.95, chance));
 
-      // Heat scales with battle size
+      // Heat scales with battle size — modified by hit type
       const totalUnitsInvolved = attackers + defenders;
-      const heatGain = Math.min(25, 8 + totalUnitsInvolved * 2);
+      let heatGain = Math.min(25, 8 + totalUnitsInvolved * 2);
+      // Scouted hit: 50% reduced heat (clean, informed operation)
+      // Blind hit: 150% heat (reckless = more attention)
+      if (isScouted && !isExecutingPlanHit) {
+        heatGain = Math.floor(heatGain / 2);
+      } else if (!isScouted) {
+        heatGain = Math.floor(heatGain * 1.5);
+      }
 
       if (Math.random() < chance) {
         // ============ VICTORY ============
