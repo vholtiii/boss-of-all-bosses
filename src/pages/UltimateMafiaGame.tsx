@@ -15,6 +15,7 @@ import SaveLoadDialog from '@/components/SaveLoadDialog';
 import TutorialSystem from '@/components/TutorialSystem';
 import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
 import TurnSummaryModal from '@/components/TurnSummaryModal';
+import CommissionVoteModal from '@/components/CommissionVoteModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
 import { Button } from '@/components/ui/button';
 import { 

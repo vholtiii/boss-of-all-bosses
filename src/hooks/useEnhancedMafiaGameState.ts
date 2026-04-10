@@ -1213,12 +1213,19 @@ export const useEnhancedMafiaGameState = (
     // Update victory progress
     state.victoryProgress.commission = { supporting: yesVotes, needed, met: yesVotes >= needed };
     
+    // Store vote result for modal display
+    state.commissionVoteResult = {
+      callerFamily: state.playerFamily,
+      isPlayerCaller: true,
+      voteResults,
+      needed,
+      won: yesVotes >= needed,
+      yesVotes,
+      totalVoters: survivingRivals.length,
+    };
+    
     if (yesVotes >= needed) {
       state.victoryType = 'commission';
-      state.pendingNotifications.push({
-        type: 'success', title: '👑 BOSS OF ALL BOSSES!',
-        message: `The Commission has voted! ${yesVotes}/${survivingRivals.length} families support your leadership. You are the Boss of All Bosses!`,
-      });
     } else {
       // Failed — penalty
       state.commissionVoteCooldownUntil = state.turn + COMMISSION_VOTE_COOLDOWN;
@@ -1228,11 +1235,6 @@ export const useEnhancedMafiaGameState = (
           state.reputation.familyRelationships[result.family] = rel - COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY;
         }
       }
-      const voteDetail = voteResults.map(r => `${r.family}: ${r.vote ? '✅ YES' : '❌ NO'} (${r.reason})`).join('. ');
-      state.pendingNotifications.push({
-        type: 'error', title: '👑 Commission Vote Failed',
-        message: `${yesVotes}/${needed} votes needed. ${voteDetail}. -${COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY} relationship with NO voters. Cooldown: ${COMMISSION_VOTE_COOLDOWN} turns.`,
-      });
     }
     
     return state;
@@ -4628,13 +4630,36 @@ export const useEnhancedMafiaGameState = (
               }
             }
             
+            // Build reason strings for AI vote results
+            const aiVoteResultsWithReasons = voteResults.map(r => {
+              const otherAi = state.aiOpponents.find(o => o.family === r.family);
+              const rel = r.family === state.playerFamily 
+                ? (state.reputation.familyRelationships[fam] || 0)
+                : (otherAi?.relationships[fam] || 0);
+              return {
+                family: r.family,
+                vote: r.vote,
+                reason: r.vote 
+                  ? `Relationship ${rel} + active pact`
+                  : rel < COMMISSION_VOTE_RELATIONSHIP_THRESHOLD
+                    ? `Relationship too low (${rel}/${COMMISSION_VOTE_RELATIONSHIP_THRESHOLD})`
+                    : 'No active alliance or ceasefire',
+              };
+            });
+
+            // Store for modal display
+            state.commissionVoteResult = {
+              callerFamily: fam,
+              isPlayerCaller: false,
+              voteResults: aiVoteResultsWithReasons,
+              needed,
+              won: yesVotes >= needed,
+              yesVotes,
+              totalVoters: totalSurvivors,
+            };
+
             if (yesVotes >= needed) {
-              // AI wins via commission vote!
               state.victoryType = 'commission';
-              state.pendingNotifications.push({
-                type: 'error', title: `👑 ${fam.charAt(0).toUpperCase() + fam.slice(1)} is Boss of All Bosses!`,
-                message: `The ${fam} family called a Commission Meeting and won ${yesVotes}/${totalSurvivors} votes. You have lost.`,
-              });
               if (turnReport) turnReport.aiActions.push({ family: fam, action: 'commission_vote_win', detail: `Won Commission Vote ${yesVotes}/${needed}!` });
             } else {
               // Failed — cooldown + relationship penalty
@@ -4650,10 +4675,6 @@ export const useEnhancedMafiaGameState = (
                   }
                 }
               }
-              state.pendingNotifications.push({
-                type: 'info', title: `👑 ${fam.charAt(0).toUpperCase() + fam.slice(1)} Commission Vote Failed`,
-                message: `The ${fam} family called a Commission Meeting but only got ${yesVotes}/${needed} votes needed.`,
-              });
               if (turnReport) turnReport.aiActions.push({ family: fam, action: 'commission_vote_fail', detail: `Failed Commission Vote ${yesVotes}/${needed}` });
             }
           }
