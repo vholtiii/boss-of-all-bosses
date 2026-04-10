@@ -5165,6 +5165,11 @@ export const useEnhancedMafiaGameState = (
           return newState;
         case 'bribe_corruption': {
           const tier = action.tier as BribeTier;
+          // Phase gate: Captain+ bribes require Phase 3
+          if (tier !== 'patrol_officer' && (newState.gamePhase || 1) < 3) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: `${tier === 'police_captain' ? 'Police Captain' : tier === 'police_chief' ? 'Police Chief' : 'Mayor'} bribes unlock in Phase 3: Controlling Territory.` });
+            return newState;
+          }
           const config = BRIBE_TIERS.find(t => t.tier === tier);
           if (!config || newState.resources.money < config.cost) return newState;
           
