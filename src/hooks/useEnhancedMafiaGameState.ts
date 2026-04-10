@@ -4308,7 +4308,7 @@ export const useEnhancedMafiaGameState = (
             turnReport.aiActions.push({ family: fam, action: 'promote', detail: `Promoted a soldier to Capo` });
         }
         // Fallback: forced promotion if AI has territory/money but no eligible soldiers
-        if (!bestCandidate && aiCapoCount < 2 && hexCount >= 15 && opponent.resources.money >= CAPO_PROMOTION_COST * 2) {
+        if (!bestCandidate && aiCapoCount < 2 && state.hexMap.filter(t => t.controllingFamily === fam).length >= 15 && opponent.resources.money >= CAPO_PROMOTION_COST * 2) {
           const anyAiSoldier = state.deployedUnits.find(u => u.family === fam && u.type === 'soldier');
           if (anyAiSoldier) {
             // Boost stats to meet threshold, then promote
