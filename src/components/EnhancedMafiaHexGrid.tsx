@@ -650,7 +650,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               const pColor = '#B0B0B0'; // uniform light grey for all supply lines
               const supplyRouteHexSet = new Set<string>();
               const connectedNodeKeys = new Set<string>();
-              const routePaths: Array<Array<{x:number;y:number}>> = [];
+              const rawRoutePaths: Array<Array<{x:number;y:number}>> = [];
               const hKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
               const dd = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
 
