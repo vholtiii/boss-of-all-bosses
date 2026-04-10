@@ -1,30 +1,33 @@
 
 
-# Add Mafia Background Music to Family Selection Screen
+# Generate Richer Mafia-Style Background Music with ffmpeg
 
-## Approach
-Use a royalty-free mafia/noir-themed MP3 file as a static asset that plays as ambient background music on the title/family selection screen. The music will loop, fade in on load, and respect the existing sound settings (mute/volume).
+## Problem
+The current `mafia-theme.mp3` is a basic ambient drone that's barely audible and doesn't feel like mafia music. The user wants something with more character -- dark, moody, mafia-noir vibes.
+
+## Solution
+Use ffmpeg to synthesize a richer 30-second looping track that layers multiple elements:
+- **Deep bass line** with a walking pattern (classic noir jazz feel)
+- **Minor-key melody tones** using sine/triangle waves at jazz intervals
+- **Subtle rhythm** via filtered noise pulses (brushed snare feel)
+- **Dark pad/atmosphere** underneath everything
+- **Tremolo and filtering** for moodiness
+
+The result gets mixed down and normalized to a proper volume level, replacing the existing `public/audio/mafia-theme.mp3`.
 
 ## Steps
 
-1. **Source a royalty-free track** — Find a short (30-60s) looping noir/mafia-style instrumental track (e.g., from Pixabay, which offers free-to-use music with no attribution required). Download and place it at `public/audio/mafia-theme.mp3`.
+1. **Generate the track** using a multi-layer ffmpeg command that creates and mixes:
+   - Walking bass (E2-A2-D3 pattern via sine waves with tremolo)
+   - Minor-key melody notes (sparse, jazzy intervals)
+   - Filtered pink noise for rhythm texture
+   - Low drone pad for atmosphere
+   - Normalize to -14 LUFS for consistent loudness
 
-2. **Create a `useBgMusic` hook** — A small hook that:
-   - Creates an `<audio>` element with `loop` enabled
-   - Fades in volume over ~2 seconds on mount
-   - Reads the sound config from `useSoundSystem` to respect enabled/volume state (uses `uiVolume`)
-   - Fades out and pauses on unmount (when game starts)
-   - Handles browser autoplay restrictions (plays on first user click if blocked)
+2. **Replace** `public/audio/mafia-theme.mp3` with the new file
 
-3. **Wire it into `FamilySelectionScreen`** — Call the hook at the top of the component. No UI changes needed; music plays automatically in the background.
+3. **No code changes needed** -- the existing `useBgMusic` hook and `FamilySelectionScreen` already handle playback, looping, fading, and mute toggle
 
-4. **Add a small mute toggle** — A speaker icon in the corner of the family selection screen so users can quickly mute/unmute without needing the full settings dialog.
-
-## Technical Details
-
-- **File**: `public/audio/mafia-theme.mp3` (~500KB-1MB target)
-- **New hook**: `src/hooks/useBgMusic.ts`
-- **Modified**: `src/components/FamilySelectionScreen.tsx` (add hook call + mute button)
-- Music stops when `onSelectFamily` is called (component unmounts)
-- Volume tied to existing `soundConfig.uiVolume` and `soundConfig.enabled`
+## File Modified
+- `public/audio/mafia-theme.mp3` (replaced with richer track)
 
