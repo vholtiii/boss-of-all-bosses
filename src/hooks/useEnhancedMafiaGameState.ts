@@ -338,6 +338,7 @@ export interface EnhancedMafiaGameState {
   ceasefires: CeasefirePact[];
   shareProfitsPacts: ShareProfitsPact[];
   safePassagePacts: SafePassagePact[];
+  supplyDealPacts: SupplyDealPact[];
   bossNegotiationCooldown: number;
   capoNegotiationCooldown: number;
   treacheryDebuff?: TreacheryDebuff;
