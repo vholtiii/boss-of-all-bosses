@@ -403,7 +403,62 @@ Active bribes can also reveal enemy planned hits — see [Intel & Threat Detecti
 
 ---
 
-## 16. Victory Conditions
+## 16. Gameplay Phases
+
+The game is divided into four phases that gate which mechanics are available. Phases create a natural arc from street-level scrapper to criminal empire. **Both player and AI families** follow the same phase gates. Once a phase is reached, it is **permanent** — losing hexes or respect does not drop you back.
+
+### 16.1 Phase 1: Making Your Bones 🔫
+
+| Requirement | Value |
+|---|---|
+| Minimum turn | 1 (start of game) |
+| Milestones | None |
+
+**Available**: Move, Extort, Claim, Recruit soldiers, Blind Hits (combat without scouting)
+
+**Locked**: Scouting, Plan Hits, Capo Promotion, Safehouses, Fortification, Boss Diplomacy, Alliances, Commission Vote
+
+### 16.2 Phase 2: Establishing Territory 🏴
+
+| Requirement | Value |
+|---|---|
+| Minimum turn | 9 |
+| Controlled hexes | 8+ |
+| Respect | 20+ |
+
+**Unlocks**: Scouting, Plan Hits, Capo Promotion, Safehouses, Fortification
+
+### 16.3 Phase 3: Controlling Territory 🏛️
+
+| Requirement | Value |
+|---|---|
+| Minimum turn | 18 |
+| Controlled hexes | 20+ |
+| Capos | 2+ |
+| Built businesses | 1+ |
+
+**Unlocks**: Boss Diplomacy, Alliances, Ceasefires, Captain+ Bribes (Police Captain, Chief, Mayor)
+
+> **AI Note**: AI families do not build businesses — any business on AI-controlled territory (extorted or pre-existing) counts toward this requirement.
+
+### 16.4 Phase 4: Boss of All Bosses 👑
+
+| Requirement | Value |
+|---|---|
+| Minimum turn | 30 |
+| **Any one of**: | 35+ hexes **OR** $40,000+ income **OR** 80+ respect |
+
+**Unlocks**: Commission Vote (diplomatic victory path)
+
+### 16.5 Phase Notifications
+
+- Players receive a notification when they enter a new phase, listing newly unlocked abilities
+- Players are also notified when **AI families advance** to a new phase (e.g., "The Genovese family has entered Phase 3: Controlling Territory")
+- Locked actions in the UI show a 🔒 icon with "Unlocks in Phase X" tooltip
+
+---
+
+## 17. Victory Conditions
 
 | Path | Small Map | Medium Map | Large Map |
 |---|---|---|---|
@@ -411,6 +466,62 @@ Active bribes can also reveal enemy planned hits — see [Intel & Threat Detecti
 | Economic Empire | $50,000/month | $50,000/month | $50,000/month |
 | Legacy of Power | Beat rival by 25% after turn 15 | Same | Same |
 | Total Domination | Eliminate all 4 families | Same | Same |
+| Commission Vote | Phase 4 required | Same | Same |
+
+---
+
+## 18. Commission Vote
+
+A diplomatic victory path available in **Phase 4 only**. The player (or an AI family) calls a Commission Meeting to be recognized as Boss of All Bosses.
+
+### 18.1 Requirements
+
+| Requirement | Value |
+|---|---|
+| Phase | 4 (Boss of All Bosses) |
+| Cost | $15,000 + 1 Action point |
+| Minimum survivors | 2 rival families (cannot call with 0-1 rivals) |
+| Cooldown | 10 turns between attempts |
+
+### 18.2 Vote Threshold (Scales with Survivors)
+
+The required votes scale with surviving rivals to prevent cheap wins:
+
+| Surviving Rivals | Votes Needed | Effect |
+|---|---|---|
+| 4 rivals | 3 of 4 | Strong consensus required |
+| 3 rivals | 2 of 3 | Broad support needed |
+| 2 rivals | 2 of 2 | Unanimous — very difficult |
+| 1 rival | Cannot call | Too few for legitimacy |
+
+### 18.3 Voting Logic
+
+**AI families vote YES if**:
+- Relationship with caller ≥ 60, **AND**
+- Active ceasefire or alliance pact with caller
+
+**Automatic NO**:
+- Families with an active Treachery debuff receive automatic NO from all voters
+
+**Player's vote toward AI caller**: Based on player's relationship level with the calling AI family (same ≥ 60 threshold + pact requirement)
+
+### 18.4 Outcomes
+
+**Success**: Instant victory (or game over if AI wins)
+
+**Failure**:
+- -10 relationship with every family that voted NO
+- 10-turn cooldown before another attempt
+- Notification to all families
+
+### 18.5 AI Commission Votes
+
+AI families in Phase 4 can also call Commission Meetings:
+- **Diplomatic** AI: 40% chance per eligible turn
+- **Opportunistic** AI: 20% chance per eligible turn
+- **All others**: 10% chance per eligible turn
+- AI follows the same cost, cooldown, and survivor requirements
+- AI win rate is low (~3-5%) by design — creates tension without being unfair
 
 ---
 
