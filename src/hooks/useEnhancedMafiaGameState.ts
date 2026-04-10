@@ -5852,6 +5852,10 @@ export const useEnhancedMafiaGameState = (
         case 'commission_vote': {
           return processCommissionVote(newState);
         }
+        case 'clear_commission_vote_result': {
+          newState.commissionVoteResult = null;
+          return newState;
+        }
         default:
           return newState;
       }
