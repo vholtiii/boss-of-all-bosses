@@ -17,6 +17,7 @@ interface NegotiationDialogProps {
   capoPersonality?: CapoPersonality;
   enemyFamily: string;
   playerReputation: number;
+  playerFear?: number;
   playerMoney: number;
   enemyStrength: number;
   hexIncome: number;
@@ -29,7 +30,7 @@ interface NegotiationDialogProps {
 
 const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   open, onClose, onNegotiate, scope, capoName, capoPersonality,
-  enemyFamily, playerReputation, playerMoney, enemyStrength, hexIncome,
+  enemyFamily, playerReputation, playerFear, playerMoney, enemyStrength, hexIncome,
   negotiationUsedThisTurn, treacheryTurnsRemaining, availableEnemyFamilies, onSelectTargetFamily,
 }) => {
   const [selectedType, setSelectedType] = useState<NegotiationType | null>(null);
