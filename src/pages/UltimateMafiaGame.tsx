@@ -1391,6 +1391,14 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
   );
 };
 
+      {/* Commission Vote Modal */}
+      <CommissionVoteModal
+        open={!!gameState.commissionVoteResult}
+        onClose={() => handleAction({ type: 'clear_commission_vote_result' })}
+        result={gameState.commissionVoteResult}
+        playSound={playSound}
+      />
+
 
 
 const UltimateMafiaGame: React.FC = () => {
