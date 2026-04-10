@@ -92,6 +92,7 @@ interface HeadquartersInfoPanelProps {
   warSummitCooldownUntil?: number;
   activeWars?: Array<{ family1: string; family2: string; turnsRemaining: number }>;
   actionsRemaining?: number;
+  gamePhase?: number;
 }
 
 const familyColors: Record<string, string> = {
