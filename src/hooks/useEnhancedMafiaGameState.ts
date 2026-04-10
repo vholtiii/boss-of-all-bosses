@@ -3272,6 +3272,7 @@ export const useEnhancedMafiaGameState = (
       syncLegacyUnits(newState);
       newState.territories = buildLegacyTerritories(newState.hexMap);
       updateVictoryProgress(newState);
+      updateGamePhase(newState);
       
       return newState;
     });
