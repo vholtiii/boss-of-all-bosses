@@ -4447,7 +4447,52 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // ── AI SAFEHOUSE ESTABLISHMENT ──
+      // ── AI SUPPLY DEAL INITIATION ──
+      // AI families propose supply deals when they have disconnected supply nodes and can afford it
+      if (aiPhase >= 2 && opponent.resources.money >= 7500 && !atWarWithPlayer) {
+        const aiConnected = getConnectedTerritory(state.hexMap, fam);
+        const supplyNodeTypes: SupplyNodeType[] = ['docks', 'union_hall', 'trucking_depot', 'liquor_route', 'food_market'];
+        const hasExistingDeal = (state.supplyDealPacts || []).some(p => p.active && p.buyerFamily === fam);
+        if (!hasExistingDeal) {
+          const disconnectedNodes = supplyNodeTypes.filter(nodeType => {
+            const node = (state.supplyNodes || []).find(n => n.type === nodeType);
+            if (!node) return false;
+            return !aiConnected.has(`${node.q},${node.r},${node.s}`);
+          });
+          if (disconnectedNodes.length > 0 && Math.random() < 0.20) {
+            // Check if player has any of these nodes connected
+            const playerConnected = getConnectedTerritory(state.hexMap, state.playerFamily);
+            const playerCanSupply = disconnectedNodes.some(nodeType => {
+              const node = (state.supplyNodes || []).find(n => n.type === nodeType);
+              return node && playerConnected.has(`${node.q},${node.r},${node.s}`);
+            });
+            if (playerCanSupply) {
+              // AI strikes the deal — pays player $7,500
+              const duration = 5 + Math.floor(Math.random() * 3);
+              opponent.resources.money -= 7500;
+              state.resources.money += 7500;
+              state.supplyDealPacts = [...(state.supplyDealPacts || []), {
+                id: `supply-deal-ai-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                buyerFamily: fam,
+                targetFamily: state.playerFamily,
+                turnsRemaining: duration,
+                turnFormed: state.turn,
+                active: true,
+              }];
+              addPairTension(state, fam, state.playerFamily, -TENSION_REDUCE_SUPPLY_DEAL);
+              state.tensionCooldowns[getTensionPairKey(fam, state.playerFamily)] = 1;
+              const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
+              state.pendingNotifications.push({
+                type: 'info' as const,
+                title: `🚚 ${famLabel} Struck a Supply Deal`,
+                message: `The ${famLabel} family is paying you $7,500 for access to your supply lines for ${duration} turns.`,
+              });
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'supply_deal', detail: `Struck a supply deal with player for ${duration} turns` });
+            }
+          }
+        }
+      }
+
       const aiFamHexes = state.hexMap.filter(t => t.controllingFamily === fam && !t.isHeadquarters);
       const aiCapos = state.deployedUnits.filter(u => u.family === fam && u.type === 'capo');
       // AI builds safehouse if: 8+ territories, $5000+, has a capo, and doesn't already have one on their territory
