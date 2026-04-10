@@ -7237,6 +7237,10 @@ export const useEnhancedMafiaGameState = (
     }
     totalChance += (state.resources.influence / 100) * 10;
     totalChance += Math.floor(state.reputation.respect / 5);
+    // Fear bonus for supply deals
+    if (negotiationType === 'supply_deal') {
+      totalChance += Math.floor((state.reputation.fear || 0) / 5);
+    }
     // Treachery debuff reduces negotiation success
     if (state.treacheryDebuff && state.treacheryDebuff.turnsRemaining > 0) {
       totalChance -= TREACHERY_NEGOTIATION_PENALTY;
