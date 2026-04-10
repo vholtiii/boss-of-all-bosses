@@ -3724,7 +3724,12 @@ export const useEnhancedMafiaGameState = (
       const wantToRecruit = Math.max(0, soldierCap - totalSoldiers);
       if (wantToRecruit > 0) {
         const canAfford = Math.floor(opponent.resources.money / SOLDIER_COST);
-        const toRecruit = Math.min(wantToRecruit, canAfford, 3 + alertBonus + atWarBonus);
+        // Personality-driven recruitment batch size
+        const personalityRecruitBonus = (opponent.personality === 'aggressive') ? 1
+          : (opponent.personality === 'defensive' || opponent.personality === 'diplomatic') ? -1
+          : (opponent.personality === 'unpredictable') ? (Math.random() < 0.5 ? 1 : -1)
+          : 0;
+        const toRecruit = Math.min(wantToRecruit, canAfford, Math.max(1, 3 + alertBonus + atWarBonus + personalityRecruitBonus));
         opponent.resources.soldiers += toRecruit;
         opponent.resources.money -= toRecruit * SOLDIER_COST;
         if (toRecruit > 0 && turnReport) {
@@ -3904,8 +3909,30 @@ export const useEnhancedMafiaGameState = (
                 break;
               case 'unpredictable':
               default: {
-                const pools = [playerHexes, neutralHexes, otherAIHexes, enemyHexes].filter(s => s.length > 0);
-                targetPool = pools.length > 0 ? pools[Math.floor(Math.random() * pools.length)] : validMoves;
+                // Truly unpredictable: randomly pick a behavior mode each turn
+                const unpredictableMode = Math.random();
+                if (unpredictableMode < 0.30) {
+                  // Act aggressive: target enemy hexes
+                  targetPool = warTargetFamily
+                    ? validMoves.filter(n => { const t = state.hexMap.find(t2 => t2.q === n.q && t2.r === n.r && t2.s === n.s); return t && t.controllingFamily === warTargetFamily; })
+                    : enemyHexes.length > 0 ? enemyHexes : playerHexes;
+                  if (targetPool.length === 0) targetPool = validMoves;
+                } else if (unpredictableMode < 0.50) {
+                  // Act defensive: stay on own territory
+                  targetPool = validMoves.filter(n => { const t = state.hexMap.find(t2 => t2.q === n.q && t2.r === n.r && t2.s === n.s); return t && t.controllingFamily === fam; });
+                  if (targetPool.length === 0) targetPool = neutralHexes.length > 0 ? neutralHexes : validMoves;
+                } else if (unpredictableMode < 0.70) {
+                  // Act diplomatic: expand neutrally only
+                  targetPool = neutralHexes.length > 0 ? neutralHexes : validMoves;
+                } else {
+                  // Act opportunistic: target weakest
+                  const weakest = enemyHexes.reduce((best, h) => {
+                    const count = state.deployedUnits.filter(u2 => u2.family !== fam && u2.q === h.q && u2.r === h.r && u2.s === h.s).length;
+                    if (!best || count < best.count) return { hex: h, count };
+                    return best;
+                  }, null as { hex: typeof validMoves[0]; count: number } | null);
+                  targetPool = weakest ? [weakest.hex] : neutralHexes.length > 0 ? neutralHexes : validMoves;
+                }
                 break;
               }
             }
@@ -3925,13 +3952,22 @@ export const useEnhancedMafiaGameState = (
             }
           }
 
-          // Alert: fortify chance (hex-based)
-          if (aiPhase >= 2 && isAlerted && !isHexFortified(state.fortifiedHexes || [], unit.q, unit.r, unit.s, fam) && Math.random() < 0.3 && aiTacticalRemaining > 0 && (state.fortifiedHexes || []).filter(f => f.family === fam).length < MAX_FORTIFICATIONS) {
-            state.fortifiedHexes = [...(state.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: fam, fortifiedOnTurn: state.turn }];
-            unit.movesRemaining = 0;
-            aiTacticalRemaining--;
-            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'fortify', detail: `Fortified a hex (alert mode)` });
-            continue;
+          // Fortify chance (hex-based): alert-based + personality-driven proactive fortification
+          if (aiPhase >= 2 && !isHexFortified(state.fortifiedHexes || [], unit.q, unit.r, unit.s, fam) && aiTacticalRemaining > 0 && (state.fortifiedHexes || []).filter(f => f.family === fam).length < MAX_FORTIFICATIONS) {
+            // Proactive fortification chance based on personality (even when not alerted)
+            const proactiveFortifyChance = personality === 'defensive' ? 0.40
+              : personality === 'diplomatic' ? 0.25
+              : personality === 'opportunistic' ? 0.20
+              : personality === 'unpredictable' ? 0.30
+              : 0.10; // aggressive
+            const shouldFortify = isAlerted ? Math.random() < 0.3 : Math.random() < proactiveFortifyChance;
+            if (shouldFortify) {
+              state.fortifiedHexes = [...(state.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: fam, fortifiedOnTurn: state.turn }];
+              unit.movesRemaining = 0;
+              aiTacticalRemaining--;
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'fortify', detail: `Fortified a hex${isAlerted ? ' (alert mode)' : ''}` });
+              continue;
+            }
           }
 
           if (targetPool.length === 0) targetPool = validMoves;
@@ -4239,40 +4275,42 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // Priority 3: Extort enemy businesses (aggressive AI only)
-      const aggressionThreshold = personality === 'aggressive' ? 0.6 : personality === 'opportunistic' ? 0.4 : 0.2;
-      for (const unit of aiUnitsForActions) {
-        if (aiActionsRemaining <= 0) break;
-        const tile = state.hexMap.find(t => t.q === unit.q && t.r === unit.r && t.s === unit.s);
-        if (!tile) continue;
-        
-        // Check adjacent enemy hexes with businesses
-        const adjacentEnemyBiz = state.hexMap.filter(t => {
-          const dist = Math.max(Math.abs(t.q - unit.q), Math.abs(t.r - unit.r), Math.abs(t.s - unit.s));
-          // Territory freeze: skip ceasefire families
-          const isCeasefireTarget = (state.ceasefires || []).some(c => c.active && (c.family === t.controllingFamily || (t.controllingFamily === state.playerFamily && c.family === fam)));
-          return dist === 1 && t.controllingFamily !== fam && t.controllingFamily !== 'neutral' && !isCeasefireTarget &&
-                 t.business && (t.business.constructionProgress === undefined || t.business.constructionProgress >= (t.business.constructionGoal || 3));
-        });
-        
-        for (const enemyTile of adjacentEnemyBiz) {
+      // Priority 3: Extort enemy businesses (Phase 2+ only, personality-driven)
+      if (aiPhase >= 2) {
+        const aggressionThreshold = personality === 'aggressive' ? 0.6 : personality === 'opportunistic' ? 0.5 : personality === 'defensive' ? 0.15 : personality === 'diplomatic' ? 0.1 : 0.35;
+        for (const unit of aiUnitsForActions) {
           if (aiActionsRemaining <= 0) break;
-          if (Math.random() > aggressionThreshold) continue;
+          const tile = state.hexMap.find(t => t.q === unit.q && t.r === unit.r && t.s === unit.s);
+          if (!tile) continue;
           
-          // Attempt extortion: ~50% base chance
-          const successChance = 0.5 + (opponent.resources.influence || 50) / 1000;
-          if (Math.random() < successChance) {
-            // Hole #6: AI extortion → tension
-            addPairTension(state, fam, enemyTile.controllingFamily as string, TENSION_EXTORT_RIVAL);
-            const basePayout = enemyTile.business!.isLegal ? 1500 : 3000;
-            const payout = Math.round(basePayout * 0.7); // Enemy extortion pays less
-            opponent.resources.money += payout;
+          // Check adjacent enemy hexes with businesses
+          const adjacentEnemyBiz = state.hexMap.filter(t => {
+            const dist = Math.max(Math.abs(t.q - unit.q), Math.abs(t.r - unit.r), Math.abs(t.s - unit.s));
+            // Territory freeze: skip ceasefire families
+            const isCeasefireTarget = (state.ceasefires || []).some(c => c.active && (c.family === t.controllingFamily || (t.controllingFamily === state.playerFamily && c.family === fam)));
+            return dist === 1 && t.controllingFamily !== fam && t.controllingFamily !== 'neutral' && !isCeasefireTarget &&
+                   t.business && (t.business.constructionProgress === undefined || t.business.constructionProgress >= (t.business.constructionGoal || 3));
+          });
+          
+          for (const enemyTile of adjacentEnemyBiz) {
+            if (aiActionsRemaining <= 0) break;
+            if (Math.random() > aggressionThreshold) continue;
             
-            if (enemyTile.controllingFamily === state.playerFamily && turnReport) {
-              turnReport.aiActions.push({ family: fam, action: 'extort', detail: `Extorted your business in ${enemyTile.district} for $${payout.toLocaleString()}` });
+            // Attempt extortion: ~50% base chance
+            const successChance = 0.5 + (opponent.resources.influence || 50) / 1000;
+            if (Math.random() < successChance) {
+              // Hole #6: AI extortion → tension
+              addPairTension(state, fam, enemyTile.controllingFamily as string, TENSION_EXTORT_RIVAL);
+              const basePayout = enemyTile.business!.isLegal ? 1500 : 3000;
+              const payout = Math.round(basePayout * 0.7); // Enemy extortion pays less
+              opponent.resources.money += payout;
+              
+              if (enemyTile.controllingFamily === state.playerFamily && turnReport) {
+                turnReport.aiActions.push({ family: fam, action: 'extort', detail: `Extorted your business in ${enemyTile.district} for $${payout.toLocaleString()}` });
+              }
             }
+            aiActionsRemaining--;
           }
-          aiActionsRemaining--;
         }
       }
 
@@ -4342,17 +4380,53 @@ export const useEnhancedMafiaGameState = (
       }
       }
 
-      // ── DIPLOMATIC AI: Ceasefire proposals (skip if at war with player) ──
+      // ── AI DIPLOMACY: Ceasefire & Alliance proposals (personality-driven) ──
       const atWarWithPlayer = areFamiliesAtWar(state, fam, state.playerFamily);
-      if (aiPhase >= 3 && !atWarWithPlayer && (opponent.personality || 'aggressive') === 'diplomatic' && Math.random() < (cooperation / 200)) {
+      if (!atWarWithPlayer) {
         const hasCeasefire = state.ceasefires.some(c => c.active && c.family === fam);
-        if (!hasCeasefire) {
-          state.pendingNotifications.push({
-            type: 'info' as const,
-            title: `🤝 ${fam.charAt(0).toUpperCase() + fam.slice(1)} Offers Ceasefire`,
-            message: `The ${fam} family signals they want to negotiate peace. Use a Capo to propose a ceasefire on their territory.`,
-          });
-          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in ceasefire' });
+        const hasAlliance = (state.alliances || []).some(a => a.alliedFamily === fam && a.active);
+        const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
+        
+        // Diplomatic: ceasefire at Phase 2+, alliance at Phase 3+ if relationship > 30
+        if (personality === 'diplomatic') {
+          if (aiPhase >= 2 && !hasCeasefire && Math.random() < (cooperation / 150)) {
+            state.pendingNotifications.push({
+              type: 'info' as const,
+              title: `🤝 ${famLabel} Offers Ceasefire`,
+              message: `The ${fam} family signals they want to negotiate peace. Use a Capo to propose a ceasefire on their territory.`,
+            });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in ceasefire' });
+          } else if (aiPhase >= 3 && !hasAlliance && hasCeasefire && (opponent.relationships?.[state.playerFamily] || 0) > 30 && Math.random() < 0.2) {
+            state.pendingNotifications.push({
+              type: 'info' as const,
+              title: `🤝 ${famLabel} Proposes Alliance`,
+              message: `The ${fam} family is interested in forming an alliance. Use a Capo to negotiate on their territory.`,
+            });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in alliance' });
+          }
+        }
+        // Defensive: ceasefire at Phase 3+
+        else if (personality === 'defensive') {
+          if (aiPhase >= 3 && !hasCeasefire && Math.random() < (cooperation / 200)) {
+            state.pendingNotifications.push({
+              type: 'info' as const,
+              title: `🤝 ${famLabel} Offers Ceasefire`,
+              message: `The ${fam} family signals they want to negotiate peace. Use a Capo to propose a ceasefire on their territory.`,
+            });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in ceasefire' });
+          }
+        }
+        // Opportunistic: ceasefire if losing territory
+        else if (personality === 'opportunistic') {
+          const aiHexCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
+          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < 6 && Math.random() < 0.3) {
+            state.pendingNotifications.push({
+              type: 'info' as const,
+              title: `🤝 ${famLabel} Offers Ceasefire`,
+              message: `The ${fam} family signals they want to negotiate peace. Use a Capo to propose a ceasefire on their territory.`,
+            });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in ceasefire (losing ground)' });
+          }
         }
       }
 
@@ -4405,11 +4479,16 @@ export const useEnhancedMafiaGameState = (
       }
 
       // ── AI PLAN HIT AGAINST PLAYER CAPOS ──
+      // Personality gate: defensive and diplomatic families NEVER initiate plan hits
       const hasCeasefireWithPlayer = (state.ceasefires || []).some(p => p.family === fam && p.active);
       const hasAllianceWithPlayer = (state.alliances || []).some(p => p.alliedFamily === fam && p.active);
+      const planHitPersonalityAllowed = personality !== 'defensive' && personality !== 'diplomatic';
+      const planHitChanceMultiplier = personality === 'aggressive' ? 2.0
+        : personality === 'unpredictable' ? 1.5
+        : 1.0; // opportunistic
       if (hasCeasefireWithPlayer || hasAllianceWithPlayer) {
         // Skip plan hit — active pact with player
-      } else if (aiPhase >= 2 && (personality === 'aggressive' || personality === 'opportunistic') && Math.random() < AI_PLAN_HIT_CHANCE) {
+      } else if (aiPhase >= 2 && planHitPersonalityAllowed && Math.random() < AI_PLAN_HIT_CHANCE * planHitChanceMultiplier) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
         const availableTargets = playerCapos.filter(c => !alreadyTargeted.has(c.id));
@@ -4469,7 +4548,7 @@ export const useEnhancedMafiaGameState = (
       opponent.resources.respect = Math.min(100, Math.max(0, (opponent.resources.respect || 0) + respectGain - 0.5));
 
       // ── AI FLIP SOLDIER (weaken enemy HQ defenses) ──
-      if (state.turn > 8 && opponent.resources.money >= FLIP_SOLDIER_COST && Math.random() < (personality === 'aggressive' ? 0.25 : personality === 'opportunistic' ? 0.20 : 0.12)) {
+      if (aiPhase >= 3 && opponent.resources.money >= FLIP_SOLDIER_COST && Math.random() < (personality === 'aggressive' ? 0.25 : personality === 'opportunistic' ? 0.20 : personality === 'unpredictable' ? 0.18 : 0.12)) {
         // Find enemy HQs and look for soldiers near them to flip
         const otherFamilies = [state.playerFamily, ...state.aiOpponents.filter(o => o.family !== fam).map(o => o.family)];
         let flipped = false;
@@ -4520,8 +4599,14 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // ── AI HQ ASSAULT (aggressive AI, after turn 12) ──
-      if (state.turn > 12 && (personality === 'aggressive' || personality === 'unpredictable') && Math.random() < 0.10) {
+      // ── AI HQ ASSAULT (Phase 4 only, personality-gated) ──
+      // Defensive and diplomatic families NEVER attempt HQ assaults
+      const hqAssaultAllowed = personality !== 'defensive' && personality !== 'diplomatic';
+      const hqAssaultChance = personality === 'aggressive' ? 0.15
+        : personality === 'unpredictable' ? 0.12
+        : personality === 'opportunistic' ? ((state.flippedSoldiers || []).length >= 2 ? 0.08 : 0)
+        : 0.10;
+      if (aiPhase >= 4 && hqAssaultAllowed && Math.random() < hqAssaultChance) {
         // Find enemy HQs adjacent to AI soldiers with high toughness
         const aiSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
         for (const soldier of aiSoldiers) {
