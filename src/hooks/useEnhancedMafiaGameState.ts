@@ -6450,6 +6450,10 @@ export const useEnhancedMafiaGameState = (
         }
         
         // Casualties — per-unit fortify re-roll (capos immune — wounded only)
+        // Plan Hit: zero attacker casualties on success (clean execution)
+        if (isExecutingPlanHit) {
+          // Skip all casualty processing for plan hits
+        } else {
         const killableUnits = playerUnits.filter(u => u.type !== 'capo');
         const playerCapos = playerUnits.filter(u => u.type === 'capo');
         const casualties = Math.max(0, Math.floor(killableUnits.length * 0.2));
