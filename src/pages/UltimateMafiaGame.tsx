@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import NegotiationDialog from '@/components/NegotiationDialog';
 import { NotificationProvider, useMafiaNotifications } from '@/components/ui/notification-system';
