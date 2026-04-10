@@ -460,10 +460,11 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         
         // Block all normal actions on HQ hexes
         const canHit = isEnemy && (isSoldier || isCapo) && !tile.isHeadquarters;
+        const enemyExtortLocked = isEnemy && (gameState?.gamePhase || 1) < 2;
         const canExtort = hasCompletedBusiness && (
           (isSoldier && unitOnTargetHex) || 
           (isCapo && (unitOnTargetHex || true))
-        ) && (isNeutral || isEnemy) && !tile.isHeadquarters;
+        ) && (isNeutral || isEnemy) && !tile.isHeadquarters && !enemyExtortLocked;
         const canClaim = isNeutral && isSoldier && !tile.business && !tile.isHeadquarters;
         const isCapoWounded = isCapo && (selectedUnit as any).woundedTurnsRemaining > 0;
         // Negotiate: only available during action phase when a pending negotiation is ready on this hex
