@@ -749,7 +749,7 @@ const createInitialGameState = (
     const validTiles = hexMap.filter(t => {
       const isHQ = hqPositions.some(hq => hq.q === t.q && hq.r === t.r && hq.s === t.s);
       const isUsed = usedHexKeys.has(`${t.q},${t.r},${t.s}`);
-      return !isHQ && !isUsed && config.validDistricts.includes(t.district);
+      return !isHQ && !isUsed && config.districts.includes(t.district);
     });
     // Minimum distance scales with map size (small=4, medium=6, large=8)
     const minSupplyDistance = Math.max(4, Math.floor(mapRadius * 0.6));
