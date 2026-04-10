@@ -641,7 +641,7 @@ export const RightSidePanel: React.FC<{
   onHighlightFamily?: (family: string | null) => void;
   highlightedFamily?: string | null;
 }> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily }) => {
-  const [openSection, setOpenSection] = useState<string>('rivals');
+  const [openSection, setOpenSection] = useState<string>('');
   const { playSound } = useSoundSystem();
   const toggle = (id: string) => {
     if (id !== 'supply') onHighlightSupplyNode?.(null);
