@@ -3437,25 +3437,40 @@ export const useEnhancedMafiaGameState = (
 
     state.activeDistrictBonuses = newBonuses;
 
-    // ============ UNIVERSAL: TURF TAX ============
-    // Enemy units on hexes in player-controlled districts lose 5 loyalty/turn
-    const playerControlledDistricts = new Set(
-      newBonuses.filter(b => b.family === state.playerFamily).map(b => b.district)
-    );
-    if (playerControlledDistricts.size > 0) {
-      state.deployedUnits.forEach(u => {
-        if (u.family === state.playerFamily || (u.family as string) === 'neutral') return;
-        const unitTile = state.hexMap.find(t => t.q === u.q && t.r === u.r && t.s === u.s);
-        if (unitTile && playerControlledDistricts.has(unitTile.district)) {
+    // ============ UNIVERSAL: TURF TAX (all families) ============
+    // Enemy units on hexes in ANY family's controlled districts lose 5 loyalty/turn
+    const allFamilies = [state.playerFamily, ...state.aiOpponents.map(o => o.family)];
+    const familyControlledDistricts: Record<string, Set<string>> = {};
+    allFamilies.forEach(fam => {
+      familyControlledDistricts[fam] = new Set(
+        newBonuses.filter(b => b.family === fam).map(b => b.district)
+      );
+    });
+    let playerTurfTaxApplied = false;
+    let aiTurfTaxApplied = false;
+    state.deployedUnits.forEach(u => {
+      if ((u.family as string) === 'neutral') return;
+      const unitTile = state.hexMap.find(t => t.q === u.q && t.r === u.r && t.s === u.s);
+      if (!unitTile) return;
+      // Check if any OTHER family controls this district
+      for (const fam of allFamilies) {
+        if (fam === u.family) continue;
+        if (familyControlledDistricts[fam].has(unitTile.district)) {
           const stats = state.soldierStats[u.id];
           if (stats) {
             stats.loyalty = Math.max(0, stats.loyalty - 5);
           }
+          if (u.family === state.playerFamily) aiTurfTaxApplied = true;
+          else if (fam === state.playerFamily) playerTurfTaxApplied = true;
+          break; // Only drain once per unit
         }
-      });
-      if (turnReport) {
-        turnReport.events.push(`💰 Turf Tax: Enemy units in your controlled districts lose 5 loyalty.`);
       }
+    });
+    if (playerTurfTaxApplied && turnReport) {
+      turnReport.events.push(`💰 Turf Tax: Enemy units in your controlled districts lose 5 loyalty.`);
+    }
+    if (aiTurfTaxApplied && turnReport) {
+      turnReport.events.push(`⚠️ Turf Tax: Your units in AI-controlled districts lose 5 loyalty.`);
     }
   };
 
@@ -3803,12 +3818,24 @@ export const useEnhancedMafiaGameState = (
           aiIncome += tileInc;
         }
       });
+      // District control bonus: Manhattan +25% income for AI
+      if (hasFamilyDistrictBonus(state, fam, 'income')) {
+        aiIncome = Math.floor(aiIncome * 1.25);
+      }
       const mapScale = state.mapSize === 'small' ? 0.6 : state.mapSize === 'large' ? 1.5 : 1.0;
       const minIncome = Math.floor((2000 + state.turn * 500) * diffMods.aiIncomeMult * mapScale);
       aiIncome = Math.max(aiIncome, minIncome);
       opponent.resources.money += aiIncome;
       opponent.resources.lastTurnIncome = aiIncome; // Track for phase calculation
       if (turnReport) turnReport.aiActions.push({ family: fam, action: 'income', detail: `Earned $${aiIncome.toLocaleString()} income` });
+
+      // District control bonus: Staten Island +3 respect & +1 influence for AI
+      if (hasFamilyDistrictBonus(state, fam, 'respect')) {
+        opponent.resources.respect = Math.min(100, (opponent.resources.respect || 0) + 3);
+      }
+      if (hasFamilyDistrictBonus(state, fam, 'influence_gain')) {
+        opponent.resources.influence = Math.min(100, (opponent.resources.influence || 0) + 1);
+      }
 
       // ── RECRUIT (difficulty-scaled cap) ──
       // War recruitment boost: recruit more aggressively during war
@@ -3820,8 +3847,15 @@ export const useEnhancedMafiaGameState = (
       const currentDeployed = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier').length;
       const totalSoldiers = opponent.resources.soldiers + currentDeployed;
       const wantToRecruit = Math.max(0, soldierCap - totalSoldiers);
+      // District control bonus: Bronx free recruit every 3 turns for AI
+      if (hasFamilyDistrictBonus(state, fam, 'free_recruit') && state.turn % 3 === 0) {
+        opponent.resources.soldiers += 1;
+        if (turnReport) turnReport.aiActions.push({ family: fam, action: 'recruit', detail: `Free Bronx recruit (district bonus)` });
+      }
       if (wantToRecruit > 0) {
-        const canAfford = Math.floor(opponent.resources.money / SOLDIER_COST);
+        // District control bonus: Bronx $750 recruit discount for AI
+        const aiRecruitCost = hasFamilyDistrictBonus(state, fam, 'recruit_discount') ? Math.max(100, SOLDIER_COST - 750) : SOLDIER_COST;
+        const canAfford = Math.floor(opponent.resources.money / aiRecruitCost);
         // Personality-driven recruitment batch size
         const personalityRecruitBonus = (opponent.personality === 'aggressive') ? 1
           : (opponent.personality === 'defensive' || opponent.personality === 'diplomatic') ? -1
@@ -3829,7 +3863,7 @@ export const useEnhancedMafiaGameState = (
           : 0;
         const toRecruit = Math.min(wantToRecruit, canAfford, Math.max(1, 3 + alertBonus + atWarBonus + personalityRecruitBonus));
         opponent.resources.soldiers += toRecruit;
-        opponent.resources.money -= toRecruit * SOLDIER_COST;
+        opponent.resources.money -= toRecruit * aiRecruitCost;
         if (toRecruit > 0 && turnReport) {
           const hasRecruitIntel = (state.activeBribes || []).some(b => (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'mayor') && b.active);
           if (hasRecruitIntel) {
@@ -3909,7 +3943,8 @@ export const useEnhancedMafiaGameState = (
       // AI action budget — boosted in early game (turns 1-8) for faster expansion, scaled by map size
       const earlyGameBonus = state.turn <= 8 ? 2 : 0;
       const mapActionBonus = state.mapSize === 'small' ? -1 : state.mapSize === 'large' ? 1 : 0;
-      let aiActionsRemaining = Math.max(1, 2 + (opponent.resources.influence >= 50 ? 1 : 0) + earlyGameBonus + mapActionBonus);
+      const aiManhattanAP = hasFamilyDistrictBonus(state, fam, 'extra_ap') ? 1 : 0;
+      let aiActionsRemaining = Math.max(1, 2 + (opponent.resources.influence >= 50 ? 1 : 0) + earlyGameBonus + mapActionBonus + aiManhattanAP);
       let aiTacticalRemaining = Math.max(2, 3 + earlyGameBonus + mapActionBonus);
 
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
@@ -4123,7 +4158,9 @@ export const useEnhancedMafiaGameState = (
                 // Built business defense bonus: player-built businesses on this hex grant defenders +20% protection
                 const isDefenderBuiltBiz = tile.controllingFamily === state.playerFamily && tile.business && !tile.business.isExtorted;
                 const builtBizDefBonus = isDefenderBuiltBiz ? (BUILT_BUSINESS_DEFENSE_BONUS / 100) : 0;
-                const baseKillChance = isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) - builtBizDefBonus : 0.7 - builtBizDefBonus;
+                // District control bonus: Queens +5% hit success for AI attacker
+                const aiQueensHitBonus = hasFamilyDistrictBonus(state, fam, 'hit_bonus') ? 0.05 : 0;
+                const baseKillChance = (isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) - builtBizDefBonus : 0.7 - builtBizDefBonus) + aiQueensHitBonus;
                 enemyUnitsHere.forEach(eu => {
                   // Capos cannot be killed in regular combat — only wounded
                   if (eu.type === 'capo') {

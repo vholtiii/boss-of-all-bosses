@@ -728,6 +728,31 @@ War begins when:
 - AI prioritizes warring opponents for hits and territorial expansion during war
 - AI fortifies HQ-adjacent hexes during active wars
 
+## 25. District Control Bonuses
+
+Control 60%+ of a district's hexes to unlock **primary** and **secondary** bonuses:
+
+| District | Primary Bonus | Secondary Bonus |
+|---|---|---|
+| **Manhattan** | +25% business income | +1 max action point per turn |
+| **Little Italy** | +20% loyalty retention | Soldiers return from hiding 1 turn faster |
+| **Brooklyn** | -5 heat/turn | +10% combat defense for units in Brooklyn |
+| **Bronx** | $750 recruitment discount | Free soldier recruit every 3 turns |
+| **Queens** | +15% extortion success | +5% hit success on all attacks |
+| **Staten Island** | +3 respect/turn | +1 influence/turn |
+
+### Universal Bonuses (any controlled district)
+- **Turf Tax**: Enemy units in your controlled districts lose **5 loyalty/turn**
+- **Safe Passage**: Friendly units get **+1 movement range** in controlled districts
+
+### AI Awareness
+AI families benefit from the **same district control bonuses** as the player:
+- Manhattan income boost, AP boost
+- Bronx recruitment discount and free recruits
+- Queens hit success bonus in combat
+- Staten Island respect and influence gains
+- Turf Tax applies universally — AI-controlled districts drain player unit loyalty too
+
 ---
 
 *Detailed guides:*
