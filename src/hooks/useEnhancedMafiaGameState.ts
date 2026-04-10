@@ -879,6 +879,7 @@ const createInitialGameState = (
     },
     gamePhase: 1 as GamePhase,
     commissionVoteCooldownUntil: 0,
+    commissionVoteResult: null,
     flippedSoldiers: [],
     eliminatedFamilies: [],
     sitdownCooldownUntil: 0,
