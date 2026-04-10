@@ -1210,6 +1210,20 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     />
                   )}
 
+
+                  {/* Family highlight — pulsing ring in family color */}
+                  {highlightedFamily && tile.controllingFamily === highlightedFamily && (
+                    <polygon
+                      points={getHexPoints(x, y, baseHexRadius + 5)}
+                      fill="none"
+                      stroke={familyColors[highlightedFamily] || '#D4AF37'}
+                      strokeWidth="3"
+                      opacity="0.9"
+                      strokeDasharray="8,4"
+                      className="pointer-events-none animate-pulse"
+                    />
+                  )}
+
                   {/* Player territory gold outer glow */}
                   {isPlayerTerritory && !tile.isHeadquarters && (
                     <polygon
