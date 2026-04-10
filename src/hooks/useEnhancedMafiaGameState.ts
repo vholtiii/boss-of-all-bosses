@@ -7392,6 +7392,30 @@ export const useEnhancedMafiaGameState = (
         }];
         break;
       }
+      case 'supply_deal': {
+        const duration = 5 + Math.floor(Math.random() * 3); // 5-7 turns
+        // Transfer money to target family
+        const targetOpp = state.aiOpponents.find(o => o.family === enemyFamily);
+        if (targetOpp) {
+          targetOpp.resources.money += cost;
+        }
+        state.supplyDealPacts = [...(state.supplyDealPacts || []), {
+          id: `supply-deal-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          targetFamily: enemyFamily,
+          turnsRemaining: duration,
+          turnFormed: state.turn,
+          active: true,
+        }];
+        // Tension reduction (minor — necessity deal)
+        addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_SUPPLY_DEAL);
+        state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
+        const famLabel = enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1);
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: '🚚 Supply Deal Struck!',
+          message: `Access to ${famLabel}'s supply lines for ${duration} turns. $${cost.toLocaleString()} paid to ${famLabel}. Tension -${TENSION_REDUCE_SUPPLY_DEAL}.`,
+        }];
+        break;
+      }
     }
 
     syncLegacyUnits(state);
