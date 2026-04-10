@@ -229,7 +229,7 @@ export const PERSONALITY_LABELS: Record<CapoPersonality, { label: string; icon: 
 };
 
 // ============ NEGOTIATION TYPES ============
-export type NegotiationType = 'ceasefire' | 'bribe_territory' | 'alliance' | 'share_profits' | 'safe_passage';
+export type NegotiationType = 'ceasefire' | 'bribe_territory' | 'alliance' | 'share_profits' | 'safe_passage' | 'supply_deal';
 
 export type NegotiationScope = 'family' | 'territory';
 
