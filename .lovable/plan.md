@@ -1,31 +1,30 @@
 
 
-# Test Supply Node Distances on All Map Sizes
+# Add Mafia Background Music to Family Selection Screen
 
-The TypeScript build errors are **already resolved** — `npx tsc --noEmit` passes cleanly with zero errors. The stale errors were from a previous state.
+## Approach
+Use a royalty-free mafia/noir-themed MP3 file as a static asset that plays as ambient background music on the title/family selection screen. The music will loop, fade in on load, and respect the existing sound settings (mute/volume).
 
-## Testing Plan
+## Steps
 
-To verify supply node minimum distances work correctly, I'll add a temporary console.log in the supply node placement code that prints the map size, radius, calculated minimum distance, and actual distances of placed nodes from each HQ. Then start 3 new games (small, medium, large) and check the console output.
+1. **Source a royalty-free track** — Find a short (30-60s) looping noir/mafia-style instrumental track (e.g., from Pixabay, which offers free-to-use music with no attribution required). Download and place it at `public/audio/mafia-theme.mp3`.
 
-### Steps
+2. **Create a `useBgMusic` hook** — A small hook that:
+   - Creates an `<audio>` element with `loop` enabled
+   - Fades in volume over ~2 seconds on mount
+   - Reads the sound config from `useSoundSystem` to respect enabled/volume state (uses `uiVolume`)
+   - Fades out and pauses on unmount (when game starts)
+   - Handles browser autoplay restrictions (plays on first user click if blocked)
 
-1. **Add debug logging** in `useEnhancedMafiaGameState.ts` after supply node placement (around line 763):
-   ```typescript
-   console.log(`[Supply Nodes] Map radius=${mapRadius}, minDist=${minSupplyDistance}`);
-   supplyNodes.forEach(node => {
-     const dists = hqPositions.map(hq => hexDistance(hq, { q: node.q, r: node.r, s: node.s }));
-     console.log(`  ${node.type}: min HQ dist = ${Math.min(...dists)}`);
-   });
-   ```
+3. **Wire it into `FamilySelectionScreen`** — Call the hook at the top of the component. No UI changes needed; music plays automatically in the background.
 
-2. **Start 3 new games** — one each on Small, Medium, Large map size — and verify console output shows:
-   - Small: all nodes >= 4 hexes from any HQ
-   - Medium: all nodes >= 6 hexes from any HQ
-   - Large: all nodes >= 8 hexes from any HQ
+4. **Add a small mute toggle** — A speaker icon in the corner of the family selection screen so users can quickly mute/unmute without needing the full settings dialog.
 
-3. **Remove debug logging** after verification.
+## Technical Details
 
-### File Modified
-- `src/hooks/useEnhancedMafiaGameState.ts` (temporary debug lines, then removed)
+- **File**: `public/audio/mafia-theme.mp3` (~500KB-1MB target)
+- **New hook**: `src/hooks/useBgMusic.ts`
+- **Modified**: `src/components/FamilySelectionScreen.tsx` (add hook call + mute button)
+- Music stops when `onSelectFamily` is called (component unmounts)
+- Volume tied to existing `soundConfig.uiVolume` and `soundConfig.enabled`
 
