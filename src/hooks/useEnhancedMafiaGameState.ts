@@ -1097,7 +1097,133 @@ export const useEnhancedMafiaGameState = (
     }
   };
 
-  // ============ HELPER: check if hex is adjacent to enemy ============
+  // ============ GAMEPLAY PHASE CALCULATION ============
+  const calculatePhaseForFamily = (state: EnhancedMafiaGameState, family: string): GamePhase => {
+    const hexCount = state.hexMap.filter(t => t.controllingFamily === family).length;
+    const isPlayer = family === state.playerFamily;
+    const respect = isPlayer ? state.reputation.respect : (state.aiOpponents.find(o => o.family === family)?.resources.respect || 0);
+    const capoCount = state.deployedUnits.filter(u => u.family === family && u.type === 'capo').length;
+    const builtBusinessCount = state.hexMap.filter(t => t.controllingFamily === family && t.business && !t.business.isExtorted).length;
+    const income = isPlayer ? state.lastTurnIncome : 0;
+
+    // Check from highest phase down
+    for (let p = 3; p >= 0; p--) {
+      const cfg = PHASE_CONFIGS[p];
+      if (state.turn < cfg.minTurn) continue;
+      const reqs = cfg.requirements;
+      if (reqs.minHexes && hexCount < reqs.minHexes) continue;
+      if (reqs.minRespect && respect < reqs.minRespect) continue;
+      if (reqs.minCapos && capoCount < reqs.minCapos) continue;
+      if (reqs.minBuiltBusinesses && builtBusinessCount < reqs.minBuiltBusinesses) continue;
+      if (reqs.minIncomeOrHexesOrRespect) {
+        const or = reqs.minIncomeOrHexesOrRespect;
+        if (hexCount < or.hexes && income < or.income && respect < or.respect) continue;
+      }
+      return cfg.phase;
+    }
+    return 1;
+  };
+
+  const updateGamePhase = (state: EnhancedMafiaGameState) => {
+    const newPhase = calculatePhaseForFamily(state, state.playerFamily);
+    // No regression — once reached, stays
+    if (newPhase > (state.gamePhase || 1)) {
+      const oldPhase = state.gamePhase || 1;
+      state.gamePhase = newPhase;
+      const cfg = PHASE_CONFIGS[newPhase - 1];
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'success' as const,
+        title: `${cfg.icon} Phase ${newPhase}: ${cfg.name}`,
+        message: `New abilities unlocked: ${cfg.unlocks.join(', ')}`,
+      }];
+    }
+  };
+
+  // ============ COMMISSION VOTE ============
+  const processCommissionVote = (state: EnhancedMafiaGameState): EnhancedMafiaGameState => {
+    if ((state.gamePhase || 1) < 4) {
+      state.pendingNotifications.push({ type: 'warning', title: '👑 Not Ready', message: 'Commission Vote requires Phase 4: Boss of All Bosses.' });
+      return state;
+    }
+    if (state.resources.money < COMMISSION_VOTE_COST) {
+      state.pendingNotifications.push({ type: 'warning', title: '💰 Not Enough Money', message: `Commission Meeting costs $${COMMISSION_VOTE_COST.toLocaleString()}.` });
+      return state;
+    }
+    if (state.actionsRemaining <= 0) {
+      state.pendingNotifications.push({ type: 'warning', title: '⚠️ No Actions', message: 'No actions remaining.' });
+      return state;
+    }
+    if ((state.commissionVoteCooldownUntil || 0) > state.turn) {
+      const cd = (state.commissionVoteCooldownUntil || 0) - state.turn;
+      state.pendingNotifications.push({ type: 'warning', title: '⏳ Cooldown', message: `Commission Vote available in ${cd} turns.` });
+      return state;
+    }
+    const survivingRivals = state.aiOpponents.filter(o => !(state.eliminatedFamilies || []).includes(o.family));
+    if (survivingRivals.length < COMMISSION_MIN_SURVIVORS) {
+      state.pendingNotifications.push({ type: 'warning', title: '👑 Too Few Families', message: `Need at least ${COMMISSION_MIN_SURVIVORS} surviving rival families for a legitimate Commission.` });
+      return state;
+    }
+    
+    state.resources.money -= COMMISSION_VOTE_COST;
+    state.actionsRemaining = Math.max(0, state.actionsRemaining - 1);
+    
+    // Unanimous minus one: need all minus one
+    const needed = Math.max(survivingRivals.length - 1, survivingRivals.length === 2 ? 2 : survivingRivals.length - 1);
+    const hasTreachery = !!(state.treacheryDebuff && state.treacheryDebuff.turnsRemaining > 0);
+    
+    let yesVotes = 0;
+    const voteResults: Array<{ family: string; vote: boolean; reason: string }> = [];
+    
+    for (const rival of survivingRivals) {
+      if (hasTreachery) {
+        voteResults.push({ family: rival.family, vote: false, reason: 'Treachery debuff — automatic NO' });
+        continue;
+      }
+      const relationship = state.reputation.familyRelationships[rival.family] || 0;
+      const hasAlliance = (state.alliances || []).some(a => a.active && a.alliedFamily === rival.family);
+      const hasCeasefire = (state.ceasefires || []).some(c => c.active && c.family === rival.family);
+      const hasPact = hasAlliance || hasCeasefire;
+      
+      if (relationship >= COMMISSION_VOTE_RELATIONSHIP_THRESHOLD && hasPact) {
+        yesVotes++;
+        voteResults.push({ family: rival.family, vote: true, reason: `Relationship ${relationship} + active pact` });
+      } else {
+        const reason = relationship < COMMISSION_VOTE_RELATIONSHIP_THRESHOLD 
+          ? `Relationship too low (${relationship}/${COMMISSION_VOTE_RELATIONSHIP_THRESHOLD})` 
+          : 'No active alliance or ceasefire';
+        voteResults.push({ family: rival.family, vote: false, reason });
+      }
+    }
+    
+    // Update victory progress
+    state.victoryProgress.commission = { supporting: yesVotes, needed, met: yesVotes >= needed };
+    
+    if (yesVotes >= needed) {
+      state.victoryType = 'commission';
+      state.pendingNotifications.push({
+        type: 'success', title: '👑 BOSS OF ALL BOSSES!',
+        message: `The Commission has voted! ${yesVotes}/${survivingRivals.length} families support your leadership. You are the Boss of All Bosses!`,
+      });
+    } else {
+      // Failed — penalty
+      state.commissionVoteCooldownUntil = state.turn + COMMISSION_VOTE_COOLDOWN;
+      for (const result of voteResults) {
+        if (!result.vote) {
+          const rel = state.reputation.familyRelationships[result.family] || 0;
+          state.reputation.familyRelationships[result.family] = rel - COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY;
+        }
+      }
+      const voteDetail = voteResults.map(r => `${r.family}: ${r.vote ? '✅ YES' : '❌ NO'} (${r.reason})`).join('. ');
+      state.pendingNotifications.push({
+        type: 'error', title: '👑 Commission Vote Failed',
+        message: `${yesVotes}/${needed} votes needed. ${voteDetail}. -${COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY} relationship with NO voters. Cooldown: ${COMMISSION_VOTE_COOLDOWN} turns.`,
+      });
+    }
+    
+    return state;
+  };
+
+
   const isAdjacentToEnemy = (q: number, r: number, s: number, hexMap: HexTile[], deployedUnits: DeployedUnit[], playerFamily: string): boolean => {
     const neighbors = getHexNeighbors(q, r, s);
     return neighbors.some(n => {
