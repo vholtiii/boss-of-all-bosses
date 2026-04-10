@@ -1,29 +1,35 @@
 
 
-# Fix Supply Line Branching & Neutral Hex Rendering
+# Stop Supply Lines at HQ Hex Boundary
 
 ## Problem
-
-1. **Deduplication breaks branching paths**: The current dedup logic strips shared segments from the second path when two supply routes share a trunk. This makes the second route visually disconnected -- it renders as a floating stub instead of a continuous line from HQ that branches off.
-
-2. **Supply line renders over neutral hexes**: Supply node hexes (Docks, Union Hall, etc.) are neutral by design but get added to the BFS traversal set (line 670) so paths can reach them. The tint overlay then highlights these neutral hexes as part of the supply route. This is mechanically correct (the route reaches the node), but visually confusing.
+Supply lines currently draw all the way to the HQ hex center point, visually penetrating into the HQ icon. They should stop at the hex edge/boundary.
 
 ## Solution
+After building each path and reversing it (so HQ is the first point), replace the HQ center coordinate with a point on the hex boundary. Calculate the direction from HQ center toward the second point in the path, then place the first point at `baseHexRadius` distance along that direction.
 
-### 1. Remove segment deduplication entirely (~lines 709-724)
+### File: `src/components/EnhancedMafiaHexGrid.tsx` (~line 705-710)
 
-With the thinner stroke widths already in place (glow: 3, main: 2), overlapping paths are visually acceptable. Two supply routes sharing a trunk and then branching will look like a single line on the shared portion (barely thicker) and cleanly fork where they diverge. This is exactly what the user wants.
+After `pathKeys.reverse()` and the `pts` mapping, add logic:
+```ts
+// Offset first point (HQ) to hex boundary
+if (pts.length > 1) {
+  const hq = pts[0];
+  const next = pts[1];
+  const dx = next.x - hq.x;
+  const dy = next.y - hq.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > 0) {
+    pts[0] = {
+      x: hq.x + (dx / dist) * baseHexRadius,
+      y: hq.y + (dy / dist) * baseHexRadius
+    };
+  }
+}
+```
 
-Replace the dedup block with a simple assignment: `const routePaths = rawRoutePaths;`
-
-### 2. Include HQ hex in path (fix line 697)
-
-Currently the path backtrace stops *before* the HQ hex (`if (nextCk === hqKey) break`). This means supply lines don't visually connect to the HQ. Fix: include the HQ position in the path by adding it after the break.
-
-### 3. Keep neutral supply node tint as-is
-
-The supply node hex being tinted is correct -- it shows the route endpoint. No change needed here since the game mechanic intentionally allows reaching adjacent neutral supply nodes.
+This moves the HQ endpoint from the center to the edge of the hex in the direction of the first path segment. Single edit, ~10 lines added.
 
 ## Files Modified
-- `src/components/EnhancedMafiaHexGrid.tsx` -- remove dedup, fix HQ inclusion in path
+- `src/components/EnhancedMafiaHexGrid.tsx`
 
