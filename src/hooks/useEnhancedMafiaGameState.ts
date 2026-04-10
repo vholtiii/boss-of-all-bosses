@@ -2415,7 +2415,31 @@ export const useEnhancedMafiaGameState = (
       newState.tacticalActionsRemaining = TACTICAL_ACTIONS_PER_TURN;
       newState.maxTacticalActions = TACTICAL_ACTIONS_PER_TURN;
 
-      // Process pending promotions — convert soldiers in ceremony to capos
+      // ============ SECONDARY: BRONX FREE RECRUIT (every 3 turns) ============
+      if (hasPlayerDistrictBonus(newState, 'free_recruit') && newState.turn % 3 === 0) {
+        const hq = newState.headquarters[newState.playerFamily];
+        if (hq) {
+          const freeId = `${newState.playerFamily}-soldier-free-${Date.now()}`;
+          newState.deployedUnits = [...newState.deployedUnits, {
+            id: freeId, type: 'soldier' as const, family: newState.playerFamily,
+            q: hq.q, r: hq.r, s: hq.s,
+            movesRemaining: 0, maxMoves: 2, level: 1,
+            recruited: true,
+          }];
+          newState.soldierStats[freeId] = {
+            loyalty: 65, training: 0, hits: 0, extortions: 0,
+            victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
+          };
+          newState.resources.soldiers += 1;
+          newState.pendingNotifications.push({
+            type: 'success' as const,
+            title: '🏠 Bronx Free Recruit',
+            message: 'A local from the Bronx has joined the family for free (district control bonus).',
+          });
+          turnReport.events.push('🏠 Free soldier recruited from Bronx district control.');
+        }
+      }
+
       const pendingPromotionUnits = newState.deployedUnits.filter(u => u.pendingPromotion && u.type === 'soldier');
       if (pendingPromotionUnits.length > 0) {
         const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
@@ -2443,6 +2467,11 @@ export const useEnhancedMafiaGameState = (
       }
 
       // Reset moves and escort for new turn; handle wound recovery for capos
+      // Secondary: Safe Passage — +1 movement in controlled districts
+      const playerControlledDistrictsForMove = new Set(
+        (newState.activeDistrictBonuses || []).filter((b: any) => b.family === newState.playerFamily).map((b: any) => b.district)
+      );
+      const hasSafePassage = playerControlledDistrictsForMove.size > 0;
       newState.deployedUnits = (newState.deployedUnits || []).map(u => {
         const wounded = u.woundedTurnsRemaining && u.woundedTurnsRemaining > 0;
         let newWounded = wounded ? u.woundedTurnsRemaining! - 1 : 0;
@@ -2455,9 +2484,19 @@ export const useEnhancedMafiaGameState = (
           });
         }
         
+        // Check if unit is in a player-controlled district for Safe Passage bonus
+        let safePassageBonus = 0;
+        if (hasSafePassage && u.family === newState.playerFamily) {
+          const unitTile = newState.hexMap.find(t => t.q === u.q && t.r === u.r && t.s === u.s);
+          if (unitTile && playerControlledDistrictsForMove.has(unitTile.district)) {
+            safePassageBonus = 1;
+          }
+        }
+        
+        const baseMoves = u.type === 'capo' ? (newWounded > 0 ? 2 : 3) : u.maxMoves;
         return {
           ...u,
-          movesRemaining: u.type === 'capo' ? (newWounded > 0 ? 2 : 3) : u.maxMoves,
+          movesRemaining: baseMoves + safePassageBonus,
           maxMoves: u.type === 'capo' ? (newWounded > 0 ? 2 : 3) : u.maxMoves,
           escortingSoldierIds: undefined,
           woundedTurnsRemaining: u.type === 'capo' ? newWounded : undefined,
