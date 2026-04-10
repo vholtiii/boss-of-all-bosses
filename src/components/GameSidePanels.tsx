@@ -108,7 +108,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         {actionsLocked && (
           <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-center">
             <p className="text-xs font-semibold text-primary uppercase tracking-wide">
-              {phase === 'deploy' ? '📦 Deploy Phase' : '🚶 Move Phase'}
+              {phase === 'deploy' ? '📦 Deploy Step' : '📋 Tactical Step'}
             </p>
             <p className="text-[10px] text-muted-foreground mt-1">
               {phase === 'deploy'
