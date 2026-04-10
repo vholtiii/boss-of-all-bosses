@@ -432,6 +432,9 @@ export interface EnhancedMafiaGameState {
   warSummitState: WarSummitState;
   warSummitCooldownUntil: number;
   
+  // Gameplay phases & commission vote
+  gamePhase: GamePhase;
+  commissionVoteCooldownUntil: number;
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
   };
