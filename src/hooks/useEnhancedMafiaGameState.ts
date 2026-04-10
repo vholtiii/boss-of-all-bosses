@@ -3627,6 +3627,7 @@ export const useEnhancedMafiaGameState = (
       const fam = opponent.family as any;
       const hq = state.headquarters[fam];
       if (!hq) return;
+      const aiPhase = calculatePhaseForFamily(state, fam);
 
       // ── INCOME (difficulty-scaled) ──
       let aiIncome = 0;
