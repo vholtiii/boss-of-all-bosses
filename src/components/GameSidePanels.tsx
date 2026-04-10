@@ -620,7 +620,9 @@ export const RightSidePanel: React.FC<{
   gameState: EnhancedMafiaGameState;
   onEventChoice: (eventId: string, choiceId: string) => void;
   onAction?: (action: any) => void;
-}> = ({ gameState, onEventChoice, onAction }) => {
+  onHighlightSupplyNode?: (hex: { q: number; r: number; s: number } | null) => void;
+  highlightedSupplyHex?: { q: number; r: number; s: number } | null;
+}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex }) => {
   const [openSection, setOpenSection] = useState<string>('rivals');
   const toggle = (id: string) => setOpenSection(prev => (prev === id ? '' : id));
 
@@ -813,7 +815,21 @@ export const RightSidePanel: React.FC<{
                   .map(([bType]) => bType);
                 
                 return (
-                  <div key={node.type} className="rounded-lg border border-border bg-card p-2.5">
+                  <div
+                    key={node.type}
+                    className={cn(
+                      "rounded-lg border bg-card p-2.5 cursor-pointer transition-colors",
+                      highlightedSupplyHex && highlightedSupplyHex.q === node.q && highlightedSupplyHex.r === node.r && highlightedSupplyHex.s === node.s
+                        ? "border-primary ring-1 ring-primary/50"
+                        : "border-border hover:border-muted-foreground/50"
+                    )}
+                    onClick={() => {
+                      if (onHighlightSupplyNode) {
+                        const isSelected = highlightedSupplyHex && highlightedSupplyHex.q === node.q && highlightedSupplyHex.r === node.r && highlightedSupplyHex.s === node.s;
+                        onHighlightSupplyNode(isSelected ? null : { q: node.q, r: node.r, s: node.s });
+                      }
+                    }}
+                  >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-base">{cfg.icon}</span>
                       <span className="text-xs font-bold text-foreground flex-1">{cfg.label}</span>
