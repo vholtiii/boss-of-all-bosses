@@ -1183,6 +1183,79 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
         onClose={() => setShowTurnSummary(false)}
       />
 
+      {/* Plan Hit Step 2: Instruction Banner + Target List */}
+      <AnimatePresence>
+        {planHitMode && planHitStep === 'selectTarget' && planHitPlannerId && (() => {
+          const plannerUnit = (gameState.deployedUnits || []).find((u: any) => u.id === planHitPlannerId);
+          const plannerName = plannerUnit?.name || 'Soldier';
+          const scoutedEnemyHexes = (gameState.scoutedHexes || []).filter((s: any) => {
+            const hex = (gameState.hexMap || []).find((h: any) => h.q === s.q && h.r === s.r && h.s === s.s);
+            return hex && hex.controllingFamily !== 'neutral' && hex.controllingFamily !== gameState.playerFamily;
+          });
+          const targetableUnits = (gameState.deployedUnits || []).filter((u: any) => {
+            if (u.family === gameState.playerFamily) return false;
+            return scoutedEnemyHexes.some((s: any) => s.q === u.q && s.r === u.r && s.s === u.s);
+          });
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="fixed top-3 left-1/2 -translate-x-1/2 z-[55] flex flex-col items-center gap-2"
+            >
+              {/* Instruction banner */}
+              <div className="bg-card/95 backdrop-blur-sm border border-destructive/50 rounded-lg px-5 py-3 shadow-xl flex items-center gap-3">
+                <span className="text-lg">🎯</span>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Select a target for {plannerName}</p>
+                  <p className="text-xs text-muted-foreground">Click a scouted enemy hex (red outline with 🎯) that has enemy units</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-3 text-xs"
+                  onClick={() => handleAction({ type: 'cancel_plan_hit_mode' })}
+                >
+                  Cancel
+                </Button>
+              </div>
+
+              {/* Target list panel */}
+              {targetableUnits.length > 0 && (
+                <div className="bg-card/95 backdrop-blur-sm border border-border rounded-lg px-4 py-3 shadow-xl w-[320px] max-h-[200px] overflow-y-auto">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">Available Targets ({targetableUnits.length})</p>
+                  <div className="space-y-1.5">
+                    {targetableUnits.map((unit: any) => {
+                      const hex = (gameState.hexMap || []).find((h: any) => h.q === unit.q && h.r === unit.r && h.s === unit.s);
+                      const district = hex?.district || 'Unknown';
+                      return (
+                        <button
+                          key={unit.id}
+                          className="w-full flex items-center gap-2 p-2 rounded border border-border bg-background hover:bg-destructive/10 hover:border-destructive/50 transition-colors text-left"
+                          onClick={() => handleAction({ type: 'plan_hit', plannerUnitId: planHitPlannerId, targetUnitId: unit.id })}
+                        >
+                          <span className="text-base">{unit.type === 'capo' ? '👔' : '🔫'}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold text-foreground truncate">{unit.name || (unit.type === 'capo' ? 'Capo' : 'Soldier')}</div>
+                            <div className="text-[10px] text-muted-foreground">{unit.family} · {district}</div>
+                          </div>
+                          <Badge variant="destructive" className="text-[10px] shrink-0">Target</Badge>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {targetableUnits.length === 0 && (
+                <div className="bg-card/95 backdrop-blur-sm border border-border rounded-lg px-4 py-3 shadow-xl">
+                  <p className="text-xs text-muted-foreground">⚠️ No enemy units found on scouted hexes. Scout more territory first.</p>
+                </div>
+              )}
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
+
       {/* Plan Hit Soldier Picker Modal */}
       <AnimatePresence>
         {showPlanHitSoldierMenu && (() => {
