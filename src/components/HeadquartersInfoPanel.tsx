@@ -576,6 +576,29 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                                           🏗️ Built
                                         </Badge>
                                       )}
+                                      {biz.supplyDependency != null && (
+                                        biz.supplyConnected ? (
+                                          <Badge variant="outline" className="text-[9px] h-4 text-green-400 border-green-400/30 flex items-center gap-0.5">
+                                            <Link2 className="h-2.5 w-2.5" /> Supplied
+                                          </Badge>
+                                        ) : (
+                                          <TooltipProvider delayDuration={200}>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Badge variant="outline" className="text-[9px] h-4 text-orange-400 border-orange-400/30 flex items-center gap-0.5 cursor-help">
+                                                  <Unlink className="h-2.5 w-2.5" /> No Supply
+                                                </Badge>
+                                              </TooltipTrigger>
+                                              <TooltipContent side="top" className="text-xs">
+                                                Needs: {(() => {
+                                                  const deps = biz.supplyDependency!.split(',');
+                                                  return deps.map(d => SUPPLY_NODE_CONFIG[d.trim() as SupplyNodeType]?.label || d).join(' or ');
+                                                })()}
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        )
+                                      )}
                                     </div>
                                     <div className="text-[10px] text-muted-foreground flex items-center gap-1">
                                       <MapPin className="h-2.5 w-2.5" />
