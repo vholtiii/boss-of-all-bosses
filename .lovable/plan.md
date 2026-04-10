@@ -1,35 +1,24 @@
 
 
-# Stop Supply Lines at HQ Hex Boundary
+# Highlight Supply Node Hex When Clicking Supply Line Info Panel
 
-## Problem
-Supply lines currently draw all the way to the HQ hex center point, visually penetrating into the HQ icon. They should stop at the hex edge/boundary.
+## Overview
+Clicking a supply node entry in the "Supply Lines" section of the right side panel will highlight that node's hex on the map using the existing `bossHighlightHex` gold pulsing ring mechanism.
 
-## Solution
-After building each path and reversing it (so HQ is the first point), replace the HQ center coordinate with a point on the hex boundary. Calculate the direction from HQ center toward the second point in the path, then place the first point at `baseHexRadius` distance along that direction.
+## Changes
 
-### File: `src/components/EnhancedMafiaHexGrid.tsx` (~line 705-710)
+### 1. `src/components/GameSidePanels.tsx`
+- Add `onHighlightSupplyNode?: (hex: { q: number; r: number; s: number } | null) => void` and `highlightedSupplyHex?: { q: number; r: number; s: number } | null` to `RightSidePanel` props
+- Make each supply node card (`<div key={node.type} ...>`) clickable with `cursor-pointer` styling
+- On click, toggle: if already highlighted, clear it (`null`); otherwise set the node's `{q, r, s}`
+- Add a visual selected state (e.g. brighter border) when the node is currently highlighted
 
-After `pathKeys.reverse()` and the `pts` mapping, add logic:
-```ts
-// Offset first point (HQ) to hex boundary
-if (pts.length > 1) {
-  const hq = pts[0];
-  const next = pts[1];
-  const dx = next.x - hq.x;
-  const dy = next.y - hq.y;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist > 0) {
-    pts[0] = {
-      x: hq.x + (dx / dist) * baseHexRadius,
-      y: hq.y + (dy / dist) * baseHexRadius
-    };
-  }
-}
-```
+### 2. `src/pages/UltimateMafiaGame.tsx`
+- Pass `onHighlightSupplyNode={setBossHighlightHex}` and `highlightedSupplyHex={bossHighlightHex}` to all `RightSidePanel` instances (desktop sidebar + mobile tab)
 
-This moves the HQ endpoint from the center to the edge of the hex in the direction of the first path segment. Single edit, ~10 lines added.
+No new state needed -- reuses the existing `bossHighlightHex` / gold pulsing ring system already rendered in `EnhancedMafiaHexGrid`.
 
 ## Files Modified
-- `src/components/EnhancedMafiaHexGrid.tsx`
+- `src/components/GameSidePanels.tsx`
+- `src/pages/UltimateMafiaGame.tsx`
 
