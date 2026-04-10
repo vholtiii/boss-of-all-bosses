@@ -2,14 +2,15 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { Trophy, MapPin, DollarSign, Crown, Skull } from 'lucide-react';
+import { Trophy, MapPin, DollarSign, Crown, Skull, Vote } from 'lucide-react';
 import { VictoryProgress } from '@/types/game-mechanics';
 
 interface VictoryTrackerProps {
   progress: VictoryProgress;
+  gamePhase?: number;
 }
 
-const VictoryTracker: React.FC<VictoryTrackerProps> = ({ progress }) => {
+const VictoryTracker: React.FC<VictoryTrackerProps> = ({ progress, gamePhase = 1 }) => {
   const conditions = [
     {
       key: 'territory',
@@ -47,6 +48,18 @@ const VictoryTracker: React.FC<VictoryTrackerProps> = ({ progress }) => {
       met: progress.domination.met,
       display: `${progress.domination.eliminated}/${progress.domination.target} eliminated`,
     },
+    {
+      key: 'commission',
+      label: 'Commission',
+      icon: <Vote className="h-3 w-3" />,
+      current: progress.commission?.supporting || 0,
+      target: progress.commission?.needed || 0,
+      met: progress.commission?.met || false,
+      display: gamePhase >= 4 
+        ? `${progress.commission?.supporting || 0}/${progress.commission?.needed || '?'} votes`
+        : '🔒 Phase 4',
+      locked: gamePhase < 4,
+    },
   ];
 
   return (
@@ -57,7 +70,7 @@ const VictoryTracker: React.FC<VictoryTrackerProps> = ({ progress }) => {
       </h4>
       <div className="space-y-2">
         {conditions.map(c => (
-          <div key={c.key}>
+          <div key={c.key} className={cn((c as any).locked && 'opacity-50')}>
             <div className="flex items-center justify-between mb-0.5">
               <span className={cn(
                 'text-[10px] font-medium flex items-center gap-1',
