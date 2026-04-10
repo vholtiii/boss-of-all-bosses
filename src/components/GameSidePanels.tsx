@@ -560,7 +560,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         </CollapsibleSection>
 
         {/* ── VICTORY TRACKER ── */}
-        <VictoryTracker progress={gameState.victoryProgress} />
+        <VictoryTracker progress={gameState.victoryProgress} gamePhase={(gameState as any).gamePhase || 1} />
 
         {/* ── Selected Territory ── */}
         {gameState.selectedTerritory && (
