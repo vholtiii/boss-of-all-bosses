@@ -437,6 +437,15 @@ export interface EnhancedMafiaGameState {
   // Gameplay phases & commission vote
   gamePhase: GamePhase;
   commissionVoteCooldownUntil: number;
+  commissionVoteResult: {
+    callerFamily: string;
+    isPlayerCaller: boolean;
+    voteResults: Array<{ family: string; vote: boolean; reason: string }>;
+    needed: number;
+    won: boolean;
+    yesVotes: number;
+    totalVoters: number;
+  } | null;
   familyControl: {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
   };
