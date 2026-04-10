@@ -6161,9 +6161,10 @@ export const useEnhancedMafiaGameState = (
         chance -= BLIND_HIT_PENALTY;
       }
       
-      // Fortification modifiers (hex-based)
+      // Fortification modifiers (hex-based) — Plan Hit bypasses fortification defense
       const defenderHexFortified = isHexFortified(state.fortifiedHexes || [], targetQ, targetR, targetS, tile.controllingFamily);
-      if (defenderHexFortified) {
+      const isExecutingPlanHit = !!(state.plannedHit && (action._executingPlan || (state.plannedHit.q === targetQ && state.plannedHit.r === targetR && state.plannedHit.s === targetS)));
+      if (defenderHexFortified && !isExecutingPlanHit) {
         chance -= FORTIFY_DEFENSE_BONUS / 100;
       }
       // Safehouse defense bonus for defenders

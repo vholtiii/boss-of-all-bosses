@@ -396,6 +396,12 @@ export interface PlannedHit {
 export const PLAN_HIT_FAIL_REPUTATION = 5;  // -5 respect or fear (whichever is higher)
 export const PLAN_HIT_FAIL_LOYALTY = 10;    // -10 loyalty on planner soldier
 
+// ============ PLAN HIT SUCCESS REWARDS ============
+export const PLAN_HIT_RESPECT = 10;           // +10 respect on successful plan hit
+export const PLAN_HIT_FEAR = 10;              // +10 fear on successful plan hit
+export const PLAN_HIT_LOOT = 5000;            // +$5,000 loot bonus on successful plan hit
+export const PLAN_HIT_CAPO_INFLUENCE = 15;    // +15 influence when plan hit kills a capo
+
 // ============ ACTION BUDGET ============
 export const BASE_ACTIONS_PER_TURN = 2;
 export const BONUS_ACTION_RESPECT_THRESHOLD = 50;
