@@ -1546,6 +1546,7 @@ export const useEnhancedMafiaGameState = (
 
       // Handle scout action (tactical phase only)
       if (prev.turnPhase === 'move' && moveAction === 'scout' && (unit.type === 'soldier' || unit.type === 'capo')) {
+        if ((prev.gamePhase || 1) < 2) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🔒 Phase Locked', message: 'Scouting unlocks in Phase 2: Establishing Territory.' }] };
         if (prev.tacticalActionsRemaining <= 0) return prev;
         const result = processScout(prev, unit, targetLocation);
         return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
@@ -1553,6 +1554,7 @@ export const useEnhancedMafiaGameState = (
 
       // Handle safehouse action (tactical phase only) — blocked for wounded capos
       if (prev.turnPhase === 'move' && moveAction === 'safehouse' && unit.type === 'capo') {
+        if ((prev.gamePhase || 1) < 2) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🔒 Phase Locked', message: 'Safehouses unlock in Phase 2: Establishing Territory.' }] };
         if ((unit.woundedTurnsRemaining || 0) > 0) {
           return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
             type: 'warning' as const, title: '🩸 Capo Wounded',
