@@ -7421,6 +7421,7 @@ export const useEnhancedMafiaGameState = (
         }
         state.supplyDealPacts = [...(state.supplyDealPacts || []), {
           id: `supply-deal-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          buyerFamily: state.playerFamily,
           targetFamily: enemyFamily,
           turnsRemaining: duration,
           turnFormed: state.turn,
