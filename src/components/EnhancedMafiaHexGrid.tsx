@@ -707,7 +707,21 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     const [qq, rr] = k.split(',').map(Number);
                     return getHexPosition(qq, rr);
                   });
-                  if (pts.length > 1) rawRoutePaths.push(pts);
+                  // Offset first point (HQ) to hex boundary so line stops at edge
+                  if (pts.length > 1) {
+                    const hq = pts[0];
+                    const next = pts[1];
+                    const dx = next.x - hq.x;
+                    const dy = next.y - hq.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > 0) {
+                      pts[0] = {
+                        x: hq.x + (dx / dist) * baseHexRadius,
+                        y: hq.y + (dy / dist) * baseHexRadius
+                      };
+                    }
+                    rawRoutePaths.push(pts);
+                  }
                 }
               }
 
