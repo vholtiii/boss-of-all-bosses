@@ -27,17 +27,22 @@ Players can **skip directly to the Action phase** from Deploy or Tactical using 
 
 The primary offensive action. Attacks an enemy-controlled hex to clear it (territory becomes neutral — must Claim next turn).
 
-**Scouted vs Unscouted (Blind) Hits:**
+**Scouted vs Unscouted (Blind) vs Planned Hits:**
 
-| | Scouted Hit | Blind Hit (Unscouted) |
-|---|---|---|
-| Civilian risk | None | Yes — if no enemies on hex |
-| Success penalty | None | −20% to hit chance |
-| Victory respect | +5 | +15 |
-| Victory fear | +5 | +15 |
-| Soldier stat boost | Normal (+1 each) | Maxed (toughness, loyalty, victories) |
-| Bounty placed | No | Yes — targeted family attacks you for 3 turns |
-| Target family penalty | None | −10 influence |
+| | Scouted Hit | Blind Hit (Unscouted) | Planned Hit |
+|---|---|---|---|
+| **Niche** | Low-heat reliable | High-risk gamble | Surgical precision |
+| Success modifier | +15% (fresh scout) | −20% | +20% (+10% if relocated), bypasses fortification |
+| Respect/Fear | +5/+5 | +15/+15 | +10/+10 |
+| Police heat | **50% normal** | **150% normal** | Normal |
+| Attacker casualties | Standard (20%) | Standard (20%) | **Zero on success** |
+| Civilian risk | None | Yes — if no enemies on hex | None |
+| Special | Clean operation | Stat boost, bounty, civ risk | Guaranteed target kill, +$5K loot |
+| Capo kill bonus | — | — | +15 influence (decapitation strike) |
+| Soldier stat boost | Normal (+1 each) | Bounded (+3 tough, +2 vic, +15 loyalty) | Normal (+1 each) |
+| Bounty placed | No | Yes — targeted family attacks for 3 turns | No |
+| Target family penalty | None | −10 influence | None |
+| Fail penalty | Standard | Civ hit risk | −5 reputation, −10 planner loyalty |
 
 ### 2.1 Civilian Hit (Blind Hit Only)
 
