@@ -702,9 +702,27 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     const [qq, rr] = k.split(',').map(Number);
                     return getHexPosition(qq, rr);
                   });
-                  if (pts.length > 1) routePaths.push(pts);
+                  if (pts.length > 1) rawRoutePaths.push(pts);
                 }
               }
+
+              // Deduplicate overlapping route segments so stacked polylines don't appear thicker
+              const usedSegments = new Set<string>();
+              const routePaths: Array<Array<{x:number;y:number}>> = [];
+              for (const pts of rawRoutePaths) {
+                const newPts: Array<{x:number;y:number}> = [pts[0]];
+                for (let i = 1; i < pts.length; i++) {
+                  const a = `${pts[i-1].x},${pts[i-1].y}`;
+                  const b = `${pts[i].x},${pts[i].y}`;
+                  const segKey = a < b ? `${a}-${b}` : `${b}-${a}`;
+                  if (!usedSegments.has(segKey)) {
+                    usedSegments.add(segKey);
+                    newPts.push(pts[i]);
+                  }
+                }
+                if (newPts.length > 1) routePaths.push(newPts);
+              }
+
               // Store sets for use in hex rendering below
               (window as any).__supplyRouteHexSet = supplyRouteHexSet;
               (window as any).__connectedNodeKeys = connectedNodeKeys;
