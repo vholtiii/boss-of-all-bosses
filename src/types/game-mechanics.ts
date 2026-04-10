@@ -250,6 +250,7 @@ export const NEGOTIATION_TYPES: NegotiationConfig[] = [
   { type: 'bribe_territory', label: 'Bribe for Territory', icon: '💵', description: 'Pay to peacefully claim this hex. Cost scales with enemy strength.', baseSuccess: 40, baseCost: 8000, reputationCost: 0, scope: 'territory' },
   { type: 'share_profits', label: 'Share Profits', icon: '💰', description: 'Don\'t take the hex — earn 30% of its income each turn for 5 turns.', baseSuccess: 55, baseCost: 3000, reputationCost: 0, scope: 'territory' },
   { type: 'safe_passage', label: 'Safe Passage', icon: '🛤️', description: 'Buy 3 turns of free movement through this family\'s territory without combat.', baseSuccess: 60, baseCost: 2000, reputationCost: 0, scope: 'territory' },
+  { type: 'supply_deal', label: 'Supply Deal', icon: '🚚', description: 'Pay $7,500 to access their supply connections for 5-7 turns. Fear improves chances.', baseSuccess: 45, baseCost: 7500, reputationCost: 0, scope: 'family' },
 ];
 
 export const NEGOTIATION_REFUND_RATE = 0.5; // 50% refund on failure
