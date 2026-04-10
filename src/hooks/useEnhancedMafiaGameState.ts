@@ -5116,6 +5116,10 @@ export const useEnhancedMafiaGameState = (
         }
         // recruit_capo case removed — capos are only obtainable via promote_capo
         case 'promote_capo': {
+          if ((newState.gamePhase || 1) < 2) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Capo Promotion unlocks in Phase 2: Establishing Territory.' });
+            return newState;
+          }
           const unitId = action.unitId as string;
           const unit = newState.deployedUnits.find(u => u.id === unitId);
           if (!unit || unit.type !== 'soldier' || unit.family !== newState.playerFamily) return newState;
@@ -5445,6 +5449,10 @@ export const useEnhancedMafiaGameState = (
           return result;
         }
         case 'boss_negotiate': {
+          if ((newState.gamePhase || 1) < 3) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Boss Diplomacy unlocks in Phase 3: Controlling Territory.' });
+            return newState;
+          }
           const result = processNegotiation(newState, { ...action, isBossNegotiation: true });
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
@@ -5512,6 +5520,11 @@ export const useEnhancedMafiaGameState = (
           return newState;
         }
         case 'declare_war': {
+          // Phase gate: Phase 3+
+          if ((newState.gamePhase || 1) < 3) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Declare War unlocks in Phase 3: Controlling Territory.' });
+            return newState;
+          }
           // Boss action — costs $10K + 1 action point
           if (newState.turnPhase !== 'action') {
             newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'Declare War is only available during the Action phase.' });
