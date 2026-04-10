@@ -3,7 +3,9 @@ import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Crown, DollarSign, Shield, Swords, Users, Eye } from 'lucide-react';
+import { Crown, DollarSign, Shield, Swords, Users, Eye, Volume2, VolumeX } from 'lucide-react';
+import { useBgMusic } from '@/hooks/useBgMusic';
+import { useSoundSystem } from '@/hooks/useSoundSystem';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
 
@@ -129,11 +131,22 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
   const [mapSize, setMapSize] = useState<MapSize>('medium');
   const [seedInput, setSeedInput] = useState('');
+  const { soundConfig, updateSoundConfig } = useSoundSystem();
+
+  useBgMusic({ src: '/audio/mafia-theme.mp3', soundConfig });
 
   const activeFamily = families.find(f => f.id === selectedFamily);
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 overflow-hidden relative">
+      {/* Music mute toggle */}
+      <button
+        onClick={() => updateSoundConfig({ enabled: !soundConfig.enabled })}
+        className="absolute top-4 right-4 z-10 p-2 rounded-lg border border-border/50 bg-card/80 backdrop-blur-sm text-muted-foreground hover:text-foreground transition-colors"
+        title={soundConfig.enabled ? 'Mute music' : 'Unmute music'}
+      >
+        {soundConfig.enabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+      </button>
       {/* Subtle background grain */}
       <div
         className="absolute inset-0 opacity-[0.02] pointer-events-none"
