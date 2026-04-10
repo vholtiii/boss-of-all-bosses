@@ -27,6 +27,7 @@ import {
   SAFEHOUSE_COST, SAFEHOUSE_DEFENSE_BONUS, SAFEHOUSE_CAPTURE_BOUNTY, SAFEHOUSE_CAPTURE_INTEL_DURATION, SAFEHOUSE_TERRITORY_THRESHOLD, MAX_SAFEHOUSES,
   PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_FAIL_REPUTATION, PLAN_HIT_FAIL_LOYALTY,
   PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN,
+  PLAN_HIT_RESPECT, PLAN_HIT_FEAR, PLAN_HIT_LOOT, PLAN_HIT_CAPO_INFLUENCE,
   BASE_ACTIONS_PER_TURN, BONUS_ACTION_RESPECT_THRESHOLD, BONUS_ACTION_INFLUENCE_THRESHOLD,
   TACTICAL_ACTIONS_PER_TURN,
   HiddenUnit, AIBounty,
@@ -6161,9 +6162,10 @@ export const useEnhancedMafiaGameState = (
         chance -= BLIND_HIT_PENALTY;
       }
       
-      // Fortification modifiers (hex-based)
+      // Fortification modifiers (hex-based) — Plan Hit bypasses fortification defense
       const defenderHexFortified = isHexFortified(state.fortifiedHexes || [], targetQ, targetR, targetS, tile.controllingFamily);
-      if (defenderHexFortified) {
+      const isExecutingPlanHit = !!(state.plannedHit && (action._executingPlan || (state.plannedHit.q === targetQ && state.plannedHit.r === targetR && state.plannedHit.s === targetS)));
+      if (defenderHexFortified && !isExecutingPlanHit) {
         chance -= FORTIFY_DEFENSE_BONUS / 100;
       }
       // Safehouse defense bonus for defenders
@@ -6254,9 +6256,16 @@ export const useEnhancedMafiaGameState = (
       
       chance = Math.max(0.1, Math.min(0.95, chance));
 
-      // Heat scales with battle size
+      // Heat scales with battle size — modified by hit type
       const totalUnitsInvolved = attackers + defenders;
-      const heatGain = Math.min(25, 8 + totalUnitsInvolved * 2);
+      let heatGain = Math.min(25, 8 + totalUnitsInvolved * 2);
+      // Scouted hit: 50% reduced heat (clean, informed operation)
+      // Blind hit: 150% heat (reckless = more attention)
+      if (isScouted && !isExecutingPlanHit) {
+        heatGain = Math.floor(heatGain / 2);
+      } else if (!isScouted) {
+        heatGain = Math.floor(heatGain * 1.5);
+      }
 
       if (Math.random() < chance) {
         // ============ VICTORY ============
@@ -6368,6 +6377,46 @@ export const useEnhancedMafiaGameState = (
             details: hitDetails,
             timestamp: Date.now(),
           };
+        } else if (isExecutingPlanHit) {
+          // ===== PLAN HIT VICTORY: Surgical precision rewards =====
+          syncRespect(state, Math.min(100, (state.reputation.respect || 0) + PLAN_HIT_RESPECT));
+          state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + PLAN_HIT_FEAR);
+          state.resources.money += PLAN_HIT_LOOT;
+          
+          // Check if target was a capo — decapitation strike bonus
+          const planTargetUnit = enemyUnits.find(u => u.id === state.plannedHit?.targetUnitId);
+          if (planTargetUnit && planTargetUnit.type === 'capo') {
+            state.resources.influence = Math.min(100, (state.resources.influence || 0) + PLAN_HIT_CAPO_INFLUENCE);
+            state.pendingNotifications = [...state.pendingNotifications, {
+              type: 'success', title: '👑 Decapitation Strike!',
+              message: `You took out an enemy capo! +${PLAN_HIT_CAPO_INFLUENCE} influence from the power vacuum.`,
+            }];
+          }
+          
+          playerUnits.forEach(u => {
+            if (state.soldierStats[u.id]) {
+              state.soldierStats[u.id].hits += 1;
+              state.soldierStats[u.id].victories = Math.min(5, state.soldierStats[u.id].victories + 1);
+              state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
+              state.soldierStats[u.id].loyalty = Math.min(
+                u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
+                state.soldierStats[u.id].loyalty + LOYALTY_ACTION_BONUS + LOYALTY_COMBAT_BONUS
+              );
+            }
+          });
+          
+          const hitDetails = `+${PLAN_HIT_RESPECT} respect, +${PLAN_HIT_FEAR} fear, +$${PLAN_HIT_LOOT.toLocaleString()} loot. Zero casualties.`;
+          state.lastCombatResult = {
+            q: targetQ, r: targetR, s: targetS,
+            success: true, type: 'hit',
+            title: '🎯 PLAN HIT EXECUTED!',
+            details: hitDetails,
+            timestamp: Date.now(),
+          };
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'success', title: '🎯 Plan Hit Executed!',
+            message: `Surgical strike successful — clean execution. ${hitDetails}`,
+          }];
         } else {
           // ===== SCOUTED HIT VICTORY: Standard rewards =====
           syncRespect(state, Math.min(100, (state.reputation.respect || 0) + 5));
@@ -6401,6 +6450,10 @@ export const useEnhancedMafiaGameState = (
         }
         
         // Casualties — per-unit fortify re-roll (capos immune — wounded only)
+        // Plan Hit: zero attacker casualties on success (clean execution)
+        if (isExecutingPlanHit) {
+          // Skip all casualty processing for plan hits
+        } else {
         const killableUnits = playerUnits.filter(u => u.type !== 'capo');
         const playerCapos = playerUnits.filter(u => u.type === 'capo');
         const casualties = Math.max(0, Math.floor(killableUnits.length * 0.2));
@@ -6456,6 +6509,7 @@ export const useEnhancedMafiaGameState = (
             state.combatLog = [...(state.combatLog || []), `🩸 Capo wounded during assault on ${tile.district}`];
           }
         });
+        } // end casualty else block
       } else {
         // ============ DEFEAT — no fortify protection (attackers got overrun), capos wounded only ============
         const defeatKillable = playerUnits.filter(u => u.type !== 'capo');
