@@ -446,7 +446,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           phaseLocked={actionsLocked}
         >
           {actionsLocked ? (
-            <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Action phase</p>
+             <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Action step</p>
           ) : (
             <CorruptionPanel
               money={resources.money}
@@ -468,7 +468,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           phaseLocked={actionsLocked}
         >
           {actionsLocked ? (
-            <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Action phase</p>
+            <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Action step</p>
           ) : (
             <HitmanPanel
               hitmanContracts={gameState.hitmanContracts || []}
@@ -1131,7 +1131,7 @@ const CollapsibleSection: React.FC<{
     >
       {icon}
       <span className="flex-1">{title}</span>
-      {phaseLocked && <span className="text-[9px] text-muted-foreground font-normal italic">({title.includes('Recruit') || title.includes('Tactical') ? 'Move Phase' : 'Action Phase'})</span>}
+      {phaseLocked && <span className="text-[9px] text-muted-foreground font-normal italic">({title.includes('Recruit') || title.includes('Tactical') ? 'Tactical Step' : 'Action Step'})</span>}
       {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
     </button>
     <AnimatePresence>

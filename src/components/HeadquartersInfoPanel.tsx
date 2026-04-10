@@ -662,7 +662,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                   </div>
                 )}
                 {turnPhase !== 'action' && (
-                  <p className="text-[10px] text-muted-foreground italic">Available during Action phase</p>
+                  <p className="text-[10px] text-muted-foreground italic">Available during Action step</p>
                 )}
               </div>
             )}
@@ -700,7 +700,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                     </Button>
 
                     {!isActionPhase && !sitdownOpen && (
-                      <p className="text-[10px] text-muted-foreground italic text-center">Available during Action phase</p>
+                       <p className="text-[10px] text-muted-foreground italic text-center">Available during Action step</p>
                     )}
 
                     <AnimatePresence>
@@ -822,7 +822,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                     >
                       ⚔️ Declare War (${ DECLARE_WAR_COST.toLocaleString()})
                     </Button>
-                    {!isActionPhase && <p className="text-[10px] text-muted-foreground italic text-center">Available during Action phase</p>}
+                    {!isActionPhase && <p className="text-[10px] text-muted-foreground italic text-center">Available during Action step</p>}
                     {atMaxWars && isActionPhase && <p className="text-[10px] text-muted-foreground italic text-center">Max {WAR_MAX_SIMULTANEOUS} simultaneous wars</p>}
                     
                     <AnimatePresence>

@@ -606,7 +606,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           variant={gameState.turnPhase === 'action' ? 'default' : 'outline'}
         >
           <SkipForward className="h-4 w-4 mr-2" />
-          {gameState.turnPhase === 'action' ? 'Next Phase' : gameState.turnPhase === 'waiting' ? 'Waiting...' : `End ${gameState.turnPhase === 'move' ? 'Tactical' : gameState.turnPhase.charAt(0).toUpperCase() + gameState.turnPhase.slice(1)}`}
+          {gameState.turnPhase === 'action' ? 'End Turn' : gameState.turnPhase === 'waiting' ? 'Waiting...' : 'Next Step'}
         </Button>
 
         {(gameState.turnPhase === 'deploy' || gameState.turnPhase === 'move') && (
@@ -836,9 +836,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const gp = (gameState as any).gamePhase || 1;
   const gpConfig = PHASE_CONFIGS[gp - 1];
   const phaseConfig: Record<string, { label: string; hint: string; color: string }> = {
-    deploy: { label: '📦 DEPLOY', hint: 'Deploy units from HQ & move them across the map', color: 'bg-blue-600/80' },
-    move: { label: '📋 TACTICAL PHASE', hint: `Scout, Fortify, Escort, Safehouse, Send Word (${gameState.tacticalActionsRemaining}/${gameState.maxTacticalActions} left) — no movement`, color: 'bg-amber-600/80' },
-    action: { label: '⚔️ ACTION PHASE', hint: `Hit, Extort, Claim, Negotiate (${gameState.actionsRemaining}/${gameState.maxActions} left)`, color: 'bg-red-600/80' },
+    deploy: { label: '📦 DEPLOY STEP', hint: 'Deploy units from HQ & move them across the map', color: 'bg-blue-600/80' },
+    move: { label: '📋 TACTICAL STEP', hint: `Scout, Fortify, Escort, Safehouse, Send Word (${gameState.tacticalActionsRemaining}/${gameState.maxTacticalActions} left) — no movement`, color: 'bg-amber-600/80' },
+    action: { label: '⚔️ ACTION STEP', hint: `Hit, Extort, Claim, Negotiate (${gameState.actionsRemaining}/${gameState.maxActions} left)`, color: 'bg-red-600/80' },
     waiting: { label: '⏳ END TURN', hint: 'Press End Turn to advance', color: 'bg-muted' },
   };
   const currentPhaseConfig = phaseConfig[gameState.turnPhase] || phaseConfig.waiting;
