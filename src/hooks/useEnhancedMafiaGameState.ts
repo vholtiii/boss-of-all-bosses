@@ -1103,8 +1103,13 @@ export const useEnhancedMafiaGameState = (
     const isPlayer = family === state.playerFamily;
     const respect = isPlayer ? state.reputation.respect : (state.aiOpponents.find(o => o.family === family)?.resources.respect || 0);
     const capoCount = state.deployedUnits.filter(u => u.family === family && u.type === 'capo').length;
-    const builtBusinessCount = state.hexMap.filter(t => t.controllingFamily === family && t.business && !t.business.isExtorted).length;
-    const income = isPlayer ? state.lastTurnIncome : 0;
+    // For AI, count any hex with a business (extorted or not) since AI doesn't build businesses
+    const builtBusinessCount = isPlayer
+      ? state.hexMap.filter(t => t.controllingFamily === family && t.business && !t.business.isExtorted).length
+      : state.hexMap.filter(t => t.controllingFamily === family && t.business).length;
+    const income = isPlayer
+      ? state.lastTurnIncome
+      : (state.aiOpponents.find(o => o.family === family)?.resources.lastTurnIncome || 0);
 
     // Check from highest phase down
     for (let p = 3; p >= 0; p--) {

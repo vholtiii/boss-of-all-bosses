@@ -116,6 +116,9 @@ export interface AIOpponent {
     soldiers: number;
     influence: number;
     respect: number;
+    lastTurnIncome?: number;
+    commissionCooldownUntil?: number;
+    cachedPhase?: number;
   };
   strategy: AIStrategy;
   relationships: {
