@@ -3324,13 +3324,13 @@ export const useEnhancedMafiaGameState = (
 
   // ============ DISTRICT CONTROL BONUSES ============
   const DISTRICT_CONTROL_THRESHOLD = 0.6;
-  const DISTRICT_BONUSES: Record<string, { bonusType: string; description: string }> = {
-    'Manhattan': { bonusType: 'income', description: '+20% business income in Manhattan' },
-    'Little Italy': { bonusType: 'loyalty', description: '+15% loyalty retention' },
-    'Brooklyn': { bonusType: 'heat', description: '-3 heat/turn' },
-    'Bronx': { bonusType: 'recruit_discount', description: '$500 off recruitment' },
-    'Queens': { bonusType: 'extortion', description: '+10% extortion success' },
-    'Staten Island': { bonusType: 'respect', description: '+2 respect/turn' },
+  const DISTRICT_BONUSES: Record<string, { bonusType: string; description: string; secondaryBonusType: string; secondaryDescription: string }> = {
+    'Manhattan': { bonusType: 'income', description: '+25% business income in Manhattan', secondaryBonusType: 'extra_ap', secondaryDescription: '+1 max action point per turn' },
+    'Little Italy': { bonusType: 'loyalty', description: '+20% loyalty retention', secondaryBonusType: 'fast_safehouse', secondaryDescription: 'Soldiers return from hiding 1 turn faster' },
+    'Brooklyn': { bonusType: 'heat', description: '-5 heat/turn', secondaryBonusType: 'combat_defense', secondaryDescription: '+10% combat defense in Brooklyn' },
+    'Bronx': { bonusType: 'recruit_discount', description: '$750 off recruitment', secondaryBonusType: 'free_recruit', secondaryDescription: 'Free soldier recruit every 3 turns' },
+    'Queens': { bonusType: 'extortion', description: '+15% extortion success', secondaryBonusType: 'hit_bonus', secondaryDescription: '+5% hit success on all attacks' },
+    'Staten Island': { bonusType: 'respect', description: '+3 respect/turn', secondaryBonusType: 'influence_gain', secondaryDescription: '+1 influence/turn' },
   };
 
   const computeDistrictBonuses = (state: EnhancedMafiaGameState, turnReport?: TurnReport) => {
@@ -3355,7 +3355,9 @@ export const useEnhancedMafiaGameState = (
         if (count / total >= DISTRICT_CONTROL_THRESHOLD) {
           const bonusDef = DISTRICT_BONUSES[district];
           if (bonusDef) {
-            newBonuses.push({ district, family, ...bonusDef });
+            newBonuses.push({ district, family, bonusType: bonusDef.bonusType, description: bonusDef.description });
+            // Also add secondary bonus
+            newBonuses.push({ district, family, bonusType: bonusDef.secondaryBonusType, description: bonusDef.secondaryDescription });
           }
         }
       });
@@ -3363,33 +3365,60 @@ export const useEnhancedMafiaGameState = (
 
     // Detect gained/lost bonuses for player notifications
     const playerFamily = state.playerFamily;
-    const prevPlayerBonuses = prevBonuses.filter(b => b.family === playerFamily);
-    const newPlayerBonuses = newBonuses.filter(b => b.family === playerFamily);
+    const prevPlayerDistricts = new Set(prevBonuses.filter(b => b.family === playerFamily).map(b => b.district));
+    const newPlayerDistricts = new Set(newBonuses.filter(b => b.family === playerFamily).map(b => b.district));
 
-    newPlayerBonuses.forEach(nb => {
-      if (!prevPlayerBonuses.some(pb => pb.district === nb.district)) {
+    // Notify gained districts (not individual bonus lines)
+    for (const district of newPlayerDistricts) {
+      if (!prevPlayerDistricts.has(district)) {
+        const bonusDef = DISTRICT_BONUSES[district];
         state.pendingNotifications.push({
-          type: 'success', title: `🏰 District Control: ${nb.district}`,
-          message: nb.description,
+          type: 'success', title: `🏰 District Control: ${district}`,
+          message: `${bonusDef.description} + ${bonusDef.secondaryDescription}. Universal: Turf Tax & Safe Passage active.`,
         });
-        if (turnReport) turnReport.events.push(`🏰 Gained control of ${nb.district}: ${nb.description}`);
+        if (turnReport) turnReport.events.push(`🏰 Gained control of ${district}: ${bonusDef.description} + ${bonusDef.secondaryDescription}`);
       }
-    });
-    prevPlayerBonuses.forEach(pb => {
-      if (!newPlayerBonuses.some(nb => nb.district === pb.district)) {
+    }
+    for (const district of prevPlayerDistricts) {
+      if (!newPlayerDistricts.has(district)) {
         state.pendingNotifications.push({
-          type: 'warning', title: `⚠️ Lost Control: ${pb.district}`,
-          message: `You no longer control 60% of ${pb.district}. Bonus lost.`,
+          type: 'warning', title: `⚠️ Lost Control: ${district}`,
+          message: `You no longer control 60% of ${district}. All bonuses lost.`,
         });
-        if (turnReport) turnReport.events.push(`⚠️ Lost control of ${pb.district} — bonus removed`);
+        if (turnReport) turnReport.events.push(`⚠️ Lost control of ${district} — bonuses removed`);
       }
-    });
+    }
 
     state.activeDistrictBonuses = newBonuses;
+
+    // ============ UNIVERSAL: TURF TAX ============
+    // Enemy units on hexes in player-controlled districts lose 5 loyalty/turn
+    const playerControlledDistricts = new Set(
+      newBonuses.filter(b => b.family === state.playerFamily).map(b => b.district)
+    );
+    if (playerControlledDistricts.size > 0) {
+      state.deployedUnits.forEach(u => {
+        if (u.family === state.playerFamily || u.family === 'neutral') return;
+        const unitTile = state.hexMap.find(t => t.q === u.q && t.r === u.r && t.s === u.s);
+        if (unitTile && playerControlledDistricts.has(unitTile.district)) {
+          const stats = state.soldierStats[u.id];
+          if (stats) {
+            stats.loyalty = Math.max(0, stats.loyalty - 5);
+          }
+        }
+      });
+      if (turnReport) {
+        turnReport.events.push(`💰 Turf Tax: Enemy units in your controlled districts lose 5 loyalty.`);
+      }
+    }
   };
 
   const hasPlayerDistrictBonus = (state: EnhancedMafiaGameState, bonusType: string): boolean => {
     return (state.activeDistrictBonuses || []).some(b => b.family === state.playerFamily && b.bonusType === bonusType);
+  };
+
+  const hasFamilyDistrictBonus = (state: EnhancedMafiaGameState, family: string, bonusType: string): boolean => {
+    return (state.activeDistrictBonuses || []).some(b => b.family === family && b.bonusType === bonusType);
   };
 
   // ============ ECONOMY (with family bonuses) ============
