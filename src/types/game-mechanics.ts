@@ -293,7 +293,8 @@ export interface ShareProfitsPact {
 
 export interface SupplyDealPact {
   id: string;
-  targetFamily: string;
+  buyerFamily: string;    // family gaining supply access
+  targetFamily: string;   // family providing supply access (gets paid)
   turnsRemaining: number;
   turnFormed: number;
   active: boolean;
