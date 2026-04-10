@@ -227,6 +227,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     warSummitCooldownUntil: state.warSummitCooldownUntil || 0,
     gamePhase: state.gamePhase || 1,
     commissionVoteCooldownUntil: state.commissionVoteCooldownUntil || 0,
+    commissionVoteResult: state.commissionVoteResult || null,
   });
 
 // ============ UNIT TYPES ============
