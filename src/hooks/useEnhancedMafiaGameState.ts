@@ -1273,7 +1273,8 @@ export const useEnhancedMafiaGameState = (
       if (nextPhase === 'action') {
         const hasBonus = prev.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD && 
                          prev.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
-        maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0);
+        const manhattanAP = (prev.activeDistrictBonuses || []).some((b: any) => b.family === prev.playerFamily && b.bonusType === 'extra_ap') ? 1 : 0;
+        maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0) + manhattanAP;
         actionsRemaining = maxActions;
       }
       
@@ -1331,7 +1332,8 @@ export const useEnhancedMafiaGameState = (
       if (prev.turnPhase === 'action' || prev.turnPhase === 'waiting') return prev;
       const hasBonus = prev.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD && 
                        prev.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
-      const maxActs = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0);
+      const manhattanAP = (prev.activeDistrictBonuses || []).some((b: any) => b.family === prev.playerFamily && b.bonusType === 'extra_ap') ? 1 : 0;
+      const maxActs = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0) + manhattanAP;
       return {
         ...prev,
         turnPhase: 'action' as TurnPhase,
@@ -2407,7 +2409,8 @@ export const useEnhancedMafiaGameState = (
       // Reset action & tactical budgets for new turn
       const hasBonus = newState.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD && 
                        newState.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
-      newState.maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0);
+      const manhattanAP = hasPlayerDistrictBonus(newState, 'extra_ap') ? 1 : 0;
+      newState.maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0) + manhattanAP;
       newState.actionsRemaining = newState.maxActions;
       newState.tacticalActionsRemaining = TACTICAL_ACTIONS_PER_TURN;
       newState.maxTacticalActions = TACTICAL_ACTIONS_PER_TURN;
@@ -6730,7 +6733,7 @@ export const useEnhancedMafiaGameState = (
         
         state.hiddenUnits = [...state.hiddenUnits, {
           unitId: hidingSoldier.id,
-          returnsOnTurn: state.turn + HIDING_DURATION,
+          returnsOnTurn: state.turn + HIDING_DURATION - (hasPlayerDistrictBonus(state, 'fast_safehouse') ? 1 : 0),
         }];
         
         state.lastCombatResult = {
@@ -6796,6 +6799,10 @@ export const useEnhancedMafiaGameState = (
       // Family bonuses (hitmen no longer provide combat bonuses — they are external contractors)
       chance += state.familyBonuses.combatBonus / 100;
       chance += state.familyBonuses.hitSuccess / 100;
+      // Secondary: Queens +5% hit success on all attacks
+      if (hasPlayerDistrictBonus(state, 'hit_bonus')) {
+        chance += 0.05;
+      }
 
       // Scout intel bonus — fresh intel gives full bonus, stale gives half
       if (isScouted) {
