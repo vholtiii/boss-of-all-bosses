@@ -6930,7 +6930,7 @@ export const useEnhancedMafiaGameState = (
             }
             
             // Player gains influence from bold move
-            state.influence = Math.min(100, (state.influence || 0) + BLIND_HIT_INFLUENCE_GAIN);
+            state.resources.influence = Math.min(100, (state.resources.influence || 0) + BLIND_HIT_INFLUENCE_GAIN);
             
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'warning', title: `🎯 Bounty Placed by ${targetFamily.charAt(0).toUpperCase() + targetFamily.slice(1)}!`,
