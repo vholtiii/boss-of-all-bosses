@@ -1260,6 +1260,14 @@ export const useEnhancedMafiaGameState = (
     });
   };
 
+  const isAdjacentToEnemyTerritory = (q: number, r: number, s: number, hexMap: HexTile[], playerFamily: string): boolean => {
+    const neighbors = getHexNeighbors(q, r, s);
+    return neighbors.some(n => {
+      const tile = hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+      return tile?.controllingFamily && tile.controllingFamily !== playerFamily;
+    });
+  };
+
   // ============ PHASE-BASED TURN SYSTEM ============
   const advancePhase = useCallback(() => {
     setGameState(prev => {
@@ -1683,8 +1691,10 @@ export const useEnhancedMafiaGameState = (
       let remainingMoves = unit.movesRemaining - moveCost;
 
       // FIX #5: Zone of control applies even on free moves — free movement skips COST but not ZoC
-      if (unit.type === 'soldier') {
-        if (isAdjacentToEnemy(targetLocation.q, targetLocation.r, targetLocation.s, prev.hexMap, prev.deployedUnits, prev.playerFamily)) {
+      // Territorial ZoC: Phase 3+ only — soldiers stop near enemy units OR rival-claimed territory
+      if (unit.type === 'soldier' && (prev.gamePhase || 1) >= 3) {
+        if (isAdjacentToEnemy(targetLocation.q, targetLocation.r, targetLocation.s, prev.hexMap, prev.deployedUnits, prev.playerFamily) ||
+            isAdjacentToEnemyTerritory(targetLocation.q, targetLocation.r, targetLocation.s, prev.hexMap, prev.playerFamily)) {
           remainingMoves = 0;
         }
       }
