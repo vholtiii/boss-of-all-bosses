@@ -3,7 +3,9 @@ import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Crown, DollarSign, Shield, Swords, Users, Eye } from 'lucide-react';
+import { Crown, DollarSign, Shield, Swords, Users, Eye, Volume2, VolumeX } from 'lucide-react';
+import { useBgMusic } from '@/hooks/useBgMusic';
+import { useSoundSystem } from '@/hooks/useSoundSystem';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
 
@@ -129,6 +131,9 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
   const [mapSize, setMapSize] = useState<MapSize>('medium');
   const [seedInput, setSeedInput] = useState('');
+  const { soundConfig, updateSoundConfig } = useSoundSystem();
+
+  useBgMusic({ src: '/audio/mafia-theme.mp3', soundConfig });
 
   const activeFamily = families.find(f => f.id === selectedFamily);
 
