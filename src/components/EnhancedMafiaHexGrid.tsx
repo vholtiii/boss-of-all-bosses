@@ -473,12 +473,13 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         const canSafehouse = isOwned && !tile.isHeadquarters && !isCapoWounded;
         const negotiateCapoId = readyPending?.capoId || (isCapo ? selectedUnit.id : undefined);
         
-        // HQ Assault: soldier adjacent to enemy HQ
+        // HQ Assault: soldier adjacent to enemy HQ — Phase 4 required
         const isAdjacentToHQ = isEnemyHQ && isSoldier && !unitOnTargetHex;
         const soldierStats = gameState?.soldierStats?.[selectedUnit.id];
         const meetsToughness = soldierStats && soldierStats.toughness >= 4 && soldierStats.loyalty >= 70;
-        const canAssaultHQ = isAdjacentToHQ && meetsToughness;
-        const canFlipSoldier = isEnemyHQ && isAdjacentToHQ;
+        const currentGamePhase = (gameState?.gamePhase || 1);
+        const canAssaultHQ = isAdjacentToHQ && meetsToughness && currentGamePhase >= 4;
+        const canFlipSoldier = isEnemyHQ && isAdjacentToHQ && currentGamePhase >= 3;
         
         // Compute reasons for disabled actions (contextually relevant only)
         const reasons: Record<string, string> = {};
@@ -515,7 +516,11 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         if (isEnemyHQ && !canAssaultHQ) {
           if (!isSoldier) reasons.assault_hq = 'Need a soldier';
           else if (unitOnTargetHex) reasons.assault_hq = 'Must be adjacent, not on HQ';
+          else if (currentGamePhase < 4) reasons.assault_hq = '🔒 Unlocks in Phase 4';
           else if (!meetsToughness) reasons.assault_hq = `Need Tough ≥ 4, Loyalty ≥ 70`;
+        }
+        if (isEnemyHQ && isAdjacentToHQ && !canFlipSoldier) {
+          if (currentGamePhase < 3) reasons.flip_soldier = '🔒 Unlocks in Phase 3';
         }
         
         // Filter out empty reasons
