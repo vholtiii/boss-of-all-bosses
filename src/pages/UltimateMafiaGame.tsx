@@ -211,6 +211,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const [showTutorial, setShowTutorial] = useState(false);
   const [showTurnSummary, setShowTurnSummary] = useState(false);
   const [bossHighlightHex, setBossHighlightHex] = useState<{ q: number; r: number; s: number } | null>(null);
+  const [highlightedFamily, setHighlightedFamily] = useState<string | null>(null);
   const [selectedHeadquarters, setSelectedHeadquarters] = useState<{
     family: string;
     headquarters: any;
@@ -482,7 +483,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   );
 
   const rightSidebar = (
-    <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} />
+    <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} onHighlightFamily={setHighlightedFamily} highlightedFamily={highlightedFamily} />
   );
 
   const topBar = (
@@ -987,7 +988,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onPlanHitSelectSoldier={(unitId) => handleAction({ type: 'plan_hit_select_soldier', unitId })}
             onCancelPlanHit={() => handleAction({ type: 'cancel_plan_hit_mode' })}
             bossHighlightHex={bossHighlightHex}
-            onClearHighlight={() => setBossHighlightHex(null)}
+            highlightedFamily={highlightedFamily}
+            onClearHighlight={() => { setBossHighlightHex(null); setHighlightedFamily(null); }}
           />
     </div>
   );
