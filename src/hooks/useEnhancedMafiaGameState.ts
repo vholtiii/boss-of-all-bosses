@@ -1790,6 +1790,7 @@ export const useEnhancedMafiaGameState = (
   const fortifyUnit = useCallback(() => {
     setGameState(prev => {
       if (prev.turnPhase !== 'move') return prev;
+      if ((prev.gamePhase || 1) < 2) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🔒 Phase Locked', message: 'Fortification unlocks in Phase 2: Establishing Territory.' }] };
       if (prev.tacticalActionsRemaining <= 0) return prev;
       if (!prev.selectedUnitId) return prev;
       const unit = prev.deployedUnits.find(u => u.id === prev.selectedUnitId);
