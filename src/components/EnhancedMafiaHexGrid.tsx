@@ -746,8 +746,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       viewBox="0 0 10 6"
                       refX="5"
                       refY="3"
-                      markerWidth="5"
-                      markerHeight="3"
+                      markerWidth="3.5"
+                      markerHeight="2"
                       orient="auto"
                     >
                       <path d="M0,0 L10,3 L0,6 Z" fill={pColor} fillOpacity="0.7" />
