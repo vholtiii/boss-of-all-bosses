@@ -861,7 +861,10 @@ const createInitialGameState = (
       economic: { current: 0, target: 50000, met: false },
       legacy: { current: 0, highestRival: 0, met: false },
       domination: { eliminated: 0, target: 4, met: false },
+      commission: { supporting: 0, needed: 0, met: false },
     },
+    gamePhase: 1 as GamePhase,
+    commissionVoteCooldownUntil: 0,
     flippedSoldiers: [],
     eliminatedFamilies: [],
     sitdownCooldownUntil: 0,
@@ -1064,6 +1067,7 @@ export const useEnhancedMafiaGameState = (
       economic: { current: income, target: ECONOMIC_TARGET, met: income >= ECONOMIC_TARGET },
       legacy: { current: playerRep, highestRival, met: legacyMet },
       domination: { eliminated: eliminatedCount, target: 4, met: eliminatedCount >= 4 },
+      commission: state.victoryProgress.commission || { supporting: 0, needed: 0, met: false },
     };
 
     const prevVictory = state.victoryType;
