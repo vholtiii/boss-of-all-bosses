@@ -145,6 +145,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   warSummitCooldownUntil = 0,
   activeWars = [],
   actionsRemaining = 0,
+  gamePhase = 1,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const [bossExpanded, setBossExpanded] = useState(false);
