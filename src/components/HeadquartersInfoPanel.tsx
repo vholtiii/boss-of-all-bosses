@@ -679,7 +679,8 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                   u.family === family &&
                   !(u.q === headquarters.q && u.r === headquarters.r && u.s === headquarters.s)
                 );
-                const canOpen = isActionPhase && !onCooldown && awayUnits.length > 0;
+                const sitdownPhaseLocked = gamePhase < 2;
+                const canOpen = isActionPhase && !onCooldown && awayUnits.length > 0 && !sitdownPhaseLocked;
 
                 return (
                   <div className="mt-2 space-y-2">
