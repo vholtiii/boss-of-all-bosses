@@ -454,6 +454,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               rivalFamilies={gameState.aiOpponents.map(o => o.family)}
               reputation={gameState.reputation.reputation}
               heat={gameState.policeHeat.level}
+              gamePhase={(gameState as any).gamePhase || 1}
               onBribe={(tier, targetFamily) => onAction({ type: 'bribe_corruption', tier, targetFamily })}
             />
           )}
@@ -476,6 +477,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               playerFamily={gameState.playerFamily}
               money={resources.money}
               currentTurn={gameState.turn}
+              gamePhase={(gameState as any).gamePhase || 1}
               onHire={(targetUnitId, targetFamily) => onAction({ type: 'hire_hitman', targetUnitId, targetFamily })}
             />
           )}

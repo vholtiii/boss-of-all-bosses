@@ -1150,6 +1150,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
             warSummitCooldownUntil={(gameState as any).warSummitCooldownUntil || 0}
             activeWars={(gameState as any).activeWars || []}
             actionsRemaining={gameState.actionsRemaining || 0}
+            gamePhase={(gameState as any).gamePhase || 1}
           />
         );
       })()}

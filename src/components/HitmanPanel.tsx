@@ -12,15 +12,17 @@ interface HitmanPanelProps {
   playerFamily: string;
   money: number;
   currentTurn: number;
+  gamePhase: number;
   onHire: (targetUnitId: string, targetFamily: string) => void;
 }
 
 const HitmanPanel: React.FC<HitmanPanelProps> = ({
-  hitmanContracts, deployedUnits, playerFamily, money, currentTurn, onHire
+  hitmanContracts, deployedUnits, playerFamily, money, currentTurn, gamePhase, onHire
 }) => {
   const [selecting, setSelecting] = useState(false);
 
-  const canHire = hitmanContracts.length < MAX_HITMEN && money >= HITMAN_CONTRACT_COST;
+  const phaseLocked = gamePhase < 3;
+  const canHire = !phaseLocked && hitmanContracts.length < MAX_HITMEN && money >= HITMAN_CONTRACT_COST;
 
   // Build target list: enemy soldiers and capos, grouped by family
   const enemyUnits = deployedUnits.filter(u => u.family !== playerFamily);
@@ -94,7 +96,11 @@ const HitmanPanel: React.FC<HitmanPanelProps> = ({
           ${HITMAN_CONTRACT_COST.toLocaleString()} · No heat · No bonuses · 3-5 turn ETA · 50% refund on failure
         </p>
 
-        {!selecting ? (
+        {phaseLocked ? (
+          <div className="text-xs text-muted-foreground italic flex items-center gap-1">
+            🔒 Unlocks in Phase 3: Controlling Territory
+          </div>
+        ) : !selecting ? (
           <Button
             size="sm"
             variant="destructive"

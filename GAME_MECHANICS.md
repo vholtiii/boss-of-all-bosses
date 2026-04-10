@@ -414,9 +414,9 @@ The game is divided into four phases that gate which mechanics are available. Ph
 | Minimum turn | 1 (start of game) |
 | Milestones | None |
 
-**Available**: Move, Extort, Claim, Recruit soldiers, Blind Hits (combat without scouting)
+**Available**: Move, Claim neutral territory, Extort (neutral hexes only), Recruit soldiers (mercenaries only), Blind Hits (combat without scouting)
 
-**Locked**: Scouting, Plan Hits, Capo Promotion, Safehouses, Fortification, Boss Diplomacy, Alliances, Commission Vote
+**Locked**: Scouting, Plan Hits, Capo Promotion, Safehouses, Fortification, Enemy Extortion, Patrol Officer Bribes, Boss Sitdown, Hitman Contracts, Go to the Mattresses, War Summit, Flip Soldier, HQ Assault, Boss Diplomacy, Alliances, Commission Vote
 
 ### 16.2 Phase 2: Establishing Territory 🏴
 
@@ -426,7 +426,7 @@ The game is divided into four phases that gate which mechanics are available. Ph
 | Controlled hexes | 8+ |
 | Respect | 20+ |
 
-**Unlocks**: Scouting, Plan Hits, Capo Promotion, Safehouses, Fortification
+**Unlocks**: Scouting, Plan Hits, Capo Promotion, Safehouses, Fortification, Enemy Extortion, Patrol Officer Bribe, Boss Sitdown, Local Recruitment
 
 ### 16.3 Phase 3: Controlling Territory 🏛️
 
@@ -437,7 +437,7 @@ The game is divided into four phases that gate which mechanics are available. Ph
 | Capos | 2+ |
 | Built businesses | 1+ |
 
-**Unlocks**: Boss Diplomacy, Alliances, Ceasefires, Captain+ Bribes (Police Captain, Chief, Mayor)
+**Unlocks**: Boss Diplomacy, Alliances, Ceasefires, Captain+ Bribes (Police Captain, Chief, Mayor), Hitman Contracts ($30K), Go to the Mattresses, War Summit, Flip Soldier
 
 > **AI Note**: AI families do not build businesses — any business on AI-controlled territory (extorted or pre-existing) counts toward this requirement.
 
@@ -448,7 +448,7 @@ The game is divided into four phases that gate which mechanics are available. Ph
 | Minimum turn | 30 |
 | **Any one of**: | 35+ hexes **OR** $40,000+ income **OR** 80+ respect |
 
-**Unlocks**: Commission Vote (diplomatic victory path)
+**Unlocks**: Commission Vote (diplomatic victory path), HQ Assault (the ultimate power move)
 
 ### 16.5 Phase Notifications
 
