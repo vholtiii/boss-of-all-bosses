@@ -3907,7 +3907,7 @@ export const useEnhancedMafiaGameState = (
           }
 
           // Alert: fortify chance (hex-based)
-          if (isAlerted && !isHexFortified(state.fortifiedHexes || [], unit.q, unit.r, unit.s, fam) && Math.random() < 0.3 && aiTacticalRemaining > 0 && (state.fortifiedHexes || []).filter(f => f.family === fam).length < MAX_FORTIFICATIONS) {
+          if (aiPhase >= 2 && isAlerted && !isHexFortified(state.fortifiedHexes || [], unit.q, unit.r, unit.s, fam) && Math.random() < 0.3 && aiTacticalRemaining > 0 && (state.fortifiedHexes || []).filter(f => f.family === fam).length < MAX_FORTIFICATIONS) {
             state.fortifiedHexes = [...(state.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: fam, fortifiedOnTurn: state.turn }];
             unit.movesRemaining = 0;
             aiTacticalRemaining--;
@@ -4326,7 +4326,7 @@ export const useEnhancedMafiaGameState = (
         const shTile = state.hexMap.find(t => t.q === s.q && t.r === s.r && t.s === s.s);
         return shTile && shTile.controllingFamily === fam;
       });
-      if (aiFamHexes.length >= 8 && opponent.resources.money >= 5000 && aiCapos.length > 0 && !aiHasSafehouse) {
+      if (aiPhase >= 2 && aiFamHexes.length >= 8 && opponent.resources.money >= 5000 && aiCapos.length > 0 && !aiHasSafehouse) {
         // Pick a border hex (adjacent to enemy territory) with most friendly neighbors
         const borderHexes = aiFamHexes.filter(h => {
           const neighbors = getHexNeighbors(h.q, h.r, h.s);
@@ -4371,7 +4371,7 @@ export const useEnhancedMafiaGameState = (
       const hasAllianceWithPlayer = (state.alliances || []).some(p => p.alliedFamily === fam && p.active);
       if (hasCeasefireWithPlayer || hasAllianceWithPlayer) {
         // Skip plan hit — active pact with player
-      } else if ((personality === 'aggressive' || personality === 'opportunistic') && Math.random() < AI_PLAN_HIT_CHANCE) {
+      } else if (aiPhase >= 2 && (personality === 'aggressive' || personality === 'opportunistic') && Math.random() < AI_PLAN_HIT_CHANCE) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
         const availableTargets = playerCapos.filter(c => !alreadyTargeted.has(c.id));
