@@ -1,40 +1,37 @@
 
 
-# Enhanced District Control Bonuses
+# AI District Control Awareness
 
-## Design
+## What Changes
 
-Each district gets its existing (primary) bonus **boosted** plus a new **secondary** bonus. Both activate at 60% control.
+AI families already receive bonus entries in `activeDistrictBonuses` (the `computeDistrictBonuses` function tracks all families). The missing piece is that bonuses are only **applied** to the player via `hasPlayerDistrictBonus`. This plan applies them to AI families too.
 
-### Updated Bonus Table
+## Bonuses to Apply for AI
 
-| District | Primary Bonus (Boosted) | Secondary Bonus (New) |
+| Bonus | Where Applied | Change |
 |---|---|---|
-| **Manhattan** | +25% business income (was +20%) | +1 max action point per turn |
-| **Little Italy** | +20% loyalty retention (was +15%) | Free safehouse (soldiers hiding return 1 turn faster) |
-| **Brooklyn** | -5 heat/turn (was -3) | +10% combat defense for all units in Brooklyn |
-| **Bronx** | $750 off recruitment (was $500) | Free soldier recruit every 3 turns |
-| **Queens** | +15% extortion success (was +10%) | +5% hit success on all attacks |
-| **Staten Island** | +3 respect/turn (was +2) | +1 influence/turn |
-
-### Universal District Control Bonus (any controlled district)
-- **Turf Tax**: Enemy units on hexes in your controlled districts lose **5 loyalty/turn**
-- **Safe Passage**: Friendly units get **+1 movement range** within controlled districts
+| **Manhattan +25% income** | AI income loop (~line 3803) | Multiply AI tile income by 1.25 if AI controls Manhattan |
+| **Little Italy +20% loyalty** | Not applicable — AI doesn't track per-soldier loyalty decay the same way | Skip (minimal impact) |
+| **Brooklyn -5 heat** | Not applicable — AI doesn't have police heat | Skip |
+| **Brooklyn +10% defense** | Already implemented (line 6821) | No change needed |
+| **Bronx $750 recruit discount** | AI recruit section (~line 3824) | Reduce effective cost by $750 |
+| **Bronx free recruit every 3 turns** | AI recruit section (~line 3823) | Grant +1 free soldier every 3 turns |
+| **Queens +15% extortion** | AI doesn't run extortion rolls | Skip |
+| **Queens +5% hit success** | AI combat (~line 4119) | Increase combat willingness / kill chance |
+| **Staten Island +3 respect** | AI resource tracking | Add respect to AI opponent |
+| **Staten Island +1 influence** | AI resource tracking | Add influence to AI opponent |
+| **Manhattan +1 AP** | AI action budget (~line 3912) | Add +1 to `aiActionsRemaining` |
+| **Turf Tax (universal)** | Already only applies player-controlled districts draining enemies | Extend to ALL controlling families draining enemies on their turf |
 
 ## Files Modified
 
 1. **`src/hooks/useEnhancedMafiaGameState.ts`**
-   - Update `DISTRICT_BONUSES` to include both primary and secondary bonus types per district
-   - Boost primary bonus values at each application point (income 1.2→1.25, loyalty +0.5→+0.7, heat 3→5, recruit $500→$750, extortion 0.10→0.15, respect 2→3)
-   - Add secondary bonus checks: Manhattan AP boost in turn start, Brooklyn defense in combat, Bronx free recruit counter, Queens hit bonus, Staten Island influence, Little Italy hiding reduction
-   - Add universal turf tax logic in turn processing (enemy loyalty drain)
-   - Add safe passage movement bonus when moving through controlled districts
-   - Update `hasPlayerDistrictBonus` to support multiple bonus types per district
+   - **AI Income** (~line 3803): After computing `aiIncome`, check `hasFamilyDistrictBonus(state, fam, 'income')` and multiply by 1.25
+   - **AI Recruitment** (~line 3824): Reduce `SOLDIER_COST` by 750 if `hasFamilyDistrictBonus(state, fam, 'recruit_discount')`; grant +1 free soldier if `hasFamilyDistrictBonus(state, fam, 'free_recruit')` and `turn % 3 === 0`
+   - **AI Action Budget** (~line 3912): Add +1 to `aiActionsRemaining` if `hasFamilyDistrictBonus(state, fam, 'extra_ap')`
+   - **AI Combat** (~line 4126): Reduce `baseKillChance` by 0.05 if attacking AI has Queens hit bonus (`hasFamilyDistrictBonus(state, fam, 'hit_bonus')`)
+   - **AI Resources** (after income section): Add +3 respect and +1 influence per turn if AI has Staten Island bonuses
+   - **Turf Tax** (~line 3440-3459): Extend loop to apply for ALL families that control any district, not just the player — enemy units on any family's controlled district hexes lose 5 loyalty
 
-2. **`src/components/GameSidePanels.tsx`**
-   - Update the District Control UI section to show both primary and secondary bonuses
-   - Show universal bonuses (Turf Tax, Safe Passage) when player controls any district
-
-3. **`GAME_MECHANICS.md`** / **`COMBAT_SYSTEM_GUIDE.md`**
-   - Document the enhanced district control system with all new bonuses
+2. **`GAME_MECHANICS.md`** — Add note that AI families benefit from the same district control bonuses
 
