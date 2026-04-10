@@ -1333,7 +1333,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         points={pts.map(p => `${p.x},${p.y}`).join(' ')}
                         fill="none"
                         stroke={storedColor}
-                        strokeWidth="6"
+                        strokeWidth="3"
                         strokeOpacity="0.2"
                         strokeLinejoin="round"
                         strokeLinecap="round"
@@ -1344,9 +1344,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         points={pts.map(p => `${p.x},${p.y}`).join(' ')}
                         fill="none"
                         stroke={storedColor}
-                        strokeWidth="4"
+                        strokeWidth="2"
                         strokeOpacity="0.8"
-                        strokeDasharray="8 4"
+                        strokeDasharray="6 3"
                         strokeLinejoin="round"
                         strokeLinecap="round"
                         markerMid={`url(#${markerId})`}
