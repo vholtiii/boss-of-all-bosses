@@ -1,33 +1,25 @@
 
 
-# Generate Richer Mafia-Style Background Music with ffmpeg
+# Boost Blind Hit Success Rewards
 
-## Problem
-The current `mafia-theme.mp3` is a basic ambient drone that's barely audible and doesn't feel like mafia music. The user wants something with more character -- dark, moody, mafia-noir vibes.
+## Changes from current values
 
-## Solution
-Use ffmpeg to synthesize a richer 30-second looping track that layers multiple elements:
-- **Deep bass line** with a walking pattern (classic noir jazz feel)
-- **Minor-key melody tones** using sine/triangle waves at jazz intervals
-- **Subtle rhythm** via filtered noise pulses (brushed snare feel)
-- **Dark pad/atmosphere** underneath everything
-- **Tremolo and filtering** for moodiness
+| Reward | Current | New |
+|---|---|---|
+| Respect | +15 | **+20** |
+| Fear | +15 | **+20** |
+| Target influence loss | -10 | **-15** |
+| Soldier Toughness | +3 | **+4** |
+| Soldier Victories | +2 | +2 (unchanged) |
+| Soldier Loyalty | +15 | **+30** |
+| Player Influence | — | **+5** |
+| Loot | — | None |
 
-The result gets mixed down and normalized to a proper volume level, replacing the existing `public/audio/mafia-theme.mp3`.
+## Files Modified
 
-## Steps
+1. **`src/types/game-mechanics.ts`** — Update constants: `BLIND_HIT_RESPECT` 15→20, `BLIND_HIT_FEAR` 15→20, `BLIND_HIT_INFLUENCE_LOSS` 10→15, soldier toughness cap 3→4, loyalty 15→30. Add `BLIND_HIT_INFLUENCE_GAIN = 5`.
 
-1. **Generate the track** using a multi-layer ffmpeg command that creates and mixes:
-   - Walking bass (E2-A2-D3 pattern via sine waves with tremolo)
-   - Minor-key melody notes (sparse, jazzy intervals)
-   - Filtered pink noise for rhythm texture
-   - Low drone pad for atmosphere
-   - Normalize to -14 LUFS for consistent loudness
+2. **`src/hooks/useEnhancedMafiaGameState.ts`** — Apply updated constants in the blind hit victory block; add +5 influence to player on success.
 
-2. **Replace** `public/audio/mafia-theme.mp3` with the new file
-
-3. **No code changes needed** -- the existing `useBgMusic` hook and `FamilySelectionScreen` already handle playback, looping, fading, and mute toggle
-
-## File Modified
-- `public/audio/mafia-theme.mp3` (replaced with richer track)
+3. **`COMBAT_SYSTEM_GUIDE.md`** — Update the blind hit reward table to reflect new values.
 
