@@ -4449,7 +4449,7 @@ export const useEnhancedMafiaGameState = (
 
       // ── AI SUPPLY DEAL INITIATION ──
       // AI families propose supply deals when they have disconnected supply nodes and can afford it
-      if (aiPhase >= 2 && opponent.resources.money >= 7500 && !atWarWithPlayer) {
+      if (aiPhase >= 2 && opponent.resources.money >= 7500) {
         const aiConnected = getConnectedTerritory(state.hexMap, fam);
         const supplyNodeTypes: SupplyNodeType[] = ['docks', 'union_hall', 'trucking_depot', 'liquor_route', 'food_market'];
         const hasExistingDeal = (state.supplyDealPacts || []).some(p => p.active && p.buyerFamily === fam);
@@ -4460,34 +4460,70 @@ export const useEnhancedMafiaGameState = (
             return !aiConnected.has(`${node.q},${node.r},${node.s}`);
           });
           if (disconnectedNodes.length > 0 && Math.random() < 0.20) {
-            // Check if player has any of these nodes connected
-            const playerConnected = getConnectedTerritory(state.hexMap, state.playerFamily);
-            const playerCanSupply = disconnectedNodes.some(nodeType => {
-              const node = (state.supplyNodes || []).find(n => n.type === nodeType);
-              return node && playerConnected.has(`${node.q},${node.r},${node.s}`);
+            // Build list of potential suppliers: player + other AI families
+            const potentialSuppliers: Array<{ family: string; isPlayer: boolean }> = [];
+            // Check player
+            if (!atWarWithPlayer) {
+              const playerConnected = getConnectedTerritory(state.hexMap, state.playerFamily);
+              const playerCanSupply = disconnectedNodes.some(nodeType => {
+                const node = (state.supplyNodes || []).find(n => n.type === nodeType);
+                return node && playerConnected.has(`${node.q},${node.r},${node.s}`);
+              });
+              if (playerCanSupply) potentialSuppliers.push({ family: state.playerFamily, isPlayer: true });
+            }
+            // Check other AI families
+            state.aiOpponents.forEach(otherOpp => {
+              if (otherOpp.family === fam) return;
+              if ((state.eliminatedFamilies || []).includes(otherOpp.family)) return;
+              if (areFamiliesAtWar(state, fam, otherOpp.family)) return;
+              const otherConnected = getConnectedTerritory(state.hexMap, otherOpp.family);
+              const canSupply = disconnectedNodes.some(nodeType => {
+                const node = (state.supplyNodes || []).find(n => n.type === nodeType);
+                return node && otherConnected.has(`${node.q},${node.r},${node.s}`);
+              });
+              if (canSupply) potentialSuppliers.push({ family: otherOpp.family, isPlayer: false });
             });
-            if (playerCanSupply) {
-              // AI strikes the deal — pays player $7,500
+
+            if (potentialSuppliers.length > 0) {
+              // Pick a random supplier
+              const supplier = potentialSuppliers[Math.floor(Math.random() * potentialSuppliers.length)];
               const duration = 5 + Math.floor(Math.random() * 3);
               opponent.resources.money -= 7500;
-              state.resources.money += 7500;
+
+              if (supplier.isPlayer) {
+                state.resources.money += 7500;
+              } else {
+                const supplierOpp = state.aiOpponents.find(o => o.family === supplier.family);
+                if (supplierOpp) supplierOpp.resources.money += 7500;
+              }
+
               state.supplyDealPacts = [...(state.supplyDealPacts || []), {
                 id: `supply-deal-ai-${Date.now()}-${Math.random().toString(36).slice(2)}`,
                 buyerFamily: fam,
-                targetFamily: state.playerFamily,
+                targetFamily: supplier.family,
                 turnsRemaining: duration,
                 turnFormed: state.turn,
                 active: true,
               }];
-              addPairTension(state, fam, state.playerFamily, -TENSION_REDUCE_SUPPLY_DEAL);
-              state.tensionCooldowns[getTensionPairKey(fam, state.playerFamily)] = 1;
+              addPairTension(state, fam, supplier.family, -TENSION_REDUCE_SUPPLY_DEAL);
+              state.tensionCooldowns[getTensionPairKey(fam, supplier.family)] = 1;
               const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
-              state.pendingNotifications.push({
-                type: 'info' as const,
-                title: `🚚 ${famLabel} Struck a Supply Deal`,
-                message: `The ${famLabel} family is paying you $7,500 for access to your supply lines for ${duration} turns.`,
-              });
-              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'supply_deal', detail: `Struck a supply deal with player for ${duration} turns` });
+              const supplierLabel = supplier.family.charAt(0).toUpperCase() + supplier.family.slice(1);
+
+              if (supplier.isPlayer) {
+                state.pendingNotifications.push({
+                  type: 'info' as const,
+                  title: `🚚 ${famLabel} Struck a Supply Deal`,
+                  message: `The ${famLabel} family is paying you $7,500 for access to your supply lines for ${duration} turns.`,
+                });
+              } else {
+                state.pendingNotifications.push({
+                  type: 'info' as const,
+                  title: `🚚 Supply Deal Between Rivals`,
+                  message: `The ${famLabel} family struck a supply deal with ${supplierLabel} for ${duration} turns.`,
+                });
+              }
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'supply_deal', detail: `Struck a supply deal with ${supplier.family} for ${duration} turns` });
             }
           }
         }
