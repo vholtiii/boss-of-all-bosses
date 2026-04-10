@@ -154,6 +154,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   gamePhase = 1,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
   const [bossExpanded, setBossExpanded] = useState(false);
   const [sitdownOpen, setSitdownOpen] = useState(false);
   const [selectedSitdownIds, setSelectedSitdownIds] = useState<string[]>([]);
@@ -161,6 +162,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      if (isDraggingRef.current) return;
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         onClose();
       }
