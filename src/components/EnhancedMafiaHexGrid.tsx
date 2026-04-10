@@ -650,7 +650,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               const pColor = '#B0B0B0'; // uniform light grey for all supply lines
               const supplyRouteHexSet = new Set<string>();
               const connectedNodeKeys = new Set<string>();
-              const routePaths: Array<Array<{x:number;y:number}>> = [];
+              const rawRoutePaths: Array<Array<{x:number;y:number}>> = [];
               const hKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
               const dd = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
 
@@ -702,9 +702,27 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     const [qq, rr] = k.split(',').map(Number);
                     return getHexPosition(qq, rr);
                   });
-                  if (pts.length > 1) routePaths.push(pts);
+                  if (pts.length > 1) rawRoutePaths.push(pts);
                 }
               }
+
+              // Deduplicate overlapping route segments so stacked polylines don't appear thicker
+              const usedSegments = new Set<string>();
+              const routePaths: Array<Array<{x:number;y:number}>> = [];
+              for (const pts of rawRoutePaths) {
+                const newPts: Array<{x:number;y:number}> = [pts[0]];
+                for (let i = 1; i < pts.length; i++) {
+                  const a = `${pts[i-1].x},${pts[i-1].y}`;
+                  const b = `${pts[i].x},${pts[i].y}`;
+                  const segKey = a < b ? `${a}-${b}` : `${b}-${a}`;
+                  if (!usedSegments.has(segKey)) {
+                    usedSegments.add(segKey);
+                    newPts.push(pts[i]);
+                  }
+                }
+                if (newPts.length > 1) routePaths.push(newPts);
+              }
+
               // Store sets for use in hex rendering below
               (window as any).__supplyRouteHexSet = supplyRouteHexSet;
               (window as any).__connectedNodeKeys = connectedNodeKeys;
@@ -728,8 +746,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       viewBox="0 0 10 6"
                       refX="5"
                       refY="3"
-                      markerWidth="5"
-                      markerHeight="3"
+                      markerWidth="3.5"
+                      markerHeight="2"
                       orient="auto"
                     >
                       <path d="M0,0 L10,3 L0,6 Z" fill={pColor} fillOpacity="0.7" />
@@ -1315,7 +1333,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         points={pts.map(p => `${p.x},${p.y}`).join(' ')}
                         fill="none"
                         stroke={storedColor}
-                        strokeWidth="6"
+                        strokeWidth="3"
                         strokeOpacity="0.2"
                         strokeLinejoin="round"
                         strokeLinecap="round"
@@ -1326,9 +1344,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         points={pts.map(p => `${p.x},${p.y}`).join(' ')}
                         fill="none"
                         stroke={storedColor}
-                        strokeWidth="4"
+                        strokeWidth="2"
                         strokeOpacity="0.8"
-                        strokeDasharray="8 4"
+                        strokeDasharray="6 3"
                         strokeLinejoin="round"
                         strokeLinecap="round"
                         markerMid={`url(#${markerId})`}
