@@ -1,39 +1,31 @@
 
 
-# Scale Supply Node Minimum Distance by Map Size
+# Test Supply Node Distances on All Map Sizes
 
-## Problem
-The minimum hex distance for supply nodes from HQs is hardcoded to 7, regardless of map size. On a small map (radius 7), 7 hexes is the entire radius — making valid placements extremely scarce. On a large map (radius 13), 7 hexes is relatively close.
+The TypeScript build errors are **already resolved** — `npx tsc --noEmit` passes cleanly with zero errors. The stale errors were from a previous state.
 
-## Solution
-Scale the minimum distance proportionally to the map radius:
+## Testing Plan
 
-| Map Size | Radius | Min Distance |
-|----------|--------|-------------|
-| Small    | 7      | 4           |
-| Medium   | 10     | 6           |
-| Large    | 13     | 8           |
+To verify supply node minimum distances work correctly, I'll add a temporary console.log in the supply node placement code that prints the map size, radius, calculated minimum distance, and actual distances of placed nodes from each HQ. Then start 3 new games (small, medium, large) and check the console output.
 
-Formula: `Math.max(4, Math.floor(mapRadius * 0.6))`
+### Steps
 
-## Change
-One edit in `src/hooks/useEnhancedMafiaGameState.ts` around line 754-755:
+1. **Add debug logging** in `useEnhancedMafiaGameState.ts` after supply node placement (around line 763):
+   ```typescript
+   console.log(`[Supply Nodes] Map radius=${mapRadius}, minDist=${minSupplyDistance}`);
+   supplyNodes.forEach(node => {
+     const dists = hqPositions.map(hq => hexDistance(hq, { q: node.q, r: node.r, s: node.s }));
+     console.log(`  ${node.type}: min HQ dist = ${Math.min(...dists)}`);
+   });
+   ```
 
-**Before:**
-```typescript
-// Minimum distance of 7 hexes from any HQ
-const tooClose = hqPositions.some(hq => hexDistance(hq, t) < 7);
-```
+2. **Start 3 new games** — one each on Small, Medium, Large map size — and verify console output shows:
+   - Small: all nodes >= 4 hexes from any HQ
+   - Medium: all nodes >= 6 hexes from any HQ
+   - Large: all nodes >= 8 hexes from any HQ
 
-**After:**
-```typescript
-// Minimum distance scales with map size (small=4, medium=6, large=8)
-const minSupplyDistance = Math.max(4, Math.floor(mapRadius * 0.6));
-const tooClose = hqPositions.some(hq => hexDistance(hq, t) < minSupplyDistance);
-```
+3. **Remove debug logging** after verification.
 
-Also update the comment on line 748 to reflect the scaling logic.
-
-## File Modified
-- `src/hooks/useEnhancedMafiaGameState.ts`
+### File Modified
+- `src/hooks/useEnhancedMafiaGameState.ts` (temporary debug lines, then removed)
 
