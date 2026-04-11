@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Swords, Bomb, X } from 'lucide-react';
+import { Swords, Bomb, X, Target, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 interface EnemyHexActionProps {
   open: boolean;
@@ -13,18 +13,34 @@ interface EnemyHexActionProps {
     hasBusiness: boolean;
     businessType?: string;
     isLegal?: boolean;
+    isScouted?: boolean;
   } | null;
   playerMoney: number;
-  onAction: (action: 'hit' | 'sabotage' | 'cancel') => void;
+  gamePhase: number;
+  onAction: (action: 'hit' | 'sabotage' | 'cancel' | 'plan_hit') => void;
 }
 
 const SABOTAGE_COST = 12000;
 
-const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({ open, targetInfo, playerMoney, onAction }) => {
+const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({ open, targetInfo, playerMoney, gamePhase, onAction }) => {
   if (!open || !targetInfo) return null;
 
   const canSabotage = targetInfo.hasBusiness && playerMoney >= SABOTAGE_COST;
+  const canPlanHit = gamePhase >= 2 && targetInfo.isScouted;
   const familyName = targetInfo.controllingFamily.charAt(0).toUpperCase() + targetInfo.controllingFamily.slice(1);
+
+  // Defender status message
+  const getDefenderStatus = () => {
+    if (targetInfo.defendersCount > 0) {
+      return { icon: <Swords className="h-3.5 w-3.5 text-destructive" />, text: `${targetInfo.defendersCount} enemy soldier${targetInfo.defendersCount !== 1 ? 's' : ''} defending`, color: 'text-destructive' };
+    }
+    if (!targetInfo.isScouted) {
+      return { icon: <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />, text: 'Unscouted — risk of civilian casualty', color: 'text-yellow-500' };
+    }
+    return { icon: <ShieldCheck className="h-3.5 w-3.5 text-green-500" />, text: 'No defenders — safe to seize', color: 'text-green-500' };
+  };
+
+  const defenderStatus = getDefenderStatus();
 
   return (
     <AnimatePresence>
@@ -59,9 +75,12 @@ const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({ open, targetInfo,
                 <span className="text-muted-foreground">Controlled by</span>
                 <Badge variant="destructive" className="text-xs">{familyName}</Badge>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Defenders</span>
-                <span className="text-foreground">{targetInfo.defendersCount} unit{targetInfo.defendersCount !== 1 ? 's' : ''}</span>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Status</span>
+                <span className={`flex items-center gap-1.5 ${defenderStatus.color}`}>
+                  {defenderStatus.icon}
+                  <span className="text-xs">{defenderStatus.text}</span>
+                </span>
               </div>
               {targetInfo.hasBusiness && (
                 <div className="flex justify-between text-sm">
@@ -87,6 +106,20 @@ const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({ open, targetInfo,
                   <div className="text-xs opacity-80">Combat for control · +10 heat</div>
                 </div>
               </Button>
+
+              {canPlanHit && (
+                <Button
+                  className="w-full justify-start gap-3"
+                  variant="default"
+                  onClick={() => onAction('plan_hit')}
+                >
+                  <Target className="h-4 w-4" />
+                  <div className="text-left">
+                    <div className="text-sm font-semibold">Plan Hit</div>
+                    <div className="text-xs opacity-80">Surgical strike · +35% bonus · 0 casualties on success</div>
+                  </div>
+                </Button>
+              )}
 
               <Button
                 className="w-full justify-start gap-3"
