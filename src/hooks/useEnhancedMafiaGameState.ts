@@ -4174,6 +4174,11 @@ export const useEnhancedMafiaGameState = (
             // Hex stacking limit: max 2 friendly units per hex
             const friendlyUnitsHere = state.deployedUnits.filter(u => u.family === fam && u.q === n.q && u.r === n.r && u.s === n.s);
             if (friendlyUnitsHere.length >= 2) return false;
+            // Rival stacking rule: AI soldiers cannot move onto hex with enemy soldier
+            if (unit.type === 'soldier') {
+              const enemySoldiersHere = state.deployedUnits.some(u => u.family !== fam && u.q === n.q && u.r === n.r && u.s === n.s);
+              if (enemySoldiersHere) return false;
+            }
             if (tile.controllingFamily === fam) return true;
             const nNeighbors = getHexNeighbors(n.q, n.r, n.s);
             return nNeighbors.some(nn => {
