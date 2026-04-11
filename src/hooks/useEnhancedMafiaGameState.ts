@@ -1520,14 +1520,27 @@ export const useEnhancedMafiaGameState = (
       }
 
       // Deploy phase: regular movement — soldiers CAN move onto enemy hexes
+      // Helper: check if an enemy soldier occupies a hex (rival stacking rule)
+      const hasEnemySoldierOnHex = (q: number, r: number, s: number) =>
+        prev.deployedUnits.some(u => u.q === q && u.r === r && u.s === s && u.family !== prev.playerFamily);
+      const hasSafePassageWith = (family: string) =>
+        (prev.safePassagePacts || []).some(p => p.active && p.targetFamily === family);
+
       if (unitType === 'capo') {
-        // Capo movement unchanged — fly up to 5 hexes
+        // Capo movement — fly up to 5 hexes
+        // Capos CAN enter rival hexes with enemy soldiers ONLY if safe passage is active
         const range = Math.min(5, unit.movesRemaining);
         const candidateHexes = getHexesInRange(unit.q, unit.r, unit.s, range);
         const validHexes = candidateHexes.filter(h => {
           const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
           if (!tile) return false;
           if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+          // Rival stacking: capo can only enter hex with enemy soldier if safe passage
+          if (hasEnemySoldierOnHex(h.q, h.r, h.s)) {
+            const hexFamily = tile.controllingFamily;
+            if (hexFamily && hexFamily !== 'neutral' && hexFamily !== prev.playerFamily && hasSafePassageWith(hexFamily)) return true;
+            return false;
+          }
           return true;
         });
         return { ...prev, selectedUnitId: unit.id, availableMoveHexes: validHexes, deployMode: null, availableDeployHexes: [] };
