@@ -4160,6 +4160,31 @@ export const useEnhancedMafiaGameState = (
       let aiActionsRemaining = Math.max(1, 2 + (opponent.resources.influence >= 50 ? 1 : 0) + earlyGameBonus + mapActionBonus + aiManhattanAP);
       let aiTacticalRemaining = Math.max(2, 3 + earlyGameBonus + mapActionBonus);
 
+      // ── AI DEFENSE OF CONTESTED HEXES ──
+      const contestedInMyTerritory = (state.contestedHexes || []).filter(c => {
+        const tile = state.hexMap.find(t => t.q === c.q && t.r === c.r && t.s === c.s);
+        return tile && tile.controllingFamily === fam && c.occupyingFamily !== fam;
+      });
+      if (contestedInMyTerritory.length > 0) {
+        const defenseChance = aggression >= 60 ? 0.85 : aggression >= 30 ? 0.6 : 0.4;
+        for (const contested of contestedInMyTerritory) {
+          if (Math.random() > defenseChance) continue;
+          // Find nearby AI soldier within 2 hexes
+          const nearbySoldier = state.deployedUnits.find(u =>
+            u.family === fam && u.type === 'soldier' && u.movesRemaining > 0 &&
+            hexDistance(u, contested) <= 2 && hexDistance(u, contested) > 0
+          );
+          if (nearbySoldier) {
+            // Move soldier to contested hex
+            nearbySoldier.q = contested.q;
+            nearbySoldier.r = contested.r;
+            nearbySoldier.s = contested.s;
+            nearbySoldier.movesRemaining = 0;
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'defend', detail: `Defended contested territory in ${state.hexMap.find(t => t.q === contested.q && t.r === contested.r && t.s === contested.s)?.district || 'unknown'}` });
+          }
+        }
+      }
+
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
       for (const unit of aiUnits) {
         if (aiTacticalRemaining <= 0) break; // No more tactical actions
