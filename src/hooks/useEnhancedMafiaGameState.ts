@@ -1637,6 +1637,18 @@ export const useEnhancedMafiaGameState = (
           (u.escortingSoldierIds?.length || 0) < MAX_ESCORT_SOLDIERS
         );
         if (!capo) return prev;
+        // Escort restriction: cannot call soldier to capo on rival hex without safe passage
+        const capoTile = prev.hexMap.find(t => t.q === capo.q && t.r === capo.r && t.s === capo.s);
+        const isCapoOnRivalHex = capoTile && capoTile.controllingFamily !== 'neutral' && capoTile.controllingFamily !== prev.playerFamily;
+        if (isCapoOnRivalHex) {
+          const hasSP = (prev.safePassagePacts || []).some(p => p.active && p.targetFamily === capoTile.controllingFamily);
+          if (!hasSP) {
+            return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
+              type: 'warning' as const, title: '🚫 No Safe Passage',
+              message: `Cannot escort soldiers here — no Safe Passage with ${capoTile.controllingFamily.charAt(0).toUpperCase() + capoTile.controllingFamily.slice(1)}.`,
+            }]};
+          }
+        }
         const newUnitsEscort = [...prev.deployedUnits];
         // Teleport soldier to capo's hex
         const soldierIdx = newUnitsEscort.findIndex(u => u.id === unit.id);
