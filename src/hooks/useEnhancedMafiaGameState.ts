@@ -2405,6 +2405,50 @@ export const useEnhancedMafiaGameState = (
       newState.pendingNegotiations = newState.pendingNegotiations.map(p => ({ ...p, ready: true }));
       
       newState.turn += 1;
+
+      // ============ CONTESTED HEX RESOLUTION ============
+      newState.contestedHexes = newState.contestedHexes || [];
+      const resolvedContested: typeof newState.contestedHexes = [];
+      for (const contested of newState.contestedHexes) {
+        // Check if the occupying soldier is still on the hex
+        const occupyingSoldier = newState.deployedUnits.find((u: any) =>
+          u.family === contested.occupyingFamily && u.q === contested.q && u.r === contested.r && u.s === contested.s
+        );
+        if (!occupyingSoldier) {
+          // Soldier left or was killed — remove contested status
+          continue;
+        }
+        // Check if a defending rival soldier has moved onto the hex
+        const defenderOnHex = newState.deployedUnits.find((u: any) =>
+          u.family !== contested.occupyingFamily && u.q === contested.q && u.r === contested.r && u.s === contested.s
+        );
+        if (defenderOnHex) {
+          // Defender present — contested hex is defended, remove
+          continue;
+        }
+        // Check if one full turn has passed
+        if (newState.turn > contested.occupyingSince + 1) {
+          // Auto-capture: flip ownership
+          const tile = newState.hexMap.find((t: any) => t.q === contested.q && t.r === contested.r && t.s === contested.s);
+          if (tile) {
+            const oldFamily = tile.controllingFamily;
+            tile.controllingFamily = contested.occupyingFamily;
+            const isPlayer = contested.occupyingFamily === newState.playerFamily;
+            if (isPlayer) {
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'success' as const, title: '🏴 Territory Seized!',
+                message: `${tile.district || 'Unknown'} hex now under your control after holding it for a turn.`,
+              }];
+            }
+          }
+          // Remove from contested
+          continue;
+        }
+        // Still contested — keep
+        resolvedContested.push(contested);
+      }
+      newState.contestedHexes = resolvedContested;
+
       
       // Snapshot before-state for turn report
       const prevMoney = newState.resources.money;
