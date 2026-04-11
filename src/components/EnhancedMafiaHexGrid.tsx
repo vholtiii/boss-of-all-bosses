@@ -1827,9 +1827,14 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             className="absolute bottom-4 left-4 bg-noir-dark/90 backdrop-blur-sm border border-noir-light rounded-lg p-4 text-white max-w-xs cursor-pointer hover:border-mafia-gold/60 transition-colors"
             onClick={() => { handleHexClick(displayHex); setPinnedHex(null); }}
           >
-            <h3 className="font-semibold text-mafia-gold mb-2">{displayHex.district}</h3>
+            {(() => {
+              const districtHexes = (gameState?.hexMap || []).filter(t => t.district === displayHex.district);
+              const playerDistrictHexes = districtHexes.filter(t => t.controllingFamily === playerFamily);
+              const districtPct = districtHexes.length > 0 ? Math.round((playerDistrictHexes.length / districtHexes.length) * 100) : 0;
+              return <h3 className="font-semibold text-mafia-gold mb-2">{displayHex.district} ({districtPct}% controlled)</h3>;
+            })()}
             <div className="space-y-1 text-sm">
-              <p><span className="text-muted-foreground">Control:</span> {(displayHex.controllingFamily || 'neutral').toUpperCase()}</p>
+              <p><span className="text-muted-foreground">Owner:</span> {(displayHex.controllingFamily || 'neutral').toUpperCase()}</p>
               <p><span className="text-muted-foreground">Terrain:</span> {displayHex.terrain}</p>
               {displayHex.business && (() => {
                 const isUnderConstruction = displayHex.business.constructionGoal && (displayHex.business.constructionProgress ?? 0) < displayHex.business.constructionGoal;
