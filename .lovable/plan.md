@@ -1,86 +1,45 @@
 
 
-# Complete Enemy Hex Entry System
+# Allow Soldier Entry to Enemy-Occupied Hexes With Forced Action
 
-## Summary
+## Current Behavior
+Soldiers are **blocked** from moving onto hexes with enemy soldiers. They can move onto unoccupied rival hexes, which triggers the action dialog in Phase 2+.
 
-Implement three interconnected mechanics governing how units interact with rival-controlled territory, plus AI defense responses.
+## Desired Behavior
+Soldiers **can** move onto enemy-occupied hexes. In Phase 2+, the action dialog always appears (hit, sabotage, or plan hit). If there are no defending soldiers and the hex is unscouted, the existing civilian casualty risk applies when choosing "Hit Territory." Phase 1 remains unrestricted (contested auto-capture).
 
----
+## Changes
 
-## Mechanic 1: Rival Soldier Stacking Rule
+### File: `src/hooks/useEnhancedMafiaGameState.ts`
 
-**No two soldiers from different families can occupy the same hex.** Only a Capo may enter a hex with a rival soldier — and only if Safe Passage is active with that family.
+**1. Remove `hasEnemySoldierOnHex` from soldier movement validation (~lines 1563, 1574, 1586)**
+- Remove the stacking filter from all three soldier movement paths (connected territory, adjacent venturing, and non-connected movement)
+- Soldiers can now move onto hexes occupied by rival soldiers, which will trigger the Phase 2+ action dialog or Phase 1 contested mechanic
 
-**File: `src/hooks/useEnhancedMafiaGameState.ts`**
+**2. Keep Capo stacking rule unchanged (~line 1539)**
+- Capos still require safe passage to enter enemy-occupied hexes — no change here
 
-- In player movement validation (~lines 1517-1565): filter out hexes occupied by an enemy soldier (check `deployedUnits` for rival family units on that tile). Exception: Capos with an active `safePassagePact` for that hex's controlling family.
-- In AI movement validation (~lines 3968-3980): same filter — AI soldiers cannot move onto hexes with a rival soldier present.
+**3. Add "Plan Hit" option to the action dialog resolution (~line 1975)**
+- Extend `resolveEnemyHexAction` to accept `'plan_hit'` as an action type
+- Uses existing plan-hit logic: +35% bonus, bypasses fortification, zero attacker casualties on success, guaranteed target kill
 
----
+### File: `src/components/EnemyHexActionDialog.tsx`
 
-## Mechanic 2: Phase 1 — Contested Hex Auto-Capture
+**4. Add "Plan Hit" button to dialog**
+- Show "Plan Hit" option when the hex has been scouted and game phase is 2+
+- Display existing civilian casualty warning when hex is unscouted and undefended: "No enemy soldiers detected — risk of civilian casualty if unscouted"
 
-When a soldier moves onto a rival-controlled hex during Phase 1, the hex becomes "contested" rather than immediately captured.
+**5. Show defender info dynamically**
+- When defenders are present: "X enemy soldiers defending"
+- When no defenders and unscouted: warning about civilian risk
+- When no defenders and scouted: "No defenders — safe to seize"
 
-**File: `src/hooks/useEnhancedMafiaGameState.ts`**
+### File: `src/pages/UltimateMafiaGame.tsx`
 
-- Add `contestedHexes: Array<{ q, r, s, occupyingFamily, occupyingSince }>` to game state (init `[]`, persist in save/load).
-- In move execution (~line 1702): if `gamePhase === 1` and target hex is rival-controlled, add entry to `contestedHexes` with current turn. Show notification: "Contesting [Family] territory — hold for 1 turn to seize it."
-- In turn-end processing (~line 2229 area): for each contested hex, if the occupying soldier is still there and no rival soldier has retaken it, flip ownership to the occupying family and remove from `contestedHexes`. Show capture notification.
-- If the soldier moved away or was killed, remove from `contestedHexes`.
+**6. Pass scouted status to dialog**
+- Add `isScouted` flag to the target info passed to `EnemyHexActionDialog`
 
----
-
-## Mechanic 3: Phase 2+ — Forced Action Dialog
-
-When a soldier moves onto a rival-controlled hex in Phase 2+, a modal forces the player to choose an action before continuing.
-
-**New file: `src/components/EnemyHexActionDialog.tsx`**
-
-- Dialog with two options:
-  - **Hit Territory**: Triggers combat using existing hit logic (success chance, casualties, heat +10). On success, hex becomes neutral or player-controlled.
-  - **Sabotage Business** (only if hex has a business and player has $12,000+): Destroys the business, costs $12k, adds +15 heat.
-- **Cancel**: Returns soldier to their previous position, restores `movesRemaining`.
-- Shows target info: district, controlling family, defenders present, business type.
-
-**File: `src/hooks/useEnhancedMafiaGameState.ts`**
-
-- Add `pendingEnemyHexAction: { unitId, fromQ, fromR, fromS, toQ, toR, toS } | null` to game state.
-- In move execution (~line 1702): if `gamePhase >= 2` and target hex is rival-controlled, set `pendingEnemyHexAction` instead of completing silently. The soldier is placed on the hex but the game pauses for action selection.
-- Add `resolveEnemyHexAction(action: 'hit' | 'sabotage' | 'cancel')`:
-  - `'hit'`: Run combat formula, apply casualties/heat, flip hex on success.
-  - `'sabotage'`: Deduct $12k, remove business, +15 heat.
-  - `'cancel'`: Move soldier back to origin hex, restore moves.
-
-**File: `src/pages/UltimateMafiaGame.tsx`**
-
-- Render `EnemyHexActionDialog` when `pendingEnemyHexAction` is set.
-
----
-
-## Mechanic 4: Capo Escort Restriction
-
-Capos escorting soldiers into rival territory requires Safe Passage.
-
-**File: `src/hooks/useEnhancedMafiaGameState.ts`**
-
-- Escort "call" action (~line 1606-1634): if the Capo is on a rival-controlled hex, check for active `safePassagePact` with that family. Block if none exists, notify: "Cannot escort here — no Safe Passage with [Family]."
-- Capo movement with escorts (~lines 1705-1715): when destination is rival-controlled and Capo has escorted soldiers, check safe passage. If none, auto-detach soldiers at their current position before the Capo moves. Notify: "Soldiers detached — no Safe Passage for escort into [Family] territory."
-
----
-
-## Mechanic 5: AI Defense of Contested Hexes
-
-**File: `src/hooks/useEnhancedMafiaGameState.ts`** (AI turn processing)
-
-- During AI movement (~line 3960+): AI families scan `contestedHexes` for entries in their territory. If a nearby AI soldier exists (within 2 hexes), prioritize moving onto the contested hex to defend it, triggering a hit action against the intruder. Defense probability scales with AI personality aggressiveness.
-
----
-
-## Technical Details
-
-- `contestedHexes` and `pendingEnemyHexAction` added to the state interface (~line 339) and initialized in `createInitialState` (~line 876).
-- Save/load functions updated to persist `contestedHexes`.
-- All hex-occupancy checks use existing `deployedUnits` array filtered by coordinates.
+## Technical Notes
+- The civilian casualty mechanic already exists in `processTerritoryHit` (lines 7043-7072) — it triggers automatically when hitting an unscouted hex with no defenders
+- No new state fields needed; this builds on the existing `pendingEnemyHexAction` system
 
