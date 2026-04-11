@@ -1560,7 +1560,7 @@ export const useEnhancedMafiaGameState = (
           const [q, r, s] = k.split(',').map(Number);
           if (k !== unitKey) {
             const tile = prev.hexMap.find(t => t.q === q && t.r === r && t.s === s);
-            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) && !hasEnemySoldierOnHex(q, r, s)) {
+            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily)) {
               validHexes.push({ q, r, s });
             }
           }
@@ -1571,7 +1571,7 @@ export const useEnhancedMafiaGameState = (
           const hk = hexKey(h.q, h.r, h.s);
           if (!connectedSet.has(hk)) {
             const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
-            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) && !hasEnemySoldierOnHex(h.q, h.r, h.s)) {
+            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily)) {
               validHexes.push(h);
             }
           }
@@ -1583,7 +1583,6 @@ export const useEnhancedMafiaGameState = (
           const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
           if (!tile) return false;
           if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
-          if (hasEnemySoldierOnHex(h.q, h.r, h.s)) return false;
           return true;
         });
       }
@@ -1972,7 +1971,7 @@ export const useEnhancedMafiaGameState = (
   }, []);
 
   // ============ RESOLVE ENEMY HEX ACTION (Phase 2+) ============
-  const resolveEnemyHexAction = useCallback((action: 'hit' | 'sabotage' | 'cancel') => {
+  const resolveEnemyHexAction = useCallback((action: 'hit' | 'sabotage' | 'cancel' | 'plan_hit') => {
     setGameState(prev => {
       if (!prev.pendingEnemyHexAction) return prev;
       const { unitId, fromQ, fromR, fromS, toQ, toR, toS } = prev.pendingEnemyHexAction;
@@ -2006,6 +2005,15 @@ export const useEnhancedMafiaGameState = (
         // Use existing sabotage logic via processSabotageHex
         const sabAction = { type: 'sabotage_hex', targetQ: toQ, targetR: toR, targetS: toS };
         const result = processSabotageHex(newState, sabAction);
+        result.pendingNotifications = result.pendingNotifications || [];
+        syncLegacyUnits(result);
+        return result;
+      }
+
+      if (action === 'plan_hit') {
+        // Use existing hit logic with _executingPlan flag for plan hit bonuses
+        const hitAction = { type: 'hit_territory', targetQ: toQ, targetR: toR, targetS: toS, _executingPlan: true };
+        const result = processTerritoryHit(newState, hitAction);
         result.pendingNotifications = result.pendingNotifications || [];
         syncLegacyUnits(result);
         return result;

@@ -1470,6 +1470,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
           const tile = (gameState.hexMap || []).find((t: any) => t.q === toQ && t.r === toR && t.s === toS);
           if (!tile) return null;
           const defenders = (gameState.deployedUnits || []).filter((u: any) => u.q === toQ && u.r === toR && u.s === toS && u.family === tile.controllingFamily);
+          const isScouted = (gameState.scoutedHexes || []).some((s: any) => s.q === toQ && s.r === toR && s.s === toS);
           return {
             district: tile.district || 'Unknown',
             controllingFamily: tile.controllingFamily || 'neutral',
@@ -1477,9 +1478,11 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
             hasBusiness: !!tile.business,
             businessType: tile.business?.type,
             isLegal: tile.business?.isLegal,
+            isScouted,
           };
         })()}
         playerMoney={gameState.resources.money}
+        gamePhase={gameState.gamePhase || 1}
         onAction={resolveEnemyHexAction}
       />
     </>
