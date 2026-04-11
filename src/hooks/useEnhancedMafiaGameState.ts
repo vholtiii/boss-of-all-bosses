@@ -437,6 +437,14 @@ export interface EnhancedMafiaGameState {
   warSummitState: WarSummitState;
   warSummitCooldownUntil: number;
   
+  // Enemy hex entry system
+  contestedHexes: Array<{ q: number; r: number; s: number; occupyingFamily: string; occupyingSince: number }>;
+  pendingEnemyHexAction: {
+    unitId: string;
+    fromQ: number; fromR: number; fromS: number;
+    toQ: number; toR: number; toS: number;
+  } | null;
+  
   // Gameplay phases & commission vote
   gamePhase: GamePhase;
   commissionVoteCooldownUntil: number;
@@ -899,10 +907,12 @@ const createInitialGameState = (
     familyTensions: Object.fromEntries(getAllFamilyPairKeys().map(k => [k, 0])),
     activeWars: [],
     tensionCooldowns: {},
-    mattressesState: { active: false, turnsRemaining: 0 },
-    mattressesCooldownUntil: 0,
-    warSummitState: { active: false, turnsRemaining: 0 },
-    warSummitCooldownUntil: 0,
+     mattressesState: { active: false, turnsRemaining: 0 },
+     mattressesCooldownUntil: 0,
+     warSummitState: { active: false, turnsRemaining: 0 },
+     warSummitCooldownUntil: 0,
+     contestedHexes: [],
+     pendingEnemyHexAction: null,
     victoryType: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
@@ -1510,14 +1520,27 @@ export const useEnhancedMafiaGameState = (
       }
 
       // Deploy phase: regular movement — soldiers CAN move onto enemy hexes
+      // Helper: check if an enemy soldier occupies a hex (rival stacking rule)
+      const hasEnemySoldierOnHex = (q: number, r: number, s: number) =>
+        prev.deployedUnits.some(u => u.q === q && u.r === r && u.s === s && u.family !== prev.playerFamily);
+      const hasSafePassageWith = (family: string) =>
+        (prev.safePassagePacts || []).some(p => p.active && p.targetFamily === family);
+
       if (unitType === 'capo') {
-        // Capo movement unchanged — fly up to 5 hexes
+        // Capo movement — fly up to 5 hexes
+        // Capos CAN enter rival hexes with enemy soldiers ONLY if safe passage is active
         const range = Math.min(5, unit.movesRemaining);
         const candidateHexes = getHexesInRange(unit.q, unit.r, unit.s, range);
         const validHexes = candidateHexes.filter(h => {
           const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
           if (!tile) return false;
           if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+          // Rival stacking: capo can only enter hex with enemy soldier if safe passage
+          if (hasEnemySoldierOnHex(h.q, h.r, h.s)) {
+            const hexFamily = tile.controllingFamily;
+            if (hexFamily && hexFamily !== 'neutral' && hexFamily !== prev.playerFamily && hasSafePassageWith(hexFamily)) return true;
+            return false;
+          }
           return true;
         });
         return { ...prev, selectedUnitId: unit.id, availableMoveHexes: validHexes, deployMode: null, availableDeployHexes: [] };
@@ -1537,7 +1560,7 @@ export const useEnhancedMafiaGameState = (
           const [q, r, s] = k.split(',').map(Number);
           if (k !== unitKey) {
             const tile = prev.hexMap.find(t => t.q === q && t.r === r && t.s === s);
-            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily)) {
+            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) && !hasEnemySoldierOnHex(q, r, s)) {
               validHexes.push({ q, r, s });
             }
           }
@@ -1548,7 +1571,7 @@ export const useEnhancedMafiaGameState = (
           const hk = hexKey(h.q, h.r, h.s);
           if (!connectedSet.has(hk)) {
             const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
-            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily)) {
+            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) && !hasEnemySoldierOnHex(h.q, h.r, h.s)) {
               validHexes.push(h);
             }
           }
@@ -1560,6 +1583,7 @@ export const useEnhancedMafiaGameState = (
           const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
           if (!tile) return false;
           if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+          if (hasEnemySoldierOnHex(h.q, h.r, h.s)) return false;
           return true;
         });
       }
@@ -1613,6 +1637,18 @@ export const useEnhancedMafiaGameState = (
           (u.escortingSoldierIds?.length || 0) < MAX_ESCORT_SOLDIERS
         );
         if (!capo) return prev;
+        // Escort restriction: cannot call soldier to capo on rival hex without safe passage
+        const capoTile = prev.hexMap.find(t => t.q === capo.q && t.r === capo.r && t.s === capo.s);
+        const isCapoOnRivalHex = capoTile && capoTile.controllingFamily !== 'neutral' && capoTile.controllingFamily !== prev.playerFamily;
+        if (isCapoOnRivalHex) {
+          const hasSP = (prev.safePassagePacts || []).some(p => p.active && p.targetFamily === capoTile.controllingFamily);
+          if (!hasSP) {
+            return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
+              type: 'warning' as const, title: '🚫 No Safe Passage',
+              message: `Cannot escort soldiers here — no Safe Passage with ${capoTile.controllingFamily.charAt(0).toUpperCase() + capoTile.controllingFamily.slice(1)}.`,
+            }]};
+          }
+        }
         const newUnitsEscort = [...prev.deployedUnits];
         // Teleport soldier to capo's hex
         const soldierIdx = newUnitsEscort.findIndex(u => u.id === unit.id);
@@ -1704,14 +1740,93 @@ export const useEnhancedMafiaGameState = (
 
       // Handle escort: move escorted soldiers along with capo (works in any move action during deploy phase)
       if (unit.type === 'capo' && unit.escortingSoldierIds?.length) {
-        unit.escortingSoldierIds.forEach(soldierIdToEscort => {
-          const sIdx = newUnits.findIndex(u => u.id === soldierIdToEscort);
-          if (sIdx !== -1) {
-            newUnits[sIdx] = { ...newUnits[sIdx], q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0 };
+        // Escort restriction: if destination is rival territory, check safe passage
+        const escortTargetTile = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
+        const isEscortToRival = escortTargetTile && escortTargetTile.controllingFamily !== 'neutral' && escortTargetTile.controllingFamily !== prev.playerFamily;
+        if (isEscortToRival) {
+          const hasSP = (prev.safePassagePacts || []).some(p => p.active && p.targetFamily === escortTargetTile.controllingFamily);
+          if (!hasSP) {
+            // Auto-detach soldiers at current position BEFORE capo moves
+            newUnits[unitIdx] = { ...newUnits[unitIdx], escortingSoldierIds: [] };
+            const notifications = [...prev.pendingNotifications, {
+              type: 'warning' as const, title: '🚫 Soldiers Detached',
+              message: `Soldiers detached — no Safe Passage for escort into ${escortTargetTile.controllingFamily.charAt(0).toUpperCase() + escortTargetTile.controllingFamily.slice(1)} territory.`,
+            }];
+            // Continue without escorting soldiers — capo moves alone
+            // (don't return here, let the rest of the movement logic proceed)
+            prev = { ...prev, pendingNotifications: notifications };
+          } else {
+            // Safe passage active — move soldiers with capo
+            unit.escortingSoldierIds.forEach(soldierIdToEscort => {
+              const sIdx = newUnits.findIndex(u => u.id === soldierIdToEscort);
+              if (sIdx !== -1) {
+                newUnits[sIdx] = { ...newUnits[sIdx], q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0 };
+              }
+            });
+            newUnits[unitIdx] = { ...newUnits[unitIdx], escortingSoldierIds: [] };
           }
-        });
-        // Auto-detach soldiers at destination
-        newUnits[unitIdx] = { ...newUnits[unitIdx], escortingSoldierIds: [] };
+        } else {
+          // Normal territory — move escorts normally
+          unit.escortingSoldierIds.forEach(soldierIdToEscort => {
+            const sIdx = newUnits.findIndex(u => u.id === soldierIdToEscort);
+            if (sIdx !== -1) {
+              newUnits[sIdx] = { ...newUnits[sIdx], q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0 };
+            }
+          });
+          newUnits[unitIdx] = { ...newUnits[unitIdx], escortingSoldierIds: [] };
+        }
+      }
+
+      // ============ ENEMY HEX ENTRY CHECK ============
+      const targetTileForEntry = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
+      const isRivalHexEntry = targetTileForEntry && targetTileForEntry.controllingFamily !== 'neutral' && targetTileForEntry.controllingFamily !== prev.playerFamily && !targetTileForEntry.isHeadquarters;
+      
+      if (isRivalHexEntry && unit.type === 'soldier') {
+        const gamePhase = prev.gamePhase || 1;
+        
+        if (gamePhase === 1) {
+          // Phase 1: Contested occupation — auto-capture after 1 turn
+          const newContested = [...(prev.contestedHexes || [])];
+          const alreadyContested = newContested.some(c => c.q === targetLocation.q && c.r === targetLocation.r && c.s === targetLocation.s);
+          if (!alreadyContested) {
+            newContested.push({
+              q: targetLocation.q, r: targetLocation.r, s: targetLocation.s,
+              occupyingFamily: prev.playerFamily,
+              occupyingSince: prev.turn,
+            });
+          }
+          const contestNotifications = [...prev.pendingNotifications, {
+            type: 'info' as const, title: '🏴 Contesting Territory',
+            message: `Your soldier is contesting ${targetTileForEntry.controllingFamily.charAt(0).toUpperCase() + targetTileForEntry.controllingFamily.slice(1)} territory. Hold for 1 turn to seize it.`,
+          }];
+
+          const newState = {
+            ...prev, deployedUnits: newUnits, hexMap: prev.hexMap,
+            resources: prev.resources,
+            contestedHexes: newContested,
+            selectedUnitId: updatedUnit.movesRemaining > 0 ? updatedUnit.id : null,
+            availableMoveHexes: [],
+            pendingNotifications: contestNotifications,
+          };
+          syncLegacyUnits(newState);
+          return newState;
+        } else {
+          // Phase 2+: Force action dialog — set pendingEnemyHexAction
+          const newState = {
+            ...prev, deployedUnits: newUnits, hexMap: prev.hexMap,
+            resources: prev.resources,
+            pendingEnemyHexAction: {
+              unitId: unit.id,
+              fromQ: unit.q, fromR: unit.r, fromS: unit.s,
+              toQ: targetLocation.q, toR: targetLocation.r, toS: targetLocation.s,
+            },
+            selectedUnitId: null,
+            availableMoveHexes: [],
+            pendingNotifications: prev.pendingNotifications,
+          };
+          syncLegacyUnits(newState);
+          return newState;
+        }
       }
 
       // Only Capos auto-claim and auto-extort neutral tiles on move
@@ -1856,7 +1971,51 @@ export const useEnhancedMafiaGameState = (
     });
   }, []);
 
-  // ============ SCOUT HEX ============
+  // ============ RESOLVE ENEMY HEX ACTION (Phase 2+) ============
+  const resolveEnemyHexAction = useCallback((action: 'hit' | 'sabotage' | 'cancel') => {
+    setGameState(prev => {
+      if (!prev.pendingEnemyHexAction) return prev;
+      const { unitId, fromQ, fromR, fromS, toQ, toR, toS } = prev.pendingEnemyHexAction;
+      const newState = cloneStateForMutation(prev);
+      newState.pendingEnemyHexAction = null;
+
+      const unitIdx = newState.deployedUnits.findIndex((u: any) => u.id === unitId);
+      if (unitIdx === -1) return newState;
+
+      if (action === 'cancel') {
+        // Return soldier to origin
+        newState.deployedUnits[unitIdx] = { ...newState.deployedUnits[unitIdx], q: fromQ, r: fromR, s: fromS, movesRemaining: (newState.deployedUnits[unitIdx].movesRemaining || 0) + 1 };
+        newState.pendingNotifications = [...(newState.pendingNotifications || []), {
+          type: 'info' as const, title: '🔙 Retreated',
+          message: 'Your soldier pulled back to their previous position.',
+        }];
+        syncLegacyUnits(newState);
+        return newState;
+      }
+
+      if (action === 'hit') {
+        // Use existing hit logic via processTerritoryHit
+        const hitAction = { type: 'hit_territory', targetQ: toQ, targetR: toR, targetS: toS };
+        const result = processTerritoryHit(newState, hitAction);
+        result.pendingNotifications = result.pendingNotifications || [];
+        syncLegacyUnits(result);
+        return result;
+      }
+
+      if (action === 'sabotage') {
+        // Use existing sabotage logic via processSabotageHex
+        const sabAction = { type: 'sabotage_hex', targetQ: toQ, targetR: toR, targetS: toS };
+        const result = processSabotageHex(newState, sabAction);
+        result.pendingNotifications = result.pendingNotifications || [];
+        syncLegacyUnits(result);
+        return result;
+      }
+
+      return newState;
+    });
+  }, []);
+
+
   const processScout = (prev: EnhancedMafiaGameState, unit: DeployedUnit, targetLocation: { q: number; r: number; s: number }): EnhancedMafiaGameState => {
     const tile = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
     if (!tile) return prev;
@@ -2246,6 +2405,50 @@ export const useEnhancedMafiaGameState = (
       newState.pendingNegotiations = newState.pendingNegotiations.map(p => ({ ...p, ready: true }));
       
       newState.turn += 1;
+
+      // ============ CONTESTED HEX RESOLUTION ============
+      newState.contestedHexes = newState.contestedHexes || [];
+      const resolvedContested: typeof newState.contestedHexes = [];
+      for (const contested of newState.contestedHexes) {
+        // Check if the occupying soldier is still on the hex
+        const occupyingSoldier = newState.deployedUnits.find((u: any) =>
+          u.family === contested.occupyingFamily && u.q === contested.q && u.r === contested.r && u.s === contested.s
+        );
+        if (!occupyingSoldier) {
+          // Soldier left or was killed — remove contested status
+          continue;
+        }
+        // Check if a defending rival soldier has moved onto the hex
+        const defenderOnHex = newState.deployedUnits.find((u: any) =>
+          u.family !== contested.occupyingFamily && u.q === contested.q && u.r === contested.r && u.s === contested.s
+        );
+        if (defenderOnHex) {
+          // Defender present — contested hex is defended, remove
+          continue;
+        }
+        // Check if one full turn has passed
+        if (newState.turn > contested.occupyingSince + 1) {
+          // Auto-capture: flip ownership
+          const tile = newState.hexMap.find((t: any) => t.q === contested.q && t.r === contested.r && t.s === contested.s);
+          if (tile) {
+            const oldFamily = tile.controllingFamily;
+            tile.controllingFamily = contested.occupyingFamily as any;
+            const isPlayer = contested.occupyingFamily === newState.playerFamily;
+            if (isPlayer) {
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'success' as const, title: '🏴 Territory Seized!',
+                message: `${tile.district || 'Unknown'} hex now under your control after holding it for a turn.`,
+              }];
+            }
+          }
+          // Remove from contested
+          continue;
+        }
+        // Still contested — keep
+        resolvedContested.push(contested);
+      }
+      newState.contestedHexes = resolvedContested;
+
       
       // Snapshot before-state for turn report
       const prevMoney = newState.resources.money;
@@ -3957,6 +4160,31 @@ export const useEnhancedMafiaGameState = (
       let aiActionsRemaining = Math.max(1, 2 + (opponent.resources.influence >= 50 ? 1 : 0) + earlyGameBonus + mapActionBonus + aiManhattanAP);
       let aiTacticalRemaining = Math.max(2, 3 + earlyGameBonus + mapActionBonus);
 
+      // ── AI DEFENSE OF CONTESTED HEXES ──
+      const contestedInMyTerritory = (state.contestedHexes || []).filter(c => {
+        const tile = state.hexMap.find(t => t.q === c.q && t.r === c.r && t.s === c.s);
+        return tile && tile.controllingFamily === fam && c.occupyingFamily !== fam;
+      });
+      if (contestedInMyTerritory.length > 0) {
+        const defenseChance = aggression >= 60 ? 0.85 : aggression >= 30 ? 0.6 : 0.4;
+        for (const contested of contestedInMyTerritory) {
+          if (Math.random() > defenseChance) continue;
+          // Find nearby AI soldier within 2 hexes
+          const nearbySoldier = state.deployedUnits.find(u =>
+            u.family === fam && u.type === 'soldier' && u.movesRemaining > 0 &&
+            hexDistance(u, contested) <= 2 && hexDistance(u, contested) > 0
+          );
+          if (nearbySoldier) {
+            // Move soldier to contested hex
+            nearbySoldier.q = contested.q;
+            nearbySoldier.r = contested.r;
+            nearbySoldier.s = contested.s;
+            nearbySoldier.movesRemaining = 0;
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'defend', detail: `Defended contested territory in ${state.hexMap.find(t => t.q === contested.q && t.r === contested.r && t.s === contested.s)?.district || 'unknown'}` });
+          }
+        }
+      }
+
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
       for (const unit of aiUnits) {
         if (aiTacticalRemaining <= 0) break; // No more tactical actions
@@ -3971,6 +4199,11 @@ export const useEnhancedMafiaGameState = (
             // Hex stacking limit: max 2 friendly units per hex
             const friendlyUnitsHere = state.deployedUnits.filter(u => u.family === fam && u.q === n.q && u.r === n.r && u.s === n.s);
             if (friendlyUnitsHere.length >= 2) return false;
+            // Rival stacking rule: AI soldiers cannot move onto hex with enemy soldier
+            if (unit.type === 'soldier') {
+              const enemySoldiersHere = state.deployedUnits.some(u => u.family !== fam && u.q === n.q && u.r === n.r && u.s === n.s);
+              if (enemySoldiersHere) return false;
+            }
             if (tile.controllingFamily === fam) return true;
             const nNeighbors = getHexNeighbors(n.q, n.r, n.s);
             return nNeighbors.some(nn => {
@@ -7839,5 +8072,6 @@ export const useEnhancedMafiaGameState = (
     fortifyUnit,
     setMoveAction,
     startEscort,
+    resolveEnemyHexAction,
   };
 };

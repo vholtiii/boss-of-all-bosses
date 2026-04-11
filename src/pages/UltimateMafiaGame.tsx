@@ -12,6 +12,7 @@ import { LeftSidePanel, RightSidePanel } from '@/components/GameSidePanels';
 import { useEnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import SaveLoadDialog from '@/components/SaveLoadDialog';
+import EnemyHexActionDialog from '@/components/EnemyHexActionDialog';
 import TutorialSystem from '@/components/TutorialSystem';
 import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
 import TurnSummaryModal from '@/components/TurnSummaryModal';
@@ -72,6 +73,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     fortifyUnit,
     setMoveAction,
     startEscort,
+    resolveEnemyHexAction,
   } = useEnhancedMafiaGameState(config.family, config.resources, config.difficulty, config.seed, config.mapSize);
 
   const { notifySuccess, notifyError, notifyWarning, notifyInfo, notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
@@ -1457,6 +1459,28 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
         onClose={() => handleAction({ type: 'clear_commission_vote_result' })}
         result={gameState.commissionVoteResult}
         playSound={playSound}
+      />
+
+      {/* Enemy Hex Action Dialog (Phase 2+) */}
+      <EnemyHexActionDialog
+        open={!!gameState.pendingEnemyHexAction}
+        targetInfo={(() => {
+          if (!gameState.pendingEnemyHexAction) return null;
+          const { toQ, toR, toS } = gameState.pendingEnemyHexAction;
+          const tile = (gameState.hexMap || []).find((t: any) => t.q === toQ && t.r === toR && t.s === toS);
+          if (!tile) return null;
+          const defenders = (gameState.deployedUnits || []).filter((u: any) => u.q === toQ && u.r === toR && u.s === toS && u.family === tile.controllingFamily);
+          return {
+            district: tile.district || 'Unknown',
+            controllingFamily: tile.controllingFamily || 'neutral',
+            defendersCount: defenders.length,
+            hasBusiness: !!tile.business,
+            businessType: tile.business?.type,
+            isLegal: tile.business?.isLegal,
+          };
+        })()}
+        playerMoney={gameState.resources.money}
+        onAction={resolveEnemyHexAction}
       />
     </>
   );
