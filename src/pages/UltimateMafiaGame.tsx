@@ -269,7 +269,10 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 district: business.district, family: business.family,
                 business: { type: business.businessType as any, income: business.income }
               });
-              if (business.family === gameState.playerFamily) {
+              const districtHexes = (gameState.hexMap || []).filter(t => t.district === business.district);
+              const playerHexes = districtHexes.filter(t => t.controllingFamily === gameState.playerFamily);
+              const controlPct = districtHexes.length > 0 ? playerHexes.length / districtHexes.length : 0;
+              if (controlPct >= 0.6) {
                 notifyTerritoryCaptured(business.district);
               }
             }}
@@ -983,7 +986,10 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 }
               });
               
-              if (business.family === gameState.playerFamily) {
+              const districtHexes2 = (gameState.hexMap || []).filter(t => t.district === business.district);
+              const playerHexes2 = districtHexes2.filter(t => t.controllingFamily === gameState.playerFamily);
+              const controlPct2 = districtHexes2.length > 0 ? playerHexes2.length / districtHexes2.length : 0;
+              if (controlPct2 >= 0.6) {
                 notifyTerritoryCaptured(business.district);
               }
             }}
