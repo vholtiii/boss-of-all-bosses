@@ -1475,7 +1475,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
             controllingFamily: tile.controllingFamily || 'neutral',
             defendersCount: defenders.length,
             hasBusiness: !!tile.business,
-            businessType: tile.business?.name || tile.business?.type,
+            businessType: tile.business?.type,
             isLegal: tile.business?.isLegal,
           };
         })()}
