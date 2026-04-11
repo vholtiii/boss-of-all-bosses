@@ -899,6 +899,30 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             </text>
                           );
                         })()}
+                        {/* Contested hex indicator — pulsing orange border + ⚔️ icon */}
+                        {(() => {
+                          const contestedHexes = gameState?.contestedHexes || [];
+                          const isContested = contestedHexes.some((c: any) => c.q === tile.q && c.r === tile.r && c.s === tile.s);
+                          if (!isContested) return null;
+                          return (
+                            <>
+                              <polygon
+                                points={getHexPoints(x, y, baseHexRadius + 2)}
+                                fill="none"
+                                stroke="#F97316"
+                                strokeWidth={2.5}
+                                strokeDasharray="5 3"
+                                className="pointer-events-none"
+                              >
+                                <animate attributeName="stroke-opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite" />
+                              </polygon>
+                              <text x={x + baseHexRadius * 0.55} y={y + baseHexRadius * 0.55} textAnchor="middle" fontSize="8" className="pointer-events-none select-none">
+                                <animate attributeName="opacity" values="1;0.4;1" dur="1.5s" repeatCount="indefinite" />
+                                ⚔️
+                              </text>
+                            </>
+                          );
+                        })()}
                       </>
                     );
                   })()}
@@ -2001,6 +2025,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               { color: '#10B981', label: 'Player-Built', style: 'dashed', width: 2.5 },
               { color: '#3B82F6', label: 'Legal Business', style: 'solid', width: 2.5 },
               { color: '#D4AF3780', label: 'Your Territory', style: 'solid', width: 2 },
+              { color: '#F97316', label: 'Contested', style: 'dashed', width: 2.5 },
             ].map(item => (
               <div key={item.label} className="flex items-center gap-2">
                 <svg width="20" height="12" className="flex-shrink-0">
@@ -2020,6 +2045,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 { icon: '🩸', label: 'Wounded Capo' },
                 { icon: '🎖️', label: 'Promotion Ceremony' },
                 { icon: '🛡️', label: 'Safehouse' },
+                { icon: '⚔️', label: 'Contested (hold 1 turn)' },
                 { icon: '⚓', label: 'Supply Node: Docks' },
                 { icon: '🔧', label: 'Supply Node: Union Hall' },
                 { icon: '🚛', label: 'Supply Node: Trucking' },
