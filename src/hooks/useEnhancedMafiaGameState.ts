@@ -437,6 +437,14 @@ export interface EnhancedMafiaGameState {
   warSummitState: WarSummitState;
   warSummitCooldownUntil: number;
   
+  // Enemy hex entry system
+  contestedHexes: Array<{ q: number; r: number; s: number; occupyingFamily: string; occupyingSince: number }>;
+  pendingEnemyHexAction: {
+    unitId: string;
+    fromQ: number; fromR: number; fromS: number;
+    toQ: number; toR: number; toS: number;
+  } | null;
+  
   // Gameplay phases & commission vote
   gamePhase: GamePhase;
   commissionVoteCooldownUntil: number;
