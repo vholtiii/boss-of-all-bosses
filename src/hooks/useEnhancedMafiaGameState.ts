@@ -1560,7 +1560,7 @@ export const useEnhancedMafiaGameState = (
           const [q, r, s] = k.split(',').map(Number);
           if (k !== unitKey) {
             const tile = prev.hexMap.find(t => t.q === q && t.r === r && t.s === s);
-            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily)) {
+            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) && !hasEnemySoldierOnHex(q, r, s)) {
               validHexes.push({ q, r, s });
             }
           }
@@ -1571,7 +1571,7 @@ export const useEnhancedMafiaGameState = (
           const hk = hexKey(h.q, h.r, h.s);
           if (!connectedSet.has(hk)) {
             const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
-            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily)) {
+            if (tile && !(tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) && !hasEnemySoldierOnHex(h.q, h.r, h.s)) {
               validHexes.push(h);
             }
           }
@@ -1583,6 +1583,7 @@ export const useEnhancedMafiaGameState = (
           const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
           if (!tile) return false;
           if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
+          if (hasEnemySoldierOnHex(h.q, h.r, h.s)) return false;
           return true;
         });
       }
