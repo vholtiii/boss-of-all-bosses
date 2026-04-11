@@ -1,14 +1,23 @@
 
 
-# Hide Capo Level Badge When Solo
+# Clarify Hex Info Panel Labels
 
-**Problem**: The capo icon always shows a "level" number badge (showing "1"), but it should match soldier behavior — only display a count when 2+ units share the same hex.
+**File: `src/components/EnhancedMafiaHexGrid.tsx`**
 
-**Fix — `src/components/CapoIcon.tsx`**:
+1. Rename "Control:" label to "Owner:" in the hex info panel display (around line 1832)
+2. Add district control percentage next to the district name header, calculated from `hexMap`
 
-- The "Level badge" block (lines 69-79) currently always renders showing `level`. This should be conditional: only render when `level >= 2`, matching SoldierIcon's `{count > 1 && (...)}` pattern.
+### Before:
+```
+Bronx
+Control: COLOMBO
+```
 
-Wrap lines 70-79 with `{level > 1 && ( ... )}`.
+### After:
+```
+Bronx (12% controlled)
+Owner: COLOMBO
+```
 
-One-line wrapper change.
+Same calculation logic as previously planned — filter hexMap by district, count player-owned tiles, show percentage. Label simply says "Owner:" instead of "Hex Owner:".
 
