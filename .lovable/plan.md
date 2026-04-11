@@ -1,23 +1,33 @@
 
 
-# Clarify Hex Info Panel Labels
+# Fix False "Territory Secured" Notification
 
-**File: `src/components/EnhancedMafiaHexGrid.tsx`**
+## Problem
 
-1. Rename "Control:" label to "Owner:" in the hex info panel display (around line 1832)
-2. Add district control percentage next to the district name header, calculated from `hexMap`
+Every time you click on a hex/business you own, the game fires a "Territory Secured — Bronx is now under your control" notification. It only checks if the clicked hex belongs to your family, not whether you actually control the district (60%+ threshold).
 
-### Before:
+## Fix
+
+**File: `src/pages/UltimateMafiaGame.tsx`** — two locations (lines 272-274 and 986-988)
+
+Replace the simple family check with a district control percentage check:
+
+```typescript
+// Before:
+if (business.family === gameState.playerFamily) {
+  notifyTerritoryCaptured(business.district);
+}
+
+// After: only notify if player controls 60%+ of the district
+const districtHexes = (gameState.hexMap || []).filter(t => t.district === business.district);
+const playerHexes = districtHexes.filter(t => t.controllingFamily === gameState.playerFamily);
+const controlPct = districtHexes.length > 0 ? playerHexes.length / districtHexes.length : 0;
+if (controlPct >= 0.6) {
+  notifyTerritoryCaptured(business.district);
+}
 ```
-Bronx
-Control: COLOMBO
-```
 
-### After:
-```
-Bronx (12% controlled)
-Owner: COLOMBO
-```
+Apply this same fix at both `onBusinessClick` handlers (line ~272 and ~986).
 
-Same calculation logic as previously planned — filter hexMap by district, count player-owned tiles, show percentage. Label simply says "Owner:" instead of "Hex Owner:".
+This ensures the notification only appears when you genuinely control the district, matching the 60% threshold used elsewhere in the game.
 
