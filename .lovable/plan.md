@@ -1,33 +1,31 @@
 
 
-# Fix False "Territory Secured" Notification
+# Make Phase Banner Non-Obstructive
 
 ## Problem
-
-Every time you click on a hex/business you own, the game fires a "Territory Secured — Bronx is now under your control" notification. It only checks if the clicked hex belongs to your family, not whether you actually control the district (60%+ threshold).
+The blue phase indicator banner sits on top of the game map (`absolute top-2 ... z-20`) and blocks hex tiles underneath it, interfering with gameplay.
 
 ## Fix
 
-**File: `src/pages/UltimateMafiaGame.tsx`** — two locations (lines 272-274 and 986-988)
+**File: `src/pages/UltimateMafiaGame.tsx`** (lines 899-953)
 
-Replace the simple family check with a district control percentage check:
+Make the banner compact, semi-transparent, and non-interactive so clicks pass through to the map:
 
-```typescript
-// Before:
-if (business.family === gameState.playerFamily) {
-  notifyTerritoryCaptured(business.district);
-}
+1. Add `pointer-events-none` to the banner wrapper so clicks pass through to hexes beneath it
+2. Reduce vertical padding from `py-2` to `py-1` and horizontal from `px-6` to `px-4`
+3. Increase transparency — change colors from `/80` to `/50` (e.g. `bg-blue-600/50`)
+4. Make the phase line text inside the tooltip trigger still hoverable by giving only that element `pointer-events-auto`
 
-// After: only notify if player controls 60%+ of the district
-const districtHexes = (gameState.hexMap || []).filter(t => t.district === business.district);
-const playerHexes = districtHexes.filter(t => t.controllingFamily === gameState.playerFamily);
-const controlPct = districtHexes.length > 0 ? playerHexes.length / districtHexes.length : 0;
-if (controlPct >= 0.6) {
-  notifyTerritoryCaptured(business.district);
-}
+This keeps the banner visible as a HUD element but prevents it from blocking map interaction.
+
+### Before
+```
+absolute top-2 ... z-20 px-6 py-2 ... bg-blue-600/80
 ```
 
-Apply this same fix at both `onBusinessClick` handlers (line ~272 and ~986).
-
-This ensures the notification only appears when you genuinely control the district, matching the 60% threshold used elsewhere in the game.
+### After
+```
+absolute top-2 ... z-20 px-4 py-1 pointer-events-none ... bg-blue-600/50
+// tooltip trigger gets pointer-events-auto so hover still works
+```
 
