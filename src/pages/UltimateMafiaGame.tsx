@@ -1460,6 +1460,28 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
         result={gameState.commissionVoteResult}
         playSound={playSound}
       />
+
+      {/* Enemy Hex Action Dialog (Phase 2+) */}
+      <EnemyHexActionDialog
+        open={!!gameState.pendingEnemyHexAction}
+        targetInfo={(() => {
+          if (!gameState.pendingEnemyHexAction) return null;
+          const { toQ, toR, toS } = gameState.pendingEnemyHexAction;
+          const tile = (gameState.hexMap || []).find((t: any) => t.q === toQ && t.r === toR && t.s === toS);
+          if (!tile) return null;
+          const defenders = (gameState.deployedUnits || []).filter((u: any) => u.q === toQ && u.r === toR && u.s === toS && u.family === tile.controllingFamily);
+          return {
+            district: tile.district || 'Unknown',
+            controllingFamily: tile.controllingFamily || 'neutral',
+            defendersCount: defenders.length,
+            hasBusiness: !!tile.business,
+            businessType: tile.business?.name || tile.business?.type,
+            isLegal: tile.business?.isLegal,
+          };
+        })()}
+        playerMoney={gameState.resources.money}
+        onAction={resolveEnemyHexAction}
+      />
     </>
   );
 };
