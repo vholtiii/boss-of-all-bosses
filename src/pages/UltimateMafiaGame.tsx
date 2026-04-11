@@ -900,10 +900,10 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       {/* Phase indicator banner */}
       <motion.div
         key={gameState.turnPhase}
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className={cn(
-          "absolute top-2 left-1/2 -translate-x-1/2 z-20 px-4 py-1 rounded-full backdrop-blur-sm border border-border/20 shadow-lg flex flex-col items-center gap-0.5 pointer-events-none opacity-80",
+          "absolute bottom-2 left-1/2 -translate-x-1/2 z-20 px-4 py-1 rounded-full backdrop-blur-sm border border-border/20 shadow-lg flex flex-col items-center gap-0.5 pointer-events-none opacity-80",
           currentPhaseConfig.color
         )}
       >
@@ -922,7 +922,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 {gpConfig.icon} Phase {gp}: {gpConfig.name}
               </span>
             </TooltipTrigger>
-            <TooltipContent side="bottom" className="max-w-xs bg-black/95 border-border/50 p-3">
+            <TooltipContent side="top" className="max-w-xs bg-black/95 border-border/50 p-3">
               {!phaseProgressRows ? (
                 <p className="text-xs text-amber-400 font-semibold">👑 Max phase reached — Boss of All Bosses</p>
               ) : (
