@@ -1740,14 +1740,93 @@ export const useEnhancedMafiaGameState = (
 
       // Handle escort: move escorted soldiers along with capo (works in any move action during deploy phase)
       if (unit.type === 'capo' && unit.escortingSoldierIds?.length) {
-        unit.escortingSoldierIds.forEach(soldierIdToEscort => {
-          const sIdx = newUnits.findIndex(u => u.id === soldierIdToEscort);
-          if (sIdx !== -1) {
-            newUnits[sIdx] = { ...newUnits[sIdx], q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0 };
+        // Escort restriction: if destination is rival territory, check safe passage
+        const escortTargetTile = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
+        const isEscortToRival = escortTargetTile && escortTargetTile.controllingFamily !== 'neutral' && escortTargetTile.controllingFamily !== prev.playerFamily;
+        if (isEscortToRival) {
+          const hasSP = (prev.safePassagePacts || []).some(p => p.active && p.targetFamily === escortTargetTile.controllingFamily);
+          if (!hasSP) {
+            // Auto-detach soldiers at current position BEFORE capo moves
+            newUnits[unitIdx] = { ...newUnits[unitIdx], escortingSoldierIds: [] };
+            const notifications = [...prev.pendingNotifications, {
+              type: 'warning' as const, title: '🚫 Soldiers Detached',
+              message: `Soldiers detached — no Safe Passage for escort into ${escortTargetTile.controllingFamily.charAt(0).toUpperCase() + escortTargetTile.controllingFamily.slice(1)} territory.`,
+            }];
+            // Continue without escorting soldiers — capo moves alone
+            // (don't return here, let the rest of the movement logic proceed)
+            prev = { ...prev, pendingNotifications: notifications };
+          } else {
+            // Safe passage active — move soldiers with capo
+            unit.escortingSoldierIds.forEach(soldierIdToEscort => {
+              const sIdx = newUnits.findIndex(u => u.id === soldierIdToEscort);
+              if (sIdx !== -1) {
+                newUnits[sIdx] = { ...newUnits[sIdx], q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0 };
+              }
+            });
+            newUnits[unitIdx] = { ...newUnits[unitIdx], escortingSoldierIds: [] };
           }
-        });
-        // Auto-detach soldiers at destination
-        newUnits[unitIdx] = { ...newUnits[unitIdx], escortingSoldierIds: [] };
+        } else {
+          // Normal territory — move escorts normally
+          unit.escortingSoldierIds.forEach(soldierIdToEscort => {
+            const sIdx = newUnits.findIndex(u => u.id === soldierIdToEscort);
+            if (sIdx !== -1) {
+              newUnits[sIdx] = { ...newUnits[sIdx], q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: 0 };
+            }
+          });
+          newUnits[unitIdx] = { ...newUnits[unitIdx], escortingSoldierIds: [] };
+        }
+      }
+
+      // ============ ENEMY HEX ENTRY CHECK ============
+      const targetTileForEntry = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
+      const isRivalHexEntry = targetTileForEntry && targetTileForEntry.controllingFamily !== 'neutral' && targetTileForEntry.controllingFamily !== prev.playerFamily && !targetTileForEntry.isHeadquarters;
+      
+      if (isRivalHexEntry && unit.type === 'soldier') {
+        const gamePhase = prev.gamePhase || 1;
+        
+        if (gamePhase === 1) {
+          // Phase 1: Contested occupation — auto-capture after 1 turn
+          const newContested = [...(prev.contestedHexes || [])];
+          const alreadyContested = newContested.some(c => c.q === targetLocation.q && c.r === targetLocation.r && c.s === targetLocation.s);
+          if (!alreadyContested) {
+            newContested.push({
+              q: targetLocation.q, r: targetLocation.r, s: targetLocation.s,
+              occupyingFamily: prev.playerFamily,
+              occupyingSince: prev.turn,
+            });
+          }
+          const contestNotifications = [...prev.pendingNotifications, {
+            type: 'info' as const, title: '🏴 Contesting Territory',
+            message: `Your soldier is contesting ${targetTileForEntry.controllingFamily.charAt(0).toUpperCase() + targetTileForEntry.controllingFamily.slice(1)} territory. Hold for 1 turn to seize it.`,
+          }];
+
+          const newState = {
+            ...prev, deployedUnits: newUnits, hexMap: prev.hexMap,
+            resources: prev.resources,
+            contestedHexes: newContested,
+            selectedUnitId: updatedUnit.movesRemaining > 0 ? updatedUnit.id : null,
+            availableMoveHexes: [],
+            pendingNotifications: contestNotifications,
+          };
+          syncLegacyUnits(newState);
+          return newState;
+        } else {
+          // Phase 2+: Force action dialog — set pendingEnemyHexAction
+          const newState = {
+            ...prev, deployedUnits: newUnits, hexMap: prev.hexMap,
+            resources: prev.resources,
+            pendingEnemyHexAction: {
+              unitId: unit.id,
+              fromQ: unit.q, fromR: unit.r, fromS: unit.s,
+              toQ: targetLocation.q, toR: targetLocation.r, toS: targetLocation.s,
+            },
+            selectedUnitId: null,
+            availableMoveHexes: [],
+            pendingNotifications: prev.pendingNotifications,
+          };
+          syncLegacyUnits(newState);
+          return newState;
+        }
       }
 
       // Only Capos auto-claim and auto-extort neutral tiles on move
