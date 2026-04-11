@@ -8072,5 +8072,8 @@ export const useEnhancedMafiaGameState = (
     fortifyUnit,
     setMoveAction,
     startEscort,
+    resolveEnemyHexAction,
+    setMoveAction,
+    startEscort,
   };
 };
