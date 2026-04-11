@@ -1971,7 +1971,51 @@ export const useEnhancedMafiaGameState = (
     });
   }, []);
 
-  // ============ SCOUT HEX ============
+  // ============ RESOLVE ENEMY HEX ACTION (Phase 2+) ============
+  const resolveEnemyHexAction = useCallback((action: 'hit' | 'sabotage' | 'cancel') => {
+    setGameState(prev => {
+      if (!prev.pendingEnemyHexAction) return prev;
+      const { unitId, fromQ, fromR, fromS, toQ, toR, toS } = prev.pendingEnemyHexAction;
+      const newState = cloneStateForMutation(prev);
+      newState.pendingEnemyHexAction = null;
+
+      const unitIdx = newState.deployedUnits.findIndex((u: any) => u.id === unitId);
+      if (unitIdx === -1) return newState;
+
+      if (action === 'cancel') {
+        // Return soldier to origin
+        newState.deployedUnits[unitIdx] = { ...newState.deployedUnits[unitIdx], q: fromQ, r: fromR, s: fromS, movesRemaining: (newState.deployedUnits[unitIdx].movesRemaining || 0) + 1 };
+        newState.pendingNotifications = [...(newState.pendingNotifications || []), {
+          type: 'info' as const, title: '🔙 Retreated',
+          message: 'Your soldier pulled back to their previous position.',
+        }];
+        syncLegacyUnits(newState);
+        return newState;
+      }
+
+      if (action === 'hit') {
+        // Use existing hit logic via processTerritoryHit
+        const hitAction = { type: 'hit_territory', targetQ: toQ, targetR: toR, targetS: toS };
+        const result = processTerritoryHit(newState, hitAction);
+        result.pendingNotifications = result.pendingNotifications || [];
+        syncLegacyUnits(result);
+        return result;
+      }
+
+      if (action === 'sabotage') {
+        // Use existing sabotage logic via processSabotageHex
+        const sabAction = { type: 'sabotage_hex', targetQ: toQ, targetR: toR, targetS: toS };
+        const result = processSabotageHex(newState, sabAction);
+        result.pendingNotifications = result.pendingNotifications || [];
+        syncLegacyUnits(result);
+        return result;
+      }
+
+      return newState;
+    });
+  }, []);
+
+
   const processScout = (prev: EnhancedMafiaGameState, unit: DeployedUnit, targetLocation: { q: number; r: number; s: number }): EnhancedMafiaGameState => {
     const tile = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
     if (!tile) return prev;
