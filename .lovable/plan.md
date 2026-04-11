@@ -1,8 +1,14 @@
 
 
-# Make Capo Icon 20% Smaller
+# Hide Capo Level Badge When Solo
 
-**File: `src/components/CapoIcon.tsx`**
+**Problem**: The capo icon always shows a "level" number badge (showing "1"), but it should match soldier behavior — only display a count when 2+ units share the same hex.
 
-Change `const size = 32` to `const size = 26` (32 × 0.8 = 25.6, rounded to 26). All dependent measurements (image position, glow radius, rings) already derive from `size`, so they'll scale automatically.
+**Fix — `src/components/CapoIcon.tsx`**:
+
+- The "Level badge" block (lines 69-79) currently always renders showing `level`. This should be conditional: only render when `level >= 2`, matching SoldierIcon's `{count > 1 && (...)}` pattern.
+
+Wrap lines 70-79 with `{level > 1 && ( ... )}`.
+
+One-line wrapper change.
 
