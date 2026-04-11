@@ -12,6 +12,7 @@ import { LeftSidePanel, RightSidePanel } from '@/components/GameSidePanels';
 import { useEnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import SaveLoadDialog from '@/components/SaveLoadDialog';
+import EnemyHexActionDialog from '@/components/EnemyHexActionDialog';
 import TutorialSystem from '@/components/TutorialSystem';
 import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
 import TurnSummaryModal from '@/components/TurnSummaryModal';
