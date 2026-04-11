@@ -2432,7 +2432,7 @@ export const useEnhancedMafiaGameState = (
           const tile = newState.hexMap.find((t: any) => t.q === contested.q && t.r === contested.r && t.s === contested.s);
           if (tile) {
             const oldFamily = tile.controllingFamily;
-            tile.controllingFamily = contested.occupyingFamily;
+            tile.controllingFamily = contested.occupyingFamily as any;
             const isPlayer = contested.occupyingFamily === newState.playerFamily;
             if (isPlayer) {
               newState.pendingNotifications = [...newState.pendingNotifications, {
