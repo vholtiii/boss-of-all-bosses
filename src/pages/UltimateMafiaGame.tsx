@@ -901,22 +901,22 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className={cn(
-          "absolute top-2 left-1/2 -translate-x-1/2 z-20 px-6 py-2 rounded-full backdrop-blur-sm border border-border/30 shadow-lg flex flex-col items-center gap-0.5",
+          "absolute top-2 left-1/2 -translate-x-1/2 z-20 px-4 py-1 rounded-full backdrop-blur-sm border border-border/20 shadow-lg flex flex-col items-center gap-0.5 pointer-events-none opacity-80",
           currentPhaseConfig.color
         )}
       >
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-bold text-white font-playfair tracking-wide">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-white font-playfair tracking-wide">
             {currentPhaseConfig.label}
           </span>
-          <span className="text-xs text-white/70">
+          <span className="text-[10px] text-white/70">
             {currentPhaseConfig.hint}
           </span>
         </div>
         <TooltipProvider delayDuration={200}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="text-[10px] text-white/50 cursor-help underline decoration-dotted underline-offset-2">
+              <span className="text-[10px] text-white/50 cursor-help underline decoration-dotted underline-offset-2 pointer-events-auto">
                 {gpConfig.icon} Phase {gp}: {gpConfig.name}
               </span>
             </TooltipTrigger>
