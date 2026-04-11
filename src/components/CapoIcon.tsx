@@ -67,16 +67,18 @@ const CapoIcon: React.FC<CapoIconProps> = ({
       )}
       
       {/* Level badge */}
-      <motion.g
-        initial={{ opacity: 0, scale: 0 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.2, delay: 0.4 }}
-      >
-        <circle cx={x + 14} cy={y - 14} r="10" fill={familyColor} stroke="#ffffff" strokeWidth="1" />
-        <text x={x + 14} y={y - 10.5} textAnchor="middle" fontSize="10" fill="#ffffff" fontWeight="bold" className="select-none">
-          {level}
-        </text>
-      </motion.g>
+      {level > 1 && (
+        <motion.g
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.2, delay: 0.4 }}
+        >
+          <circle cx={x + 14} cy={y - 14} r="10" fill={familyColor} stroke="#ffffff" strokeWidth="1" />
+          <text x={x + 14} y={y - 10.5} textAnchor="middle" fontSize="10" fill="#ffffff" fontWeight="bold" className="select-none">
+            {level}
+          </text>
+        </motion.g>
+      )}
 
       {/* Wounded badge */}
       {wounded && (
