@@ -3690,6 +3690,8 @@ export const useEnhancedMafiaGameState = (
               // Tension: hitman kills are anonymous — only global tension, no pair tension
               if (targetUnit.type === 'capo') {
                 addGlobalTension(newState, TENSION_HITMAN_KILL_CAPO_GLOBAL);
+                // Colombo succession trigger
+                triggerColomboSuccession(newState, contract.targetFamily, targetUnit.q, targetUnit.r, targetUnit.s);
               } else {
                 addGlobalTension(newState, TENSION_HITMAN_KILL_SOLDIER_GLOBAL);
               }
