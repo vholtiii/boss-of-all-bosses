@@ -2917,6 +2917,23 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
+      // --- Family Power cooldown tick-down ---
+      Object.keys(newState.familyPowerCooldowns || {}).forEach(fam => {
+        if (newState.familyPowerCooldowns[fam] > 0) {
+          newState.familyPowerCooldowns[fam] -= 1;
+          if (newState.familyPowerCooldowns[fam] <= 0) delete newState.familyPowerCooldowns[fam];
+        }
+      });
+      // Front Boss hex timers
+      newState.frontBossHexes = (newState.frontBossHexes || []).map(h => ({ ...h, turnsRemaining: h.turnsRemaining - 1 })).filter(h => h.turnsRemaining > 0);
+      // Lucchese boost timer
+      if (newState.luccheseBoostedDistrict && newState.luccheseBoostedDistrict.turnsRemaining > 0) {
+        newState.luccheseBoostedDistrict = { ...newState.luccheseBoostedDistrict, turnsRemaining: newState.luccheseBoostedDistrict.turnsRemaining - 1 };
+        if (newState.luccheseBoostedDistrict.turnsRemaining <= 0) newState.luccheseBoostedDistrict = null;
+      }
+      // Bonanno purge immunity timer
+      newState.bonannoPurgeImmunity = (newState.bonannoPurgeImmunity || []).map(i => ({ ...i, turnsRemaining: i.turnsRemaining - 1 })).filter(i => i.turnsRemaining > 0);
+
       // --- Hex fortification abandonment tick ---
       newState.fortifiedHexes = (newState.fortifiedHexes || []).filter(f => {
         const hasUnits = newState.deployedUnits.some(u => u.family === f.family && u.q === f.q && u.r === f.r && u.s === f.s);
