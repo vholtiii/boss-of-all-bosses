@@ -3986,9 +3986,19 @@ export const useEnhancedMafiaGameState = (
           }
         }
         
-        // District control bonus: Manhattan +25% income
+       // District control bonus: Manhattan +25% income
         if (tile.district === 'Manhattan' && hasPlayerDistrictBonus(state, 'income')) {
           tileIncome = Math.floor(tileIncome * 1.25);
+        }
+        // Lucchese Garment District Shakedown: +50% income in boosted district
+        const luccheeBoost = state.luccheseBoostedDistrict;
+        if (luccheeBoost && luccheeBoost.turnsRemaining > 0 && luccheeBoost.family === state.playerFamily && tile.district === luccheeBoost.district) {
+          tileIncome = Math.floor(tileIncome * 1.5);
+        }
+        // Front Boss heat zeroing: skip heat for businesses on front boss hexes
+        const isOnFrontBossHex = (state.frontBossHexes || []).some(h => h.q === tile.q && h.r === tile.r && h.s === tile.s && h.ownerFamily === state.playerFamily);
+        if (isOnFrontBossHex && tile.business) {
+          tile.business.heatLevel = 0;
         }
         // War income penalty: -20% on hexes adjacent to warring enemy territory (capped at -30%)
         let warPenalty = 0;
