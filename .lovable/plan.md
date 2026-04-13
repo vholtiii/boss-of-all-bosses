@@ -1,24 +1,25 @@
 
 
-# Reposition Phase Banner to Avoid Popup Overlap
+# Replace Menu Music With a Mafia-Themed Royalty-Free Track
 
-## Problem
-The phase indicator banner sits at `absolute top-2 left-1/2 z-20` centered over the game board. This overlaps with dialogs and popups (EnemyHexActionDialog, NegotiationDialog, TurnSummaryModal, etc.) that appear centered on screen.
+## Summary
 
-## Solution
-Move the banner to the **bottom-center** of the main content area instead of the top-center. This keeps it visible and informative but out of the way of centered modals and action dialogs.
+Replace the current `mafia-theme.mp3` with a more authentic, dark, cinematic mafia-style track. Since you've chosen to provide a royalty-free MP3, the code changes are minimal — just a file swap.
 
-## Changes
+## What You Need To Do
 
-**File: `src/pages/UltimateMafiaGame.tsx`** (~line 906)
+Provide or upload a royalty-free MP3 file that has the mafia atmosphere you want (e.g., dark orchestral, Godfather-style, Italian mandolin, tense strings, or cinematic noir). Good free sources:
 
-Change positioning classes from:
-- `absolute top-2 left-1/2 -translate-x-1/2`
+- **Pixabay Music** (pixabay.com/music) — search "mafia", "godfather", "italian crime"
+- **Free Music Archive** (freemusicarchive.org) — search "noir", "crime jazz"
+- **Mixkit** (mixkit.co/free-stock-music) — search "cinematic dark"
 
-To:
-- `absolute bottom-2 left-1/2 -translate-x-1/2`
+## Implementation
 
-Also update the tooltip to open `side="top"` instead of `side="bottom"` (line 925), and change the entry animation from `y: -20` to `y: 20` (line 903) so it slides in from the bottom.
+Once you upload the MP3 file:
 
-Three lines changed total.
+1. **Replace** `public/audio/mafia-theme.mp3` with the new file (same filename so no code changes needed)
+2. If the file has a different name, update the single reference in `src/components/FamilySelectionScreen.tsx` line 136
+
+That's it — the existing `useBgMusic` hook handles looping, fade-in/out, and volume control automatically.
 
