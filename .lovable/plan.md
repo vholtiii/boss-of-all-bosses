@@ -1,55 +1,29 @@
 
 
-# Family Selection Screen Enhancement — Particles, Crests & Gritty Cards
+# Add Family Power Info to Detail Panel
 
-## Scope
-Implement three enhancements to the family selection screen: an atmospheric particle system, animated family crests on each card, and a gritty street-style card redesign. Title animation, detail panel changes, and background overhaul are deferred.
+## Overview
+Add a "Family Power" section to the detail panel that appears when a family is selected. Cards remain unchanged.
 
-## 1. Atmospheric Particle System
+## What Changes
 
-Create a canvas-based particle overlay rendered behind the UI content:
-- ~50 particles: small dust motes and embers drifting upward with slight horizontal sway
-- Warm amber/gray tones, low opacity (0.1–0.4)
-- Subtle parallax response to mouse position
-- Canvas element is `pointer-events: none`, `position: fixed`, behind content
-- Runs at ~30fps via `requestAnimationFrame` with frame-skip logic
-- Built as a standalone `<AtmosphericParticles />` component
+**`src/components/FamilySelectionScreen.tsx`** — single file change:
 
-**New file:** `src/components/AtmosphericParticles.tsx`
+1. **Extend `FamilyInfo` interface** with `powerName`, `powerLore`, `powerEffect`, `powerCost`, and `powerCooldown` fields.
 
-## 2. Animated Family Crests
+2. **Add power data to each family object**:
+   - **Gambino** — "The Dellacroce Network" | *Underboss Aniello Dellacroce ran an unrivaled intelligence network through enforcers like Roy DeMeo's "Murder Machine" crew — their eyes and ears stretched further than any rival family.* | Scout target hex + all 6 adjacent hexes | 2 Tactical | 3 turns
+   - **Genovese** — "The Front Boss" | *Vincent "The Chin" Gigante feigned insanity in a bathrobe for 30 years, hiding the family's true operations in plain sight while the FBI chased shadows.* | Hide hex as neutral 3 turns; unscoutable, -30% hit/sabotage, zero heat | 1 Tactical | 2 turns
+   - **Lucchese** — "Garment District Shakedown" | *For decades the Lucchese family strangled NYC's Garment District, extracting tribute from every manufacturer on Seventh Avenue.* | +50% district income, extract $1k/hex rival tribute | 1 Tactical | 3 turns
+   - **Bonanno** — "The Donnie Brasco Purge" | *After FBI agent Joe Pistone infiltrated the family as "Donnie Brasco," the Bonannos launched a brutal internal purge of suspected informants.* | Remove soldiers <50 loyalty; survivors +15 loyalty, 2-turn flip immunity | 1 Tactical | 4 turns
+   - **Colombo** — "The Persico Succession" | *When Joe Colombo was shot at the 1971 Unity Day Rally, Carmine Persico seized control and reorganized — a pattern repeated through decades of assassinations and internal wars.* | Instant soldier-to-capo promotion when a capo dies | 1 Tactical | Once per game
 
-Add a unique inline SVG crest/emblem to each family card:
-- **Gambino**: Crown with dollar sign
-- **Genovese**: Eye with serpent
-- **Lucchese**: Crossed keys
-- **Bonanno**: Shield with fist
-- **Colombo**: Crossed swords
+3. **Insert a new section in the detail panel** between the description paragraph (line ~458) and the bonuses/resources grid (line ~460). It will display:
+   - A header: "⚡ FAMILY POWER" in the family's accent color
+   - Power name as a bold subtitle
+   - Historical lore in italic muted text
+   - Effect description in normal text
+   - Cost and cooldown as small badges (e.g., "2 Tactical Actions" / "Cooldown: 3 turns" or "Once per game")
 
-Each crest:
-- Renders above the family name in the card, sized ~32x32px
-- Colored in the family's theme color
-- Pulses/glows on hover using framer-motion
-- On selection: brief scale-up + glow burst animation
-
-Crests defined as a `familyCrestMap` object in `FamilySelectionScreen.tsx` or a small helper file.
-
-## 3. Gritty Street-Style Card Redesign
-
-Restyle the existing 150px family cards:
-- Slightly uneven edges via CSS `clip-path: polygon(...)` for a distressed look
-- Subtle concrete-like noise texture background (CSS SVG data URI, no image assets)
-- Thicker, more industrial stat bars — taller (h-3), with a brushed/rough feel
-- Selected card: harsh directional glow (box-shadow with family color), spray-paint style top accent bar
-- Unselected cards: rougher border style, muted tones
-- Add a faint grunge noise overlay to the entire screen background (CSS-only, very low opacity)
-
-**Modified file:** `src/components/FamilySelectionScreen.tsx` — card section rewrite, add particle component, integrate crests
-**Modified file:** `src/index.css` — add any needed keyframes (glow pulse, ember drift)
-
-## Technical Notes
-- No external dependencies — canvas API for particles, inline SVGs for crests, CSS for textures
-- Particle component uses `useRef` + `useEffect` with cleanup on unmount
-- All visual textures are CSS-generated (no image assets to load)
-- Existing layout structure (card grid, detail panel, difficulty/map selectors) stays the same
+The section will be styled with a subtle border-left in the family color and slightly darker background to visually separate it from the rest of the panel.
 
