@@ -5456,8 +5456,12 @@ export const useEnhancedMafiaGameState = (
           if (targetUnit) {
             if (Math.random() < AI_PLAN_HIT_SUCCESS_RATE) {
               // Success — capo is killed
+              const capoQ = targetUnit.q, capoR = targetUnit.r, capoS = targetUnit.s;
+              const capoFam = targetUnit.family;
               const idx = state.deployedUnits.indexOf(targetUnit);
               if (idx !== -1) state.deployedUnits.splice(idx, 1);
+              // Colombo succession trigger
+              triggerColomboSuccession(state, capoFam as string, capoQ, capoR, capoS);
               state.pendingNotifications.push({
                 type: 'error' as const,
                 title: '💀 Capo Assassinated!',
