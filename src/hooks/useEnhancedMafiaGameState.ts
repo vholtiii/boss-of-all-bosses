@@ -5918,6 +5918,128 @@ export const useEnhancedMafiaGameState = (
           }
           return newState;
         }
+        case 'use_family_power': {
+          const power = FAMILY_POWERS[newState.playerFamily];
+          if (!power) return newState;
+          
+          // Check cooldown
+          const cd = (newState.familyPowerCooldowns || {})[newState.playerFamily] || 0;
+          if (cd > 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⏳ Power on Cooldown', message: `${power.name} available in ${cd} turn(s).` });
+            return newState;
+          }
+          // Check one-time use
+          if (power.oneTimeUse && (newState.familyPowerUsedForever || {})[newState.playerFamily]) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚡ Already Used', message: `${power.name} can only be used once per game.` });
+            return newState;
+          }
+          // Check tactical actions
+          if (newState.tacticalActionsRemaining < power.cost) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚡ Not Enough Actions', message: `${power.name} costs ${power.cost} tactical action(s).` });
+            return newState;
+          }
+          
+          // Hex-targeting powers switch to map selection mode
+          if (power.requiresHexTarget) {
+            newState.selectedMoveAction = 'family_power' as MoveAction;
+            // Show appropriate hexes based on power type
+            if (power.targetOwnHex) {
+              // Genovese: show own hexes
+              newState.availableMoveHexes = newState.hexMap
+                .filter(t => t.controllingFamily === newState.playerFamily && !t.isHeadquarters)
+                .map(t => ({ q: t.q, r: t.r, s: t.s }));
+            } else {
+              // Gambino: show all non-HQ hexes
+              newState.availableMoveHexes = newState.hexMap
+                .filter(t => !t.isHeadquarters)
+                .map(t => ({ q: t.q, r: t.r, s: t.s }));
+            }
+            newState.pendingNotifications.push({ type: 'info', title: `⚡ ${power.name}`, message: 'Select a target hex on the map.' });
+            return newState;
+          }
+          
+          // Instant powers
+          if (newState.playerFamily === 'lucchese') {
+            // Garment District Shakedown: find district with most player hexes
+            const districtCounts: Record<string, number> = {};
+            newState.hexMap.forEach(t => {
+              if (t.controllingFamily === newState.playerFamily) {
+                districtCounts[t.district] = (districtCounts[t.district] || 0) + 1;
+              }
+            });
+            const bestDistrict = Object.entries(districtCounts).sort((a, b) => b[1] - a[1])[0];
+            if (!bestDistrict) {
+              newState.pendingNotifications.push({ type: 'warning', title: '⚠️ No Territory', message: 'You need territory to use this power.' });
+              return newState;
+            }
+            // Extract $1,000 per rival hex in that district
+            let tributeExtracted = 0;
+            newState.hexMap.forEach(t => {
+              if (t.district === bestDistrict[0] && t.controllingFamily !== newState.playerFamily && t.controllingFamily !== 'neutral') {
+                tributeExtracted += 1000;
+                const rival = newState.aiOpponents.find(o => o.family === t.controllingFamily);
+                if (rival) rival.resources.money = Math.max(0, rival.resources.money - 1000);
+              }
+            });
+            newState.resources.money += tributeExtracted;
+            newState.luccheseBoostedDistrict = { district: bestDistrict[0], turnsRemaining: 3, family: newState.playerFamily };
+            newState.tacticalActionsRemaining -= power.cost;
+            newState.familyPowerCooldowns[newState.playerFamily] = power.cooldownTurns;
+            newState.pendingNotifications.push({
+              type: 'success', title: '💰 Garment District Shakedown!',
+              message: `${bestDistrict[0]} businesses boosted +50% for 3 turns. Extracted $${tributeExtracted.toLocaleString()} tribute from rivals.`,
+            });
+            return newState;
+          }
+          
+          if (newState.playerFamily === 'bonanno') {
+            // Donnie Brasco Purge: remove low-loyalty soldiers, boost survivors
+            const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+            const purged: string[] = [];
+            const survivors: string[] = [];
+            playerSoldiers.forEach(u => {
+              const stats = newState.soldierStats[u.id];
+              if (stats && stats.loyalty < 50) {
+                purged.push(u.id);
+              } else {
+                survivors.push(u.id);
+              }
+            });
+            // Remove purged soldiers
+            newState.deployedUnits = newState.deployedUnits.filter(u => !purged.includes(u.id));
+            purged.forEach(id => delete newState.soldierStats[id]);
+            // Boost survivors
+            survivors.forEach(id => {
+              const stats = newState.soldierStats[id];
+              if (stats) {
+                stats.loyalty = Math.min(SOLDIER_LOYALTY_CAP, stats.loyalty + 15);
+              }
+            });
+            // Add purge immunity
+            newState.bonannoPurgeImmunity = [
+              ...(newState.bonannoPurgeImmunity || []),
+              ...survivors.map(id => ({ unitId: id, turnsRemaining: 2 })),
+            ];
+            newState.tacticalActionsRemaining -= power.cost;
+            newState.familyPowerCooldowns[newState.playerFamily] = power.cooldownTurns;
+            newState.pendingNotifications.push({
+              type: 'success', title: '🔪 Donnie Brasco Purge!',
+              message: `${purged.length} disloyal soldier(s) removed. ${survivors.length} survivor(s) gain +15 loyalty and 2-turn flip immunity.`,
+            });
+            return newState;
+          }
+          
+          if (newState.playerFamily === 'colombo') {
+            // Persico Succession is passive/reactive — inform the player
+            newState.pendingNotifications.push({
+              type: 'info', title: '👑 Persico Succession',
+              message: 'This power activates automatically when a capo dies — a soldier is instantly promoted to replace them.',
+            });
+            return newState;
+          }
+          
+          return newState;
+        }
         // recruit_capo case removed — capos are only obtainable via promote_capo
         case 'promote_capo': {
           if ((newState.gamePhase || 1) < 2) {
