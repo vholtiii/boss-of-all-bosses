@@ -393,7 +393,60 @@ export const SAFEHOUSE_MAX_STOCKPILE = 5;
 export const SAFEHOUSE_MAX_ALLOCATION = 50;
 export const SAFEHOUSE_STOCKPILE_RATE = 1; // units per turn at 50% allocation per node type
 
-export type MoveAction = 'move' | 'scout' | 'fortify' | 'escort' | 'safehouse' | 'send_word';
+export type MoveAction = 'move' | 'scout' | 'fortify' | 'escort' | 'safehouse' | 'send_word' | 'family_power';
+
+// ============ FAMILY POWER SYSTEM ============
+export interface FamilyPower {
+  id: string;
+  name: string;
+  family: string;
+  cost: number;           // tactical actions consumed
+  cooldownTurns: number;
+  oneTimeUse?: boolean;
+  phase: 'tactical';
+  requiresHexTarget: boolean;
+  targetOwnHex?: boolean; // true = must target own hex (Genovese)
+}
+
+export const FAMILY_POWERS: Record<string, FamilyPower> = {
+  gambino: {
+    id: 'dellacroce_network', name: 'The Dellacroce Network', family: 'gambino',
+    cost: 2, cooldownTurns: 3, phase: 'tactical', requiresHexTarget: true,
+  },
+  genovese: {
+    id: 'front_boss', name: 'The Front Boss', family: 'genovese',
+    cost: 1, cooldownTurns: 2, phase: 'tactical', requiresHexTarget: true, targetOwnHex: true,
+  },
+  lucchese: {
+    id: 'garment_shakedown', name: 'Garment District Shakedown', family: 'lucchese',
+    cost: 1, cooldownTurns: 3, phase: 'tactical', requiresHexTarget: false,
+  },
+  bonanno: {
+    id: 'donnie_brasco_purge', name: 'The Donnie Brasco Purge', family: 'bonanno',
+    cost: 1, cooldownTurns: 4, phase: 'tactical', requiresHexTarget: false,
+  },
+  colombo: {
+    id: 'persico_succession', name: 'The Persico Succession', family: 'colombo',
+    cost: 1, cooldownTurns: 0, oneTimeUse: true, phase: 'tactical', requiresHexTarget: false,
+  },
+};
+
+export interface FrontBossHex {
+  q: number; r: number; s: number;
+  turnsRemaining: number;
+  ownerFamily: string;
+}
+
+export interface LuccheseBoostedDistrict {
+  district: string;
+  turnsRemaining: number;
+  family: string;
+}
+
+export interface BonannoPurgeImmunity {
+  unitId: string;
+  turnsRemaining: number;
+}
 
 // ============ PENDING NEGOTIATION (Send Word) ============
 export interface PendingNegotiation {

@@ -68,6 +68,8 @@ import {
   GamePhase, PHASE_CONFIGS,
   COMMISSION_VOTE_COST, COMMISSION_VOTE_COOLDOWN, COMMISSION_MIN_SURVIVORS,
   COMMISSION_VOTE_RELATIONSHIP_THRESHOLD, COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY,
+  // Family Power System
+  FAMILY_POWERS, FamilyPower, FrontBossHex, LuccheseBoostedDistrict, BonannoPurgeImmunity,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -229,6 +231,12 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     gamePhase: state.gamePhase || 1,
     commissionVoteCooldownUntil: state.commissionVoteCooldownUntil || 0,
     commissionVoteResult: state.commissionVoteResult || null,
+    // Family Power system
+    familyPowerCooldowns: { ...(state.familyPowerCooldowns || {}) },
+    familyPowerUsedForever: { ...(state.familyPowerUsedForever || {}) },
+    frontBossHexes: (state.frontBossHexes || []).map(h => ({ ...h })),
+    luccheseBoostedDistrict: state.luccheseBoostedDistrict ? { ...state.luccheseBoostedDistrict } : null,
+    bonannoPurgeImmunity: (state.bonannoPurgeImmunity || []).map(i => ({ ...i })),
   });
 
 // ============ UNIT TYPES ============
@@ -461,6 +469,13 @@ export interface EnhancedMafiaGameState {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
   };
   
+  // Family Power system
+  familyPowerCooldowns: Record<string, number>;      // family → cooldown turns remaining
+  familyPowerUsedForever: Record<string, boolean>;   // family → true if one-time power used (Colombo)
+  frontBossHexes: FrontBossHex[];                    // Genovese hidden hexes
+  luccheseBoostedDistrict: LuccheseBoostedDistrict | null;
+  bonannoPurgeImmunity: BonannoPurgeImmunity[];
+  
   territories: Array<{
     district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
     family: 'neutral' | 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
@@ -488,6 +503,61 @@ const hexNeighborDirections = [
 
 const getHexNeighbors = (q:number,r:number,s:number) =>
   hexNeighborDirections.map(d => ({q:q+d.q, r:r+d.r, s:s+d.s}));
+
+// ============ COLOMBO SUCCESSION HELPER ============
+const triggerColomboSuccession = (state: EnhancedMafiaGameState, deadCapoFamily: string, deadCapoQ: number, deadCapoR: number, deadCapoS: number) => {
+  // Only trigger for Colombo family and if not already used
+  if (deadCapoFamily !== 'colombo') return;
+  const power = FAMILY_POWERS.colombo;
+  if (!power) return;
+  
+  const isPlayer = deadCapoFamily === state.playerFamily;
+  const usedKey = deadCapoFamily;
+  
+  if ((state.familyPowerUsedForever || {})[usedKey]) return;
+  
+  // Find nearest soldier to promote
+  const familySoldiers = state.deployedUnits.filter(u => u.family === deadCapoFamily && u.type === 'soldier');
+  if (familySoldiers.length === 0) return;
+  
+  // Pick highest loyalty soldier near the dead capo's position
+  const scored = familySoldiers.map(u => ({
+    unit: u,
+    dist: hexDistance(u, { q: deadCapoQ, r: deadCapoR, s: deadCapoS }),
+    loyalty: (state.soldierStats[u.id]?.loyalty || 0),
+  })).sort((a, b) => b.loyalty - a.loyalty || a.dist - b.dist);
+  
+  const best = scored[0];
+  if (!best) return;
+  
+  // Promote to capo
+  const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
+  const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
+  const capoName = `Capo ${Math.floor(Math.random() * 100)}`;
+  
+  const idx = state.deployedUnits.findIndex(u => u.id === best.unit.id);
+  if (idx !== -1) {
+    state.deployedUnits[idx] = {
+      ...state.deployedUnits[idx],
+      type: 'capo' as const,
+      maxMoves: 3,
+      movesRemaining: 0,
+      name: capoName,
+      personality: randomPersonality,
+      level: 1,
+    };
+  }
+  
+  state.familyPowerUsedForever = { ...(state.familyPowerUsedForever || {}), [usedKey]: true };
+  
+  if (isPlayer) {
+    state.pendingNotifications.push({
+      type: 'success',
+      title: '👑 Persico Succession!',
+      message: `${capoName} has been instantly promoted to capo to fill the void. The family endures.`,
+    });
+  }
+};
 
 // ============ TENSION HELPERS ============
 const addPairTension = (state: EnhancedMafiaGameState, familyA: string, familyB: string, amount: number) => {
@@ -913,6 +983,12 @@ const createInitialGameState = (
      warSummitCooldownUntil: 0,
      contestedHexes: [],
      pendingEnemyHexAction: null,
+    // Family Power system
+    familyPowerCooldowns: {},
+    familyPowerUsedForever: {},
+    frontBossHexes: [],
+    luccheseBoostedDistrict: null,
+    bonannoPurgeImmunity: [],
     victoryType: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
@@ -1612,7 +1688,80 @@ export const useEnhancedMafiaGameState = (
         return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
       }
 
-      // Handle safehouse action (tactical phase only) — blocked for wounded capos
+      // Handle family_power hex target (Gambino area scout / Genovese hide hex)
+      if (prev.turnPhase === 'move' && moveAction === 'family_power') {
+        const power = FAMILY_POWERS[prev.playerFamily];
+        if (!power || !power.requiresHexTarget) return prev;
+        if (prev.tacticalActionsRemaining < power.cost) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '⚡ Not Enough Tactical Actions', message: `${power.name} costs ${power.cost} tactical action(s).` }] };
+        const cd = (prev.familyPowerCooldowns || {})[prev.playerFamily] || 0;
+        if (cd > 0) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '⏳ Power on Cooldown', message: `${power.name} available in ${cd} turn(s).` }] };
+        
+        const newState = cloneStateForMutation(prev);
+        
+        if (prev.playerFamily === 'gambino') {
+          // Dellacroce Network: scout target + all 6 adjacent hexes
+          const targetHexes = [targetLocation, ...getHexNeighbors(targetLocation.q, targetLocation.r, targetLocation.s)];
+          const newScoutedHexes = [...newState.scoutedHexes];
+          let scoutedCount = 0;
+          targetHexes.forEach(loc => {
+            const tile = newState.hexMap.find(t => t.q === loc.q && t.r === loc.r && t.s === loc.s);
+            if (!tile || tile.isHeadquarters) return;
+            const enemyUnitsOnHex = newState.deployedUnits.filter(u => u.q === loc.q && u.r === loc.r && u.s === loc.s && u.family !== newState.playerFamily);
+            const hexIsFortified = (newState.fortifiedHexes || []).some(f => f.q === loc.q && f.r === loc.r && f.s === loc.s && f.family !== newState.playerFamily);
+            const hexHasSafehouse = (newState.safehouses || []).some(s => s.q === loc.q && s.r === loc.r && s.s === loc.s);
+            const idx = newScoutedHexes.findIndex(s => s.q === loc.q && s.r === loc.r && s.s === loc.s);
+            if (idx !== -1) newScoutedHexes.splice(idx, 1);
+            newScoutedHexes.push({
+              q: loc.q, r: loc.r, s: loc.s,
+              scoutedTurn: newState.turn, turnsRemaining: SCOUT_DURATION,
+              freshUntilTurn: newState.turn + 1,
+              enemySoldierCount: enemyUnitsOnHex.length,
+              enemyFamily: tile.controllingFamily,
+              businessType: tile.business?.type,
+              businessIncome: tile.business?.income,
+              isFortified: hexIsFortified || undefined,
+              hasSafehouse: hexHasSafehouse || undefined,
+            });
+            scoutedCount++;
+          });
+          newState.scoutedHexes = newScoutedHexes;
+          newState.tacticalActionsRemaining -= power.cost;
+          newState.familyPowerCooldowns[newState.playerFamily] = power.cooldownTurns;
+          newState.pendingNotifications.push({
+            type: 'success', title: '🕵️ Dellacroce Network Activated',
+            message: `Intelligence network revealed ${scoutedCount} hexes in the target area.`,
+          });
+          newState.selectedMoveAction = 'move' as MoveAction;
+          newState.selectedUnitId = null;
+          newState.availableMoveHexes = [];
+          return newState;
+        }
+        
+        if (prev.playerFamily === 'genovese') {
+          // Front Boss: hide own hex as neutral for 3 turns
+          const tile = newState.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
+          if (!tile || tile.controllingFamily !== newState.playerFamily) {
+            return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '⚠️ Invalid Target', message: 'You can only hide your own hexes.' }] };
+          }
+          // Check if already hidden
+          if ((newState.frontBossHexes || []).some(h => h.q === targetLocation.q && h.r === targetLocation.r && h.s === targetLocation.s)) {
+            return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '⚠️ Already Hidden', message: 'This hex is already under Front Boss protection.' }] };
+          }
+          newState.frontBossHexes = [...(newState.frontBossHexes || []), { q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, turnsRemaining: 3, ownerFamily: newState.playerFamily }];
+          newState.tacticalActionsRemaining -= power.cost;
+          newState.familyPowerCooldowns[newState.playerFamily] = power.cooldownTurns;
+          newState.pendingNotifications.push({
+            type: 'success', title: '🎭 Front Boss Activated',
+            message: `Hex in ${tile.district} is now hidden for 3 turns. Unscoutable, -30% hit/sabotage success, zero heat.`,
+          });
+          newState.selectedMoveAction = 'move' as MoveAction;
+          newState.selectedUnitId = null;
+          newState.availableMoveHexes = [];
+          return newState;
+        }
+        
+        return prev;
+      }
       if (prev.turnPhase === 'move' && moveAction === 'safehouse' && unit.type === 'capo') {
         if ((prev.gamePhase || 1) < 2) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🔒 Phase Locked', message: 'Safehouses unlock in Phase 2: Establishing Territory.' }] };
         if ((unit.woundedTurnsRemaining || 0) > 0) {
@@ -2032,6 +2181,20 @@ export const useEnhancedMafiaGameState = (
     const dist = hexDistance(unit, targetLocation);
     const maxScoutRange = unit.type === 'capo' ? 2 : 1;
     if (dist < 1 || dist > maxScoutRange) return prev;
+
+    // Front Boss blocking: if target hex is hidden by another family, block the scout
+    const frontBossBlock = (prev.frontBossHexes || []).find(h => 
+      h.q === targetLocation.q && h.r === targetLocation.r && h.s === targetLocation.s && h.ownerFamily !== prev.playerFamily
+    );
+    if (frontBossBlock) {
+      return {
+        ...prev,
+        pendingNotifications: [...prev.pendingNotifications, {
+          type: 'warning' as const, title: '🎭 Intel Blocked',
+          message: `Your scout could not gather intelligence — the target area appears to be a front operation.`,
+        }],
+      };
+    }
 
     const enemyUnitsOnHex = prev.deployedUnits.filter(u => 
       u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s &&
@@ -2753,6 +2916,23 @@ export const useEnhancedMafiaGameState = (
           });
         }
       }
+
+      // --- Family Power cooldown tick-down ---
+      Object.keys(newState.familyPowerCooldowns || {}).forEach(fam => {
+        if (newState.familyPowerCooldowns[fam] > 0) {
+          newState.familyPowerCooldowns[fam] -= 1;
+          if (newState.familyPowerCooldowns[fam] <= 0) delete newState.familyPowerCooldowns[fam];
+        }
+      });
+      // Front Boss hex timers
+      newState.frontBossHexes = (newState.frontBossHexes || []).map(h => ({ ...h, turnsRemaining: h.turnsRemaining - 1 })).filter(h => h.turnsRemaining > 0);
+      // Lucchese boost timer
+      if (newState.luccheseBoostedDistrict && newState.luccheseBoostedDistrict.turnsRemaining > 0) {
+        newState.luccheseBoostedDistrict = { ...newState.luccheseBoostedDistrict, turnsRemaining: newState.luccheseBoostedDistrict.turnsRemaining - 1 };
+        if (newState.luccheseBoostedDistrict.turnsRemaining <= 0) newState.luccheseBoostedDistrict = null;
+      }
+      // Bonanno purge immunity timer
+      newState.bonannoPurgeImmunity = (newState.bonannoPurgeImmunity || []).map(i => ({ ...i, turnsRemaining: i.turnsRemaining - 1 })).filter(i => i.turnsRemaining > 0);
 
       // --- Hex fortification abandonment tick ---
       newState.fortifiedHexes = (newState.fortifiedHexes || []).filter(f => {
@@ -3527,6 +3707,8 @@ export const useEnhancedMafiaGameState = (
               // Tension: hitman kills are anonymous — only global tension, no pair tension
               if (targetUnit.type === 'capo') {
                 addGlobalTension(newState, TENSION_HITMAN_KILL_CAPO_GLOBAL);
+                // Colombo succession trigger
+                triggerColomboSuccession(newState, contract.targetFamily, targetUnit.q, targetUnit.r, targetUnit.s);
               } else {
                 addGlobalTension(newState, TENSION_HITMAN_KILL_SOLDIER_GLOBAL);
               }
@@ -3821,9 +4003,19 @@ export const useEnhancedMafiaGameState = (
           }
         }
         
-        // District control bonus: Manhattan +25% income
+       // District control bonus: Manhattan +25% income
         if (tile.district === 'Manhattan' && hasPlayerDistrictBonus(state, 'income')) {
           tileIncome = Math.floor(tileIncome * 1.25);
+        }
+        // Lucchese Garment District Shakedown: +50% income in boosted district
+        const luccheeBoost = state.luccheseBoostedDistrict;
+        if (luccheeBoost && luccheeBoost.turnsRemaining > 0 && luccheeBoost.family === state.playerFamily && tile.district === luccheeBoost.district) {
+          tileIncome = Math.floor(tileIncome * 1.5);
+        }
+        // Front Boss heat zeroing: skip heat for businesses on front boss hexes
+        const isOnFrontBossHex = (state.frontBossHexes || []).some(h => h.q === tile.q && h.r === tile.r && h.s === tile.s && h.ownerFamily === state.playerFamily);
+        if (isOnFrontBossHex && tile.business) {
+          tile.business.heatLevel = 0;
         }
         // War income penalty: -20% on hexes adjacent to warring enemy territory (capped at -30%)
         let warPenalty = 0;
@@ -5005,6 +5197,86 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
+      // ── AI FAMILY POWER USAGE ──
+      const aiPower = FAMILY_POWERS[fam];
+      if (aiPower && aiPhase >= 2 && aiTacticalRemaining >= aiPower.cost) {
+        const aiPowerCD = (state.familyPowerCooldowns || {})[fam] || 0;
+        const aiPowerUsed = aiPower.oneTimeUse && (state.familyPowerUsedForever || {})[fam];
+        if (aiPowerCD <= 0 && !aiPowerUsed) {
+          let usedPower = false;
+          if (fam === 'gambino' && Math.random() < 0.30) {
+            // Area scout a border hex
+            const borderHexes = state.hexMap.filter(t => t.controllingFamily !== fam && t.controllingFamily !== 'neutral' && !t.isHeadquarters);
+            if (borderHexes.length >= 2) {
+              const target = borderHexes[Math.floor(Math.random() * borderHexes.length)];
+              const scoutTargets = [target, ...getHexNeighbors(target.q, target.r, target.s)];
+              scoutTargets.forEach(loc => {
+                const tile = state.hexMap.find(t => t.q === loc.q && t.r === loc.r && t.s === loc.s);
+                if (!tile || tile.isHeadquarters) return;
+                const enemies = state.deployedUnits.filter(u => u.q === loc.q && u.r === loc.r && u.s === loc.s && u.family !== fam);
+                state.scoutedHexes = state.scoutedHexes.filter(s => !(s.q === loc.q && s.r === loc.r && s.s === loc.s));
+                state.scoutedHexes.push({ q: loc.q, r: loc.r, s: loc.s, scoutedTurn: state.turn, turnsRemaining: SCOUT_DURATION, freshUntilTurn: state.turn + 1, enemySoldierCount: enemies.length, enemyFamily: tile.controllingFamily });
+              });
+              aiTacticalRemaining -= aiPower.cost;
+              state.familyPowerCooldowns[fam] = aiPower.cooldownTurns;
+              usedPower = true;
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'family_power', detail: 'Activated Dellacroce Network (area scout)' });
+            }
+          } else if (fam === 'genovese' && Math.random() < 0.25) {
+            // Hide highest-value hex
+            const ownHexes = state.hexMap.filter(t => t.controllingFamily === fam && t.business && !t.isHeadquarters);
+            const notHidden = ownHexes.filter(t => !(state.frontBossHexes || []).some(h => h.q === t.q && h.r === t.r && h.s === t.s));
+            if (notHidden.length > 0) {
+              const best = notHidden.sort((a, b) => (b.business?.income || 0) - (a.business?.income || 0))[0];
+              state.frontBossHexes = [...(state.frontBossHexes || []), { q: best.q, r: best.r, s: best.s, turnsRemaining: 3, ownerFamily: fam }];
+              aiTacticalRemaining -= aiPower.cost;
+              state.familyPowerCooldowns[fam] = aiPower.cooldownTurns;
+              usedPower = true;
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'family_power', detail: 'Activated Front Boss (hex hidden)' });
+            }
+          } else if (fam === 'lucchese' && Math.random() < 0.40) {
+            const distCounts: Record<string, number> = {};
+            state.hexMap.forEach(t => { if (t.controllingFamily === fam) distCounts[t.district] = (distCounts[t.district] || 0) + 1; });
+            const best = Object.entries(distCounts).sort((a, b) => b[1] - a[1])[0];
+            if (best && best[1] >= 3) {
+              let tribute = 0;
+              state.hexMap.forEach(t => {
+                if (t.district === best[0] && t.controllingFamily !== fam && t.controllingFamily !== 'neutral') {
+                  tribute += 1000;
+                }
+              });
+              opponent.resources.money += tribute;
+              state.luccheseBoostedDistrict = { district: best[0], turnsRemaining: 3, family: fam };
+              aiTacticalRemaining -= aiPower.cost;
+              state.familyPowerCooldowns[fam] = aiPower.cooldownTurns;
+              usedPower = true;
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'family_power', detail: `Garment District Shakedown on ${best[0]}` });
+            }
+          } else if (fam === 'bonanno' && Math.random() < 0.50) {
+            const aiSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
+            const lowLoyalty = aiSoldiers.filter(u => (state.soldierStats[u.id]?.loyalty || 50) < 50);
+            if (lowLoyalty.length >= 2) {
+              lowLoyalty.forEach(u => {
+                const idx = state.deployedUnits.indexOf(u);
+                if (idx !== -1) state.deployedUnits.splice(idx, 1);
+                delete state.soldierStats[u.id];
+              });
+              const survivors = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
+              survivors.forEach(u => {
+                const stats = state.soldierStats[u.id];
+                if (stats) stats.loyalty = Math.min(SOLDIER_LOYALTY_CAP, stats.loyalty + 15);
+              });
+              state.bonannoPurgeImmunity = [...(state.bonannoPurgeImmunity || []), ...survivors.map(u => ({ unitId: u.id, turnsRemaining: 2 }))];
+              aiTacticalRemaining -= aiPower.cost;
+              state.familyPowerCooldowns[fam] = aiPower.cooldownTurns;
+              usedPower = true;
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'family_power', detail: `Donnie Brasco Purge (${lowLoyalty.length} removed)` });
+            }
+          }
+          // Colombo is reactive only — handled in triggerColomboSuccession
+        }
+      }
+
       // ── AI RESPECT & INFLUENCE GROWTH ──
       const aiTerritoryCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
       // Influence: +1 per 3 hexes controlled, with decay
@@ -5291,8 +5563,12 @@ export const useEnhancedMafiaGameState = (
           if (targetUnit) {
             if (Math.random() < AI_PLAN_HIT_SUCCESS_RATE) {
               // Success — capo is killed
+              const capoQ = targetUnit.q, capoR = targetUnit.r, capoS = targetUnit.s;
+              const capoFam = targetUnit.family;
               const idx = state.deployedUnits.indexOf(targetUnit);
               if (idx !== -1) state.deployedUnits.splice(idx, 1);
+              // Colombo succession trigger
+              triggerColomboSuccession(state, capoFam as string, capoQ, capoR, capoS);
               state.pendingNotifications.push({
                 type: 'error' as const,
                 title: '💀 Capo Assassinated!',
@@ -5822,6 +6098,128 @@ export const useEnhancedMafiaGameState = (
               message: `A loyal local joins the family for $${finalCost2.toLocaleString()}. Loyalty +2.${bronxDiscount2 > 0 ? ' (Bronx discount applied)' : ''}`,
             }];
           }
+          return newState;
+        }
+        case 'use_family_power': {
+          const power = FAMILY_POWERS[newState.playerFamily];
+          if (!power) return newState;
+          
+          // Check cooldown
+          const cd = (newState.familyPowerCooldowns || {})[newState.playerFamily] || 0;
+          if (cd > 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⏳ Power on Cooldown', message: `${power.name} available in ${cd} turn(s).` });
+            return newState;
+          }
+          // Check one-time use
+          if (power.oneTimeUse && (newState.familyPowerUsedForever || {})[newState.playerFamily]) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚡ Already Used', message: `${power.name} can only be used once per game.` });
+            return newState;
+          }
+          // Check tactical actions
+          if (newState.tacticalActionsRemaining < power.cost) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚡ Not Enough Actions', message: `${power.name} costs ${power.cost} tactical action(s).` });
+            return newState;
+          }
+          
+          // Hex-targeting powers switch to map selection mode
+          if (power.requiresHexTarget) {
+            newState.selectedMoveAction = 'family_power' as MoveAction;
+            // Show appropriate hexes based on power type
+            if (power.targetOwnHex) {
+              // Genovese: show own hexes
+              newState.availableMoveHexes = newState.hexMap
+                .filter(t => t.controllingFamily === newState.playerFamily && !t.isHeadquarters)
+                .map(t => ({ q: t.q, r: t.r, s: t.s }));
+            } else {
+              // Gambino: show all non-HQ hexes
+              newState.availableMoveHexes = newState.hexMap
+                .filter(t => !t.isHeadquarters)
+                .map(t => ({ q: t.q, r: t.r, s: t.s }));
+            }
+            newState.pendingNotifications.push({ type: 'info', title: `⚡ ${power.name}`, message: 'Select a target hex on the map.' });
+            return newState;
+          }
+          
+          // Instant powers
+          if (newState.playerFamily === 'lucchese') {
+            // Garment District Shakedown: find district with most player hexes
+            const districtCounts: Record<string, number> = {};
+            newState.hexMap.forEach(t => {
+              if (t.controllingFamily === newState.playerFamily) {
+                districtCounts[t.district] = (districtCounts[t.district] || 0) + 1;
+              }
+            });
+            const bestDistrict = Object.entries(districtCounts).sort((a, b) => b[1] - a[1])[0];
+            if (!bestDistrict) {
+              newState.pendingNotifications.push({ type: 'warning', title: '⚠️ No Territory', message: 'You need territory to use this power.' });
+              return newState;
+            }
+            // Extract $1,000 per rival hex in that district
+            let tributeExtracted = 0;
+            newState.hexMap.forEach(t => {
+              if (t.district === bestDistrict[0] && t.controllingFamily !== newState.playerFamily && t.controllingFamily !== 'neutral') {
+                tributeExtracted += 1000;
+                const rival = newState.aiOpponents.find(o => o.family === t.controllingFamily);
+                if (rival) rival.resources.money = Math.max(0, rival.resources.money - 1000);
+              }
+            });
+            newState.resources.money += tributeExtracted;
+            newState.luccheseBoostedDistrict = { district: bestDistrict[0], turnsRemaining: 3, family: newState.playerFamily };
+            newState.tacticalActionsRemaining -= power.cost;
+            newState.familyPowerCooldowns[newState.playerFamily] = power.cooldownTurns;
+            newState.pendingNotifications.push({
+              type: 'success', title: '💰 Garment District Shakedown!',
+              message: `${bestDistrict[0]} businesses boosted +50% for 3 turns. Extracted $${tributeExtracted.toLocaleString()} tribute from rivals.`,
+            });
+            return newState;
+          }
+          
+          if (newState.playerFamily === 'bonanno') {
+            // Donnie Brasco Purge: remove low-loyalty soldiers, boost survivors
+            const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+            const purged: string[] = [];
+            const survivors: string[] = [];
+            playerSoldiers.forEach(u => {
+              const stats = newState.soldierStats[u.id];
+              if (stats && stats.loyalty < 50) {
+                purged.push(u.id);
+              } else {
+                survivors.push(u.id);
+              }
+            });
+            // Remove purged soldiers
+            newState.deployedUnits = newState.deployedUnits.filter(u => !purged.includes(u.id));
+            purged.forEach(id => delete newState.soldierStats[id]);
+            // Boost survivors
+            survivors.forEach(id => {
+              const stats = newState.soldierStats[id];
+              if (stats) {
+                stats.loyalty = Math.min(SOLDIER_LOYALTY_CAP, stats.loyalty + 15);
+              }
+            });
+            // Add purge immunity
+            newState.bonannoPurgeImmunity = [
+              ...(newState.bonannoPurgeImmunity || []),
+              ...survivors.map(id => ({ unitId: id, turnsRemaining: 2 })),
+            ];
+            newState.tacticalActionsRemaining -= power.cost;
+            newState.familyPowerCooldowns[newState.playerFamily] = power.cooldownTurns;
+            newState.pendingNotifications.push({
+              type: 'success', title: '🔪 Donnie Brasco Purge!',
+              message: `${purged.length} disloyal soldier(s) removed. ${survivors.length} survivor(s) gain +15 loyalty and 2-turn flip immunity.`,
+            });
+            return newState;
+          }
+          
+          if (newState.playerFamily === 'colombo') {
+            // Persico Succession is passive/reactive — inform the player
+            newState.pendingNotifications.push({
+              type: 'info', title: '👑 Persico Succession',
+              message: 'This power activates automatically when a capo dies — a soldier is instantly promoted to replace them.',
+            });
+            return newState;
+          }
+          
           return newState;
         }
         // recruit_capo case removed — capos are only obtainable via promote_capo
@@ -6704,7 +7102,18 @@ export const useEnhancedMafiaGameState = (
     // Deduct cost
     state.resources.money -= 12000;
 
-    // Permanently destroy the business
+    // Front Boss sabotage penalty: 30% chance of failure on hidden hexes
+    const isSabFrontBoss = (state.frontBossHexes || []).some(h => 
+      h.q === targetQ && h.r === targetR && h.s === targetS && h.ownerFamily !== state.playerFamily
+    );
+    if (isSabFrontBoss && Math.random() < 0.30) {
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'warning', title: '💣 Sabotage Failed',
+        message: `The operation was foiled — the target appears to be a front. -$12,000.`,
+      }];
+      return state;
+    }
+
     const destroyedType = tile.business.type;
     const destroyedIncome = tile.business.income;
     tile.business = undefined;
@@ -6907,7 +7316,9 @@ export const useEnhancedMafiaGameState = (
     // FIX #6: Any soldier with loyalty < 80 can be targeted (low loyalty = easier to flip)
     const flippableTargets = enemySoldiersNearHQ.filter(u => {
       const uStats = state.soldierStats[u.id];
-      return uStats && uStats.loyalty < 80 && !(state.flippedSoldiers || []).some(f => f.unitId === u.id);
+      // Bonanno purge immunity blocks flip attempts
+      const hasFlipImmunity = (state.bonannoPurgeImmunity || []).some(i => i.unitId === u.id);
+      return uStats && uStats.loyalty < 80 && !(state.flippedSoldiers || []).some(f => f.unitId === u.id) && !hasFlipImmunity;
     });
 
     if (flippableTargets.length === 0) {
@@ -7138,8 +7549,15 @@ export const useEnhancedMafiaGameState = (
       if (hasPlayerDistrictBonus(state, 'hit_bonus')) {
         chance += 0.05;
       }
+      
+      // Front Boss penalty: -30% hit chance on hidden hexes
+      const isFrontBossHex = (state.frontBossHexes || []).some(h => 
+        h.q === targetQ && h.r === targetR && h.s === targetS && h.ownerFamily !== state.playerFamily
+      );
+      if (isFrontBossHex) {
+        chance -= 0.30;
+      }
 
-      // Scout intel bonus — fresh intel gives full bonus, stale gives half
       if (isScouted) {
         const scoutInfo = state.scoutedHexes.find(s => s.q === tile.q && s.r === tile.r && s.s === tile.s);
         if (scoutInfo && state.turn <= scoutInfo.freshUntilTurn) {
