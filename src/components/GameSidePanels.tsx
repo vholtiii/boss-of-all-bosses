@@ -232,6 +232,48 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           phaseLocked={!isTacticalPhase}
         >
           <div className="space-y-1.5">
+            {/* ── FAMILY POWER BUTTON ── */}
+            {(() => {
+              const power = FAMILY_POWERS[gameState.playerFamily];
+              if (!power) return null;
+              const cd = (gameState as any).familyPowerCooldowns?.[gameState.playerFamily] || 0;
+              const usedForever = power.oneTimeUse && (gameState as any).familyPowerUsedForever?.[gameState.playerFamily];
+              const isPassive = gameState.playerFamily === 'colombo';
+              const canUse = !usedForever && cd <= 0 && gameState.tacticalActionsRemaining >= power.cost && !isPassive;
+              return (
+                <div className="rounded-md border border-primary/40 bg-primary/5 p-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-primary">⚡ {power.name}</span>
+                    <Badge variant="outline" className="text-[10px]">{power.cost} Tactical</Badge>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {gameState.playerFamily === 'gambino' && 'Scout target hex + all 6 adjacent hexes'}
+                    {gameState.playerFamily === 'genovese' && 'Hide hex for 3 turns: unscoutable, -30% hit/sabotage'}
+                    {gameState.playerFamily === 'lucchese' && '+50% district income + extract $1K/rival hex tribute'}
+                    {gameState.playerFamily === 'bonanno' && 'Remove soldiers <50 loyalty; survivors +15 loyalty, flip immune'}
+                    {gameState.playerFamily === 'colombo' && 'Auto-promotes a soldier when a capo dies (passive)'}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {cd > 0 && <span className="text-[10px] text-muted-foreground">⏳ Cooldown: {cd}t</span>}
+                    {usedForever && <span className="text-[10px] text-muted-foreground">✓ Used (once per game)</span>}
+                    {isPassive && <span className="text-[10px] text-muted-foreground">🔄 Reactive — triggers automatically</span>}
+                  </div>
+                  {!isPassive && (
+                    <ActionButton
+                      icon={<Target className="h-4 w-4" />}
+                      label={`Activate ${power.name.split(' ').slice(0, 2).join(' ')}`}
+                      sublabel={cd > 0 ? `Cooldown: ${cd} turn(s)` : usedForever ? 'Already used' : `${power.cost} tactical action(s)`}
+                      disabled={!canUse}
+                      disabledReason={usedForever ? 'Already used this game' : cd > 0 ? `Cooldown: ${cd}t` : gameState.tacticalActionsRemaining < power.cost ? 'Not enough tactical actions' : undefined}
+                      phaseLocked={!isTacticalPhase}
+                      variant="default"
+                      onClick={() => onAction({ type: 'use_family_power' })}
+                    />
+                  )}
+                </div>
+              );
+            })()}
+            <Separator className="my-1" />
             <ActionButton
               icon={<Target className="h-4 w-4" />}
               label="Plan Hit"
