@@ -589,6 +589,32 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                   ⚔️ {deployedCount}/{totalSoldiers} deployed
                 </span>
               )}
+              {/* Active family power effects */}
+              {(gameState as any).frontBossHexes?.length > 0 && (gameState as any).frontBossHexes.some((h: any) => h.ownerFamily === gameState.playerFamily) && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] border bg-purple-500/15 border-purple-500/25 text-purple-400">
+                  🎭 Front Boss: {Math.max(...(gameState as any).frontBossHexes.filter((h: any) => h.ownerFamily === gameState.playerFamily).map((h: any) => h.turnsRemaining))}t
+                </span>
+              )}
+              {(gameState as any).luccheseBoostedDistrict && (gameState as any).luccheseBoostedDistrict.family === gameState.playerFamily && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] border bg-amber-500/15 border-amber-500/25 text-amber-400">
+                  💰 Shakedown: {(gameState as any).luccheseBoostedDistrict.turnsRemaining}t
+                </span>
+              )}
+              {(gameState as any).bonannoPurgeImmunity?.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] border bg-teal-500/15 border-teal-500/25 text-teal-400">
+                  🛡️ Purge: {Math.max(...(gameState as any).bonannoPurgeImmunity.map((i: any) => i.turnsRemaining))}t
+                </span>
+              )}
+              {/* Power cooldown (tactical phase only) */}
+              {gameState.turnPhase === 'move' && (() => {
+                const cd = ((gameState as any).familyPowerCooldowns || {})[gameState.playerFamily] || 0;
+                if (cd <= 0) return null;
+                return (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] border bg-muted/30 border-muted text-muted-foreground">
+                    ⚡ Power: {cd}t CD
+                  </span>
+                );
+              })()}
             </div>
           );
         })()}
