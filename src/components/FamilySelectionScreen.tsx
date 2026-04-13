@@ -19,6 +19,11 @@ interface FamilyInfo {
   traits: { label: string; icon: React.ReactNode; value: number }[];
   bonuses: string[];
   difficulty: string;
+  powerName: string;
+  powerLore: string;
+  powerEffect: string;
+  powerCost: string;
+  powerCooldown: string;
   startingResources: {
     money: number;
     soldiers: number;
