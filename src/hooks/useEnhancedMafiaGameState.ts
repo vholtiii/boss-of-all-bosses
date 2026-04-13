@@ -463,6 +463,13 @@ export interface EnhancedMafiaGameState {
     gambino: number; genovese: number; lucchese: number; bonanno: number; colombo: number;
   };
   
+  // Family Power system
+  familyPowerCooldowns: Record<string, number>;      // family → cooldown turns remaining
+  familyPowerUsedForever: Record<string, boolean>;   // family → true if one-time power used (Colombo)
+  frontBossHexes: FrontBossHex[];                    // Genovese hidden hexes
+  luccheseBoostedDistrict: LuccheseBoostedDistrict | null;
+  bonannoPurgeImmunity: BonannoPurgeImmunity[];
+  
   territories: Array<{
     district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
     family: 'neutral' | 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
