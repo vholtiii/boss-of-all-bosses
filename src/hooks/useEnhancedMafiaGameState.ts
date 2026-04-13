@@ -231,6 +231,12 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     gamePhase: state.gamePhase || 1,
     commissionVoteCooldownUntil: state.commissionVoteCooldownUntil || 0,
     commissionVoteResult: state.commissionVoteResult || null,
+    // Family Power system
+    familyPowerCooldowns: { ...(state.familyPowerCooldowns || {}) },
+    familyPowerUsedForever: { ...(state.familyPowerUsedForever || {}) },
+    frontBossHexes: (state.frontBossHexes || []).map(h => ({ ...h })),
+    luccheseBoostedDistrict: state.luccheseBoostedDistrict ? { ...state.luccheseBoostedDistrict } : null,
+    bonannoPurgeImmunity: (state.bonannoPurgeImmunity || []).map(i => ({ ...i })),
   });
 
 // ============ UNIT TYPES ============
