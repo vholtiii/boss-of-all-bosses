@@ -2141,6 +2141,7 @@ export const useEnhancedMafiaGameState = (
       };
     }
 
+    const enemyUnitsOnHex = prev.deployedUnits.filter(u => 
       u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s &&
       u.family !== prev.playerFamily
     );
