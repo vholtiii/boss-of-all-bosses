@@ -1633,7 +1633,80 @@ export const useEnhancedMafiaGameState = (
         return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
       }
 
-      // Handle safehouse action (tactical phase only) — blocked for wounded capos
+      // Handle family_power hex target (Gambino area scout / Genovese hide hex)
+      if (prev.turnPhase === 'move' && moveAction === 'family_power') {
+        const power = FAMILY_POWERS[prev.playerFamily];
+        if (!power || !power.requiresHexTarget) return prev;
+        if (prev.tacticalActionsRemaining < power.cost) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '⚡ Not Enough Tactical Actions', message: `${power.name} costs ${power.cost} tactical action(s).` }] };
+        const cd = (prev.familyPowerCooldowns || {})[prev.playerFamily] || 0;
+        if (cd > 0) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '⏳ Power on Cooldown', message: `${power.name} available in ${cd} turn(s).` }] };
+        
+        const newState = cloneStateForMutation(prev);
+        
+        if (prev.playerFamily === 'gambino') {
+          // Dellacroce Network: scout target + all 6 adjacent hexes
+          const targetHexes = [targetLocation, ...getHexNeighbors(targetLocation.q, targetLocation.r, targetLocation.s)];
+          const newScoutedHexes = [...newState.scoutedHexes];
+          let scoutedCount = 0;
+          targetHexes.forEach(loc => {
+            const tile = newState.hexMap.find(t => t.q === loc.q && t.r === loc.r && t.s === loc.s);
+            if (!tile || tile.isHeadquarters) return;
+            const enemyUnitsOnHex = newState.deployedUnits.filter(u => u.q === loc.q && u.r === loc.r && u.s === loc.s && u.family !== newState.playerFamily);
+            const hexIsFortified = (newState.fortifiedHexes || []).some(f => f.q === loc.q && f.r === loc.r && f.s === loc.s && f.family !== newState.playerFamily);
+            const hexHasSafehouse = (newState.safehouses || []).some(s => s.q === loc.q && s.r === loc.r && s.s === loc.s);
+            const idx = newScoutedHexes.findIndex(s => s.q === loc.q && s.r === loc.r && s.s === loc.s);
+            if (idx !== -1) newScoutedHexes.splice(idx, 1);
+            newScoutedHexes.push({
+              q: loc.q, r: loc.r, s: loc.s,
+              scoutedTurn: newState.turn, turnsRemaining: SCOUT_DURATION,
+              freshUntilTurn: newState.turn + 1,
+              enemySoldierCount: enemyUnitsOnHex.length,
+              enemyFamily: tile.controllingFamily,
+              businessType: tile.business?.type,
+              businessIncome: tile.business?.income,
+              isFortified: hexIsFortified || undefined,
+              hasSafehouse: hexHasSafehouse || undefined,
+            });
+            scoutedCount++;
+          });
+          newState.scoutedHexes = newScoutedHexes;
+          newState.tacticalActionsRemaining -= power.cost;
+          newState.familyPowerCooldowns[newState.playerFamily] = power.cooldownTurns;
+          newState.pendingNotifications.push({
+            type: 'success', title: '🕵️ Dellacroce Network Activated',
+            message: `Intelligence network revealed ${scoutedCount} hexes in the target area.`,
+          });
+          newState.selectedMoveAction = 'move' as MoveAction;
+          newState.selectedUnitId = null;
+          newState.availableMoveHexes = [];
+          return newState;
+        }
+        
+        if (prev.playerFamily === 'genovese') {
+          // Front Boss: hide own hex as neutral for 3 turns
+          const tile = newState.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
+          if (!tile || tile.controllingFamily !== newState.playerFamily) {
+            return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '⚠️ Invalid Target', message: 'You can only hide your own hexes.' }] };
+          }
+          // Check if already hidden
+          if ((newState.frontBossHexes || []).some(h => h.q === targetLocation.q && h.r === targetLocation.r && h.s === targetLocation.s)) {
+            return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '⚠️ Already Hidden', message: 'This hex is already under Front Boss protection.' }] };
+          }
+          newState.frontBossHexes = [...(newState.frontBossHexes || []), { q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, turnsRemaining: 3, ownerFamily: newState.playerFamily }];
+          newState.tacticalActionsRemaining -= power.cost;
+          newState.familyPowerCooldowns[newState.playerFamily] = power.cooldownTurns;
+          newState.pendingNotifications.push({
+            type: 'success', title: '🎭 Front Boss Activated',
+            message: `Hex in ${tile.district} is now hidden for 3 turns. Unscoutable, -30% hit/sabotage success, zero heat.`,
+          });
+          newState.selectedMoveAction = 'move' as MoveAction;
+          newState.selectedUnitId = null;
+          newState.availableMoveHexes = [];
+          return newState;
+        }
+        
+        return prev;
+      }
       if (prev.turnPhase === 'move' && moveAction === 'safehouse' && unit.type === 'capo') {
         if ((prev.gamePhase || 1) < 2) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🔒 Phase Locked', message: 'Safehouses unlock in Phase 2: Establishing Territory.' }] };
         if ((unit.woundedTurnsRemaining || 0) > 0) {
