@@ -3,9 +3,10 @@ import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Crown, DollarSign, Shield, Swords, Users, Eye, Volume2, VolumeX } from 'lucide-react';
+import { DollarSign, Shield, Swords, Users, Eye, Volume2, VolumeX, Crown } from 'lucide-react';
 import { useBgMusic } from '@/hooks/useBgMusic';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
+import AtmosphericParticles from '@/components/AtmosphericParticles';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
 
@@ -14,7 +15,7 @@ interface FamilyInfo {
   name: string;
   motto: string;
   description: string;
-  color: string; // hex for inline styles
+  color: string;
   traits: { label: string; icon: React.ReactNode; value: number }[];
   bonuses: string[];
   difficulty: string;
@@ -105,20 +106,104 @@ const families: FamilyInfo[] = [
   },
 ];
 
+// --- Family Crests (inline SVGs) ---
+const FamilyCrest: React.FC<{ familyId: FamilyId; color: string; size?: number }> = ({ familyId, color, size = 32 }) => {
+  const s = size;
+  const crests: Record<FamilyId, React.ReactNode> = {
+    gambino: (
+      // Crown with dollar sign
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <path d="M6 22L8 10L12 16L16 8L20 16L24 10L26 22H6Z" stroke={color} strokeWidth="1.5" fill={color + '20'} />
+        <circle cx="8" cy="10" r="2" fill={color} />
+        <circle cx="16" cy="8" r="2" fill={color} />
+        <circle cx="24" cy="10" r="2" fill={color} />
+        <text x="16" y="20" textAnchor="middle" fontSize="8" fontWeight="bold" fill={color}>$</text>
+        <line x1="6" y1="24" x2="26" y2="24" stroke={color} strokeWidth="1.5" />
+      </svg>
+    ),
+    genovese: (
+      // Eye with serpent
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <ellipse cx="16" cy="16" rx="12" ry="7" stroke={color} strokeWidth="1.5" fill={color + '10'} />
+        <circle cx="16" cy="16" r="3.5" fill={color} opacity="0.8" />
+        <circle cx="16" cy="16" r="1.5" fill="black" />
+        <path d="M4 16C4 16 8 9 16 9C24 9 28 16 28 16" stroke={color} strokeWidth="1.2" fill="none" />
+        <path d="M4 16C4 16 8 23 16 23C24 23 28 16 28 16" stroke={color} strokeWidth="1.2" fill="none" />
+        <path d="M26 11C28 9 30 10 29 12" stroke={color} strokeWidth="1" opacity="0.6" />
+      </svg>
+    ),
+    lucchese: (
+      // Crossed keys
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <line x1="8" y1="8" x2="24" y2="24" stroke={color} strokeWidth="1.5" />
+        <line x1="24" y1="8" x2="8" y2="24" stroke={color} strokeWidth="1.5" />
+        <circle cx="8" cy="8" r="3" stroke={color} strokeWidth="1.5" fill={color + '15'} />
+        <circle cx="24" cy="8" r="3" stroke={color} strokeWidth="1.5" fill={color + '15'} />
+        <line x1="20" y1="20" x2="22" y2="18" stroke={color} strokeWidth="1.2" />
+        <line x1="20" y1="20" x2="18" y2="18" stroke={color} strokeWidth="1.2" />
+        <line x1="12" y1="20" x2="14" y2="18" stroke={color} strokeWidth="1.2" />
+        <line x1="12" y1="20" x2="10" y2="18" stroke={color} strokeWidth="1.2" />
+      </svg>
+    ),
+    bonanno: (
+      // Shield with fist
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <path d="M16 4L6 8V18C6 23 10 27 16 28C22 27 26 23 26 18V8L16 4Z" stroke={color} strokeWidth="1.5" fill={color + '12'} />
+        <path d="M13 14H19V17C19 17 19 20 16 20C13 20 13 17 13 17V14Z" fill={color} opacity="0.7" />
+        <line x1="14" y1="14" x2="14" y2="12" stroke={color} strokeWidth="1.2" />
+        <line x1="16" y1="14" x2="16" y2="11" stroke={color} strokeWidth="1.2" />
+        <line x1="18" y1="14" x2="18" y2="12" stroke={color} strokeWidth="1.2" />
+      </svg>
+    ),
+    colombo: (
+      // Crossed swords with skull
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <line x1="6" y1="6" x2="26" y2="26" stroke={color} strokeWidth="1.5" />
+        <line x1="26" y1="6" x2="6" y2="26" stroke={color} strokeWidth="1.5" />
+        <polygon points="6,6 4,8 8,8" fill={color} />
+        <polygon points="26,6 24,8 28,8" fill={color} />
+        <circle cx="16" cy="15" r="4" stroke={color} strokeWidth="1.2" fill={color + '15'} />
+        <circle cx="14.5" cy="14" r="1" fill={color} />
+        <circle cx="17.5" cy="14" r="1" fill={color} />
+        <path d="M14 17.5C14 17.5 15 18.5 16 17.5C17 18.5 18 17.5 18 17.5" stroke={color} strokeWidth="0.8" fill="none" />
+      </svg>
+    ),
+  };
+  return <>{crests[familyId]}</>;
+};
+
+// Industrial stat bar
 const StatBar: React.FC<{ value: number; color: string }> = ({ value, color }) => (
   <div className="flex gap-0.5">
     {[1, 2, 3, 4, 5].map(i => (
       <div
         key={i}
-        className="h-2 w-4 rounded-sm transition-all duration-300"
+        className="h-3 w-5 transition-all duration-300 relative overflow-hidden"
         style={{
           backgroundColor: i <= value ? color : 'hsl(var(--muted))',
-          opacity: i <= value ? 1 : 0.3,
+          opacity: i <= value ? 1 : 0.2,
+          clipPath: 'polygon(0% 0%, 95% 0%, 100% 100%, 5% 100%)',
         }}
-      />
+      >
+        {/* Brushed metal grain */}
+        {i <= value && (
+          <div
+            className="absolute inset-0 opacity-20"
+            style={{
+              backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255,255,255,0.1) 1px, rgba(255,255,255,0.1) 2px)`,
+            }}
+          />
+        )}
+      </div>
     ))}
   </div>
 );
+
+// Noise texture for cards (CSS data URI)
+const NOISE_BG = `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E")`;
+
+// Distressed card clip path
+const CARD_CLIP = 'polygon(0% 1.5%, 1% 0%, 99% 0.5%, 100% 2%, 99.5% 98%, 100% 100%, 0.5% 99.5%, 0% 97%)';
 
 type MapSize = 'small' | 'medium' | 'large';
 
@@ -139,6 +224,9 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 overflow-hidden relative">
+      {/* Atmospheric particles */}
+      <AtmosphericParticles />
+
       {/* Music mute toggle */}
       <button
         onClick={() => updateSoundConfig({ enabled: !soundConfig.enabled })}
@@ -147,23 +235,33 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
       >
         {soundConfig.enabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
       </button>
+
+      {/* Grunge noise overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none z-[1]"
+        style={{
+          backgroundImage: NOISE_BG,
+          mixBlendMode: 'overlay',
+        }}
+      />
+
       {/* Subtle background grain */}
       <div
-        className="absolute inset-0 opacity-[0.02] pointer-events-none"
+        className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
         }}
       />
 
       {/* Top decorative line */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent z-[2]" />
 
       {/* Title */}
       <motion.div
         initial={{ y: -40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="text-center mb-12"
+        className="text-center mb-12 relative z-[3]"
       >
         <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-3 font-source">
           New York City, 1955
@@ -226,7 +324,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
       </motion.div>
 
       {/* Map Seed Input */}
-      <div className="flex items-center justify-center gap-2 mb-6">
+      <div className="flex items-center justify-center gap-2 mb-6 relative z-[3]">
         <label className="text-xs text-muted-foreground font-source">Map Seed:</label>
         <input
           type="text"
@@ -238,7 +336,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
       </div>
 
       {/* Family cards — horizontal row */}
-      <div className="flex flex-wrap justify-center gap-3 max-w-5xl mb-10">
+      <div className="flex flex-wrap justify-center gap-4 max-w-5xl mb-10 relative z-[3]">
         {families.map((family, i) => {
           const isSelected = selectedFamily === family.id;
           return (
@@ -247,32 +345,53 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.15 + i * 0.08, duration: 0.4 }}
+              whileHover={{ scale: 1.05, y: -4 }}
               onClick={() => setSelectedFamily(family.id)}
               className={cn(
-                'w-[150px] cursor-pointer rounded-xl border-2 p-4 transition-all duration-200 relative',
-                'bg-card/80 backdrop-blur-sm',
-                isSelected
-                  ? 'scale-[1.03] shadow-xl'
-                  : 'border-border/50 hover:border-muted-foreground/50 hover:bg-card'
+                'w-[155px] cursor-pointer p-4 transition-all duration-200 relative',
+                'bg-card/90 backdrop-blur-sm',
               )}
               style={{
-                borderColor: isSelected ? family.color : undefined,
-                boxShadow: isSelected ? `0 8px 30px ${family.color}20` : undefined,
+                clipPath: CARD_CLIP,
+                backgroundImage: NOISE_BG,
+                border: `2px solid ${isSelected ? family.color : 'hsl(var(--border))'}`,
+                boxShadow: isSelected
+                  ? `0 0 25px ${family.color}40, 0 0 50px ${family.color}15, inset 0 1px 0 ${family.color}20`
+                  : '0 4px 12px hsl(20 15% 5% / 0.4)',
               }}
             >
-              {/* Selection indicator */}
+              {/* Spray-paint style accent bar */}
               {isSelected && (
-                <div
-                  className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-1 rounded-full"
-                  style={{ backgroundColor: family.color }}
+                <motion.div
+                  layoutId="selectedAccent"
+                  className="absolute -top-0.5 left-2 right-2 h-1 rounded-full"
+                  style={{
+                    backgroundColor: family.color,
+                    boxShadow: `0 0 8px ${family.color}80`,
+                  }}
                 />
               )}
 
-              <div className="text-lg font-bold font-playfair mb-0.5" style={{ color: family.color }}>
+              {/* Crest */}
+              <motion.div
+                className="flex justify-center mb-2"
+                whileHover={{
+                  filter: `drop-shadow(0 0 6px ${family.color})`,
+                }}
+                animate={isSelected ? {
+                  scale: [1, 1.1, 1],
+                  filter: [`drop-shadow(0 0 4px ${family.color}60)`, `drop-shadow(0 0 10px ${family.color})`, `drop-shadow(0 0 4px ${family.color}60)`],
+                } : {}}
+                transition={isSelected ? { duration: 1.5, repeat: Infinity, ease: 'easeInOut' } : {}}
+              >
+                <FamilyCrest familyId={family.id} color={family.color} size={36} />
+              </motion.div>
+
+              <div className="text-lg font-bold font-playfair mb-0.5 text-center" style={{ color: family.color }}>
                 {family.name}
               </div>
-              <div className="text-[10px] text-muted-foreground mb-1">{family.difficulty} difficulty</div>
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-3">
+              <div className="text-[10px] text-muted-foreground mb-1 text-center">{family.difficulty} difficulty</div>
+              <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground mb-3">
                 <Users className="h-3 w-3" />
                 <span>{family.startingResources.soldiers} soldiers</span>
               </div>
@@ -297,7 +416,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
       </div>
 
       {/* Detail panel — only shows for selected family */}
-      <div className="max-w-2xl w-full min-h-[220px]">
+      <div className="max-w-2xl w-full min-h-[220px] relative z-[3]">
         {activeFamily ? (
           <motion.div
             key={activeFamily.id}
@@ -305,16 +424,22 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25 }}
             className="rounded-xl border-2 p-6 bg-card/90 backdrop-blur-sm"
-            style={{ borderColor: activeFamily.color + '60' }}
+            style={{
+              borderColor: activeFamily.color + '60',
+              backgroundImage: NOISE_BG,
+            }}
           >
             <div className="flex items-start justify-between mb-3">
-              <div>
-                <h2 className="text-2xl font-bold font-playfair" style={{ color: activeFamily.color }}>
-                  The {activeFamily.name} Family
-                </h2>
-                <p className="text-xs text-muted-foreground italic font-playfair mt-1">
-                  {activeFamily.motto}
-                </p>
+              <div className="flex items-center gap-3">
+                <FamilyCrest familyId={activeFamily.id} color={activeFamily.color} size={40} />
+                <div>
+                  <h2 className="text-2xl font-bold font-playfair" style={{ color: activeFamily.color }}>
+                    The {activeFamily.name} Family
+                  </h2>
+                  <p className="text-xs text-muted-foreground italic font-playfair mt-1">
+                    {activeFamily.motto}
+                  </p>
+                </div>
               </div>
               <Badge
                 className="text-[10px] font-bold border"
@@ -341,7 +466,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 <ul className="space-y-1.5">
                   {activeFamily.bonuses.map(b => (
                     <li key={b} className="text-xs text-foreground flex items-center gap-1.5">
-                      <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: activeFamily.color }} />
+                      <span className="w-1.5 h-1.5 flex-shrink-0" style={{ backgroundColor: activeFamily.color, clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)' }} />
                       {b}
                     </li>
                   ))}
@@ -373,6 +498,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
               style={{
                 backgroundColor: activeFamily.color,
                 color: '#000',
+                boxShadow: `0 0 20px ${activeFamily.color}40`,
               }}
             >
               BEGIN AS THE {activeFamily.name.toUpperCase()} FAMILY
