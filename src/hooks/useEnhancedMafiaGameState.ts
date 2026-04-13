@@ -6934,7 +6934,18 @@ export const useEnhancedMafiaGameState = (
     // Deduct cost
     state.resources.money -= 12000;
 
-    // Permanently destroy the business
+    // Front Boss sabotage penalty: 30% chance of failure on hidden hexes
+    const isSabFrontBoss = (state.frontBossHexes || []).some(h => 
+      h.q === targetQ && h.r === targetR && h.s === targetS && h.ownerFamily !== state.playerFamily
+    );
+    if (isSabFrontBoss && Math.random() < 0.30) {
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'warning', title: '💣 Sabotage Failed',
+        message: `The operation was foiled — the target appears to be a front. -$12,000.`,
+      }];
+      return state;
+    }
+
     const destroyedType = tile.business.type;
     const destroyedIncome = tile.business.income;
     tile.business = undefined;
