@@ -922,6 +922,12 @@ const createInitialGameState = (
      warSummitCooldownUntil: 0,
      contestedHexes: [],
      pendingEnemyHexAction: null,
+    // Family Power system
+    familyPowerCooldowns: {},
+    familyPowerUsedForever: {},
+    frontBossHexes: [],
+    luccheseBoostedDistrict: null,
+    bonannoPurgeImmunity: [],
     victoryType: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
