@@ -7368,8 +7368,15 @@ export const useEnhancedMafiaGameState = (
       if (hasPlayerDistrictBonus(state, 'hit_bonus')) {
         chance += 0.05;
       }
+      
+      // Front Boss penalty: -30% hit chance on hidden hexes
+      const isFrontBossHex = (state.frontBossHexes || []).some(h => 
+        h.q === targetQ && h.r === targetR && h.s === targetS && h.ownerFamily !== state.playerFamily
+      );
+      if (isFrontBossHex) {
+        chance -= 0.30;
+      }
 
-      // Scout intel bonus — fresh intel gives full bonus, stale gives half
       if (isScouted) {
         const scoutInfo = state.scoutedHexes.find(s => s.q === tile.q && s.r === tile.r && s.s === tile.s);
         if (scoutInfo && state.turn <= scoutInfo.freshUntilTurn) {
