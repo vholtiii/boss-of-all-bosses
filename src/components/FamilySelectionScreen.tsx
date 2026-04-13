@@ -19,6 +19,11 @@ interface FamilyInfo {
   traits: { label: string; icon: React.ReactNode; value: number }[];
   bonuses: string[];
   difficulty: string;
+  powerName: string;
+  powerLore: string;
+  powerEffect: string;
+  powerCost: string;
+  powerCooldown: string;
   startingResources: {
     money: number;
     soldiers: number;
@@ -42,6 +47,11 @@ const families: FamilyInfo[] = [
       { label: 'Influence', icon: <Crown className="h-3.5 w-3.5" />, value: 4 },
     ],
     bonuses: ['+25% combat power', '+10% territory income', '+15% intimidation'],
+    powerName: 'The Dellacroce Network',
+    powerLore: 'Underboss Aniello Dellacroce ran an unrivaled intelligence network through enforcers like Roy DeMeo\'s "Murder Machine" crew — their eyes and ears stretched further than any rival family.',
+    powerEffect: 'Scout a target hex and all 6 adjacent hexes (7 total revealed).',
+    powerCost: '2 Tactical Actions',
+    powerCooldown: '3 turns',
     startingResources: { money: 60000, soldiers: 4, influence: 15, politicalPower: 40, respect: 30 },
   },
   {
@@ -57,6 +67,11 @@ const families: FamilyInfo[] = [
       { label: 'Stealth', icon: <Eye className="h-3.5 w-3.5" />, value: 5 },
     ],
     bonuses: ['+30% business income', '+20% laundering efficiency', '+25% business upgrade discount'],
+    powerName: 'The Front Boss',
+    powerLore: 'Vincent "The Chin" Gigante feigned insanity in a bathrobe for 30 years, hiding the family\'s true operations in plain sight while the FBI chased shadows.',
+    powerEffect: 'Hide a hex as neutral for 3 turns. While disguised: unscoutable by enemies, -30% hit and sabotage success against it, zero police heat.',
+    powerCost: '1 Tactical Action',
+    powerCooldown: '2 turns',
     startingResources: { money: 45000, soldiers: 4, influence: 10, politicalPower: 25, respect: 20 },
   },
   {
@@ -72,6 +87,11 @@ const families: FamilyInfo[] = [
       { label: 'Trade', icon: <Shield className="h-3.5 w-3.5" />, value: 5 },
     ],
     bonuses: ['+25% hit success rate', '+15% heat reduction', '+20% intelligence gathering'],
+    powerName: 'Garment District Shakedown',
+    powerLore: 'For decades the Lucchese family strangled NYC\'s Garment District, extracting tribute from every manufacturer on Seventh Avenue.',
+    powerEffect: '+50% income from all businesses in the target district. Extract $1,000 tribute from each rival-owned hex in that district.',
+    powerCost: '1 Tactical Action',
+    powerCooldown: '3 turns',
     startingResources: { money: 70000, soldiers: 3, influence: 12, politicalPower: 20, respect: 15 },
   },
   {
@@ -87,6 +107,11 @@ const families: FamilyInfo[] = [
       { label: 'Loyalty', icon: <Users className="h-3.5 w-3.5" />, value: 5 },
     ],
     bonuses: ['+20% extortion income', '+25% intimidation power', '+15% fear generation'],
+    powerName: 'The Donnie Brasco Purge',
+    powerLore: 'After FBI agent Joe Pistone infiltrated the family as "Donnie Brasco," the Bonannos launched a brutal internal purge of suspected informants.',
+    powerEffect: 'Remove all soldiers with loyalty below 50. Survivors gain +15 loyalty and 2-turn immunity to enemy flip attempts.',
+    powerCost: '1 Tactical Action',
+    powerCooldown: '4 turns',
     startingResources: { money: 40000, soldiers: 3, influence: 8, politicalPower: 15, respect: 35 },
   },
   {
@@ -102,6 +127,11 @@ const families: FamilyInfo[] = [
       { label: 'Fear', icon: <Crown className="h-3.5 w-3.5" />, value: 4 },
     ],
     bonuses: ['+20% combat power', '-15% recruitment cost', '+15% fear generation'],
+    powerName: 'The Persico Succession',
+    powerLore: 'When Joe Colombo was shot at the 1971 Unity Day Rally, Carmine Persico seized control and reorganized — a pattern repeated through decades of assassinations and internal wars.',
+    powerEffect: 'Instantly promote a soldier to capo when one of your capos is killed. Reactive trigger — no turn required.',
+    powerCost: '1 Tactical Action',
+    powerCooldown: 'Once per game',
     startingResources: { money: 35000, soldiers: 3, influence: 18, politicalPower: 10, respect: 25 },
   },
 ];
@@ -456,6 +486,51 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
             <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
               {activeFamily.description}
             </p>
+
+            {/* Family Power Section */}
+            <div
+              className="mb-5 p-4 rounded-lg border-l-[3px]"
+              style={{
+                borderLeftColor: activeFamily.color,
+                backgroundColor: `${activeFamily.color}08`,
+              }}
+            >
+              <h4
+                className="text-[10px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5"
+                style={{ color: activeFamily.color }}
+              >
+                ⚡ FAMILY POWER
+              </h4>
+              <p className="text-sm font-bold text-foreground font-playfair mb-1">
+                {activeFamily.powerName}
+              </p>
+              <p className="text-xs text-muted-foreground italic mb-2 leading-relaxed">
+                "{activeFamily.powerLore}"
+              </p>
+              <p className="text-xs text-foreground mb-3 leading-relaxed">
+                {activeFamily.powerEffect}
+              </p>
+              <div className="flex items-center gap-2">
+                <span
+                  className="text-[10px] font-bold px-2 py-0.5 rounded"
+                  style={{
+                    backgroundColor: `${activeFamily.color}20`,
+                    color: activeFamily.color,
+                  }}
+                >
+                  {activeFamily.powerCost}
+                </span>
+                <span
+                  className="text-[10px] font-bold px-2 py-0.5 rounded"
+                  style={{
+                    backgroundColor: `${activeFamily.color}20`,
+                    color: activeFamily.color,
+                  }}
+                >
+                  {activeFamily.powerCooldown === 'Once per game' ? '🔒 Once per game' : `⏱ Cooldown: ${activeFamily.powerCooldown}`}
+                </span>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-6 mb-6">
               {/* Bonuses */}
