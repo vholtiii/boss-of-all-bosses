@@ -122,6 +122,88 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           </div>
         )}
 
+        {/* ── FAMILY POWER (standalone, tactical phase) ── */}
+        {(() => {
+          const power = FAMILY_POWERS[gameState.playerFamily];
+          if (!power) return null;
+          const cd = (gameState as any).familyPowerCooldowns?.[gameState.playerFamily] || 0;
+          const usedForever = power.oneTimeUse && (gameState as any).familyPowerUsedForever?.[gameState.playerFamily];
+          const isPassive = gameState.playerFamily === 'colombo';
+          const canUse = !usedForever && cd <= 0 && gameState.tacticalActionsRemaining >= power.cost && !isPassive && isTacticalPhase;
+          const familyColorMap: Record<string, string> = {
+            gambino: 'border-families-gambino',
+            genovese: 'border-families-genovese',
+            lucchese: 'border-families-lucchese',
+            bonanno: 'border-families-bonanno',
+            colombo: 'border-families-colombo',
+          };
+          const familyBorderColor = familyColorMap[gameState.playerFamily] || 'border-primary';
+          const familyGradientMap: Record<string, string> = {
+            gambino: 'from-families-gambino/20 to-families-gambino/5',
+            genovese: 'from-families-genovese/20 to-families-genovese/5',
+            lucchese: 'from-families-lucchese/20 to-families-lucchese/5',
+            bonanno: 'from-families-bonanno/20 to-families-bonanno/5',
+            colombo: 'from-families-colombo/20 to-families-colombo/5',
+          };
+          const familyGradient = familyGradientMap[gameState.playerFamily] || 'from-primary/20 to-primary/5';
+          const familyBtnGradientMap: Record<string, string> = {
+            gambino: 'from-families-gambino/80 to-families-gambino/60',
+            genovese: 'from-families-genovese/80 to-families-genovese/60',
+            lucchese: 'from-families-lucchese/80 to-families-lucchese/60',
+            bonanno: 'from-families-bonanno/80 to-families-bonanno/60',
+            colombo: 'from-families-colombo/80 to-families-colombo/60',
+          };
+          const familyBtnGradient = familyBtnGradientMap[gameState.playerFamily] || 'from-primary/80 to-primary/60';
+
+          return (
+            <div className={cn(
+              "rounded-lg border-l-4 p-3 space-y-2 bg-gradient-to-r transition-all",
+              familyBorderColor,
+              familyGradient,
+              canUse && "shadow-[0_0_8px_hsl(var(--primary)/0.15)]",
+              !isTacticalPhase && "opacity-40"
+            )}>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-primary/80">⚡ Family Power</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-foreground">{power.name}</span>
+                <Badge variant="outline" className="text-[10px]">{power.cost} Tactical</Badge>
+              </div>
+              <div className="text-[10px] text-muted-foreground">
+                {gameState.playerFamily === 'gambino' && 'Scout target hex + all 6 adjacent hexes'}
+                {gameState.playerFamily === 'genovese' && 'Hide hex for 3 turns: unscoutable, -30% hit/sabotage'}
+                {gameState.playerFamily === 'lucchese' && '+50% district income + extract $1K/rival hex tribute'}
+                {gameState.playerFamily === 'bonanno' && 'Remove soldiers <50 loyalty; survivors +15 loyalty, flip immune'}
+                {gameState.playerFamily === 'colombo' && 'Auto-promotes a soldier when a capo dies (passive)'}
+              </div>
+              <div className="flex items-center gap-1.5">
+                {cd > 0 && <span className="text-[10px] text-muted-foreground">⏳ Cooldown: {cd}t</span>}
+                {usedForever && <span className="text-[10px] text-muted-foreground">✓ Used (once per game)</span>}
+                {isPassive && <span className="text-[10px] text-muted-foreground">🔄 Reactive — triggers automatically</span>}
+              </div>
+              {!isPassive && (
+                <Button
+                  className={cn(
+                    "w-full py-2 text-xs font-semibold bg-gradient-to-r text-white",
+                    familyBtnGradient,
+                    canUse && "hover:brightness-110",
+                    !canUse && "opacity-50 cursor-not-allowed"
+                  )}
+                  disabled={!canUse}
+                  onClick={() => onAction({ type: 'use_family_power' })}
+                >
+                  <Target className="h-3.5 w-3.5 mr-1.5" />
+                  Activate {power.name.split(' ').slice(0, 2).join(' ')}
+                </Button>
+              )}
+              {!isTacticalPhase && (
+                <p className="text-[9px] text-muted-foreground text-center">Available during Tactical phase</p>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ── ACTIONS ── */}
         <CollapsibleSection
           title="Strategic Actions"
