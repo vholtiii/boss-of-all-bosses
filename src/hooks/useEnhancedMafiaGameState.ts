@@ -2127,7 +2127,20 @@ export const useEnhancedMafiaGameState = (
     const maxScoutRange = unit.type === 'capo' ? 2 : 1;
     if (dist < 1 || dist > maxScoutRange) return prev;
 
-    const enemyUnitsOnHex = prev.deployedUnits.filter(u => 
+    // Front Boss blocking: if target hex is hidden by another family, block the scout
+    const frontBossBlock = (prev.frontBossHexes || []).find(h => 
+      h.q === targetLocation.q && h.r === targetLocation.r && h.s === targetLocation.s && h.ownerFamily !== prev.playerFamily
+    );
+    if (frontBossBlock) {
+      return {
+        ...prev,
+        pendingNotifications: [...prev.pendingNotifications, {
+          type: 'warning' as const, title: '🎭 Intel Blocked',
+          message: `Your scout could not gather intelligence — the target area appears to be a front operation.`,
+        }],
+      };
+    }
+
       u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s &&
       u.family !== prev.playerFamily
     );
