@@ -1159,6 +1159,53 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     return null;
                   })()}
 
+                  {/* Family Power: Front Boss dashed border (Genovese) */}
+                  {(() => {
+                    const frontBossHexes = gameState?.frontBossHexes || [];
+                    const fbEntry = frontBossHexes.find((h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s);
+                    if (!fbEntry) return null;
+                    const isOwn = fbEntry.ownerFamily === playerFamily;
+                    if (isOwn) {
+                      return (
+                        <circle cx={x} cy={y} r={baseHexRadius - 2} fill="none" stroke="#8A2BE2" strokeWidth="1.5" strokeDasharray="5,3" opacity="0.6" className="pointer-events-none" />
+                      );
+                    }
+                    // Enemy front boss hex visible via scout
+                    const scoutInfo = scoutedHexes.find((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
+                    if (scoutInfo) {
+                      return (
+                        <g className="pointer-events-none">
+                          <circle cx={x} cy={y} r={baseHexRadius - 2} fill="none" stroke="#888888" strokeWidth="1" strokeDasharray="4,4" opacity="0.4" />
+                          <text x={x + baseHexRadius * 0.55} y={y - baseHexRadius * 0.55} textAnchor="middle" fontSize="8" className="select-none" opacity="0.7">🎭</text>
+                        </g>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Family Power: Lucchese boosted district dashed border */}
+                  {(() => {
+                    const boost = gameState?.luccheseBoostedDistrict;
+                    if (!boost || boost.turnsRemaining <= 0) return null;
+                    if (tile.district !== boost.district) return null;
+                    if (tile.controllingFamily !== boost.family) return null;
+                    return (
+                      <circle cx={x} cy={y} r={baseHexRadius - 3} fill="none" stroke="#D4AF37" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.5" className="pointer-events-none" />
+                    );
+                  })()}
+
+                  {/* Family Power: Bonanno purge immunity ring on soldiers */}
+                  {(() => {
+                    const immunities = gameState?.bonannoPurgeImmunity || [];
+                    if (immunities.length === 0) return null;
+                    const soldiersHere = (deployedUnits || []).filter(u => u.q === tile.q && u.r === tile.r && u.s === tile.s && u.type === 'soldier');
+                    const hasImmune = soldiersHere.some(u => immunities.some((im: any) => im.unitId === u.id));
+                    if (!hasImmune) return null;
+                    return (
+                      <circle cx={x + baseHexRadius * 0.45} cy={y + baseHexRadius * 0.35} r={6} fill="none" stroke="#14B8A6" strokeWidth="1.5" strokeDasharray="2,2" opacity="0.5" className="pointer-events-none" />
+                    );
+                  })()}
+
                   {/* Scouted enemy safehouse indicator */}
                   {(() => {
                     const scoutInfo = scoutedHexes.find((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s);
@@ -2026,6 +2073,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               { color: '#3B82F6', label: 'Legal Business', style: 'solid', width: 2.5 },
               { color: '#D4AF3780', label: 'Your Territory', style: 'solid', width: 2 },
               { color: '#F97316', label: 'Contested', style: 'dashed', width: 2.5 },
+              { color: '#8A2BE2', label: 'Front Boss (Hidden)', style: 'dashed', width: 1.5 },
+              { color: '#D4AF37', label: 'Boosted District', style: 'dashed', width: 1.5 },
             ].map(item => (
               <div key={item.label} className="flex items-center gap-2">
                 <svg width="20" height="12" className="flex-shrink-0">
