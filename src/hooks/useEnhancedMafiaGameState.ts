@@ -7148,7 +7148,9 @@ export const useEnhancedMafiaGameState = (
     // FIX #6: Any soldier with loyalty < 80 can be targeted (low loyalty = easier to flip)
     const flippableTargets = enemySoldiersNearHQ.filter(u => {
       const uStats = state.soldierStats[u.id];
-      return uStats && uStats.loyalty < 80 && !(state.flippedSoldiers || []).some(f => f.unitId === u.id);
+      // Bonanno purge immunity blocks flip attempts
+      const hasFlipImmunity = (state.bonannoPurgeImmunity || []).some(i => i.unitId === u.id);
+      return uStats && uStats.loyalty < 80 && !(state.flippedSoldiers || []).some(f => f.unitId === u.id) && !hasFlipImmunity;
     });
 
     if (flippableTargets.length === 0) {
