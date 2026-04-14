@@ -1,68 +1,45 @@
 
 
-# AI-Initiated Sitdown Requests
-
-## What Changes
-
-### 1. New data type: `IncomingSitdown`
-**File: `src/types/game-mechanics.ts`**
-
-Add a new interface for AI-initiated sitdown requests:
-```ts
-export interface IncomingSitdown {
-  id: string;
-  fromFamily: string;
-  proposedDeal: 'ceasefire' | 'alliance' | 'safe_passage' | 'supply_deal';
-  turnRequested: number;
-  expiresOnTurn: number; // 2-turn window to respond
-  successBonus: number;  // +15% since THEY asked
-}
-```
-
-### 2. Add `incomingSitdowns` to game state
-**File: `src/hooks/useEnhancedMafiaGameState.ts`**
-
-- Add `incomingSitdowns: IncomingSitdown[]` to state interface and initial state
-- Deep-copy it in `deepCloneState`
-
-### 3. AI creates incoming sitdowns (replaces vague notifications)
-**File: `src/hooks/useEnhancedMafiaGameState.ts` (~line 5563-5610)**
-
-Replace the current "signals they want to negotiate" notifications with actual `IncomingSitdown` entries pushed to `state.incomingSitdowns`. Keep the notification but change the message to: "The [Family] family has requested a sitdown. Accept or decline below."
-
-Personality-driven triggers stay the same (Diplomatic P2+, Defensive P3+, Opportunistic when losing). Add Aggressive families occasionally requesting sitdowns when they're losing badly (hex count < 4).
-
-### 4. AI-to-AI sitdowns
-**File: `src/hooks/useEnhancedMafiaGameState.ts`**
-
-After the player-facing diplomacy block, add AI-to-AI ceasefire logic: diplomatic/defensive AI families can form ceasefires with each other (auto-resolved, no player input needed). Push an info notification so the player is aware: "The [Family] and [Family] families have agreed to a ceasefire."
-
-### 5. Incoming Sitdowns UI — Accept/Decline panel
-**File: `src/pages/UltimateMafiaGame.tsx`**
-
-Add an "Incoming Sitdowns" section next to the existing Pending Sitdowns tracker. Each entry shows:
-- Family name + proposed deal type
-- Turns remaining to respond (e.g., "1t left")
-- **Accept** button (opens NegotiationDialog with the proposed deal pre-selected and the +15% success bonus applied)
-- **Decline** button (removes the sitdown, +5 tension with that family)
-
-### 6. Expiration penalty
-**File: `src/hooks/useEnhancedMafiaGameState.ts`** (turn-end lifecycle)
-
-Expire `incomingSitdowns` where `expiresOnTurn <= state.turn`. Ignoring an incoming sitdown increases tension by +5 (less than the +8 for snubbing your own sitdown, since declining is less offensive than ghosting).
-
-### 7. Accept flow
-**File: `src/hooks/useEnhancedMafiaGameState.ts`**
-
-Add an `acceptIncomingSitdown` action handler that:
-- Consumes 1 AP
-- Opens the negotiation with the +15% bonus baked in
-- Removes the incoming sitdown entry on completion
+# Fix Family Selection Screen Discrepancies
 
 ## Summary
-- 2 files edited (`useEnhancedMafiaGameState.ts`, `UltimateMafiaGame.tsx`)
-- 1 file with type addition (`game-mechanics.ts`)
-- AI families now actively request sitdowns based on personality
-- AI-to-AI ceasefires happen autonomously with player notification
-- Player gets Accept/Decline UI with a success bonus for accepting
+The family selection cards have 4 factual errors (wrong bonuses / misleading descriptions) and 2 soldier count mismatches versus the intended game balance. This plan corrects all of them.
+
+## Changes
+
+### File: `src/components/FamilySelectionScreen.tsx`
+
+**1. Colombo bonuses (line 129)**
+Change: `['+20% combat power', '-15% recruitment cost', '+15% fear generation']`
+To: `['+20% income bonus', '-15% recruitment cost', '+15% fear generation']`
+
+**2. Colombo description (line 121)**
+Change: *"The wildcards. Aggressive and unpredictable with the strongest military force — but you burn through resources quickly."*
+To: *"The scrappy survivors. Start with the least but fight the hardest for every dollar. Low resources force creative play — recruitment discounts and fear keep you in the game."*
+
+**3. Genovese description (line 61)**
+Change: *"The most secretive family. Expert infiltrators with unmatched intelligence networks. Hard to pin down and harder to defeat."*
+To: *"The shadow empire. Masters of legitimate business fronts and money laundering. Their economic engine funds everything while staying hidden in plain sight."*
+
+**4. Lucchese description (line 81)**
+Change: *"The traders and smugglers. Control the supply chains and laundering operations. Excellent at turning dirty money clean."*
+To: *"The silent killers. Superior intelligence networks and surgical precision make them deadly. Lower heat and higher hit rates let them strike without consequences."*
+
+**5. Bonanno starting soldiers (line 115)**
+Change: `soldiers: 3` to `soldiers: 2` — matches the guide and `familySoldierCount` default.
+
+**6. Colombo starting soldiers (line 135)**
+Change: `soldiers: 3` to `soldiers: 1` — matches the guide and `familySoldierCount` default. Reinforces "Hard" difficulty.
+
+### File: `SOLDIER_RECRUITMENT_GUIDE.md`
+Update the Starting Conditions money table to reflect the actual per-family amounts used in the cards (no longer $50K flat).
+
+## What stays the same
+- All `FAMILY_BONUSES` in `game-mechanics.ts` (the code bonuses are correct)
+- Family power descriptions (all accurate)
+- Trait stat bars (remain as-is — they represent relative identity, not literal bonus mapping)
+- Starting money on cards (the varied amounts are better for balance than flat $50K)
+
+## Result
+Every card will accurately reflect what the player actually gets in-game. No more "combat power" listed for a family with 0% combat bonus.
 
