@@ -593,6 +593,18 @@ export const LOYALTY_FAILED_ACTION_PENALTY = 5; // -5 loyalty when hit or extort
 export const LOYALTY_ENEMY_TERRITORY_PENALTY = 2; // -2 loyalty/turn on or adjacent to enemy hex
 export const LOYALTY_NEUTRAL_HEX_PENALTY = 2;  // -2 loyalty/turn stationed on neutral hex
 
+// ============ PROSECUTION RISK SYSTEM ============
+export const PROSECUTION_ARREST_THRESHOLD = 50;       // risk level that starts prosecution arrest timer
+export const PROSECUTION_ARREST_TIMER = 3;             // consecutive turns at 50+ before arrest fires
+export const PROSECUTION_ARREST_DURATION = 5;          // turns a prosecution-arrested soldier is jailed
+export const PROSECUTION_ARREST_LOYALTY_PENALTY = 10;  // -10 loyalty when soldier is released from prosecution arrest
+export const GRAND_JURY_THRESHOLD = 60;                // risk level for Grand Jury Subpoena
+export const GRAND_JURY_ILLEGAL_PROFIT_PENALTY = 0.3;  // 30% reduction to illegal business profits at 60+ risk
+export const FEDERAL_INDICTMENT_THRESHOLD = 90;        // risk level for federal indictment timer
+export const FEDERAL_INDICTMENT_TIMER = 3;             // consecutive turns at 90+ before indictment fires
+export const FEDERAL_INDICTMENT_DEFENSE_COST = 25000;  // cost to fight federal indictment
+export const PROSECUTION_LAWYER_REDUCTION = 5;         // -5 prosecution risk per turn when lawyer is retained
+
 // ============ CAPO COMBAT PROTECTION ============
 export const CAPO_WOUND_LOYALTY_PENALTY = 10;  // -10 loyalty when capo is wounded in combat
 export const CAPO_WOUND_MOVE_PENALTY = 1;      // -1 max moves next turn for wounded capo

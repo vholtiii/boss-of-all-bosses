@@ -315,15 +315,17 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   ];
 
   // RICO or Bankruptcy Game Over
-  if (gameState.gameOver?.type === 'rico' || (gameState.gameOver as any)?.type === 'bankruptcy' || (gameState.gameOver as any)?.type === 'assassination') {
+  if (gameState.gameOver?.type === 'rico' || (gameState.gameOver as any)?.type === 'bankruptcy' || (gameState.gameOver as any)?.type === 'assassination' || (gameState.gameOver as any)?.type === 'federal_indictment') {
     const goType = (gameState.gameOver as any)?.type;
     const playerTerritoryCount = gameState.hexMap.filter(h => h.controllingFamily === gameState.playerFamily).length;
     const playerSoldierCount = gameState.deployedUnits.filter(u => u.family === gameState.playerFamily && u.type === 'soldier').length;
     const eliminatedCount = (gameState as any).eliminatedFamilies?.length || 0;
-    const goEmoji = goType === 'rico' ? '🚨' : goType === 'assassination' ? '🔫' : '💸';
-    const goTitle = goType === 'rico' ? 'RICO INDICTMENT' : goType === 'assassination' ? 'THE COMMISSION HAS SPOKEN' : 'BANKRUPTCY';
+    const goEmoji = goType === 'rico' ? '🚨' : goType === 'federal_indictment' ? '🏛️' : goType === 'assassination' ? '🔫' : '💸';
+    const goTitle = goType === 'rico' ? 'RICO INDICTMENT' : goType === 'federal_indictment' ? 'FEDERAL INDICTMENT' : goType === 'assassination' ? 'THE COMMISSION HAS SPOKEN' : 'BANKRUPTCY';
     const goDesc = goType === 'rico'
       ? 'The federal government has dismantled your criminal empire after 5 consecutive turns at critical heat.'
+      : goType === 'federal_indictment'
+      ? 'A federal grand jury has indicted the entire organization. Unable to pay for legal defense, the empire crumbles.'
       : goType === 'assassination'
       ? 'With no soldiers, no money, and no way out — the other families voted. The Boss sleeps with the fishes.'
       : 'Your family collapsed under crushing debt. The other families have divided your territory.';
@@ -525,6 +527,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               className="text-center px-3 py-1 rounded-lg bg-destructive/20 border border-destructive/40"
             >
               <div className="text-sm font-bold text-destructive">🚨 RICO {gameState.ricoTimer}/5</div>
+            </motion.div>
+          )}
+          {(gameState as any).prosecutionTimer > 0 && (
+            <motion.div
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="text-center px-3 py-1 rounded-lg bg-orange-500/20 border border-orange-500/40"
+            >
+              <div className="text-sm font-bold text-orange-400">⚖️ PROSECUTION {(gameState as any).prosecutionTimer}/3</div>
             </motion.div>
           )}
           <div className="text-center">
