@@ -519,7 +519,14 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                                     {unit.type === 'soldier' && soldierStats[unit.id] && (() => {
                                       const ss = soldierStats[unit.id];
                                       return (
-                                        <span className={`text-[9px] px-1 rounded mt-0.5 ${ss.loyalty >= 70 ? 'bg-green-500/20 text-green-400' : ss.loyalty >= 40 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>♥ {ss.loyalty}</span>
+                                        <>
+                                          <span className={`text-[9px] px-1 rounded mt-0.5 ${ss.loyalty >= 70 ? 'bg-green-500/20 text-green-400' : ss.loyalty >= 40 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>♥ {ss.loyalty}</span>
+                                          {ss.markedForDeath && ss.markedTurnsRemaining > 0 && (
+                                            <span className="text-[9px] px-1 rounded mt-0.5 bg-red-900/30 text-red-400 animate-pulse">
+                                              ☠️ {ss.markedTurnsRemaining}t
+                                            </span>
+                                          )}
+                                        </>
                                       );
                                     })()}
                                   </div>
