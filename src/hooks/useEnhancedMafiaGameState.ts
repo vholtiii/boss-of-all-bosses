@@ -5443,6 +5443,10 @@ export const useEnhancedMafiaGameState = (
       }
 
       // ── AI ACTION PHASE: CLAIM & EXTORT ──
+      // Phase 3+: AI claim/extort disabled — influence system handles territory
+      if (aiPhase >= 3) {
+        // Skip claim/extort — territory handled by processInfluenceSystem
+      } else {
       // Priority 1: Extort neutral hexes with completed businesses (free money + territory)
       const aiUnitsForActions = state.deployedUnits.filter(u => u.family === fam);
       for (const unit of aiUnitsForActions) {
