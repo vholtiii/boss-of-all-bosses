@@ -3705,8 +3705,155 @@ export const useEnhancedMafiaGameState = (
           }
         }
       }
-      
-      // --- Update rattingRisk ---
+
+      // ============ PROSECUTION RISK SYSTEM ============
+      {
+        // Calculate prosecution risk from heat, informants, arrests, bribes, lawyer
+        const heat = newState.policeHeat.level;
+        const informantCount = (newState.copFlippedSoldiers || []).filter(c => c.family === newState.playerFamily).length;
+        const recentArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn < 3).length;
+        const hasPatrol = newState.activeBribes.some(b => b.tier === 'patrol_officer' && b.active);
+        const hasCaptain = newState.activeBribes.some(b => b.tier === 'police_captain' && b.active);
+        const hasChief = newState.activeBribes.some(b => b.tier === 'police_chief' && b.active);
+        const hasMayor = newState.activeBribes.some(b => b.tier === 'mayor' && b.active);
+        const hasLawyer = (newState.lawyerActiveUntil || 0) >= newState.turn;
+
+        let risk = Math.floor(heat * 0.4)
+          + informantCount * 10
+          + recentArrests * 5
+          - (hasPatrol ? 10 : 0)
+          - (hasCaptain ? 10 : 0)
+          - (hasChief ? 15 : 0)
+          - (hasMayor ? 20 : 0)
+          - (hasLawyer ? PROSECUTION_LAWYER_REDUCTION : 0);
+        risk = Math.min(100, Math.max(0, risk));
+        newState.legalStatus.prosecutionRisk = risk;
+
+        // --- Prosecution Arrest (50+ for 3 consecutive turns) ---
+        if (risk >= PROSECUTION_ARREST_THRESHOLD) {
+          newState.prosecutionTimer = (newState.prosecutionTimer || 0) + 1;
+          if (newState.prosecutionTimer >= PROSECUTION_ARREST_TIMER) {
+            // Arrest a random deployed soldier
+            const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+            if (playerSoldiers.length > 0) {
+              const victim = playerSoldiers[Math.floor(Math.random() * playerSoldiers.length)];
+              newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== victim.id);
+              newState.arrestedSoldiers.push({
+                unitId: victim.id,
+                returnTurn: newState.turn + PROSECUTION_ARREST_DURATION,
+                source: 'prosecution',
+              });
+              turnReport.events.push(`⚖️ PROSECUTION ARREST: A soldier was indicted and arrested for ${PROSECUTION_ARREST_DURATION} turns! (Maintenance still due)`);
+              newState.pendingNotifications.push({
+                type: 'error' as const,
+                title: '⚖️ Soldier Arrested — Federal Prosecution',
+                message: `A grand jury indicted one of your soldiers. Jailed for ${PROSECUTION_ARREST_DURATION} turns. You still pay maintenance.`,
+              });
+            }
+            newState.prosecutionTimer = 0; // reset, restarts if still 50+
+          } else {
+            turnReport.events.push(`⚖️ Prosecution pressure: ${newState.prosecutionTimer}/${PROSECUTION_ARREST_TIMER} turns at risk ${risk}+`);
+          }
+        } else {
+          if ((newState.prosecutionTimer || 0) > 0) {
+            newState.prosecutionTimer = 0;
+            turnReport.events.push('✅ Prosecution pressure eased — risk dropped below threshold.');
+          }
+        }
+
+        // --- Federal Indictment (90+ for 3 consecutive turns) ---
+        if (risk >= FEDERAL_INDICTMENT_THRESHOLD) {
+          newState.federalIndictmentTimer = (newState.federalIndictmentTimer || 0) + 1;
+          turnReport.events.push(`🚨 FEDERAL INVESTIGATION: ${newState.federalIndictmentTimer}/${FEDERAL_INDICTMENT_TIMER} turns at critical prosecution risk!`);
+          if (newState.federalIndictmentTimer >= FEDERAL_INDICTMENT_TIMER) {
+            // Can the player afford defense?
+            if (newState.resources.money >= FEDERAL_INDICTMENT_DEFENSE_COST) {
+              newState.resources.money -= FEDERAL_INDICTMENT_DEFENSE_COST;
+              // Shut down all illegal businesses for 3 turns
+              newState.federalIndictmentActive = true;
+              newState.federalIndictmentRecoveryTurn = newState.turn + 3;
+              // Freeze 30% of remaining cash
+              const frozen = Math.floor(newState.resources.money * 0.3);
+              newState.resources.money -= frozen;
+              // Shut down illegal businesses
+              newState.hexMap.forEach(t => {
+                if (t.controllingFamily === newState.playerFamily && t.business && !t.business.isLegal) {
+                  t.business = undefined;
+                }
+              });
+              turnReport.events.push(`🏛️ FEDERAL INDICTMENT! Paid $${FEDERAL_INDICTMENT_DEFENSE_COST.toLocaleString()} defense. All illegal businesses shut down. $${frozen.toLocaleString()} frozen.`);
+              newState.pendingNotifications.push({
+                type: 'error' as const,
+                title: '🏛️ Federal Indictment!',
+                message: `Paid $${FEDERAL_INDICTMENT_DEFENSE_COST.toLocaleString()} legal defense. All illegal businesses destroyed. $${frozen.toLocaleString()} assets frozen. Rebuilding in 3 turns.`,
+              });
+            } else {
+              // Game over
+              newState.gameOver = { type: 'federal_indictment' as any, turn: newState.turn };
+              turnReport.events.push(`🏛️ FEDERAL INDICTMENT — GAME OVER! Cannot afford $${FEDERAL_INDICTMENT_DEFENSE_COST.toLocaleString()} legal defense.`);
+              newState.pendingNotifications.push({
+                type: 'error' as const,
+                title: '🏛️ GAME OVER — Federal Indictment',
+                message: `The federal government has indicted you. Unable to pay $${FEDERAL_INDICTMENT_DEFENSE_COST.toLocaleString()} for legal defense. Your empire has been dismantled.`,
+              });
+            }
+            newState.federalIndictmentTimer = 0;
+          }
+        } else {
+          if ((newState.federalIndictmentTimer || 0) > 0) {
+            newState.federalIndictmentTimer = 0;
+            turnReport.events.push('✅ Federal investigation suspended — prosecution risk dropped below critical.');
+          }
+        }
+
+        // --- Federal Indictment recovery ---
+        if (newState.federalIndictmentActive && newState.turn >= newState.federalIndictmentRecoveryTurn) {
+          newState.federalIndictmentActive = false;
+          turnReport.events.push('✅ Federal oversight lifted — you may rebuild illegal operations.');
+          newState.pendingNotifications.push({
+            type: 'success' as const,
+            title: '✅ Federal Oversight Lifted',
+            message: 'The indictment period has ended. You can rebuild illegal businesses.',
+          });
+        }
+      }
+
+      // ============ PROSECUTION-ARRESTED SOLDIER RELEASE ============
+      {
+        const releasedSoldiers = newState.arrestedSoldiers.filter(
+          a => a.source === 'prosecution' && newState.turn >= a.returnTurn
+        );
+        releasedSoldiers.forEach(a => {
+          // Return soldier to HQ with -10 loyalty
+          const hq = newState.headquarters[newState.playerFamily];
+          if (hq) {
+            const soldierId = a.unitId;
+            newState.deployedUnits.push({
+              id: soldierId,
+              family: newState.playerFamily,
+              type: 'soldier' as any,
+              q: hq.q, r: hq.r, s: hq.s,
+              movesRemaining: 0,
+              maxMoves: 2,
+            });
+            // Apply loyalty penalty
+            const stats = newState.soldierStats[soldierId];
+            if (stats) {
+              stats.loyalty = Math.max(0, stats.loyalty - PROSECUTION_ARREST_LOYALTY_PENALTY);
+            }
+            turnReport.events.push(`⚖️ A soldier has been released from federal custody and returned to HQ (−${PROSECUTION_ARREST_LOYALTY_PENALTY} loyalty)`);
+            newState.pendingNotifications.push({
+              type: 'warning' as const,
+              title: '⚖️ Soldier Released',
+              message: `A soldier served their sentence and returned to HQ. Loyalty reduced by ${PROSECUTION_ARREST_LOYALTY_PENALTY}.`,
+            });
+          }
+        });
+        // Remove released from arrested list
+        newState.arrestedSoldiers = newState.arrestedSoldiers.filter(
+          a => !(a.source === 'prosecution' && newState.turn >= a.returnTurn)
+        );
+      }
       {
         const recentArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn < 3).length;
         const loyalty = newState.reputation.loyalty;
