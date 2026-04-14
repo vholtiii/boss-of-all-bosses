@@ -3779,7 +3779,38 @@ export const useEnhancedMafiaGameState = (
           }
         }
       }
-      
+
+      // --- COUNTER-INTEL DISCOVERY: Per-turn chance for family-flipped soldiers to be discovered ---
+      {
+        const discoveredIds: string[] = [];
+        for (const flipped of (newState.flippedSoldiers || [])) {
+          if (Math.random() < COP_FLIP_DISCOVERY_CHANCE) {
+            discoveredIds.push(flipped.unitId);
+            // Remove the unit (executed by the host family's counter-intelligence)
+            newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== flipped.unitId);
+            delete newState.soldierStats[flipped.unitId];
+            const isPlayerAsset = flipped.flippedByFamily === newState.playerFamily;
+            const isPlayerSoldier = flipped.family === newState.playerFamily;
+            if (isPlayerAsset) {
+              newState.pendingNotifications.push({
+                type: 'error' as const,
+                title: '🔍 Rat Discovered!',
+                message: `Your flipped ${flipped.family} soldier was discovered and eliminated by counter-intelligence!`,
+              });
+            } else if (isPlayerSoldier) {
+              newState.pendingNotifications.push({
+                type: 'success' as const,
+                title: '🛡️ Enemy Rat Found!',
+                message: `A ${flipped.flippedByFamily} spy in your ranks was uncovered and dealt with.`,
+              });
+            }
+            if (turnReport) turnReport.events.push(`🔍 A flipped ${flipped.family} soldier (turned by ${flipped.flippedByFamily}) was discovered and eliminated.`);
+          }
+        }
+        if (discoveredIds.length > 0) {
+          newState.flippedSoldiers = (newState.flippedSoldiers || []).filter(f => !discoveredIds.includes(f.unitId));
+        }
+      }
 
       if (newState.hitmanContracts && newState.hitmanContracts.length > 0) {
         const resolvedContracts: string[] = [];
