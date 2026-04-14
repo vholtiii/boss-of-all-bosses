@@ -1379,6 +1379,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         const firstSoldier = soldiers[0];
                         const isSelected = soldiers.some(s => s.id === selectedUnitId);
                         const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action');
+                        const hasMark = fam === playerFamily && soldiers.some(s => gameState?.soldierStats?.[s.id]?.markedForDeath);
                         elements.push(
                           <SoldierIcon
                             key={`soldier-${fam}-${key}`}
@@ -1388,6 +1389,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             count={soldiers.length}
                             isPlayerFamily={fam === playerFamily}
                             selected={isSelected}
+                            markedForDeath={hasMark}
                             onClick={isClickable ? (e) => {
                               e.stopPropagation();
                               setPinnedHex(tile);
