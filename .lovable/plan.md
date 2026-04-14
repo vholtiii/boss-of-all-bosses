@@ -1,25 +1,31 @@
 
 
-# Update All Family Mottos
+# Add Mafia-Themed Background to Family Selection Screen
 
-## Changes
+## What Changes
 
-**File: `src/components/FamilySelectionScreen.tsx`**
+The current selection screen has a plain dark `bg-background` with subtle grain/noise overlays and particles. We'll add the uploaded silhouette image as a dramatic background, creating a moody, smoky mafia atmosphere.
 
-| Family | Current Motto | New Motto |
-|---|---|---|
-| Gambino | Generic/mismatched quote | *"The man who controls the money controls everything."* |
-| Genovese | Combat-focused quote | *"The best move is the one nobody sees."* |
-| Lucchese | Money-focused quote | *"One clean hit is worth a hundred soldiers."* |
-| Colombo | *"Strike fast. Strike hard. No mercy."* | *"We don't need much. Just enough to bury you."* |
-| Bonanno | No change — already accurate | — |
+## Approach
 
-## Why
-Each new motto aligns with the family's actual gameplay identity:
-- **Gambino**: Economic/political empire
-- **Genovese**: Stealth, business fronts, The Front Boss ability
-- **Lucchese**: Assassination, intel, surgical precision
-- **Colombo**: Scrappy underdog, low resources, high threat
+1. **Copy the uploaded image** into `src/assets/mafia-sitdown-bg.png`
+2. **Update `FamilySelectionScreen.tsx`** to use the image as a full-bleed background with a dark overlay so the cards and text remain readable
 
-One file, four line changes.
+### File: `src/components/FamilySelectionScreen.tsx`
+
+- Import the image from `@/assets/mafia-sitdown-bg.png`
+- On the root `<div>` (line 256), add the background image via inline style: `backgroundImage`, `backgroundSize: cover`, `backgroundPosition: center`
+- Add a dark gradient overlay (`bg-black/70` or similar) between the image and the content so cards/text stay legible
+- Keep the existing noise texture, grain, and atmospheric particles on top for consistency
+
+### Visual Result
+- The smoky silhouette of men at a table fills the background
+- A dark semi-transparent overlay ensures all UI elements remain readable
+- Existing grain and particle effects layer on top for depth
+- The overall feel shifts from "dark UI" to "noir mafia meeting room"
+
+## Technical Details
+- One image asset added (`src/assets/`)
+- One component file edited (`FamilySelectionScreen.tsx`) — ~5 lines changed
+- Image imported as ES module for proper Vite bundling
 
