@@ -1,22 +1,27 @@
 
 
-# Add Purge Ranks to Boss Actions in HQ Panel
-
-## Problem
-Purge Ranks is currently a separate section in the HQ panel (lines 978-1040) that only appears when flagged soldiers exist. The user wants it grouped with the other Boss actions (Diplomacy, Sitdown, Declare War, Go to Mattresses, War Summit) and always visible.
+# Add Loyalty to Capo Promotion Panel, Soldier Stats to Deployed Units, and Loyalty Requirement for Promotion
 
 ## Changes
 
-### `src/components/HeadquartersInfoPanel.tsx`
+### 1. Add loyalty display to CapoPromotionPanel soldier cards
+**File: `src/components/CapoPromotionPanel.tsx`**
+- Add a new `Req` line showing `Loyalty: X/70` with a check/X icon based on whether loyalty >= 70
+- Place it after the existing requirement lines (victories, racketeering, balanced path)
 
-1. **Move Purge Ranks into the Boss actions block** (before line 976's closing `</div>`), right after War Summit (~line 975). Style it consistently with the other Boss action buttons.
+### 2. Add loyalty requirement to promotion eligibility
+**File: `src/types/game-mechanics.ts`**
+- Update `isCapoPromotionEligible()` (line 387) to also require `stats.loyalty >= 70`
+- The function currently only checks victories/racketeering — add `&& stats.loyalty >= 70`
 
-2. **Remove the early `return null`** on line 986 — always render the section.
+### 3. Add soldier stats to Deployed Units in Boss dropdown
+**File: `src/components/HeadquartersInfoPanel.tsx`**
+- In the Deployed Units list (lines 499-523), expand each unit's info to show key stats from `soldierStats[unit.id]`: loyalty, training, toughness, victories, racketeering
+- Display as a compact row of stat badges beneath the unit name/district line
+- Only show stats for soldiers (not capos, which have different stat tracking)
 
-3. **Show "All clear" when empty** — display a small "No suspects detected" message instead of hiding entirely.
-
-4. **Remove the old standalone Purge Ranks section** (lines 978-1040) since it's now inside the Boss actions block.
-
-### Result
-When clicking your HQ, the Boss actions area will show: Diplomacy, Call a Sitdown, Declare War, Go to Mattresses, War Summit, and Purge Ranks — all in one place. Purge Ranks shows "No suspects detected" when empty, or lists flagged soldiers with Eliminate buttons when present.
+### Files Modified
+1. `src/types/game-mechanics.ts` — 1-line edit to `isCapoPromotionEligible`
+2. `src/components/CapoPromotionPanel.tsx` — Add loyalty requirement display line
+3. `src/components/HeadquartersInfoPanel.tsx` — Add stat badges to deployed unit entries
 
