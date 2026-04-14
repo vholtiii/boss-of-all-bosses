@@ -884,6 +884,56 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             </div>
           );
         })()}
+
+        {/* Incoming Sitdowns (AI-requested) */}
+        {(() => {
+          const incoming = (gameState as any).incomingSitdowns || [];
+          if (incoming.length === 0) return null;
+          const dealLabels: Record<string, string> = { ceasefire: '🕊️ Ceasefire', alliance: '⚖️ Alliance', supply_deal: '🚚 Supply Deal', safe_passage: '🛤️ Safe Passage' };
+          return (
+            <div className="mt-2 flex flex-wrap gap-2 items-center">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Incoming:</span>
+              {incoming.map((s: any) => {
+                const turnsLeft = s.expiresOnTurn - gameState.turn;
+                const famLabel = s.fromFamily.charAt(0).toUpperCase() + s.fromFamily.slice(1);
+                return (
+                  <div 
+                    key={s.id}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded border bg-primary/10 border-primary/30 text-xs animate-pulse"
+                  >
+                    <span>📩</span>
+                    <span className="font-medium capitalize">{famLabel}</span>
+                    <span className="text-muted-foreground">—</span>
+                    <span>{dealLabels[s.proposedDeal] || s.proposedDeal}</span>
+                    <span className="text-[10px] text-muted-foreground">({turnsLeft}t)</span>
+                    <span className="text-[10px] text-primary">+{s.successBonus}%</span>
+                    <button
+                      className="ml-1 px-1.5 py-0.5 rounded bg-primary/80 hover:bg-primary text-primary-foreground text-[10px] font-bold transition-colors"
+                      onClick={() => {
+                        // For ceasefire/alliance (boss-level), open boss negotiation dialog
+                        setNegotiationState({
+                          open: true,
+                          scope: 'family',
+                          targetFamily: s.fromFamily,
+                        });
+                        // Store the sitdown info for the accept handler
+                        (window as any).__pendingIncomingSitdown = s;
+                      }}
+                    >
+                      Accept
+                    </button>
+                    <button
+                      className="px-1.5 py-0.5 rounded bg-destructive/80 hover:bg-destructive text-destructive-foreground text-[10px] font-bold transition-colors"
+                      onClick={() => performAction({ type: 'decline_incoming_sitdown', sitdownId: s.id })}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
       
       {/* Center - Resources */}
