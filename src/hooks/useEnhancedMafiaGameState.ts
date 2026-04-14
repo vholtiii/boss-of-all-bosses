@@ -5572,46 +5572,95 @@ export const useEnhancedMafiaGameState = (
         const hasCeasefire = state.ceasefires.some(c => c.active && c.family === fam);
         const hasAlliance = (state.alliances || []).some(a => a.alliedFamily === fam && a.active);
         const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
+        // Check if there's already an incoming sitdown from this family
+        const hasIncoming = (state.incomingSitdowns || []).some(s => s.fromFamily === fam);
+        
+        const pushSitdown = (deal: IncomingSitdown['proposedDeal']) => {
+          state.incomingSitdowns = state.incomingSitdowns || [];
+          state.incomingSitdowns.push({
+            id: `sitdown-${fam}-${state.turn}-${Math.random().toString(36).slice(2)}`,
+            fromFamily: fam,
+            proposedDeal: deal,
+            turnRequested: state.turn,
+            expiresOnTurn: state.turn + 2,
+            successBonus: 15,
+          });
+          const dealLabel = deal === 'ceasefire' ? 'Ceasefire' : deal === 'alliance' ? 'Alliance' : deal === 'supply_deal' ? 'Supply Deal' : 'Safe Passage';
+          state.pendingNotifications.push({
+            type: 'info' as const,
+            title: `📩 ${famLabel} Requests Sitdown`,
+            message: `The ${famLabel} family wants to discuss a ${dealLabel}. Accept or decline in the Incoming Sitdowns panel.`,
+          });
+        };
         
         // Diplomatic: ceasefire at Phase 2+, alliance at Phase 3+ if relationship > 30
-        if (personality === 'diplomatic') {
+        if (personality === 'diplomatic' && !hasIncoming) {
           if (aiPhase >= 2 && !hasCeasefire && Math.random() < (cooperation / 150)) {
-            state.pendingNotifications.push({
-              type: 'info' as const,
-              title: `🤝 ${famLabel} Offers Ceasefire`,
-              message: `The ${fam} family signals they want to negotiate peace. Use a Capo to propose a ceasefire on their territory.`,
-            });
-            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in ceasefire' });
+            pushSitdown('ceasefire');
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire' });
           } else if (aiPhase >= 3 && !hasAlliance && hasCeasefire && (opponent.relationships?.[state.playerFamily] || 0) > 30 && Math.random() < 0.2) {
-            state.pendingNotifications.push({
-              type: 'info' as const,
-              title: `🤝 ${famLabel} Proposes Alliance`,
-              message: `The ${fam} family is interested in forming an alliance. Use a Capo to negotiate on their territory.`,
-            });
-            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in alliance' });
+            pushSitdown('alliance');
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for alliance' });
           }
         }
         // Defensive: ceasefire at Phase 3+
-        else if (personality === 'defensive') {
+        else if (personality === 'defensive' && !hasIncoming) {
           if (aiPhase >= 3 && !hasCeasefire && Math.random() < (cooperation / 200)) {
-            state.pendingNotifications.push({
-              type: 'info' as const,
-              title: `🤝 ${famLabel} Offers Ceasefire`,
-              message: `The ${fam} family signals they want to negotiate peace. Use a Capo to propose a ceasefire on their territory.`,
-            });
-            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in ceasefire' });
+            pushSitdown('ceasefire');
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire' });
           }
         }
         // Opportunistic: ceasefire if losing territory
-        else if (personality === 'opportunistic') {
+        else if (personality === 'opportunistic' && !hasIncoming) {
           const aiHexCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
           if (aiPhase >= 2 && !hasCeasefire && aiHexCount < 6 && Math.random() < 0.3) {
+            pushSitdown('ceasefire');
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire (losing ground)' });
+          }
+        }
+        // Aggressive: ceasefire only when losing badly (< 4 hexes)
+        else if (personality === 'aggressive' && !hasIncoming) {
+          const aiHexCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
+          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < 4 && Math.random() < 0.2) {
+            pushSitdown('ceasefire');
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire (desperate)' });
+          }
+        }
+      }
+
+      // ── AI-to-AI DIPLOMACY: Auto-resolve ceasefires between AI families ──
+      if (!atWarWithPlayer) {
+        const otherAIs = state.aiOpponents.filter(o => o.family !== fam && !(state.eliminatedFamilies || []).includes(o.family));
+        for (const otherOpp of otherAIs) {
+          const otherFam = otherOpp.family;
+          if (areFamiliesAtWar(state, fam, otherFam)) continue;
+          const pairKey = getTensionPairKey(fam, otherFam);
+          const existingPact = state.ceasefires.some(c => c.active && (
+            (c.family === fam && state.playerFamily !== otherFam) || 
+            (c.family === otherFam && state.playerFamily !== fam)
+          ));
+          // AI-AI ceasefires stored as a ceasefire on the lower-sorted family name
+          const aiCeasefireExists = (state as any)._aiAiCeasefires?.includes(pairKey);
+          if (existingPact || aiCeasefireExists) continue;
+          
+          const otherPersonality = otherOpp.personality || 'aggressive';
+          const bothDiplomatic = (personality === 'diplomatic' || personality === 'defensive') && 
+                                (otherPersonality === 'diplomatic' || otherPersonality === 'defensive');
+          if (bothDiplomatic && Math.random() < 0.08) {
+            // Auto-resolve: form ceasefire between AI families (reduce tension)
+            addPairTension(state, fam, otherFam, -TENSION_REDUCE_CEASEFIRE);
+            state.tensionCooldowns[pairKey] = 3;
+            const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
+            const otherLabel = otherFam.charAt(0).toUpperCase() + otherFam.slice(1);
             state.pendingNotifications.push({
               type: 'info' as const,
-              title: `🤝 ${famLabel} Offers Ceasefire`,
-              message: `The ${fam} family signals they want to negotiate peace. Use a Capo to propose a ceasefire on their territory.`,
+              title: `🕊️ ${famLabel}-${otherLabel} Ceasefire`,
+              message: `The ${famLabel} and ${otherLabel} families have agreed to a ceasefire.`,
             });
-            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in ceasefire (losing ground)' });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: `Formed ceasefire with ${otherFam}` });
+            // Track to avoid duplicates (transient, not persisted)
+            (state as any)._aiAiCeasefires = (state as any)._aiAiCeasefires || [];
+            (state as any)._aiAiCeasefires.push(pairKey);
           }
         }
       }
