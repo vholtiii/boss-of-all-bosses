@@ -2254,6 +2254,8 @@ export const useEnhancedMafiaGameState = (
       };
     }
 
+    if (dist < 1 || dist > maxScoutRange) return prev;
+
     // Front Boss blocking: if target hex is hidden by another family, block the scout
     const frontBossBlock = (prev.frontBossHexes || []).find(h => 
       h.q === targetLocation.q && h.r === targetLocation.r && h.s === targetLocation.s && h.ownerFamily !== prev.playerFamily
