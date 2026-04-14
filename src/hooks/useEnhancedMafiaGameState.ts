@@ -7483,6 +7483,7 @@ export const useEnhancedMafiaGameState = (
                 ss.loyalty = Math.min(cap, ss.loyalty + PURGE_CONFIRMED_LOYALTY_BOOST);
               }
             }
+            newState.combatLog = [...(newState.combatLog || []), `🔫 Rat eliminated: ${targetUnit.name || 'soldier'} was a confirmed informant. +${PURGE_CONFIRMED_FEAR} fear, +${PURGE_CONFIRMED_HEAT} heat.`];
             newState.pendingNotifications.push({
               type: 'success', title: '🔫 Rat Eliminated',
               message: `The family dealt with a rat in the ranks. +${PURGE_CONFIRMED_FEAR} fear, +${PURGE_CONFIRMED_HEAT} heat. Low-loyalty soldiers are intimidated into compliance.`,
@@ -7500,6 +7501,7 @@ export const useEnhancedMafiaGameState = (
                 ss.loyalty = Math.max(0, ss.loyalty - PURGE_INNOCENT_LOYALTY_PENALTY);
               }
             }
+            newState.combatLog = [...(newState.combatLog || []), `💀 Wrongful kill: ${targetUnit.name || 'soldier'} was innocent. -${PURGE_INNOCENT_RESPECT_LOSS} respect, all soldiers -${PURGE_INNOCENT_LOYALTY_PENALTY} loyalty.`];
             newState.pendingNotifications.push({
               type: 'error', title: '💀 Wrongful Elimination',
               message: `A loyal soldier was wrongfully eliminated. The family questions your judgment. -${PURGE_INNOCENT_RESPECT_LOSS} respect, all soldiers -${PURGE_INNOCENT_LOYALTY_PENALTY} loyalty.`,
