@@ -275,6 +275,107 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'extort_business', amount: 5000 })}
             />
+
+            {/* ── Purge Ranks ── */}
+            {(() => {
+              const soldierStats = (gameState as any).soldierStats || {};
+              const playerUnits = (gameState.deployedUnits || []).filter(
+                (u: any) => u.family === gameState.playerFamily && (u.type === 'soldier' || u.type === 'capo')
+              );
+              const flaggedSoldiers = playerUnits.filter((u: any) => {
+                const stats = soldierStats[u.id];
+                return stats && (stats.suspicious || stats.confirmedRat);
+              });
+              const flaggedCount = flaggedSoldiers.length;
+              const canEliminate = !actionsLocked && gameState.actionsRemaining > 0;
+              const [purgeOpen, setPurgeOpen] = [
+                openSections.has('purge'),
+                (open: boolean) => setOpenSections(prev => {
+                  const next = new Set(prev);
+                  if (open) next.add('purge'); else next.delete('purge');
+                  return next;
+                })
+              ];
+
+              return (
+                <>
+                  <button
+                    className={cn(
+                      "w-full flex items-center justify-between rounded-md px-3 py-2 text-xs font-medium transition-colors",
+                      "border border-destructive/30 bg-destructive/5 hover:bg-destructive/10 text-foreground",
+                      actionsLocked && "opacity-50 cursor-not-allowed"
+                    )}
+                    disabled={actionsLocked}
+                    onClick={() => setPurgeOpen(!purgeOpen)}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Crosshair className="h-4 w-4 text-destructive" />
+                      🔫 Purge Ranks
+                      {flaggedCount > 0 && (
+                        <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4 min-w-[16px] flex items-center justify-center">
+                          {flaggedCount}
+                        </Badge>
+                      )}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground italic">Action Phase</span>
+                  </button>
+
+                  <AnimatePresence>
+                    {purgeOpen && !actionsLocked && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="rounded-md border border-destructive/20 bg-destructive/5 p-2 space-y-1.5">
+                          {flaggedCount === 0 ? (
+                            <p className="text-[10px] text-muted-foreground text-center py-1">
+                              No suspicious or confirmed rats detected.
+                            </p>
+                          ) : (
+                            flaggedSoldiers.map((u: any) => {
+                              const stats = soldierStats[u.id];
+                              const isRat = stats?.confirmedRat;
+                              return (
+                                <div key={u.id} className="flex items-center justify-between rounded px-2 py-1.5 bg-background/50 border border-border/30">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-sm">{isRat ? '🐀' : '⚠️'}</span>
+                                    <div className="min-w-0">
+                                      <p className="text-[11px] font-medium text-foreground truncate">
+                                        {u.name || u.id.split('-').slice(-2).join(' ')}
+                                      </p>
+                                      <p className="text-[9px] text-muted-foreground">
+                                        Loyalty: {stats?.loyalty ?? '?'} · {isRat ? 'Confirmed Rat' : `Suspicious (${stats?.suspiciousTurns || 0} turns)`}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    className="h-6 px-2 text-[10px]"
+                                    disabled={!canEliminate}
+                                    onClick={() => onAction({ type: 'eliminate_soldier', targetId: u.id })}
+                                  >
+                                    Eliminate
+                                  </Button>
+                                </div>
+                              );
+                            })
+                          )}
+                          {!canEliminate && flaggedCount > 0 && (
+                            <p className="text-[9px] text-destructive/70 text-center">
+                              {actionsLocked ? 'Available during Action phase' : 'No actions remaining'}
+                            </p>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              );
+            })()}
           </div>
         </CollapsibleSection>
 
