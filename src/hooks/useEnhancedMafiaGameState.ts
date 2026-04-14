@@ -7544,8 +7544,7 @@ export const useEnhancedMafiaGameState = (
             return newState;
           }
           // Abandon the hex
-          hex.controllingFamily = null;
-          hex.extpizzo = false;
+          hex.controllingFamily = 'neutral';
           (newState as any).abandonedThisTurn = abandonedCount + 1;
           newState.combatLog = [...(newState.combatLog || []), `🏳️ Abandoned territory at (${hex.q},${hex.r}).`];
           newState.pendingNotifications.push({
