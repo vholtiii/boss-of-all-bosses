@@ -771,7 +771,10 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 { action: 'escort' as const, label: '🚗 Escort', tip: 'Call a soldier to your capo\'s location. Select a soldier, then click a capo.' },
                 { action: 'safehouse' as const, label: '🏠 Safehouse', tip: 'Select a capo on your territory to set up a secondary deploy point (5 turns).' },
                 { action: 'send_word' as const, label: `📩 Send Word (${((gameState as any).pendingNegotiations || []).length})`, tip: 'Select a capo, then click an enemy hex to request a sitdown. Negotiation available next turn.' },
-              ] as const).map(({ action, label, tip }) => {
+              ] as const).filter(({ action }) => {
+                if (action === 'send_word' && ((gameState as any).gamePhase || 1) < 2) return false;
+                return true;
+              }).map(({ action, label, tip }) => {
                 const noTactical = gameState.tacticalActionsRemaining <= 0;
                 const selectedUnit = gameState.selectedUnitId ? (gameState.deployedUnits || []).find((u: any) => u.id === gameState.selectedUnitId) : null;
                 const isSoldier = selectedUnit?.type === 'soldier';

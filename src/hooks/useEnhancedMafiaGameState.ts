@@ -1610,6 +1610,7 @@ export const useEnhancedMafiaGameState = (
         }
 
         if (moveAction === 'send_word') {
+          if ((prev as any).gamePhase < 2) return prev;
           if (prev.tacticalActionsRemaining <= 0) return prev;
           if (unitType !== 'capo') return prev;
           if ((unit as any).woundedTurnsRemaining > 0) return prev;
@@ -1849,6 +1850,7 @@ export const useEnhancedMafiaGameState = (
 
       // Handle "Send Word" action (tactical phase only) — capo requests negotiation on enemy hex
       if (prev.turnPhase === 'move' && moveAction === 'send_word' && unit.type === 'capo') {
+        if ((prev as any).gamePhase < 2) return prev;
         if (prev.tacticalActionsRemaining <= 0) return prev;
         const targetTile = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
         if (!targetTile || targetTile.controllingFamily === prev.playerFamily || targetTile.controllingFamily === 'neutral' || targetTile.isHeadquarters) return prev;
