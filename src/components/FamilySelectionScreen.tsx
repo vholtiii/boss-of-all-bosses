@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import mafiaSitdownBg from '@/assets/mafia-sitdown-bg.png';
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -253,7 +254,16 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const activeFamily = families.find(f => f.id === selectedFamily);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 overflow-hidden relative">
+    <div
+      className="min-h-screen bg-background flex flex-col items-center justify-center p-6 overflow-hidden relative"
+      style={{
+        backgroundImage: `url(${mafiaSitdownBg})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
+      {/* Dark overlay for readability */}
+      <div className="absolute inset-0 bg-black/70 z-0" />
       {/* Atmospheric particles */}
       <AtmosphericParticles />
 
