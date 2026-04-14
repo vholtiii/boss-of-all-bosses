@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
