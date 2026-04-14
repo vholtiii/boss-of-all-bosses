@@ -2733,6 +2733,7 @@ export const useEnhancedMafiaGameState = (
       newState.availableMoveHexes = [];
       newState.deployMode = null;
       newState.availableDeployHexes = [];
+      (newState as any).abandonedThisTurn = 0;
 
       // ============ HIDDEN UNITS RETURN / INTERNAL HIT CHECK ============
       const returningUnits = newState.hiddenUnits.filter(h => newState.turn >= h.returnsOnTurn);
