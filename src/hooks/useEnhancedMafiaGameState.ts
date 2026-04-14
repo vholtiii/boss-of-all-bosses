@@ -1896,6 +1896,7 @@ export const useEnhancedMafiaGameState = (
             resources: { ...prev.resources, respect: newRespect },
             combatLog: newCombatLog,
             pendingNotifications: newNotifications,
+            lastCombatResult: { success: true, type: 'hit' as const, timestamp: Date.now() },
           };
         }
 
