@@ -253,6 +253,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     frontBossHexes: (state.frontBossHexes || []).map(h => ({ ...h })),
     luccheseBoostedDistrict: state.luccheseBoostedDistrict ? { ...state.luccheseBoostedDistrict } : null,
     bonannoPurgeImmunity: (state.bonannoPurgeImmunity || []).map(i => ({ ...i })),
+    incomingSitdowns: (state.incomingSitdowns || []).map(s => ({ ...s })),
   });
 
 // ============ UNIT TYPES ============
