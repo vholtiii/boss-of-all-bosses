@@ -99,6 +99,7 @@ interface HeadquartersInfoPanelProps {
   activeWars?: Array<{ family1: string; family2: string; turnsRemaining: number }>;
   actionsRemaining?: number;
   gamePhase?: number;
+  flippedSoldiers?: Array<{ unitId: string; family: string; flippedByFamily: string; hqQ: number; hqR: number; hqS: number }>;
 }
 
 const familyColors: Record<string, string> = {
@@ -152,6 +153,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   activeWars = [],
   actionsRemaining = 0,
   gamePhase = 1,
+  flippedSoldiers = [],
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
