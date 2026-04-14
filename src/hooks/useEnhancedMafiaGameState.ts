@@ -2965,12 +2965,19 @@ export const useEnhancedMafiaGameState = (
         return (newState.turn - f.abandonedSinceTurn) < FORTIFY_ABANDON_TURNS; // Remove if abandoned too long
       });
 
-      // --- Training increment & individual soldier loyalty (per-turn) ---
+      // --- Training increment & individual soldier loyalty (per-turn summed delta) ---
       const maintenanceUnpaid = (() => {
         const pSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
         let maint = pSoldiers.length * SOLDIER_MAINTENANCE;
         return newState.resources.money < maint;
       })();
+
+      // Helper: hex distance for capo aura
+      const hexDistance = (a: { q: number; r: number; s: number }, b: { q: number; r: number; s: number }) =>
+        Math.max(Math.abs(a.q - b.q), Math.abs(a.r - b.r), Math.abs(a.s - b.s));
+
+      // Collect capo positions per family for aura check
+      const familyCapos = newState.deployedUnits.filter(u => u.type === 'capo');
 
       newState.deployedUnits.forEach(u => {
         const stats = newState.soldierStats[u.id];
@@ -2982,26 +2989,79 @@ export const useEnhancedMafiaGameState = (
           stats.turnsDeployed += 1;
         }
 
-        // === Individual soldier loyalty: stats-correlated baseline ===
-        const baseline = Math.floor((stats.training + stats.toughness + stats.racketeering + stats.victories) / 4);
-        stats.loyalty += baseline;
+        // === SUMMED LOYALTY DELTA ===
+        let loyaltyDelta = 0;
 
-        // === +3 if on high-income hex ===
-        if (u.family === newState.playerFamily) {
-          const hex = newState.hexMap.find(t => t.q === u.q && t.r === u.r && t.s === u.s);
-          if (hex?.business && hex.business.income >= LOYALTY_INCOME_HEX_THRESHOLD) {
-            stats.loyalty += LOYALTY_INCOME_HEX_BONUS;
+        // 1. Stats baseline: only if soldier acted this turn
+        if (stats.actedThisTurn) {
+          const baseline = Math.floor((stats.training + stats.toughness + stats.racketeering + stats.victories) / 4);
+          loyaltyDelta += baseline;
+        }
+
+        // 2. High-income hex bonus (+3)
+        const hex = newState.hexMap.find(t => t.q === u.q && t.r === u.r && t.s === u.s);
+        if (hex?.business && hex.business.income >= LOYALTY_INCOME_HEX_THRESHOLD) {
+          loyaltyDelta += LOYALTY_INCOME_HEX_BONUS;
+        }
+
+        // 3. Capo aura: +2 if friendly capo within range
+        if (u.type === 'soldier') {
+          const nearCapo = familyCapos.some(c => c.family === u.family && hexDistance(c, u) <= LOYALTY_CAPO_AURA_RANGE);
+          if (nearCapo) loyaltyDelta += LOYALTY_CAPO_AURA;
+        }
+
+        // 4. HQ comfort: +1 if at HQ
+        if (atHQ) loyaltyDelta += LOYALTY_HQ_COMFORT;
+
+        // 5. Local recruit early bonus: +1/turn for first N turns
+        if (!stats.isMercenary && stats.turnsDeployed <= LOYALTY_RECRUIT_EARLY_TURNS) {
+          loyaltyDelta += LOYALTY_RECRUIT_EARLY_BONUS;
+        }
+
+        // === LOSSES ===
+
+        // 6. Idle decay: -2 if idle for 2+ consecutive turns
+        if (stats.turnsIdle >= LOYALTY_IDLE_THRESHOLD) {
+          loyaltyDelta -= LOYALTY_IDLE_DECAY;
+        }
+
+        // 7. Maintenance unpaid: -3
+        if (maintenanceUnpaid && u.family === newState.playerFamily) {
+          loyaltyDelta -= LOYALTY_UNPAID_PENALTY;
+        }
+
+        // 8. Enemy territory exposure: -2 if on or adjacent to enemy hex
+        if (hex) {
+          const isEnemyHex = hex.controllingFamily !== 'neutral' && hex.controllingFamily !== u.family;
+          const neighbors = getHexNeighbors(u.q, u.r, u.s);
+          const hasEnemyAdjacent = neighbors.some(n => {
+            const nh = newState.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+            return nh && nh.controllingFamily !== 'neutral' && nh.controllingFamily !== u.family;
+          });
+          if (isEnemyHex || hasEnemyAdjacent) {
+            loyaltyDelta -= LOYALTY_ENEMY_TERRITORY_PENALTY;
           }
         }
 
-        // === -2 when unpaid ===
-        if (maintenanceUnpaid && u.family === newState.playerFamily) {
-          stats.loyalty -= LOYALTY_UNPAID_PENALTY;
+        // 9. Neutral hex penalty: -2 if on neutral hex
+        if (hex && hex.controllingFamily === 'neutral') {
+          loyaltyDelta -= LOYALTY_NEUTRAL_HEX_PENALTY;
         }
 
-        // Enforce loyalty caps & floor
+        // Apply summed delta
+        stats.loyalty += loyaltyDelta;
+
+        // Enforce loyalty caps & floor (mercenary cap at 70, recruit at 80, capo at 99)
         const isCapo = u.type === 'capo';
-        stats.loyalty = Math.max(0, Math.min(isCapo ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP, stats.loyalty));
+        const cap = isCapo ? CAPO_LOYALTY_CAP : (stats.isMercenary ? LOYALTY_MERC_CAP : SOLDIER_LOYALTY_CAP);
+        stats.loyalty = Math.max(0, Math.min(cap, stats.loyalty));
+
+        // Turn tracking: increment turnsIdle (reset happens in action handlers)
+        if (!stats.actedThisTurn) {
+          stats.turnsIdle = (stats.turnsIdle || 0) + 1;
+        }
+        // Reset actedThisTurn for next turn
+        stats.actedThisTurn = false;
       });
 
       // Tick scouted hexes
