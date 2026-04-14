@@ -7438,6 +7438,9 @@ export const useEnhancedMafiaGameState = (
           toughnessMsg = ` 💪 Soldier toughness increased to ${sStats.toughness}!`;
         }
       }
+      // Mark claiming soldier as active
+      sStats.actedThisTurn = true;
+      sStats.turnsIdle = 0;
     }
 
     state.pendingNotifications = [...state.pendingNotifications, {
