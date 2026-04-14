@@ -529,6 +529,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               <div className="text-sm font-bold text-destructive">🚨 RICO {gameState.ricoTimer}/5</div>
             </motion.div>
           )}
+          {(gameState as any).prosecutionTimer > 0 && (
+            <motion.div
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="text-center px-3 py-1 rounded-lg bg-orange-500/20 border border-orange-500/40"
+            >
+              <div className="text-sm font-bold text-orange-400">⚖️ PROSECUTION {(gameState as any).prosecutionTimer}/3</div>
+            </motion.div>
+          )}
           <div className="text-center">
             <div className="text-sm font-medium text-green-400">Commission Active</div>
             <motion.div
