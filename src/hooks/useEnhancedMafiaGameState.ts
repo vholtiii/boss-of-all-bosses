@@ -83,6 +83,7 @@ import {
   COMMISSION_VOTE_RELATIONSHIP_THRESHOLD, COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY,
   // Family Power System
   FAMILY_POWERS, FamilyPower, FrontBossHex, LuccheseBoostedDistrict, BonannoPurgeImmunity,
+  IncomingSitdown,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
