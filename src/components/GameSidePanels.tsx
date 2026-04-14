@@ -37,6 +37,7 @@ import HitmanPanel from '@/components/HitmanPanel';
 import CapoPromotionPanel from '@/components/CapoPromotionPanel';
 import CorruptionPanel from '@/components/CorruptionPanel';
 import VictoryTracker from '@/components/VictoryTracker';
+import PhaseInfographic from '@/components/PhaseInfographic';
 import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType, SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, Safehouse, getTensionPairKey, WAR_TENSION_THRESHOLD, FAMILY_POWERS } from '@/types/game-mechanics';
 import { Anchor, Wrench, Truck, Wine, Fish, Package, Link2 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
@@ -1007,6 +1008,17 @@ export const RightSidePanel: React.FC<{
             ))}
           </div>
         </div>
+
+        {/* ── Phase Progression ── */}
+        <PhaseInfographic
+          gamePhase={(gameState as any).gamePhase || 1}
+          turn={gameState.turn}
+          hexMap={gameState.hexMap}
+          resources={gameState.resources}
+          units={gameState.deployedUnits || []}
+          aiOpponents={gameState.aiOpponents}
+          playerFamily={gameState.playerFamily}
+        />
 
         {/* ── Events ── */}
         {gameState.events.length > 0 && (
