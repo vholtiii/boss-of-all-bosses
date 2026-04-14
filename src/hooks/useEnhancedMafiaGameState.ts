@@ -2210,7 +2210,49 @@ export const useEnhancedMafiaGameState = (
     if (tile.isHeadquarters) return prev;
     const dist = hexDistance(unit, targetLocation);
     const maxScoutRange = unit.type === 'capo' ? 2 : 1;
-    if (dist < 1 || dist > maxScoutRange) return prev;
+
+    // === SELF-SCOUT: scouting own hex reveals if soldier is a confirmed rat ===
+    if (tile.controllingFamily === prev.playerFamily) {
+      if (dist > maxScoutRange) return prev;
+      const unitsOnHex = prev.deployedUnits.filter(u => 
+        u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s && 
+        u.family === prev.playerFamily && u.type === 'soldier' && u.id !== unit.id
+      );
+      if (unitsOnHex.length === 0) {
+        return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
+          type: 'info' as const, title: '👁️ Self-Scout', message: 'No other soldiers on this hex to investigate.',
+        }]};
+      }
+      const newState = cloneStateForMutation(prev);
+      const notifications = [...newState.pendingNotifications];
+      let foundRat = false;
+      for (const target of unitsOnHex) {
+        const isRat = (newState.copFlippedSoldiers || []).some(c => c.unitId === target.id);
+        const stats = newState.soldierStats[target.id];
+        if (stats) {
+          if (isRat) {
+            stats.confirmedRat = true;
+            foundRat = true;
+            notifications.push({
+              type: 'error' as const, title: '🐀 RAT CONFIRMED!',
+              message: `${target.name || 'Soldier'} is a police informant! You can eliminate them via Purge Ranks.`,
+            });
+          } else {
+            // Clear suspicion if scouted and clean
+            stats.suspicious = false;
+            stats.suspiciousTurns = 0;
+            notifications.push({
+              type: 'success' as const, title: '✅ Soldier Clean',
+              message: `${target.name || 'Soldier'} is not an informant.`,
+            });
+          }
+        }
+      }
+      return {
+        ...newState, pendingNotifications: notifications,
+        selectedUnitId: null, availableMoveHexes: [],
+      };
+    }
 
     // Front Boss blocking: if target hex is hidden by another family, block the scout
     const frontBossBlock = (prev.frontBossHexes || []).find(h => 
