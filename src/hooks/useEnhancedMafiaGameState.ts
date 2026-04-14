@@ -7439,6 +7439,74 @@ export const useEnhancedMafiaGameState = (
             }
           }
           break;
+
+        case 'eliminate_soldier': {
+          // Purge Ranks: eliminate a suspicious or confirmed rat soldier
+          if (newState.turnPhase !== 'action') {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Wrong Phase', message: 'Purge Ranks is only available during the Action phase.' });
+            return newState;
+          }
+          if (newState.actionsRemaining <= 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ No Actions Remaining', message: 'You have used all your actions this turn.' });
+            return newState;
+          }
+          const targetId = action.targetId as string;
+          const targetUnit = newState.deployedUnits.find(u => u.id === targetId && u.family === newState.playerFamily);
+          if (!targetUnit) {
+            newState.pendingNotifications.push({ type: 'error', title: '⚠️ Target Not Found', message: 'Could not find the target soldier.' });
+            return newState;
+          }
+          const targetStats = newState.soldierStats[targetId];
+          if (!targetStats || (!targetStats.suspicious && !targetStats.confirmedRat)) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Invalid Target', message: 'This soldier is neither suspicious nor a confirmed rat.' });
+            return newState;
+          }
+
+          const isActualRat = (newState.copFlippedSoldiers || []).some(c => c.unitId === targetId);
+
+          // Remove soldier
+          newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== targetId);
+          delete newState.soldierStats[targetId];
+          newState.copFlippedSoldiers = (newState.copFlippedSoldiers || []).filter(c => c.unitId !== targetId);
+          newState.actionsRemaining -= 1;
+
+          if (isActualRat) {
+            // Confirmed rat — clean removal
+            newState.reputation.fear = Math.min(100, (newState.reputation.fear || 0) + PURGE_CONFIRMED_FEAR);
+            newState.policeHeat.level = Math.min(100, newState.policeHeat.level + PURGE_CONFIRMED_HEAT);
+            // Loyalty boost to soldiers below 50
+            const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+            for (const s of playerSoldiers) {
+              const ss = newState.soldierStats[s.id];
+              if (ss && ss.loyalty < 50) {
+                const cap = ss.isMercenary ? LOYALTY_MERC_CAP : SOLDIER_LOYALTY_CAP;
+                ss.loyalty = Math.min(cap, ss.loyalty + PURGE_CONFIRMED_LOYALTY_BOOST);
+              }
+            }
+            newState.pendingNotifications.push({
+              type: 'success', title: '🔫 Rat Eliminated',
+              message: `The family dealt with a rat in the ranks. +${PURGE_CONFIRMED_FEAR} fear, +${PURGE_CONFIRMED_HEAT} heat. Low-loyalty soldiers are intimidated into compliance.`,
+            });
+          } else {
+            // Innocent soldier — wrongful kill
+            newState.reputation.fear = Math.min(100, (newState.reputation.fear || 0) + PURGE_INNOCENT_FEAR);
+            newState.policeHeat.level = Math.min(100, newState.policeHeat.level + PURGE_INNOCENT_HEAT);
+            syncRespect(newState, Math.max(0, newState.resources.respect - PURGE_INNOCENT_RESPECT_LOSS));
+            // Loyalty penalty to ALL soldiers
+            const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+            for (const s of playerSoldiers) {
+              const ss = newState.soldierStats[s.id];
+              if (ss) {
+                ss.loyalty = Math.max(0, ss.loyalty - PURGE_INNOCENT_LOYALTY_PENALTY);
+              }
+            }
+            newState.pendingNotifications.push({
+              type: 'error', title: '💀 Wrongful Elimination',
+              message: `A loyal soldier was wrongfully eliminated. The family questions your judgment. -${PURGE_INNOCENT_RESPECT_LOSS} respect, all soldiers -${PURGE_INNOCENT_LOYALTY_PENALTY} loyalty.`,
+            });
+          }
+          break;
+        }
       }
 
       // Finance values are computed by processEconomy at end of turn — no legacy recalculation here
