@@ -1,26 +1,19 @@
 
 
-# Fix: Loyalty Bar Showing Hardcoded 75 Instead of Average Soldier Loyalty
+# Fix: Gate "Send Word" Behind Phase 2+
 
 ## Problem
-The "Loyalty" status bar in the left panel (`GameSidePanels.tsx`, line 103) displays `reputation.loyalty`, which is a family-level value hardcoded to 75 at game start. It does not reflect actual individual soldier loyalty values.
+The "Send Word" tactical action button is visible and usable in Phase 1, but per game rules it should only unlock at Phase 2+ (Turn 9+, 8+ hexes, 20+ respect).
 
-Per the game's own design (documented in the loyalty system memory), the global Loyalty Bar should show the **mean average** of all deployed units' individual loyalty.
+## Changes
 
-## Fix
+### 1. `src/pages/UltimateMafiaGame.tsx` (~lines 768-773)
+- Add a phase check: filter out or disable the `send_word` action when `gamePhase < 2`
+- Approach: add a `hidden` or `phase` property to the action config array, and skip rendering `send_word` when `gp < 2` (where `gp` is already computed at line 897)
+- Since `gp` is computed after this block, either move the `gp` computation earlier or inline the check as `((gameState as any).gamePhase || 1) < 2`
 
-### 1. `src/components/GameSidePanels.tsx` (~line 103)
-- Instead of `reputation.loyalty`, compute the average loyalty from `soldierStats` across all deployed soldier IDs
-- Fallback to `reputation.loyalty` if no soldiers are deployed
-- This requires `soldierStats` and deployed unit IDs to be available in scope (they're already passed to this component or accessible from `gameState`)
+### 2. `src/hooks/useEnhancedMafiaGameState.ts` (~lines 1612, 1851)
+- Add a backend guard: in both `send_word` handler blocks, return early if `prev.gamePhase < 2` to prevent the action even if the UI is bypassed
 
-### 2. Verify `soldierStats` is available in GameSidePanels
-- Check if it's already a prop or needs to be passed down
-- If not available, pass it from the parent component
-
-### 3. Update `reputation.loyalty` sync (optional but recommended)
-- In `useEnhancedMafiaGameState.ts`, update `reputation.loyalty` each turn to match the computed average so the value stays consistent everywhere it's referenced
-
-## Result
-The Loyalty bar will show the true average loyalty of your soldiers (e.g., 50 if all soldiers are at 50) instead of the static 75.
+Two files, three small guard additions.
 
