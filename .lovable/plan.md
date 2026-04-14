@@ -1,33 +1,43 @@
 
 
-# Flip Soldier Proximity Rework — Capo-Only, 3-Hex Range
+# Flip Soldier Rework — Remaining 5 Items
 
-## Summary
-Change the Flip Soldier mechanic so that **only capos** can initiate it, from **within 3 hexes** of the enemy HQ. The target pool becomes any enemy soldier **within 1-2 hexes of the acting capo** (not tied to HQ proximity). This makes capos the intelligence operatives and adds tactical positioning depth.
+## 1. Target Selection UI (`EnhancedMafiaHexGrid.tsx`)
+Instead of randomly picking a target when clicking "Flip Soldier", show a picker popup (reuse the `planHitUnitMenu` pattern):
+- New state: `flipTargetMenu` with tile, acting capo, and eligible enemy soldiers
+- Clicking "🐀 Flip Soldier (Capo)" opens the picker instead of dispatching immediately
+- Each target row shows: soldier name, loyalty bar (color-coded), success chance %, and cost
+- Clicking a target dispatches `flip_soldier` with `targetUnitId` added to the action payload
+- Cancel button to dismiss
 
-## Changes
+## 2. Escalating Cost (`game-mechanics.ts` + `useEnhancedMafiaGameState.ts`)
+- Add constants: `FLIP_SOLDIER_BASE_COST = 5000`, `FLIP_SOLDIER_COST_ESCALATION = 3000`
+- Rename existing `FLIP_SOLDIER_COST` to `FLIP_SOLDIER_BASE_COST` or replace usage
+- Cost formula: `base + (currentFlippedCount * escalation)` — $5K, $8K, $11K...
+- Update `processFlipSoldier` to compute dynamic cost
+- Update AI flip logic to use dynamic cost
+- Show current cost in the context menu label and target picker
 
-### 1. UI Gate — `EnhancedMafiaHexGrid.tsx`
-**Line ~488**: Change `canFlipSoldier` condition:
-- Old: `isEnemyHQ && isAdjacentToHQ && currentGamePhase >= 3`
-- New: Player has a **capo** within 3 hexes of the enemy HQ tile being clicked, and phase >= 3
-- Update the context menu button label to reflect capo requirement (e.g., "🐀 Flip Soldier (Capo)")
+## 3. Counter-Intel Discovery (`useEnhancedMafiaGameState.ts`)
+- In turn processing (alongside cop flip processing), iterate player-flipped soldiers (`flippedSoldiers`)
+- Each has `COP_FLIP_DISCOVERY_CHANCE` (8%) per turn of being discovered
+- If discovered: remove from `flippedSoldiers`, remove unit from `deployedUnits`, push notification
+- Apply to AI-flipped soldiers too (symmetric)
 
-### 2. Backend Logic — `useEnhancedMafiaGameState.ts`
-**`processFlipSoldier` (~line 7418)**:
-- Replace `hasAdjacentUnit` check: require a player **capo** within 3 hexes of target HQ (`hexDistance <= 3`)
-- Identify which capo is acting (closest eligible capo to the HQ)
-- Change target pool: instead of enemy soldiers within 1 hex of HQ, find enemy soldiers within **2 hexes of the acting capo**
-- Keep all other logic (cost, chance modifiers, schemer bonus, etc.)
+## 4. Rat Icon on Map (`EnhancedMafiaHexGrid.tsx`)
+- After rendering each soldier group, check if any soldier in that group is in the player's `flippedSoldiers`
+- If yes, render a small 🐀 text element offset below-right of the soldier icon (opacity 0.7)
+- Only visible for soldiers flipped BY the player (not visible on the player's own compromised soldiers)
 
-### 3. AI Flip Logic — `useEnhancedMafiaGameState.ts`
-**AI flip section (~line 5413)**: Update AI flip attempts to also require a capo within 3 hexes of the target HQ and target soldiers near the capo, matching the new rules.
+## 5. HQ Tracking Panel (`HeadquartersInfoPanel.tsx`)
+- Add `flippedSoldiers` to props
+- When viewing an enemy HQ, show a "🐀 Flipped Assets" section
+- Display count of flipped soldiers at that HQ and cumulative defense reduction (count x 10%)
+- Show "No assets" in muted text when zero
 
-### 4. Disabled Reason Text
-Update the disabled action reason when the option is unavailable:
-- No capo within 3 hexes: "Need a Capo within 3 hexes of enemy HQ"
-- Phase locked: stays as "🔒 Unlocks in Phase 3"
-
-## No Other Files Changed
-Types and constants remain the same. The target picker UI (from the rework plan) will use the new capo-based target pool when implemented.
+## Files Changed
+1. `src/types/game-mechanics.ts` — Add escalation constant, keep base cost
+2. `src/hooks/useEnhancedMafiaGameState.ts` — Escalating cost, counter-intel discovery in turn processing, accept `targetUnitId` in flip action
+3. `src/components/EnhancedMafiaHexGrid.tsx` — Target picker popup, rat icon overlay, updated flip button to open picker with cost display
+4. `src/components/HeadquartersInfoPanel.tsx` — Flipped Assets section in enemy HQ view
 
