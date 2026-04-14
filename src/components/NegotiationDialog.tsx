@@ -33,6 +33,7 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   open, onClose, onNegotiate, scope, capoName, capoPersonality,
   enemyFamily, playerReputation, playerFear, playerMoney, enemyStrength, hexIncome,
   negotiationUsedThisTurn, treacheryTurnsRemaining, availableEnemyFamilies, onSelectTargetFamily,
+  successBonus = 0,
 }) => {
   const [selectedType, setSelectedType] = useState<NegotiationType | null>(null);
   const [rolling, setRolling] = useState(false);
