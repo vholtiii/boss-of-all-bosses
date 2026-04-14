@@ -171,6 +171,28 @@ Four business types: Brothel ($3K), Gambling Den ($4K), Loan Sharking ($5K), Sto
 - Influence boosts extortion success (+15%) and bribe success (+12%)
 - Police heat from combat/extortion, reducible via bribe tiers (Patrol Officer → Mayor)
 
+### Prosecution Risk
+Prosecution Risk runs parallel to Police Heat as a dynamic failure condition. Calculated from heat, active informants, recent arrests, minus bribe reductions.
+
+| Threshold | Timer | Consequence |
+|---|---|---|
+| **50+ Risk** | 3 consecutive turns | Random soldier arrested (jailed 5 turns, still costs maintenance) |
+| **60+ Risk** | Immediate | Grand Jury Subpoena — **-30% illegal business profit** |
+| **90+ Risk** | 3 turns to respond | Federal Indictment — pay **$25,000** legal defense or **Game Over**. If paid, 30% cash frozen + illegal businesses suspended 3 turns |
+
+### Counter-Intelligence & Purge Ranks
+Detect and eliminate informants within your ranks:
+
+**Detection Paths:**
+- **Bribed Officials**: Captain (25% chance), Chief (40%), Mayor (100%) reveal rats each turn
+- **Suspicion Markers**: Soldiers with loyalty < 40 for 2+ consecutive turns are flagged as "Suspicious"
+- **Self-Scouting**: Scout your own hexes to check for informants
+
+**Purge Ranks** (Boss Action — 1 Action, Action phase only):
+- Eliminate "Suspicious" or "Confirmed Rat" soldiers from the left panel or HQ panel
+- **Confirmed Rat**: +5 fear, +3 heat, +10 loyalty to low-loyalty soldiers
+- **Innocent Soldier**: +3 fear, +2 heat, -5 loyalty to all soldiers, -3 respect
+
 ### AI Personality Traits
 
 AI families follow the same four-phase gates as the player, with five distinct personality-driven behavior profiles:

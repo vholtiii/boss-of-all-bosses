@@ -204,7 +204,9 @@ Click any headquarters to view:
 - **Business count**: Number of controlled businesses
 - **Deploy actions**: Deploy buttons (player HQ only, deploy phase)
 - **Sitdown button**: Available during action phase (player HQ only)
+- **Purge Ranks**: List of flagged soldiers (Suspicious / Confirmed Rat) with Eliminate buttons. Also accessible from the left panel's Strategic Actions section. Costs 1 action point per elimination.
 - **Active Threats**: Detected planned hits from scouting/bribes showing attacking family, target, turns remaining, and intel source (player HQ only)
+- **Prosecution Risk**: Status bar showing current risk level with tooltip breakdown of contributing factors
 - **Rival info**: Respect, influence, soldier count, money (rival HQs)
 
 ---
@@ -230,6 +232,10 @@ During active wars:
 - **Income penalty**: Hexes adjacent to warring enemy territory suffer -20% income (capped -30%)
 - **Diplomatic lockout**: No negotiations possible between warring families
 - Wars last **10 turns**, after which tension resets to 30 and relationship drops -50
+
+### 12.1 Boss Actions at HQ
+
+In addition to **Call a Sitdown**, the Boss can perform **Purge Ranks** from the HQ panel during the Action phase — eliminating soldiers flagged as Suspicious or Confirmed Rat. See [GAME_MECHANICS.md — Counter-Intelligence & Purge Ranks](./GAME_MECHANICS.md#27-counter-intelligence--purge-ranks) for full details.
 
 ---
 

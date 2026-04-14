@@ -250,6 +250,8 @@ Weaken enemy HQ defenses by turning a rival soldier.
 **On Success:** Target marked as flipped (hidden from enemy). Reduces HQ defense by 10%.
 **On Failure:** Scheming family loses **15 influence**. Target soldier gains +10 loyalty. Enemy notified.
 
+> **Counter-Intelligence**: Flipped soldiers on your side can be detected via bribed officials (Captain 25%, Chief 40%, Mayor 100%), suspicion markers (loyalty < 40 for 2+ turns), or self-scouting. Detected rats can be eliminated via the **Purge Ranks** Boss action. See [GAME_MECHANICS.md — Counter-Intelligence & Purge Ranks](./GAME_MECHANICS.md#27-counter-intelligence--purge-ranks).
+
 ---
 
 ## 9. Victory Conditions
