@@ -300,6 +300,10 @@ export interface HexTile {
   };
   isHeadquarters?: string;
   supplyNode?: SupplyNodeType;
+  // Phase 3 influence system
+  erosionCounter?: number;
+  expansionCounter?: number;
+  expansionInfluencer?: string;
 }
 
 export type TurnPhase = 'deploy' | 'move' | 'action' | 'waiting';
