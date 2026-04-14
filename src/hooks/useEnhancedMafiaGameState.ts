@@ -500,6 +500,9 @@ export interface EnhancedMafiaGameState {
   luccheseBoostedDistrict: LuccheseBoostedDistrict | null;
   bonannoPurgeImmunity: BonannoPurgeImmunity[];
   
+  // AI-initiated sitdown requests
+  incomingSitdowns: IncomingSitdown[];
+  
   territories: Array<{
     district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
     family: 'neutral' | 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
