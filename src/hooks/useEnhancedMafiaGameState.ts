@@ -8147,6 +8147,8 @@ export const useEnhancedMafiaGameState = (
               u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
               state.soldierStats[u.id].loyalty + LOYALTY_COMBAT_BONUS
             );
+            state.soldierStats[u.id].actedThisTurn = true;
+            state.soldierStats[u.id].turnsIdle = 0;
           }
         });
         const failDetails = `${defeatCasualties} casualt${defeatCasualties > 1 ? 'ies' : 'y'} suffered`;
