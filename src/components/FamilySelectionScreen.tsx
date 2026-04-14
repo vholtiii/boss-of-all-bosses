@@ -262,8 +262,14 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         backgroundPosition: 'center',
       }}
     >
-      {/* Dark overlay for readability */}
-      <div className="absolute inset-0 bg-black/70 z-0" />
+      {/* Dark overlay + vignette for dramatic atmosphere */}
+      <div className="absolute inset-0 bg-black/60 z-0" />
+      <div
+        className="absolute inset-0 z-0"
+        style={{
+          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.7) 70%, rgba(0,0,0,0.95) 100%)',
+        }}
+      />
       {/* Atmospheric particles */}
       <AtmosphericParticles />
 
