@@ -38,6 +38,8 @@ import {
   AI_PLAN_HIT_CHANCE, AI_PLAN_HIT_SUCCESS_RATE, AI_PLAN_HIT_DURATION,
   AIPlannedHit, IntelSource, INTEL_SOURCE_LABELS,
   FlippedSoldier,
+  CopFlippedSoldier, COP_FLIP_LOYALTY_THRESHOLD, COP_FLIP_BASE_CHANCE, COP_FLIP_LOYALTY_SCALING, COP_FLIP_HEAT_SCALING,
+  COP_FLIP_HEAT_PER_TURN, COP_FLIP_INCOME_PENALTY,
   HQ_ASSAULT_BASE_CHANCE, HQ_DEFENSE_BONUS, HQ_ASSAULT_MAX_CHANCE, HQ_ASSAULT_MIN_TOUGHNESS, HQ_ASSAULT_MIN_LOYALTY,
   FLIP_SOLDIER_COST, FLIP_SOLDIER_BASE_CHANCE, FLIP_SOLDIER_FAIL_INFLUENCE_LOSS,
   SITDOWN_COST, SITDOWN_COOLDOWN, SITDOWN_LOYALTY_BONUS, SITDOWN_DEFENSE_PER_SOLDIER,
@@ -429,6 +431,10 @@ export interface EnhancedMafiaGameState {
   flippedSoldiers: FlippedSoldier[];
   eliminatedFamilies: string[];
   sitdownCooldownUntil: number;
+  
+  // Cop Flip (Rat) system
+  copFlippedSoldiers: CopFlippedSoldier[];
+  copFlipImmunityUntil: number; // turn number until which mayor bribe grants immunity
   
   // Supply lines
   supplyNodes: SupplyNode[];
