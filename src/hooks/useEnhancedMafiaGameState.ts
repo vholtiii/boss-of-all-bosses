@@ -2750,6 +2750,20 @@ export const useEnhancedMafiaGameState = (
       newState.pendingNegotiations = newState.pendingNegotiations.filter(p => !p.ready);
       // Promote "pending" (from last turn) to "ready"
       newState.pendingNegotiations = newState.pendingNegotiations.map(p => ({ ...p, ready: true }));
+
+      // ============ INCOMING SITDOWNS EXPIRATION ============
+      newState.incomingSitdowns = newState.incomingSitdowns || [];
+      const expiredIncoming = newState.incomingSitdowns.filter(s => s.expiresOnTurn <= newState.turn + 1);
+      for (const expired of expiredIncoming) {
+        addPairTension(newState, newState.playerFamily, expired.fromFamily, 5);
+        const famLabel = expired.fromFamily.charAt(0).toUpperCase() + expired.fromFamily.slice(1);
+        newState.pendingNotifications.push({
+          type: 'warning' as const,
+          title: '😤 Sitdown Ignored',
+          message: `The ${famLabel} family is offended you never responded to their sitdown request. Tension +5.`,
+        });
+      }
+      newState.incomingSitdowns = newState.incomingSitdowns.filter(s => s.expiresOnTurn > newState.turn + 1);
       
       newState.turn += 1;
 
