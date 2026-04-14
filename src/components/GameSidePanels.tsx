@@ -100,7 +100,17 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
 
         {/* ── Status Bars ── */}
         <div className="space-y-2">
-          <StatusBar label="Loyalty" value={Math.round(reputation.loyalty)} max={100} color="bg-primary" />
+          <StatusBar label="Loyalty" value={(() => {
+            const deployedIds = (gameState.deployedUnits || [])
+              .filter((u: any) => u.family === gameState.playerFamily && u.type === 'soldier')
+              .map((u: any) => u.id);
+            if (deployedIds.length === 0) return Math.round(reputation.loyalty);
+            const total = deployedIds.reduce((sum: number, id: string) => {
+              const s = gameState.soldierStats?.[id];
+              return sum + (s ? s.loyalty : 0);
+            }, 0);
+            return Math.round(total / deployedIds.length);
+          })()} max={100} color="bg-primary" />
           <StatusBar label="Police Heat" value={policeHeat.level} max={100} color="bg-destructive" />
           <StatusBar label="Prosecution Risk" value={legalStatus.prosecutionRisk} max={100} color="bg-orange-500" />
         </div>
