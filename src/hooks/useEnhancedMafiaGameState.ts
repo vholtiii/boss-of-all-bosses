@@ -4034,6 +4034,48 @@ export const useEnhancedMafiaGameState = (
             });
           }
         }
+
+        // === PURGE RANKS: Bribe-based confirmedRat discovery (complements existing auto-elimination) ===
+        // For rats NOT already auto-eliminated by Mayor/Chief, flag them via probabilistic discovery
+        const remainingPlayerRats = newState.copFlippedSoldiers.filter(c => c.family === newState.playerFamily);
+        if (remainingPlayerRats.length > 0) {
+          const hasMayorBribe = newState.activeBribes.some(b => b.tier === 'mayor' && b.active);
+          const hasChiefBribe = newState.activeBribes.some(b => b.tier === 'police_chief' && b.active);
+          const hasCaptainBribe = newState.activeBribes.some(b => b.tier === 'police_captain' && b.active);
+
+          if (hasMayorBribe) {
+            // Mayor auto-reveals ALL rats as confirmed
+            for (const rat of remainingPlayerRats) {
+              const stats = newState.soldierStats[rat.unitId];
+              if (stats && !stats.confirmedRat) {
+                stats.confirmedRat = true;
+                turnReport.events.push(`🐀 ${rat.unitName} confirmed as informant by mayor's intelligence.`);
+              }
+            }
+          } else if (hasChiefBribe) {
+            // Chief: 40% per rat, max 2
+            let revealed = 0;
+            for (const rat of remainingPlayerRats) {
+              if (revealed >= PURGE_BRIBE_CHIEF_MAX_REVEALS) break;
+              const stats = newState.soldierStats[rat.unitId];
+              if (stats && !stats.confirmedRat && Math.random() < PURGE_BRIBE_CHIEF_DISCOVER_CHANCE) {
+                stats.confirmedRat = true;
+                revealed++;
+                turnReport.events.push(`🐀 ${rat.unitName} confirmed as informant by chief's intelligence.`);
+              }
+            }
+          } else if (hasCaptainBribe) {
+            // Captain: 25% per rat, max 1
+            for (const rat of remainingPlayerRats) {
+              const stats = newState.soldierStats[rat.unitId];
+              if (stats && !stats.confirmedRat && Math.random() < PURGE_BRIBE_CAPTAIN_DISCOVER_CHANCE) {
+                stats.confirmedRat = true;
+                turnReport.events.push(`🐀 ${rat.unitName} confirmed as informant by captain's intelligence.`);
+                break; // max 1
+              }
+            }
+          }
+        }
       }
 
       // --- COUNTER-INTEL DISCOVERY: Per-turn chance for family-flipped soldiers to be discovered ---
