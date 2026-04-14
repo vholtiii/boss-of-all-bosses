@@ -9168,7 +9168,7 @@ export const useEnhancedMafiaGameState = (
       // Built businesses within range (owned by family)
       const hasBuiltBiz = state.hexMap.some(t =>
         t.controllingFamily === family &&
-        t.business?.builtByPlayer &&
+        t.business && !t.business.isExtorted &&
         hexDistance(t, hex) <= EROSION_PROTECTION_RANGE
       );
       if (hasBuiltBiz) return true;
@@ -9181,10 +9181,11 @@ export const useEnhancedMafiaGameState = (
       );
       if (hasSupply) return true;
 
-      // Safehouses within range
-      const hasSafehouse = (state.safehouses || []).some(s =>
-        s.family === family && hexDistance(s, hex) <= EROSION_PROTECTION_RANGE
-      );
+      // Safehouses within range (check hex ownership for family)
+      const hasSafehouse = (state.safehouses || []).some(s => {
+        const shTile = state.hexMap.find(t => t.q === s.q && t.r === s.r && t.s === s.s);
+        return shTile && shTile.controllingFamily === family && hexDistance(s, hex) <= EROSION_PROTECTION_RANGE;
+      });
       if (hasSafehouse) return true;
 
       return false;
@@ -9201,7 +9202,7 @@ export const useEnhancedMafiaGameState = (
       // Built business adjacent
       const hasBuiltBiz = state.hexMap.some(t =>
         t.controllingFamily === family &&
-        t.business?.builtByPlayer &&
+        t.business && !t.business.isExtorted &&
         neighbors.some(n => n.q === t.q && n.r === t.r && n.s === t.s)
       );
       if (hasBuiltBiz) return true;
@@ -9213,9 +9214,10 @@ export const useEnhancedMafiaGameState = (
       );
       if (hasSupply) return true;
       // Safehouse adjacent
-      const hasSafehouse = (state.safehouses || []).some(s =>
-        s.family === family && neighbors.some(n => n.q === s.q && n.r === s.r && n.s === s.s)
-      );
+      const hasSafehouse = (state.safehouses || []).some(s => {
+        const shTile = state.hexMap.find(t => t.q === s.q && t.r === s.r && t.s === s.s);
+        return shTile && shTile.controllingFamily === family && neighbors.some(n => n.q === s.q && n.r === s.r && n.s === s.s);
+      });
       if (hasSafehouse) return true;
       return false;
     };
