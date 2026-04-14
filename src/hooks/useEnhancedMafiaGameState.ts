@@ -8931,6 +8931,10 @@ export const useEnhancedMafiaGameState = (
     if (state.treacheryDebuff && state.treacheryDebuff.turnsRemaining > 0) {
       totalChance -= TREACHERY_NEGOTIATION_PENALTY;
     }
+    // Incoming sitdown bonus (AI asked for this meeting)
+    if (action.successBonus) {
+      totalChance += action.successBonus;
+    }
     totalChance = Math.max(5, Math.min(95, totalChance));
     const roll = Math.random() * 100;
 
