@@ -7421,8 +7421,10 @@ export const useEnhancedMafiaGameState = (
     const targetFamily = tile.isHeadquarters;
     if (targetFamily === state.playerFamily) return state;
 
-    if (state.resources.money < FLIP_SOLDIER_COST) {
-      state.pendingNotifications = [...state.pendingNotifications, { type: 'warning', title: '💰 Not Enough Money', message: `Flipping costs $${FLIP_SOLDIER_COST.toLocaleString()}.` }];
+    const currentFlippedCount = (state.flippedSoldiers || []).filter(f => f.flippedByFamily === state.playerFamily).length;
+    const flipCost = FLIP_SOLDIER_BASE_COST + currentFlippedCount * FLIP_SOLDIER_COST_ESCALATION;
+    if (state.resources.money < flipCost) {
+      state.pendingNotifications = [...state.pendingNotifications, { type: 'warning', title: '💰 Not Enough Money', message: `Flipping costs $${flipCost.toLocaleString()}.` }];
       return state;
     }
 
@@ -7452,8 +7454,10 @@ export const useEnhancedMafiaGameState = (
       return state;
     }
 
-    state.resources.money -= FLIP_SOLDIER_COST;
-    const target = flippableTargets[Math.floor(Math.random() * flippableTargets.length)];
+    state.resources.money -= flipCost;
+    // If a specific target was chosen via UI, use it; otherwise pick randomly
+    const chosenTarget = action.targetUnitId ? flippableTargets.find(u => u.id === action.targetUnitId) : null;
+    const target = chosenTarget || flippableTargets[Math.floor(Math.random() * flippableTargets.length)];
     const targetStats = state.soldierStats[target.id]!;
 
     let chance = FLIP_SOLDIER_BASE_CHANCE;
