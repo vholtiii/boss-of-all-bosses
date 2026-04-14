@@ -7501,6 +7501,7 @@ export const useEnhancedMafiaGameState = (
                 ss.loyalty = Math.max(0, ss.loyalty - PURGE_INNOCENT_LOYALTY_PENALTY);
               }
             }
+            newState.combatLog = [...(newState.combatLog || []), `💀 Wrongful kill: ${targetUnit.name || 'soldier'} was innocent. -${PURGE_INNOCENT_RESPECT_LOSS} respect, all soldiers -${PURGE_INNOCENT_LOYALTY_PENALTY} loyalty.`];
             newState.pendingNotifications.push({
               type: 'error', title: '💀 Wrongful Elimination',
               message: `A loyal soldier was wrongfully eliminated. The family questions your judgment. -${PURGE_INNOCENT_RESPECT_LOSS} respect, all soldiers -${PURGE_INNOCENT_LOYALTY_PENALTY} loyalty.`,
