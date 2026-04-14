@@ -1,33 +1,22 @@
 
 
-# Play 25-Turn Simulation — Post-Fix Balance Check
+# Add Purge Ranks to Boss Actions in HQ Panel
 
-## Goal
-Run an automated 25-turn game simulation to verify:
-1. AI income is capped properly (no runaway scaling past turn 20)
-2. AI soldier counts stay within the 18-base cap (18-24 with bonuses)
-3. AI families remain competitive with each other (no single family snowballs)
-4. The fixes didn't break core gameplay loops
+## Problem
+Purge Ranks is currently a separate section in the HQ panel (lines 978-1040) that only appears when flagged soldiers exist. The user wants it grouped with the other Boss actions (Diplomacy, Sitdown, Declare War, Go to Mattresses, War Summit) and always visible.
 
-## Approach
-Write a Node.js simulation script (like the previous report) that models the core economy and recruitment loop for all 5 AI families over 30 turns on Normal/Medium settings. Track per-turn snapshots of each family's money, soldiers, territory, and income. The player will follow a simple expand-and-extort strategy.
+## Changes
 
-### Metrics to Report
-- Per-family income at turns 5, 10, 15, 20, 25, 30 (should plateau after turn 20)
-- Per-family soldier count at those same checkpoints (should cap around 18-24)
-- Territory distribution — are families converging or is one dominating?
-- Inter-AI competition — do AI families fight each other or only the player?
+### `src/components/HeadquartersInfoPanel.tsx`
 
-### Expected Results (Pass/Fail Criteria)
-- **PASS**: No AI family exceeds ~$12k min income on Normal/Medium after turn 20
-- **PASS**: No AI family exceeds ~24 soldiers (18 base + 6 max bonuses)
-- **PASS**: Territory spread across families stays within 2:1 ratio (largest:smallest)
-- **FAIL**: Any family hits $20k+ income or 30+ soldiers
+1. **Move Purge Ranks into the Boss actions block** (before line 976's closing `</div>`), right after War Summit (~line 975). Style it consistently with the other Boss action buttons.
 
-## Output
-A markdown report at `/mnt/documents/post_fix_balance_report.md` with turn-by-turn tables and a summary verdict.
+2. **Remove the early `return null`** on line 986 — always render the section.
 
-## Files
-- `/tmp/balance_check.js` — simulation script (ephemeral)
-- `/mnt/documents/post_fix_balance_report.md` — results report
+3. **Show "All clear" when empty** — display a small "No suspects detected" message instead of hiding entirely.
+
+4. **Remove the old standalone Purge Ranks section** (lines 978-1040) since it's now inside the Boss actions block.
+
+### Result
+When clicking your HQ, the Boss actions area will show: Diplomacy, Call a Sitdown, Declare War, Go to Mattresses, War Summit, and Purge Ranks — all in one place. Purge Ranks shows "No suspects detected" when empty, or lists flagged soldiers with Eliminate buttons when present.
 
