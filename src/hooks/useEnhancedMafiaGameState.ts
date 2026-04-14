@@ -7483,6 +7483,7 @@ export const useEnhancedMafiaGameState = (
                 ss.loyalty = Math.min(cap, ss.loyalty + PURGE_CONFIRMED_LOYALTY_BOOST);
               }
             }
+            newState.combatLog = [...(newState.combatLog || []), `🔫 Rat eliminated: ${targetUnit.name || 'soldier'} was a confirmed informant. +${PURGE_CONFIRMED_FEAR} fear, +${PURGE_CONFIRMED_HEAT} heat.`];
             newState.pendingNotifications.push({
               type: 'success', title: '🔫 Rat Eliminated',
               message: `The family dealt with a rat in the ranks. +${PURGE_CONFIRMED_FEAR} fear, +${PURGE_CONFIRMED_HEAT} heat. Low-loyalty soldiers are intimidated into compliance.`,
