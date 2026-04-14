@@ -157,6 +157,8 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   actionsRemaining = 0,
   gamePhase = 1,
   flippedSoldiers = [],
+  soldierStats = {},
+  onEliminateSoldier,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
