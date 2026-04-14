@@ -7943,6 +7943,15 @@ export const useEnhancedMafiaGameState = (
     const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
     if (!tile || tile.controllingFamily !== 'neutral' || tile.isHeadquarters) return state;
 
+    // Phase 3+ gate: claiming disabled — influence system handles territory
+    if ((state.gamePhase || 1) >= 3) {
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'warning', title: '🔒 Phase 3 — Influence Era',
+        message: 'Territory now shifts through influence. Position your units and businesses strategically.',
+      }];
+      return state;
+    }
+
     // Territory freeze: block claims on neutral hexes adjacent to ceasefire family territory
     const claimCheckNeighbors = getHexNeighbors(targetQ, targetR, targetS);
     const adjacentCeasefireFamily = claimCheckNeighbors.some(n => {
