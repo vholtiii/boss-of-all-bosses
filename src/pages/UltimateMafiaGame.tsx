@@ -912,14 +912,13 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                     <button
                       className="ml-1 px-1.5 py-0.5 rounded bg-primary/80 hover:bg-primary text-primary-foreground text-[10px] font-bold transition-colors"
                       onClick={() => {
-                        // For ceasefire/alliance (boss-level), open boss negotiation dialog
                         setNegotiationState({
                           open: true,
                           scope: 'family',
                           targetFamily: s.fromFamily,
+                          incomingSitdownId: s.id,
+                          successBonus: s.successBonus,
                         });
-                        // Store the sitdown info for the accept handler
-                        (window as any).__pendingIncomingSitdown = s;
                       }}
                     >
                       Accept
