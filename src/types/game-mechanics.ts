@@ -16,6 +16,8 @@ export interface SoldierStats {
   suspiciousTurns: number;  // consecutive turns with loyalty < 40
   suspicious: boolean;       // true when suspiciousTurns >= 2
   confirmedRat: boolean;     // true when discovered via bribe/scout
+  markedForDeath?: boolean;  // true when marked for elimination via Purge Ranks
+  markedTurnsRemaining?: number; // turns left before mark expires
 }
 
 // ============ PURGE RANKS (ELIMINATE RAT) SYSTEM ============

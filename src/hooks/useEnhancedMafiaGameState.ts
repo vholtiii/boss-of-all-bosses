@@ -1833,7 +1833,73 @@ export const useEnhancedMafiaGameState = (
         const soldierIdx = newUnitsEscort.findIndex(u => u.id === unit.id);
         if (soldierIdx === -1) return prev;
         newUnitsEscort[soldierIdx] = { ...unit, q: capo.q, r: capo.r, s: capo.s, movesRemaining: 0 };
-        // Add soldier to capo's escort list
+
+        // Check if this soldier is marked for death — execute the hit
+        const escortStats = prev.soldierStats[unit.id];
+        if (escortStats?.markedForDeath) {
+          // Remove the marked soldier (the hit is carried out)
+          const finalUnits = newUnitsEscort.filter(u => u.id !== unit.id);
+          const newSoldierStats = { ...prev.soldierStats };
+          delete newSoldierStats[unit.id];
+          const newCopFlipped = (prev.copFlippedSoldiers || []).filter(c => c.unitId !== unit.id);
+
+          const isActualRat = (prev.copFlippedSoldiers || []).some(c => c.unitId === unit.id);
+          const newNotifications = [...prev.pendingNotifications];
+          let newFear = prev.reputation.fear || 0;
+          let newHeat = prev.policeHeat.level;
+          let newRespect = prev.resources.respect;
+          const newCombatLog = [...(prev.combatLog || [])];
+
+          if (isActualRat) {
+            newFear = Math.min(100, newFear + PURGE_CONFIRMED_FEAR);
+            newHeat = Math.min(100, newHeat + PURGE_CONFIRMED_HEAT);
+            // Loyalty boost to soldiers below 50
+            for (const s of finalUnits.filter(u => u.family === prev.playerFamily && u.type === 'soldier')) {
+              const ss = newSoldierStats[s.id];
+              if (ss && ss.loyalty < 50) {
+                const cap = ss.isMercenary ? LOYALTY_MERC_CAP : SOLDIER_LOYALTY_CAP;
+                ss.loyalty = Math.min(cap, ss.loyalty + PURGE_CONFIRMED_LOYALTY_BOOST);
+              }
+            }
+            newCombatLog.push(`🔫 Rat eliminated: ${unit.name || 'soldier'} was a confirmed informant. The Capo carried out the hit.`);
+            newNotifications.push({
+              type: 'success' as const, title: '🔫 The Capo Carried Out the Hit',
+              message: `The rat has been dealt with. +${PURGE_CONFIRMED_FEAR} fear, +${PURGE_CONFIRMED_HEAT} heat. Low-loyalty soldiers fall in line.`,
+            });
+          } else {
+            newFear = Math.min(100, newFear + PURGE_INNOCENT_FEAR);
+            newHeat = Math.min(100, newHeat + PURGE_INNOCENT_HEAT);
+            newRespect = Math.max(0, newRespect - PURGE_INNOCENT_RESPECT_LOSS);
+            // Loyalty penalty to ALL soldiers
+            for (const s of finalUnits.filter(u => u.family === prev.playerFamily && u.type === 'soldier')) {
+              const ss = newSoldierStats[s.id];
+              if (ss) {
+                ss.loyalty = Math.max(0, ss.loyalty - PURGE_INNOCENT_LOYALTY_PENALTY);
+              }
+            }
+            newCombatLog.push(`💀 Wrongful kill: ${unit.name || 'soldier'} was innocent. The Capo carried out the hit on an innocent.`);
+            newNotifications.push({
+              type: 'error' as const, title: '💀 Wrongful Elimination',
+              message: `A loyal soldier was wrongfully eliminated by the Capo. -${PURGE_INNOCENT_RESPECT_LOSS} respect, all soldiers -${PURGE_INNOCENT_LOYALTY_PENALTY} loyalty.`,
+            });
+          }
+
+          return {
+            ...prev,
+            deployedUnits: finalUnits,
+            soldierStats: newSoldierStats,
+            copFlippedSoldiers: newCopFlipped,
+            selectedUnitId: null, availableMoveHexes: [],
+            tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
+            reputation: { ...prev.reputation, fear: newFear },
+            policeHeat: { ...prev.policeHeat, level: newHeat },
+            resources: { ...prev.resources, respect: newRespect },
+            combatLog: newCombatLog,
+            pendingNotifications: newNotifications,
+          };
+        }
+
+        // Normal escort — add soldier to capo's escort list
         const capoIdx = newUnitsEscort.findIndex(u => u.id === capo.id);
         const existingEscorts = capo.escortingSoldierIds || [];
         newUnitsEscort[capoIdx] = { ...capo, escortingSoldierIds: [...existingEscorts, unit.id] };
@@ -7467,51 +7533,22 @@ export const useEnhancedMafiaGameState = (
             return newState;
           }
 
-          const isActualRat = (newState.copFlippedSoldiers || []).some(c => c.unitId === targetId);
+          // Check if already marked
+          if (targetStats.markedForDeath) {
+            newState.pendingNotifications.push({ type: 'warning', title: '☠️ Already Marked', message: 'This soldier is already marked for death.' });
+            return newState;
+          }
 
-          // Remove soldier
-          newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== targetId);
-          delete newState.soldierStats[targetId];
-          newState.copFlippedSoldiers = (newState.copFlippedSoldiers || []).filter(c => c.unitId !== targetId);
+          // Mark for death instead of instant kill
+          targetStats.markedForDeath = true;
+          targetStats.markedTurnsRemaining = 5;
           newState.actionsRemaining -= 1;
 
-          if (isActualRat) {
-            // Confirmed rat — clean removal
-            newState.reputation.fear = Math.min(100, (newState.reputation.fear || 0) + PURGE_CONFIRMED_FEAR);
-            newState.policeHeat.level = Math.min(100, newState.policeHeat.level + PURGE_CONFIRMED_HEAT);
-            // Loyalty boost to soldiers below 50
-            const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
-            for (const s of playerSoldiers) {
-              const ss = newState.soldierStats[s.id];
-              if (ss && ss.loyalty < 50) {
-                const cap = ss.isMercenary ? LOYALTY_MERC_CAP : SOLDIER_LOYALTY_CAP;
-                ss.loyalty = Math.min(cap, ss.loyalty + PURGE_CONFIRMED_LOYALTY_BOOST);
-              }
-            }
-            newState.combatLog = [...(newState.combatLog || []), `🔫 Rat eliminated: ${targetUnit.name || 'soldier'} was a confirmed informant. +${PURGE_CONFIRMED_FEAR} fear, +${PURGE_CONFIRMED_HEAT} heat.`];
-            newState.pendingNotifications.push({
-              type: 'success', title: '🔫 Rat Eliminated',
-              message: `The family dealt with a rat in the ranks. +${PURGE_CONFIRMED_FEAR} fear, +${PURGE_CONFIRMED_HEAT} heat. Low-loyalty soldiers are intimidated into compliance.`,
-            });
-          } else {
-            // Innocent soldier — wrongful kill
-            newState.reputation.fear = Math.min(100, (newState.reputation.fear || 0) + PURGE_INNOCENT_FEAR);
-            newState.policeHeat.level = Math.min(100, newState.policeHeat.level + PURGE_INNOCENT_HEAT);
-            syncRespect(newState, Math.max(0, newState.resources.respect - PURGE_INNOCENT_RESPECT_LOSS));
-            // Loyalty penalty to ALL soldiers
-            const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
-            for (const s of playerSoldiers) {
-              const ss = newState.soldierStats[s.id];
-              if (ss) {
-                ss.loyalty = Math.max(0, ss.loyalty - PURGE_INNOCENT_LOYALTY_PENALTY);
-              }
-            }
-            newState.combatLog = [...(newState.combatLog || []), `💀 Wrongful kill: ${targetUnit.name || 'soldier'} was innocent. -${PURGE_INNOCENT_RESPECT_LOSS} respect, all soldiers -${PURGE_INNOCENT_LOYALTY_PENALTY} loyalty.`];
-            newState.pendingNotifications.push({
-              type: 'error', title: '💀 Wrongful Elimination',
-              message: `A loyal soldier was wrongfully eliminated. The family questions your judgment. -${PURGE_INNOCENT_RESPECT_LOSS} respect, all soldiers -${PURGE_INNOCENT_LOYALTY_PENALTY} loyalty.`,
-            });
-          }
+          newState.combatLog = [...(newState.combatLog || []), `☠️ ${targetUnit.name || 'soldier'} has been marked for elimination. The Capo must carry out the hit via Escort.`];
+          newState.pendingNotifications.push({
+            type: 'warning', title: '☠️ Marked for Death',
+            message: `${targetUnit.name || 'A soldier'} has been marked for elimination. Use Capo Escort to carry out the hit within 5 turns.`,
+          });
           break;
         }
 
