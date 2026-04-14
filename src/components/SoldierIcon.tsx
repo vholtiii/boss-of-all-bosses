@@ -9,6 +9,7 @@ interface SoldierIconProps {
   count: number;
   isPlayerFamily?: boolean;
   selected?: boolean;
+  markedForDeath?: boolean;
   onClick?: (e: React.MouseEvent) => void;
 }
 
@@ -21,7 +22,7 @@ const familyColors = {
 };
 
 const SoldierIcon: React.FC<SoldierIconProps> = ({ 
-  x, y, family, count, isPlayerFamily = false, selected = false, onClick 
+  x, y, family, count, isPlayerFamily = false, selected = false, markedForDeath = false, onClick 
 }) => {
   const familyColor = familyColors[family];
   const size = 14;
@@ -74,6 +75,20 @@ const SoldierIcon: React.FC<SoldierIconProps> = ({
           <circle cx={x + 12} cy={y - 12} r="8" fill={familyColor} stroke="#ffffff" strokeWidth="1" />
           <text x={x + 12} y={y - 8.5} textAnchor="middle" fontSize="8" fill="#ffffff" fontWeight="bold" className="select-none">
             {count}
+          </text>
+        </motion.g>
+      )}
+
+      {/* Marked for death skull badge */}
+      {markedForDeath && (
+        <motion.g
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: [1, 1.15, 1] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+        >
+          <circle cx={x - 12} cy={y - 12} r="8" fill="#8B0000" stroke="#FF4444" strokeWidth="1.5" />
+          <text x={x - 12} y={y - 8.5} textAnchor="middle" fontSize="9" className="select-none">
+            ☠️
           </text>
         </motion.g>
       )}

@@ -363,15 +363,21 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                                       </p>
                                     </div>
                                   </div>
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    className="h-6 px-2 text-[10px]"
-                                    disabled={!canEliminate}
-                                    onClick={() => onAction({ type: 'eliminate_soldier', targetId: u.id })}
-                                  >
-                                    Eliminate
-                                  </Button>
+                                  {stats?.markedForDeath ? (
+                                    <span className="h-6 px-2 text-[10px] inline-flex items-center text-red-400 font-semibold">
+                                      ☠️ Marked ({stats.markedTurnsRemaining || 0}t)
+                                    </span>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      className="h-6 px-2 text-[10px]"
+                                      disabled={!canEliminate}
+                                      onClick={() => onAction({ type: 'eliminate_soldier', targetId: u.id })}
+                                    >
+                                      Mark for Death
+                                    </Button>
+                                  )}
                                 </div>
                               );
                             })

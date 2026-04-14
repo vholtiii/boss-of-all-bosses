@@ -54,7 +54,7 @@ import {
   PURGE_CONFIRMED_FEAR, PURGE_CONFIRMED_HEAT, PURGE_CONFIRMED_LOYALTY_BOOST,
   PURGE_INNOCENT_FEAR, PURGE_INNOCENT_HEAT, PURGE_INNOCENT_LOYALTY_PENALTY, PURGE_INNOCENT_RESPECT_LOSS,
   PURGE_SUSPICION_LOYALTY_THRESHOLD, PURGE_SUSPICION_CLEAR_THRESHOLD, PURGE_SUSPICION_TURNS_REQUIRED,
-  PURGE_BRIBE_CAPTAIN_DISCOVER_CHANCE, PURGE_BRIBE_CHIEF_DISCOVER_CHANCE, PURGE_BRIBE_CHIEF_MAX_REVEALS,
+  PURGE_BRIBE_CAPTAIN_DISCOVER_CHANCE, PURGE_BRIBE_CHIEF_DISCOVER_CHANCE, PURGE_BRIBE_CHIEF_MAX_REVEALS, PURGE_MARK_DURATION,
   BUILT_BUSINESS_DEFENSE_BONUS, BUILT_BUSINESS_HEAT_REDUCTION, BUILT_BUSINESS_RESPECT_THRESHOLD, BUILT_BUSINESS_RESPECT_BONUS, BUILT_BUSINESS_LOYALTY_BONUS,
   BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION, BUILT_BIZ_SEIZURE_INCOME_PENALTY, BUILT_BIZ_SEIZURE_RESPECT_LOSS, BUILT_BIZ_SEIZURE_FEAR_LOSS, BUILT_BIZ_SEIZURE_INFLUENCE_GAIN,
   CEASEFIRE_VIOLATION_RESPECT_LOSS, CEASEFIRE_VIOLATION_FEAR_LOSS, TREACHERY_DEBUFF_DURATION, TREACHERY_NEGOTIATION_PENALTY, TreacheryDebuff,
@@ -2711,6 +2711,23 @@ export const useEnhancedMafiaGameState = (
       newState.policeHeat.bribedOfficials = newState.policeHeat.bribedOfficials || [];
       newState.aiAlertState = newState.aiAlertState || {};
       
+      // ============ PURGE MARK EXPIRY ============
+      for (const unitId of Object.keys(newState.soldierStats)) {
+        const ss = newState.soldierStats[unitId];
+        if (ss?.markedForDeath) {
+          ss.markedTurnsRemaining = (ss.markedTurnsRemaining || 1) - 1;
+          if (ss.markedTurnsRemaining <= 0) {
+            ss.markedForDeath = false;
+            ss.markedTurnsRemaining = undefined;
+            const markedUnit = newState.deployedUnits.find(u => u.id === unitId);
+            newState.pendingNotifications.push({
+              type: 'info' as const, title: '⏳ Mark Expired',
+              message: `The mark on ${markedUnit?.name || 'a soldier'} has expired. The hit was never carried out.`,
+            });
+          }
+        }
+      }
+
       // ============ PENDING NEGOTIATIONS LIFECYCLE ============
       newState.pendingNegotiations = newState.pendingNegotiations || [];
       // Expire "ready" negotiations that weren't used last turn
