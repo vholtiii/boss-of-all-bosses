@@ -1019,6 +1019,7 @@ const createInitialGameState = (
     frontBossHexes: [],
     luccheseBoostedDistrict: null,
     bonannoPurgeImmunity: [],
+    incomingSitdowns: [],
     victoryType: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
