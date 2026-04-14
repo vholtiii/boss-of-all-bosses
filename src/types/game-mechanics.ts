@@ -116,7 +116,7 @@ export const PHASE_CONFIGS: PhaseConfig[] = [
   },
   {
     phase: 2, name: 'Establishing Territory', icon: '🏴', minTurn: 9,
-    requirements: { minHexes: 8, minRespect: 20 },
+    requirements: { minHexes: 8, minRespect: 30 },
     unlocks: ['Scouting', 'Plan Hits', 'Capo Promotion', 'Safehouses', 'Fortification', 'Enemy Extortion', 'Patrol Officer Bribe', 'Boss Sitdown', 'Local Recruitment'],
   },
   {
