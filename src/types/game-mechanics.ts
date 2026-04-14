@@ -12,7 +12,26 @@ export interface SoldierStats {
   turnsIdle: number;     // consecutive turns without an action
   isMercenary: boolean;  // true = mercenary (bought), false = local recruit
   actedThisTurn: boolean; // reset each turn, set true on hit/extort/claim/move
+  // Suspicion & counter-intelligence
+  suspiciousTurns: number;  // consecutive turns with loyalty < 40
+  suspicious: boolean;       // true when suspiciousTurns >= 2
+  confirmedRat: boolean;     // true when discovered via bribe/scout
 }
+
+// ============ PURGE RANKS (ELIMINATE RAT) SYSTEM ============
+export const PURGE_CONFIRMED_FEAR = 5;
+export const PURGE_CONFIRMED_HEAT = 3;
+export const PURGE_CONFIRMED_LOYALTY_BOOST = 10;    // to soldiers below loyalty 50
+export const PURGE_INNOCENT_FEAR = 3;
+export const PURGE_INNOCENT_HEAT = 2;
+export const PURGE_INNOCENT_LOYALTY_PENALTY = 5;     // to ALL soldiers
+export const PURGE_INNOCENT_RESPECT_LOSS = 3;
+export const PURGE_SUSPICION_LOYALTY_THRESHOLD = 40; // loyalty below this starts suspicion counter
+export const PURGE_SUSPICION_CLEAR_THRESHOLD = 50;   // loyalty above this clears suspicion
+export const PURGE_SUSPICION_TURNS_REQUIRED = 2;     // consecutive turns below threshold
+export const PURGE_BRIBE_CAPTAIN_DISCOVER_CHANCE = 0.25;
+export const PURGE_BRIBE_CHIEF_DISCOVER_CHANCE = 0.40;
+export const PURGE_BRIBE_CHIEF_MAX_REVEALS = 2;
 
 export const CLAIM_TOUGHNESS_GAIN = 0.25; // +0.25 progress per territory claim (4 claims = +1 toughness)
 export const EXTORTION_TOUGHNESS_GAIN = 0.3; // +0.3 progress per successful extortion (~3-4 extortions = +1 toughness)
