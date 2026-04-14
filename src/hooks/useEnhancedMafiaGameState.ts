@@ -3078,6 +3078,19 @@ export const useEnhancedMafiaGameState = (
         }
         // Reset actedThisTurn for next turn
         stats.actedThisTurn = false;
+
+        // === SUSPICION TRACKING (for player soldiers only) ===
+        if (u.family === newState.playerFamily && u.type === 'soldier') {
+          if (stats.loyalty < PURGE_SUSPICION_LOYALTY_THRESHOLD) {
+            stats.suspiciousTurns = (stats.suspiciousTurns || 0) + 1;
+            if (stats.suspiciousTurns >= PURGE_SUSPICION_TURNS_REQUIRED) {
+              stats.suspicious = true;
+            }
+          } else if (stats.loyalty >= PURGE_SUSPICION_CLEAR_THRESHOLD) {
+            stats.suspiciousTurns = 0;
+            stats.suspicious = false;
+          }
+        }
       });
 
       // Tick scouted hexes
