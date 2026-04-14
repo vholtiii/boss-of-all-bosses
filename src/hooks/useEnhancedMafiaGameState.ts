@@ -83,6 +83,7 @@ import {
   COMMISSION_VOTE_RELATIONSHIP_THRESHOLD, COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY,
   // Family Power System
   FAMILY_POWERS, FamilyPower, FrontBossHex, LuccheseBoostedDistrict, BonannoPurgeImmunity,
+  IncomingSitdown,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -252,6 +253,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     frontBossHexes: (state.frontBossHexes || []).map(h => ({ ...h })),
     luccheseBoostedDistrict: state.luccheseBoostedDistrict ? { ...state.luccheseBoostedDistrict } : null,
     bonannoPurgeImmunity: (state.bonannoPurgeImmunity || []).map(i => ({ ...i })),
+    incomingSitdowns: (state.incomingSitdowns || []).map(s => ({ ...s })),
   });
 
 // ============ UNIT TYPES ============
@@ -498,6 +500,9 @@ export interface EnhancedMafiaGameState {
   frontBossHexes: FrontBossHex[];                    // Genovese hidden hexes
   luccheseBoostedDistrict: LuccheseBoostedDistrict | null;
   bonannoPurgeImmunity: BonannoPurgeImmunity[];
+  
+  // AI-initiated sitdown requests
+  incomingSitdowns: IncomingSitdown[];
   
   territories: Array<{
     district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
@@ -1015,6 +1020,7 @@ const createInitialGameState = (
     frontBossHexes: [],
     luccheseBoostedDistrict: null,
     bonannoPurgeImmunity: [],
+    incomingSitdowns: [],
     victoryType: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
@@ -2744,6 +2750,20 @@ export const useEnhancedMafiaGameState = (
       newState.pendingNegotiations = newState.pendingNegotiations.filter(p => !p.ready);
       // Promote "pending" (from last turn) to "ready"
       newState.pendingNegotiations = newState.pendingNegotiations.map(p => ({ ...p, ready: true }));
+
+      // ============ INCOMING SITDOWNS EXPIRATION ============
+      newState.incomingSitdowns = newState.incomingSitdowns || [];
+      const expiredIncoming = newState.incomingSitdowns.filter(s => s.expiresOnTurn <= newState.turn + 1);
+      for (const expired of expiredIncoming) {
+        addPairTension(newState, newState.playerFamily, expired.fromFamily, 5);
+        const famLabel = expired.fromFamily.charAt(0).toUpperCase() + expired.fromFamily.slice(1);
+        newState.pendingNotifications.push({
+          type: 'warning' as const,
+          title: '😤 Sitdown Ignored',
+          message: `The ${famLabel} family is offended you never responded to their sitdown request. Tension +5.`,
+        });
+      }
+      newState.incomingSitdowns = newState.incomingSitdowns.filter(s => s.expiresOnTurn > newState.turn + 1);
       
       newState.turn += 1;
 
@@ -5566,46 +5586,95 @@ export const useEnhancedMafiaGameState = (
         const hasCeasefire = state.ceasefires.some(c => c.active && c.family === fam);
         const hasAlliance = (state.alliances || []).some(a => a.alliedFamily === fam && a.active);
         const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
+        // Check if there's already an incoming sitdown from this family
+        const hasIncoming = (state.incomingSitdowns || []).some(s => s.fromFamily === fam);
+        
+        const pushSitdown = (deal: IncomingSitdown['proposedDeal']) => {
+          state.incomingSitdowns = state.incomingSitdowns || [];
+          state.incomingSitdowns.push({
+            id: `sitdown-${fam}-${state.turn}-${Math.random().toString(36).slice(2)}`,
+            fromFamily: fam,
+            proposedDeal: deal,
+            turnRequested: state.turn,
+            expiresOnTurn: state.turn + 2,
+            successBonus: 15,
+          });
+          const dealLabel = deal === 'ceasefire' ? 'Ceasefire' : deal === 'alliance' ? 'Alliance' : deal === 'supply_deal' ? 'Supply Deal' : 'Safe Passage';
+          state.pendingNotifications.push({
+            type: 'info' as const,
+            title: `📩 ${famLabel} Requests Sitdown`,
+            message: `The ${famLabel} family wants to discuss a ${dealLabel}. Accept or decline in the Incoming Sitdowns panel.`,
+          });
+        };
         
         // Diplomatic: ceasefire at Phase 2+, alliance at Phase 3+ if relationship > 30
-        if (personality === 'diplomatic') {
+        if (personality === 'diplomatic' && !hasIncoming) {
           if (aiPhase >= 2 && !hasCeasefire && Math.random() < (cooperation / 150)) {
-            state.pendingNotifications.push({
-              type: 'info' as const,
-              title: `🤝 ${famLabel} Offers Ceasefire`,
-              message: `The ${fam} family signals they want to negotiate peace. Use a Capo to propose a ceasefire on their territory.`,
-            });
-            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in ceasefire' });
+            pushSitdown('ceasefire');
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire' });
           } else if (aiPhase >= 3 && !hasAlliance && hasCeasefire && (opponent.relationships?.[state.playerFamily] || 0) > 30 && Math.random() < 0.2) {
-            state.pendingNotifications.push({
-              type: 'info' as const,
-              title: `🤝 ${famLabel} Proposes Alliance`,
-              message: `The ${fam} family is interested in forming an alliance. Use a Capo to negotiate on their territory.`,
-            });
-            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in alliance' });
+            pushSitdown('alliance');
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for alliance' });
           }
         }
         // Defensive: ceasefire at Phase 3+
-        else if (personality === 'defensive') {
+        else if (personality === 'defensive' && !hasIncoming) {
           if (aiPhase >= 3 && !hasCeasefire && Math.random() < (cooperation / 200)) {
-            state.pendingNotifications.push({
-              type: 'info' as const,
-              title: `🤝 ${famLabel} Offers Ceasefire`,
-              message: `The ${fam} family signals they want to negotiate peace. Use a Capo to propose a ceasefire on their territory.`,
-            });
-            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in ceasefire' });
+            pushSitdown('ceasefire');
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire' });
           }
         }
         // Opportunistic: ceasefire if losing territory
-        else if (personality === 'opportunistic') {
+        else if (personality === 'opportunistic' && !hasIncoming) {
           const aiHexCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
           if (aiPhase >= 2 && !hasCeasefire && aiHexCount < 6 && Math.random() < 0.3) {
+            pushSitdown('ceasefire');
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire (losing ground)' });
+          }
+        }
+        // Aggressive: ceasefire only when losing badly (< 4 hexes)
+        else if (personality === 'aggressive' && !hasIncoming) {
+          const aiHexCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
+          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < 4 && Math.random() < 0.2) {
+            pushSitdown('ceasefire');
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire (desperate)' });
+          }
+        }
+      }
+
+      // ── AI-to-AI DIPLOMACY: Auto-resolve ceasefires between AI families ──
+      if (!atWarWithPlayer) {
+        const otherAIs = state.aiOpponents.filter(o => o.family !== fam && !(state.eliminatedFamilies || []).includes(o.family));
+        for (const otherOpp of otherAIs) {
+          const otherFam = otherOpp.family;
+          if (areFamiliesAtWar(state, fam, otherFam)) continue;
+          const pairKey = getTensionPairKey(fam, otherFam);
+          const existingPact = state.ceasefires.some(c => c.active && (
+            (c.family === fam && state.playerFamily !== otherFam) || 
+            (c.family === otherFam && state.playerFamily !== fam)
+          ));
+          // AI-AI ceasefires stored as a ceasefire on the lower-sorted family name
+          const aiCeasefireExists = (state as any)._aiAiCeasefires?.includes(pairKey);
+          if (existingPact || aiCeasefireExists) continue;
+          
+          const otherPersonality = otherOpp.personality || 'aggressive';
+          const bothDiplomatic = (personality === 'diplomatic' || personality === 'defensive') && 
+                                (otherPersonality === 'diplomatic' || otherPersonality === 'defensive');
+          if (bothDiplomatic && Math.random() < 0.08) {
+            // Auto-resolve: form ceasefire between AI families (reduce tension)
+            addPairTension(state, fam, otherFam, -TENSION_REDUCE_CEASEFIRE);
+            state.tensionCooldowns[pairKey] = 3;
+            const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
+            const otherLabel = otherFam.charAt(0).toUpperCase() + otherFam.slice(1);
             state.pendingNotifications.push({
               type: 'info' as const,
-              title: `🤝 ${famLabel} Offers Ceasefire`,
-              message: `The ${fam} family signals they want to negotiate peace. Use a Capo to propose a ceasefire on their territory.`,
+              title: `🕊️ ${famLabel}-${otherLabel} Ceasefire`,
+              message: `The ${famLabel} and ${otherLabel} families have agreed to a ceasefire.`,
             });
-            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Signaled interest in ceasefire (losing ground)' });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: `Formed ceasefire with ${otherFam}` });
+            // Track to avoid duplicates (transient, not persisted)
+            (state as any)._aiAiCeasefires = (state as any)._aiAiCeasefires || [];
+            (state as any)._aiAiCeasefires.push(pairKey);
           }
         }
       }
@@ -7183,6 +7252,37 @@ export const useEnhancedMafiaGameState = (
           const result = processNegotiation(newState, { ...action, isBossNegotiation: true });
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
+        }
+        case 'accept_incoming_sitdown': {
+          const sitdown = (newState.incomingSitdowns || []).find(s => s.id === action.sitdownId);
+          if (!sitdown) return newState;
+          // Remove the incoming sitdown entry
+          newState.incomingSitdowns = newState.incomingSitdowns.filter(s => s.id !== action.sitdownId);
+          // Route to boss_negotiate with the success bonus
+          const result = processNegotiation(newState, {
+            ...action,
+            type: 'boss_negotiate',
+            isBossNegotiation: true,
+            negotiationType: sitdown.proposedDeal,
+            targetFamily: sitdown.fromFamily,
+            successBonus: sitdown.successBonus,
+            extraData: action.extraData,
+          });
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
+        case 'decline_incoming_sitdown': {
+          const sitdown = (newState.incomingSitdowns || []).find(s => s.id === action.sitdownId);
+          if (!sitdown) return newState;
+          newState.incomingSitdowns = newState.incomingSitdowns.filter(s => s.id !== action.sitdownId);
+          addPairTension(newState, newState.playerFamily, sitdown.fromFamily, 5);
+          const famLabel = sitdown.fromFamily.charAt(0).toUpperCase() + sitdown.fromFamily.slice(1);
+          newState.pendingNotifications.push({
+            type: 'warning' as const,
+            title: '🚫 Sitdown Declined',
+            message: `You declined the ${famLabel} family's request. Tension +5.`,
+          });
+          return newState;
         }
         case 'assault_hq': {
           // Phase gate: Phase 4+
@@ -8861,6 +8961,10 @@ export const useEnhancedMafiaGameState = (
     // Treachery debuff reduces negotiation success
     if (state.treacheryDebuff && state.treacheryDebuff.turnsRemaining > 0) {
       totalChance -= TREACHERY_NEGOTIATION_PENALTY;
+    }
+    // Incoming sitdown bonus (AI asked for this meeting)
+    if (action.successBonus) {
+      totalChance += action.successBonus;
     }
     totalChance = Math.max(5, Math.min(95, totalChance));
     const roll = Math.random() * 100;

@@ -26,12 +26,14 @@ interface NegotiationDialogProps {
   // For boss negotiation — choose target family
   availableEnemyFamilies?: string[];
   onSelectTargetFamily?: (family: string) => void;
+  successBonus?: number;
 }
 
 const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   open, onClose, onNegotiate, scope, capoName, capoPersonality,
   enemyFamily, playerReputation, playerFear, playerMoney, enemyStrength, hexIncome,
   negotiationUsedThisTurn, treacheryTurnsRemaining, availableEnemyFamilies, onSelectTargetFamily,
+  successBonus = 0,
 }) => {
   const [selectedType, setSelectedType] = useState<NegotiationType | null>(null);
   const [rolling, setRolling] = useState(false);
@@ -59,8 +61,9 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
       chance += Math.floor((playerFear || 0) / 5);
     }
     if (type === 'bribe_territory') chance -= enemyStrength * 5;
+    chance += successBonus;
     return Math.max(5, Math.min(95, chance));
-  }, [personalityBonuses, playerReputation, playerFear, enemyStrength, scope]);
+  }, [personalityBonuses, playerReputation, playerFear, enemyStrength, scope, successBonus]);
 
   const getCost = useCallback((type: NegotiationType) => {
     const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
@@ -222,6 +225,11 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
                   {scope === 'territory' && personalityBonuses[config.type] > 0 && (
                     <p className="text-xs text-primary mt-1">
                       {personalityInfo.icon} +{personalityBonuses[config.type]}% from {personalityInfo.label}
+                    </p>
+                   )}
+                  {successBonus > 0 && (
+                    <p className="text-xs text-primary mt-1">
+                      📩 +{successBonus}% — they requested this sitdown
                     </p>
                   )}
                   {config.type === 'supply_deal' && (playerFear || 0) > 0 && (

@@ -147,6 +147,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     open: boolean;
     scope: 'family';
     targetFamily: string;
+    incomingSitdownId?: string;
+    successBonus?: number;
   } | null>(null);
 
   // Plan Hit mode — 2-step: select soldier, then select target hex+unit
@@ -884,6 +886,55 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             </div>
           );
         })()}
+
+        {/* Incoming Sitdowns (AI-requested) */}
+        {(() => {
+          const incoming = (gameState as any).incomingSitdowns || [];
+          if (incoming.length === 0) return null;
+          const dealLabels: Record<string, string> = { ceasefire: '🕊️ Ceasefire', alliance: '⚖️ Alliance', supply_deal: '🚚 Supply Deal', safe_passage: '🛤️ Safe Passage' };
+          return (
+            <div className="mt-2 flex flex-wrap gap-2 items-center">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Incoming:</span>
+              {incoming.map((s: any) => {
+                const turnsLeft = s.expiresOnTurn - gameState.turn;
+                const famLabel = s.fromFamily.charAt(0).toUpperCase() + s.fromFamily.slice(1);
+                return (
+                  <div 
+                    key={s.id}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded border bg-primary/10 border-primary/30 text-xs animate-pulse"
+                  >
+                    <span>📩</span>
+                    <span className="font-medium capitalize">{famLabel}</span>
+                    <span className="text-muted-foreground">—</span>
+                    <span>{dealLabels[s.proposedDeal] || s.proposedDeal}</span>
+                    <span className="text-[10px] text-muted-foreground">({turnsLeft}t)</span>
+                    <span className="text-[10px] text-primary">+{s.successBonus}%</span>
+                    <button
+                      className="ml-1 px-1.5 py-0.5 rounded bg-primary/80 hover:bg-primary text-primary-foreground text-[10px] font-bold transition-colors"
+                      onClick={() => {
+                        setNegotiationState({
+                          open: true,
+                          scope: 'family',
+                          targetFamily: s.fromFamily,
+                          incomingSitdownId: s.id,
+                          successBonus: s.successBonus,
+                        });
+                      }}
+                    >
+                      Accept
+                    </button>
+                    <button
+                      className="px-1.5 py-0.5 rounded bg-destructive/80 hover:bg-destructive text-destructive-foreground text-[10px] font-bold transition-colors"
+                      onClick={() => performAction({ type: 'decline_incoming_sitdown', sitdownId: s.id })}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
       
       {/* Center - Resources */}
@@ -1360,6 +1411,8 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
           // Boss (family-level) negotiation
           const enemyFamilies = gameState.aiOpponents.map((o: any) => o.family).filter((f: string) => !(gameState as any).eliminatedFamilies?.includes(f));
           const targetFam = negotiationState.targetFamily || enemyFamilies[0] || '';
+          const incomingSitdownId = (negotiationState as any).incomingSitdownId;
+          const successBonus = (negotiationState as any).successBonus || 0;
           return (
             <NegotiationDialog
               open={negotiationState.open}
@@ -1367,12 +1420,22 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               scope="family"
               negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               onNegotiate={(type, extraData) => {
-                performAction({
-                  type: 'boss_negotiate',
-                  negotiationType: type,
-                  targetFamily: targetFam,
-                  extraData,
-                });
+                if (incomingSitdownId) {
+                  performAction({
+                    type: 'accept_incoming_sitdown',
+                    sitdownId: incomingSitdownId,
+                    negotiationType: type,
+                    targetFamily: targetFam,
+                    extraData,
+                  });
+                } else {
+                  performAction({
+                    type: 'boss_negotiate',
+                    negotiationType: type,
+                    targetFamily: targetFam,
+                    extraData,
+                  });
+                }
                 setNegotiationState(null);
               }}
               enemyFamily={targetFam}
@@ -1381,7 +1444,8 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               playerMoney={gameState.resources.money}
               enemyStrength={0}
               hexIncome={0}
-              availableEnemyFamilies={enemyFamilies}
+              availableEnemyFamilies={incomingSitdownId ? undefined : enemyFamilies}
+              successBonus={successBonus}
               treacheryTurnsRemaining={(gameState as any).treacheryDebuff?.turnsRemaining || 0}
             />
           );

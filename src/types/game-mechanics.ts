@@ -810,3 +810,13 @@ export const getAllFamilyPairKeys = (): string[] => {
   }
   return pairs;
 };
+
+// ============ AI-INITIATED SITDOWN REQUESTS ============
+export interface IncomingSitdown {
+  id: string;
+  fromFamily: string;
+  proposedDeal: 'ceasefire' | 'alliance' | 'safe_passage' | 'supply_deal';
+  turnRequested: number;
+  expiresOnTurn: number; // 2-turn window to respond
+  successBonus: number;  // +15% since THEY asked
+}
