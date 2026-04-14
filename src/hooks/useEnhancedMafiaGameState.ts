@@ -7253,6 +7253,36 @@ export const useEnhancedMafiaGameState = (
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
         }
+        case 'accept_incoming_sitdown': {
+          const sitdown = (newState.incomingSitdowns || []).find(s => s.id === action.sitdownId);
+          if (!sitdown) return newState;
+          // Remove the incoming sitdown entry
+          newState.incomingSitdowns = newState.incomingSitdowns.filter(s => s.id !== action.sitdownId);
+          // Route to boss_negotiate with the success bonus
+          const result = processNegotiation(newState, {
+            ...action,
+            type: 'boss_negotiate',
+            isBossNegotiation: true,
+            negotiationType: sitdown.proposedDeal,
+            targetFamily: sitdown.fromFamily,
+            successBonus: sitdown.successBonus,
+            extraData: action.extraData,
+          });
+          result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
+        case 'decline_incoming_sitdown': {
+          const sitdown = (newState.incomingSitdowns || []).find(s => s.id === action.sitdownId);
+          if (!sitdown) return newState;
+          newState.incomingSitdowns = newState.incomingSitdowns.filter(s => s.id !== action.sitdownId);
+          addPairTension(newState, newState.playerFamily, sitdown.fromFamily, 5);
+          const famLabel = sitdown.fromFamily.charAt(0).toUpperCase() + sitdown.fromFamily.slice(1);
+          newState.pendingNotifications.push({
+            type: 'warning' as const,
+            title: '🚫 Sitdown Declined',
+            message: `You declined the ${famLabel} family's request. Tension +5.`,
+          });
+          return newState;
         case 'assault_hq': {
           // Phase gate: Phase 4+
           if ((newState.gamePhase || 1) < 4) {
