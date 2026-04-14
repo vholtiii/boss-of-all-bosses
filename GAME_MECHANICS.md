@@ -26,6 +26,9 @@
 - [22. Intel & Threat Detection](#22-intel--threat-detection)
 - [23. Strategic Tips](#23-strategic-tips)
 - [24. Tension & War System](#24-tension--war-system)
+- [25. District Control Bonuses](#25-district-control-bonuses)
+- [26. Prosecution Risk System](#26-prosecution-risk-system)
+- [27. Counter-Intelligence & Purge Ranks](#27-counter-intelligence--purge-ranks)
 
 ---
 
@@ -329,7 +332,9 @@ Requires a capo. Success is rolled against base chance + personality bonus + inf
 | Police Chief | $8,000 | 40% | 7 turns | +50% intel on rival |
 | Mayor | $25,000 | 25% | 10 turns | Shut down rival territory |
 
-Active bribes can also reveal enemy planned hits — see [Intel & Threat Detection](#20-intel--threat-detection).
+Active bribes can also reveal enemy planned hits — see [Intel & Threat Detection](#22-intel--threat-detection).
+
+Higher-tier bribes (Captain+) can also reveal **informants** in your own ranks — see [Counter-Intelligence & Purge Ranks](#27-counter-intelligence--purge-ranks).
 
 ---
 
@@ -400,6 +405,14 @@ Active bribes can also reveal enemy planned hits — see [Intel & Threat Detecti
 - **Immediate**: +10 fear, +8 police heat, +3 loyalty to all soldiers
 - **Ongoing**: +15% combat (hit) bonus for all deployed soldiers
 - **Tradeoff**: Heat increase risks arrests at high heat levels — weigh combat edge vs police attention
+
+### 15.5 Purge Ranks
+- **Cost**: 1 action point. **Phase**: Action phase only.
+- Eliminate soldiers flagged as "Suspicious" or "Confirmed Rat"
+- Available from the left side panel (Strategic Actions) or HQ panel
+- **Confirmed Rat**: +5 fear, +3 heat, +10 loyalty to soldiers under 50 loyalty
+- **Innocent Soldier**: +3 fear, +2 heat, -5 loyalty to all soldiers, -3 respect
+- See [Counter-Intelligence & Purge Ranks](#27-counter-intelligence--purge-ranks) for detection mechanics
 
 ---
 
@@ -752,6 +765,90 @@ AI families benefit from the **same district control bonuses** as the player:
 - Queens hit success bonus in combat
 - Staten Island respect and influence gains
 - Turf Tax applies universally — AI-controlled districts drain player unit loyalty too
+
+---
+
+## 26. Prosecution Risk System
+
+Prosecution Risk is a dynamic failure condition that runs parallel to Police Heat. It creates escalating legal pressure as your criminal activity attracts law enforcement attention.
+
+### 26.1 Calculation
+
+```
+Prosecution Risk = (Heat × 0.4) + (Active Informants × 10) + (Recent Arrests × 5)
+                 - Bribe Reductions - Lawyer Bonus (-5/turn)
+```
+
+### 26.2 Thresholds
+
+| Risk Level | Timer | Consequence |
+|---|---|---|
+| **50+** (Arrest Risk) | 3 consecutive turns at 50+ | Random soldier arrested — jailed for 5 turns (maintenance still paid, -10 loyalty on release) |
+| **60+** (Grand Jury) | Immediate | Grand Jury Subpoena — **-30% profit** on all illegal businesses |
+| **90+** (Federal Indictment) | 3 turns to respond | Must pay **$25,000** legal defense or **Game Over**. If paid: 30% of cash frozen, illegal businesses suspended for 3 turns |
+
+### 26.3 Key Constants
+
+| Constant | Value |
+|---|---|
+| `PROSECUTION_ARREST_THRESHOLD` | 50 |
+| `PROSECUTION_ARREST_TIMER` | 3 turns |
+| `GRAND_JURY_THRESHOLD` | 60 |
+| `FEDERAL_INDICTMENT_TIMER` | 3 turns |
+| `FEDERAL_INDICTMENT_DEFENSE_COST` | $25,000 |
+
+### 26.4 UI
+
+Status bars in the HQ panel display prosecution risk with tooltip breakdowns of all contributing factors (heat, informants, arrests, bribe offsets).
+
+---
+
+## 27. Counter-Intelligence & Purge Ranks
+
+Internal security system for detecting and eliminating informants (rats) within your family.
+
+### 27.1 How Informants Appear
+
+- **Police Informants**: Soldiers with loyalty < 40 face a turn-based chance of being flipped by police. Active informants generate **+3 heat/turn** and incur a **-10% illegal income penalty**.
+- **Enemy Flips**: Rival capos within 3 hexes of your HQ can flip your soldiers (escalating cost: $5K base + $3K per active flip). Flipped units have an **8% turn-based discovery risk**.
+
+### 27.2 Detection Paths
+
+| Method | Chance | Requirement |
+|---|---|---|
+| **Bribed Captain** | 25% per turn | Active Captain bribe |
+| **Bribed Chief** | 40% per turn | Active Chief bribe |
+| **Bribed Mayor** | 100% per turn | Active Mayor bribe |
+| **Suspicion Markers** | Automatic | Loyalty < 40 for 2+ consecutive turns |
+| **Self-Scouting** | Per scout action | Scout your own hex to check for informants |
+
+- **Captain+** bribes: Each turn, a random check reveals whether any of your soldiers are informants
+- **Suspicion**: After 2+ turns with loyalty < 40, a soldier is flagged as "Suspicious" (visible in UI)
+- **Self-Scout**: Use the Scout tactical action on your own territory to check units for informant status
+
+### 27.3 Purge Ranks (Boss Action)
+
+Eliminate flagged soldiers from your family.
+
+| Property | Value |
+|---|---|
+| Cost | 1 action point |
+| Phase | Action phase only |
+| Access | Left panel (Strategic Actions) or HQ panel |
+| Targets | Soldiers flagged as "Suspicious" or "Confirmed Rat" |
+
+### 27.4 Elimination Outcomes
+
+| Target Status | Fear | Heat | Loyalty Effect | Respect |
+|---|---|---|---|---|
+| **Confirmed Rat** | +5 | +3 | +10 to soldiers with loyalty < 50 | — |
+| **Innocent Soldier** | +3 | +2 | -5 to all soldiers | -3 |
+
+### 27.5 Turn Summary
+
+Rat eliminations and wrongful kills are reported in the Turn Summary modal at end of turn:
+- 🔫 **Rat eliminated**: Confirms the target was an informant
+- 💀 **Wrongful kill**: Target was innocent — morale and respect penalties applied
 
 ---
 

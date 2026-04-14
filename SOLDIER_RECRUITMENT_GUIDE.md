@@ -82,6 +82,18 @@ Every soldier tracks individual statistics:
 | Unpaid maintenance | -2 loyalty/turn |
 | Capo wounded in combat | -10 loyalty |
 
+### 4.2 Suspicion & Informant Flags
+
+Soldiers can become informants (rats) through police pressure or enemy espionage. Three tracking fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `suspiciousTurns` | Counter | Increments each turn loyalty stays < 40. Resets when loyalty ≥ 40. |
+| `suspicious` | Boolean | Set to `true` when `suspiciousTurns` ≥ 2. Visible in UI as ⚠️ marker. |
+| `confirmedRat` | Boolean | Set to `true` when an informant is positively identified via bribe discovery or self-scouting. Visible as 🐀 marker. |
+
+Soldiers flagged as Suspicious or Confirmed Rat can be eliminated via the **Purge Ranks** Boss action (see Section 9).
+
 ---
 
 ## 5. Capo Promotion
@@ -210,6 +222,45 @@ Auto-fails after 5 turns total.
 - Flip enemy soldiers at their HQ to weaken defenses (-10% each)
 - Use Sitdown to consolidate your own HQ defense
 - Position multiple units adjacent to target HQ for the +5% per-unit bonus
+
+---
+
+## 9. Purge Ranks (Eliminating Soldiers)
+
+The Boss can eliminate soldiers flagged as "Suspicious" or "Confirmed Rat" to protect the family from internal threats.
+
+### 9.1 Mechanics
+
+| Property | Value |
+|---|---|
+| Cost | 1 action point |
+| Phase | Action phase only |
+| Access | Left panel (Strategic Actions → Purge Ranks) or HQ Information Panel |
+| Targets | Deployed soldiers flagged as `suspicious` or `confirmedRat` |
+
+### 9.2 Outcomes
+
+| Target Status | Result |
+|---|---|
+| **Confirmed Rat** | 🔫 +5 fear, +3 heat. Soldiers with loyalty < 50 gain +10 loyalty. Reported in Turn Summary. |
+| **Innocent Soldier** | 💀 +3 fear, +2 heat. All soldiers lose -5 loyalty. Family loses -3 respect. Reported in Turn Summary. |
+
+### 9.3 Detection Methods
+
+| Method | Chance | How |
+|---|---|---|
+| Bribed Captain | 25%/turn | Random check each turn |
+| Bribed Chief | 40%/turn | Random check each turn |
+| Bribed Mayor | 100%/turn | Guaranteed discovery |
+| Suspicion markers | Automatic | Loyalty < 40 for 2+ consecutive turns |
+| Self-scouting | Per action | Scout your own hex |
+
+### 9.4 Strategic Considerations
+
+- Eliminating a confirmed rat is always net positive — fear boost + loyalty restoration
+- Eliminating a suspicious (but innocent) soldier is devastating — morale collapse across the family
+- Invest in Captain+ bribes for reliable detection before purging
+- Keep soldier loyalty above 40 to prevent suspicion markers from appearing
 
 ---
 
