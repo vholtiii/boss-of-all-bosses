@@ -140,7 +140,8 @@ const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
                       met={s.stats.victories >= balancedThreshold && s.stats.racketeering >= balancedThreshold} 
                       label={`Balanced path: both ≥${balancedThreshold}`} 
                     />
-                  )}
+                   )}
+                  <Req met={s.stats.loyalty >= 70} label={`Loyalty: ${s.stats.loyalty}/70`} />
                   {s.pathLabel && (
                     <span className="text-[9px] text-primary/70 ml-4">→ {s.pathLabel}</span>
                   )}
