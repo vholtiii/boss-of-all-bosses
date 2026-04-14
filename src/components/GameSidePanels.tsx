@@ -1009,6 +1009,17 @@ export const RightSidePanel: React.FC<{
           </div>
         </div>
 
+        {/* ── Phase Progression ── */}
+        <PhaseInfographic
+          gamePhase={(gameState as any).gamePhase || 1}
+          turn={gameState.turn}
+          hexMap={gameState.hexMap}
+          resources={gameState.resources}
+          units={gameState.deployedUnits || []}
+          aiOpponents={gameState.aiOpponents}
+          playerFamily={gameState.playerFamily}
+        />
+
         {/* ── Events ── */}
         {gameState.events.length > 0 && (
           <CollapsibleSection
