@@ -4224,7 +4224,7 @@ export const useEnhancedMafiaGameState = (
     }
 
     // Total expenses = maintenance + upkeep + penalties
-    const totalExpenses = soldierMaintenance + communityUpkeep + arrestPenaltyAmount + heatPenaltyAmount;
+    const totalExpenses = soldierMaintenance + communityUpkeep + arrestPenaltyAmount + heatPenaltyAmount + copFlipPenaltyAmount;
     const totalProfit = grossIncome - totalExpenses;
 
     // Apply to money
@@ -4235,7 +4235,7 @@ export const useEnhancedMafiaGameState = (
     const postPenaltyLegalIncome = totalProfitPenalty > 0 
       ? Math.floor(grossLegalIncome * Math.max(0.1, (100 - totalProfitPenalty) / 100))
       : grossLegalIncome;
-    const postPenaltyIllegalIncome = Math.max(0, grossIllegalIncome - heatPenaltyAmount - (totalProfitPenalty > 0 ? (arrestPenaltyAmount - (grossLegalIncome - postPenaltyLegalIncome)) : 0));
+    const postPenaltyIllegalIncome = Math.max(0, grossIllegalIncome - heatPenaltyAmount - copFlipPenaltyAmount - (totalProfitPenalty > 0 ? (arrestPenaltyAmount - (grossLegalIncome - postPenaltyLegalIncome)) : 0));
     
     state.finances.totalIncome = grossIncome;
     state.finances.totalExpenses = totalExpenses;
