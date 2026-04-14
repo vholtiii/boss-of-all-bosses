@@ -61,8 +61,9 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
       chance += Math.floor((playerFear || 0) / 5);
     }
     if (type === 'bribe_territory') chance -= enemyStrength * 5;
+    chance += successBonus;
     return Math.max(5, Math.min(95, chance));
-  }, [personalityBonuses, playerReputation, playerFear, enemyStrength, scope]);
+  }, [personalityBonuses, playerReputation, playerFear, enemyStrength, scope, successBonus]);
 
   const getCost = useCallback((type: NegotiationType) => {
     const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
