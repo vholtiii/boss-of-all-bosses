@@ -444,7 +444,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                   </Collapsible>
                 </>
               );
-            })()
+            })()}
           </div>
         </CollapsibleSection>
 
