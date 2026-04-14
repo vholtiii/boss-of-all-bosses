@@ -84,6 +84,9 @@ import {
   // Family Power System
   FAMILY_POWERS, FamilyPower, FrontBossHex, LuccheseBoostedDistrict, BonannoPurgeImmunity,
   IncomingSitdown,
+  // Influence system
+  EROSION_THRESHOLD, EROSION_PROTECTION_RANGE, EXPANSION_THRESHOLD,
+  EROSION_RESPECT_LOSS, EROSION_INFLUENCE_LOSS, EXPANSION_RESPECT_GAIN, EXPANSION_INFLUENCE_GAIN,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
