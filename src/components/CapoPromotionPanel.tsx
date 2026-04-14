@@ -84,6 +84,7 @@ const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
         <p>• Max Victories ({maxThreshold}) + Racketeering ≥{discountedThreshold}</p>
         <p>• Max Racketeering ({maxThreshold}) + Victories ≥{discountedThreshold}</p>
         <p>• Both ≥{balancedThreshold} (balanced)</p>
+        <p>• Training ≥3 actions (movement, claims, etc.)</p>
         <p className="text-yellow-400/80">⏳ 1-turn ceremony — soldier cannot act during promotion</p>
       </div>
 
@@ -141,6 +142,7 @@ const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
                       label={`Balanced path: both ≥${balancedThreshold}`} 
                     />
                    )}
+                  <Req met={s.stats.training >= 3} label={`Training: ${s.stats.training}/3`} />
                   <Req met={s.stats.loyalty >= 70} label={`Loyalty: ${s.stats.loyalty}/70`} />
                   {s.pathLabel && (
                     <span className="text-[9px] text-primary/70 ml-4">→ {s.pathLabel}</span>

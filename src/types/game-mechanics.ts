@@ -387,7 +387,7 @@ export const CAPO_PROMOTION_REQUIREMENTS = {
 export function isCapoPromotionEligible(stats: SoldierStats): boolean {
   const v = stats.victories;
   const r = stats.racketeering;
-  return ((v >= 5 && r >= 3) || (r >= 5 && v >= 3) || (v >= 4 && r >= 4)) && stats.loyalty >= 70;
+  return ((v >= 5 && r >= 3) || (r >= 5 && v >= 3) || (v >= 4 && r >= 4)) && stats.loyalty >= 70 && stats.training >= 3;
 }
 
 // Helper: get promotion cost with loyalty discount
