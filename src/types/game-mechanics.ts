@@ -820,3 +820,12 @@ export interface IncomingSitdown {
   expiresOnTurn: number; // 2-turn window to respond
   successBonus: number;  // +15% since THEY asked
 }
+
+// ============ INFLUENCE EROSION & PASSIVE EXPANSION (Phase 3+) ============
+export const EROSION_THRESHOLD = 3;           // turns unprotected before hex flips neutral
+export const EROSION_PROTECTION_RANGE = 2;    // hex distance to count as protected
+export const EXPANSION_THRESHOLD = 2;         // turns adjacent before neutral hex is absorbed
+export const EROSION_RESPECT_LOSS = 2;        // absolute value — subtracted
+export const EROSION_INFLUENCE_LOSS = 3;      // absolute value — subtracted
+export const EXPANSION_RESPECT_GAIN = 2;
+export const EXPANSION_INFLUENCE_GAIN = 3;
