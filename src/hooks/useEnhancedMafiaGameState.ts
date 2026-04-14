@@ -7994,6 +7994,8 @@ export const useEnhancedMafiaGameState = (
                 u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
                 state.soldierStats[u.id].loyalty + LOYALTY_ACTION_BONUS + LOYALTY_COMBAT_BONUS
               );
+              state.soldierStats[u.id].actedThisTurn = true;
+              state.soldierStats[u.id].turnsIdle = 0;
             }
           });
           
@@ -8024,6 +8026,8 @@ export const useEnhancedMafiaGameState = (
                 u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
                 state.soldierStats[u.id].loyalty + LOYALTY_ACTION_BONUS + LOYALTY_COMBAT_BONUS
               );
+              state.soldierStats[u.id].actedThisTurn = true;
+              state.soldierStats[u.id].turnsIdle = 0;
             }
           });
           
@@ -8154,6 +8158,15 @@ export const useEnhancedMafiaGameState = (
           type: 'error', title: !isScouted ? '💀 Blind Hit Failed!' : 'Hit Failed!',
           message: `The attack was repelled. ${failDetails}.`,
         }];
+        // Failed action penalty: -5 loyalty to surviving attackers
+        const survivingAttackers = state.deployedUnits.filter(u => u.family === state.playerFamily && u.q === targetQ && u.r === targetR && u.s === targetS);
+        survivingAttackers.forEach(u => {
+          if (state.soldierStats[u.id]) {
+            state.soldierStats[u.id].loyalty = Math.max(0, state.soldierStats[u.id].loyalty - LOYALTY_FAILED_ACTION_PENALTY);
+            state.soldierStats[u.id].actedThisTurn = true;
+            state.soldierStats[u.id].turnsIdle = 0;
+          }
+        });
         state.combatLog = [...(state.combatLog || []), `💀 Hit on ${tile.district} failed! ${failDetails}`];
       }
       state.policeHeat.level = Math.min(100, state.policeHeat.level + heatGain);
@@ -8245,6 +8258,8 @@ export const useEnhancedMafiaGameState = (
             actingUnit.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
             stats.loyalty + LOYALTY_ACTION_BONUS
           );
+          stats.actedThisTurn = true;
+          stats.turnsIdle = 0;
           // Toughness progress from extortion
           stats.toughnessProgress = (stats.toughnessProgress || 0) + EXTORTION_TOUGHNESS_GAIN;
           if (stats.toughnessProgress >= 1.0 && stats.toughness < 5) {
@@ -8287,6 +8302,14 @@ export const useEnhancedMafiaGameState = (
           type: 'error', title: 'Extortion Failed!',
           message: `The locals refused to pay and word spread. Your reputation takes a hit.`,
         }];
+        // Failed action penalty: -5 loyalty to acting soldier
+        const extortActingSoldiers = allPlayerUnits.filter(u => u.type === 'soldier');
+        const extortActingUnit = extortActingSoldiers.length > 0 ? extortActingSoldiers[0] : allPlayerUnits[0];
+        if (extortActingUnit && state.soldierStats[extortActingUnit.id]) {
+          state.soldierStats[extortActingUnit.id].loyalty = Math.max(0, state.soldierStats[extortActingUnit.id].loyalty - LOYALTY_FAILED_ACTION_PENALTY);
+          state.soldierStats[extortActingUnit.id].actedThisTurn = true;
+          state.soldierStats[extortActingUnit.id].turnsIdle = 0;
+        }
       }
       const extortionFailed = !state.lastCombatResult?.success;
       state.policeHeat.level = Math.min(100, state.policeHeat.level + (isEnemy ? 12 : 8) + (extortionFailed ? 5 : 0));
