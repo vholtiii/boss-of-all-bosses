@@ -16,6 +16,8 @@ export interface SoldierStats {
   suspiciousTurns: number;  // consecutive turns with loyalty < 40
   suspicious: boolean;       // true when suspiciousTurns >= 2
   confirmedRat: boolean;     // true when discovered via bribe/scout
+  markedForDeath?: boolean;  // true when marked for elimination via Purge Ranks
+  markedTurnsRemaining?: number; // turns left before mark expires
 }
 
 // ============ PURGE RANKS (ELIMINATE RAT) SYSTEM ============
@@ -32,6 +34,7 @@ export const PURGE_SUSPICION_TURNS_REQUIRED = 2;     // consecutive turns below 
 export const PURGE_BRIBE_CAPTAIN_DISCOVER_CHANCE = 0.25;
 export const PURGE_BRIBE_CHIEF_DISCOVER_CHANCE = 0.40;
 export const PURGE_BRIBE_CHIEF_MAX_REVEALS = 2;
+export const PURGE_MARK_DURATION = 5;
 
 export const CLAIM_TOUGHNESS_GAIN = 0.25; // +0.25 progress per territory claim (4 claims = +1 toughness)
 export const EXTORTION_TOUGHNESS_GAIN = 0.3; // +0.3 progress per successful extortion (~3-4 extortions = +1 toughness)
