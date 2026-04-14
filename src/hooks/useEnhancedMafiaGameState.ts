@@ -34,6 +34,9 @@ import {
   BLIND_HIT_PENALTY, BLIND_HIT_RESPECT, BLIND_HIT_FEAR, HIDING_DURATION, BOUNTY_DURATION, BLIND_HIT_INFLUENCE_LOSS, BLIND_HIT_INFLUENCE_GAIN,
   INTERNAL_HIT_LOYALTY_THRESHOLD, INTERNAL_HIT_HEAT_REDUCTION, INTERNAL_HIT_MORALE_RISK, INTERNAL_HIT_MORALE_PENALTY,
   LOYALTY_ACTION_BONUS, LOYALTY_COMBAT_BONUS, LOYALTY_INCOME_HEX_BONUS, LOYALTY_INCOME_HEX_THRESHOLD, LOYALTY_UNPAID_PENALTY,
+  LOYALTY_IDLE_DECAY, LOYALTY_IDLE_THRESHOLD, LOYALTY_CAPO_AURA, LOYALTY_CAPO_AURA_RANGE, LOYALTY_HQ_COMFORT,
+  LOYALTY_MERC_CAP, LOYALTY_MERC_START, LOYALTY_RECRUIT_START, LOYALTY_RECRUIT_EARLY_BONUS, LOYALTY_RECRUIT_EARLY_TURNS,
+  LOYALTY_FAILED_ACTION_PENALTY, LOYALTY_ENEMY_TERRITORY_PENALTY, LOYALTY_NEUTRAL_HEX_PENALTY,
   CAPO_WOUND_LOYALTY_PENALTY, CAPO_WOUND_MOVE_PENALTY, CAPO_WOUND_DURATION, CAPO_WOUND_COMBAT_PENALTY,
   AI_PLAN_HIT_CHANCE, AI_PLAN_HIT_SUCCESS_RATE, AI_PLAN_HIT_DURATION,
   AIPlannedHit, IntelSource, INTEL_SOURCE_LABELS,
@@ -897,6 +900,7 @@ const createInitialGameState = (
       soldierStats[id] = {
         loyalty: 50, training: 0,
         hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
+        turnsIdle: 0, isMercenary: false, actedThisTurn: false,
       };
     }
     const capoNames: Record<string, string> = {
@@ -2479,6 +2483,7 @@ export const useEnhancedMafiaGameState = (
           newSoldierStats[newId] = {
             loyalty: 50, training: 0,
             hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
+            turnsIdle: 0, isMercenary: false, actedThisTurn: false,
           };
           newResources.soldiers -= 1;
         } else {
@@ -2720,6 +2725,7 @@ export const useEnhancedMafiaGameState = (
               newState.soldierStats[h.unitId] = {
                 loyalty: 50, training: 0, hits: 0, extortions: 0,
                 victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
+                turnsIdle: 0, isMercenary: false, actedThisTurn: false,
               };
             }
           }
@@ -2821,8 +2827,9 @@ export const useEnhancedMafiaGameState = (
             recruited: true,
           }];
           newState.soldierStats[freeId] = {
-            loyalty: 65, training: 0, hits: 0, extortions: 0,
+            loyalty: LOYALTY_RECRUIT_START, training: 0, hits: 0, extortions: 0,
             victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
+            turnsIdle: 0, isMercenary: false, actedThisTurn: false,
           };
           newState.resources.soldiers += 1;
           newState.pendingNotifications.push({
@@ -4467,6 +4474,7 @@ export const useEnhancedMafiaGameState = (
             state.soldierStats[newId] = {
               loyalty: 40 + Math.floor(Math.random() * 30), training: 0,
               hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
+              turnsIdle: 0, isMercenary: true, actedThisTurn: false,
             };
             // Only capos auto-claim neutral territory on deploy (matches player rules)
             const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
@@ -5096,7 +5104,7 @@ export const useEnhancedMafiaGameState = (
           const anyAiSoldier = state.deployedUnits.find(u => u.family === fam && u.type === 'soldier');
           if (anyAiSoldier) {
             // Boost stats to meet threshold, then promote
-            const stats = state.soldierStats[anyAiSoldier.id] || { loyalty: 50, training: 1, hits: 0, extortions: 2, victories: 3, toughness: 2, racketeering: 3, turnsDeployed: 10, toughnessProgress: 0 };
+            const stats = state.soldierStats[anyAiSoldier.id] || { loyalty: 50, training: 1, hits: 0, extortions: 2, victories: 3, toughness: 2, racketeering: 3, turnsDeployed: 10, toughnessProgress: 0, turnsIdle: 0, isMercenary: false, actedThisTurn: false };
             stats.victories = Math.max(stats.victories, 3);
             stats.racketeering = Math.max(stats.racketeering, 3);
             stats.loyalty = Math.max(stats.loyalty, 60);
@@ -6199,8 +6207,9 @@ export const useEnhancedMafiaGameState = (
                 recruited: false,
               }];
               newState.soldierStats[newId] = {
-                loyalty: 50, training: 0,
+                loyalty: LOYALTY_MERC_START, training: 0,
                 hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
+                turnsIdle: 0, isMercenary: true, actedThisTurn: false,
               };
             }
             newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -6244,8 +6253,9 @@ export const useEnhancedMafiaGameState = (
                 recruited: true,
               }];
               newState.soldierStats[newId] = {
-                loyalty: 65, training: 0,
+                loyalty: LOYALTY_RECRUIT_START, training: 0,
                 hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
+                turnsIdle: 0, isMercenary: false, actedThisTurn: false,
               };
             }
             newState.pendingNotifications = [...newState.pendingNotifications, {
