@@ -507,6 +507,30 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 🚨 RICO: {(gameState as any).ricoTimer}/5 turns
               </div>
             )}
+            {/* Prosecution Arrest Timer */}
+            {(gameState as any).prosecutionTimer > 0 && legalStatus.prosecutionRisk >= 50 && (
+              <div className="rounded-md border border-orange-500/50 bg-orange-500/10 px-3 py-1.5 text-xs text-orange-400 font-bold flex items-center gap-1.5">
+                ⚖️ Prosecution: {(gameState as any).prosecutionTimer}/3 turns — soldier arrest imminent
+              </div>
+            )}
+            {/* Grand Jury Subpoena Warning */}
+            {legalStatus.prosecutionRisk >= 60 && (
+              <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 px-3 py-1.5 text-xs text-yellow-400 font-semibold flex items-center gap-1.5">
+                📜 Grand Jury Subpoena — Illegal profits −30%
+              </div>
+            )}
+            {/* Federal Indictment Warning */}
+            {(gameState as any).federalIndictmentTimer > 0 && legalStatus.prosecutionRisk >= 90 && (
+              <div className="rounded-md border border-red-600/50 bg-red-600/10 px-3 py-1.5 text-xs text-red-400 font-bold flex items-center gap-1.5 animate-pulse">
+                🏛️ Federal Indictment: {(gameState as any).federalIndictmentTimer}/3 turns — pay $25K or GAME OVER
+              </div>
+            )}
+            {/* Federal Indictment Active */}
+            {(gameState as any).federalIndictmentActive && (
+              <div className="rounded-md border border-red-600/50 bg-red-600/10 px-3 py-1.5 text-xs text-red-300 font-medium flex items-center gap-1.5">
+                🏛️ Under Federal Oversight — illegal businesses suspended ({(gameState as any).federalIndictmentRecoveryTurn - gameState.turn} turns left)
+              </div>
+            )}
             {/* Heat Tier Indicator */}
             {(() => {
               const heat = policeHeat.level;
