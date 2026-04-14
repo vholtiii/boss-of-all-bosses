@@ -7283,6 +7283,7 @@ export const useEnhancedMafiaGameState = (
             message: `You declined the ${famLabel} family's request. Tension +5.`,
           });
           return newState;
+        }
         case 'assault_hq': {
           // Phase gate: Phase 4+
           if ((newState.gamePhase || 1) < 4) {
