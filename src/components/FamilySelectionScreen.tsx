@@ -37,7 +37,7 @@ const families: FamilyInfo[] = [
   {
     id: 'gambino',
     name: 'Gambino',
-    motto: '"Keep your friends close, but your enemies closer."',
+    motto: '"The man who controls the money controls everything."',
     description: 'The most powerful family in New York. Masters of business and political connections with a strong starting economy — but that power makes you a target.',
     color: '#42D3F2',
     difficulty: 'Medium',
@@ -57,7 +57,7 @@ const families: FamilyInfo[] = [
   {
     id: 'genovese',
     name: 'Genovese',
-    motto: '"In this business, you either kill or get killed."',
+    motto: '"The best move is the one nobody sees."',
     description: 'The shadow empire. Masters of legitimate business fronts and money laundering. Their economic engine funds everything while staying hidden in plain sight.',
     color: '#2AA63E',
     difficulty: 'Hard',
@@ -77,7 +77,7 @@ const families: FamilyInfo[] = [
   {
     id: 'lucchese',
     name: 'Lucchese',
-    motto: '"Money talks. Everything else walks."',
+    motto: '"One clean hit is worth a hundred soldiers."',
     description: 'The silent killers. Superior intelligence networks and surgical precision make them deadly. Lower heat and higher hit rates let them strike without consequences.',
     color: '#4169E1',
     difficulty: 'Easy',
@@ -117,7 +117,7 @@ const families: FamilyInfo[] = [
   {
     id: 'colombo',
     name: 'Colombo',
-    motto: '"Strike fast. Strike hard. No mercy."',
+    motto: '"We don\'t need much. Just enough to bury you."',
     description: 'The scrappy survivors. Start with the least but fight the hardest for every dollar. Low resources force creative play — recruitment discounts and fear keep you in the game.',
     color: '#8A2BE2',
     difficulty: 'Hard',
