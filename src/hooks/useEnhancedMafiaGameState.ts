@@ -5411,7 +5411,9 @@ export const useEnhancedMafiaGameState = (
       opponent.resources.respect = Math.min(100, Math.max(0, (opponent.resources.respect || 0) + respectGain - 0.5));
 
       // ── AI FLIP SOLDIER (weaken enemy HQ defenses) — Capo within 3 hexes of enemy HQ ──
-      if (aiPhase >= 3 && opponent.resources.money >= FLIP_SOLDIER_COST && Math.random() < (personality === 'aggressive' ? 0.25 : personality === 'opportunistic' ? 0.20 : personality === 'unpredictable' ? 0.18 : 0.12)) {
+      const aiFlippedCount = (state.flippedSoldiers || []).filter(f => f.flippedByFamily === fam).length;
+      const aiFlipCost = FLIP_SOLDIER_BASE_COST + aiFlippedCount * FLIP_SOLDIER_COST_ESCALATION;
+      if (aiPhase >= 3 && opponent.resources.money >= aiFlipCost && Math.random() < (personality === 'aggressive' ? 0.25 : personality === 'opportunistic' ? 0.20 : personality === 'unpredictable' ? 0.18 : 0.12)) {
         const otherFamilies = [state.playerFamily, ...state.aiOpponents.filter(o => o.family !== fam).map(o => o.family)];
         let flipped = false;
         for (const victimFamily of otherFamilies) {
@@ -5435,7 +5437,7 @@ export const useEnhancedMafiaGameState = (
           if (flippableTargets.length === 0) continue;
           const target = flippableTargets[Math.floor(Math.random() * flippableTargets.length)];
           const tStats = state.soldierStats[target.id];
-          opponent.resources.money -= FLIP_SOLDIER_COST;
+          opponent.resources.money -= aiFlipCost;
           let chance = FLIP_SOLDIER_BASE_CHANCE;
           if (tStats && tStats.loyalty < 60) chance += 0.15;
           if (tStats && tStats.loyalty > 70) chance -= 0.10;
