@@ -282,9 +282,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             <ActionButton
               icon={<HandCoins className="h-4 w-4" />}
               label="Extort Business"
-              sublabel={`Free · +Heat`}
-              disabled={legalStatus.jailTime > 0}
-              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : undefined}
+              sublabel={(gameState as any).gamePhase >= 3 ? '🔒 Influence Era' : `Free · +Heat`}
+              disabled={legalStatus.jailTime > 0 || (gameState as any).gamePhase >= 3}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : (gameState as any).gamePhase >= 3 ? '🔒 Phase 3 — Territory shifts through influence' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'extort_business', amount: 5000 })}
             />

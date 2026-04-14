@@ -158,6 +158,10 @@ const PhaseInfographic: React.FC<PhaseInfographicProps> = ({
         <p className="text-[10px] text-primary font-semibold text-center">👑 Final Phase — Seize total control!</p>
       )}
 
+      {gamePhase === 3 && (
+        <p className="text-[10px] text-amber-400 font-semibold text-center">🔒 Claiming & Extortion disabled — territory shifts through influence</p>
+      )}
+
       {/* Rival phases */}
       {aiOpponents && aiOpponents.length > 0 && (
         <div className="space-y-1">

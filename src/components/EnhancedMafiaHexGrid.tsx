@@ -467,11 +467,12 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         // Block all normal actions on HQ hexes
         const canHit = isEnemy && (isSoldier || isCapo) && !tile.isHeadquarters;
         const enemyExtortLocked = isEnemy && (gameState?.gamePhase || 1) < 2;
-        const canExtort = hasCompletedBusiness && (
+        const phase3Locked = (gameState?.gamePhase || 1) >= 3;
+        const canExtort = !phase3Locked && hasCompletedBusiness && (
           (isSoldier && unitOnTargetHex) || 
           (isCapo && (unitOnTargetHex || true))
         ) && (isNeutral || isEnemy) && !tile.isHeadquarters && !enemyExtortLocked;
-        const canClaim = isNeutral && isSoldier && !tile.business && !tile.isHeadquarters;
+        const canClaim = !phase3Locked && isNeutral && isSoldier && !tile.business && !tile.isHeadquarters;
         const isCapoWounded = isCapo && (selectedUnit as any).woundedTurnsRemaining > 0;
         // Negotiate: only available during action phase when a pending negotiation is ready on this hex
         const readyPending = (gameState?.pendingNegotiations || []).find((p: any) => p.ready && p.targetQ === tile.q && p.targetR === tile.r && p.targetS === tile.s);
@@ -502,14 +503,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           reasons.hit = noActions ? 'No actions left' : (!isSoldier && !isCapo) ? 'Need soldier or capo' : '';
         }
         if (!canExtort) {
-          if (enemyExtortLocked && hasCompletedBusiness) reasons.extort = '🔒 Enemy extortion unlocks in Phase 2';
+          if (phase3Locked && hasCompletedBusiness && (isNeutral || isEnemy)) reasons.extort = '🔒 Phase 3 — shifts through influence';
+          else if (enemyExtortLocked && hasCompletedBusiness) reasons.extort = '🔒 Enemy extortion unlocks in Phase 2';
           else if (!hasCompletedBusiness && (isNeutral || isEnemy) && tile.business) reasons.extort = 'Business under construction';
           else if (!hasCompletedBusiness && (isNeutral || isEnemy)) reasons.extort = 'No business on hex';
           else if (hasCompletedBusiness && isSoldier && !unitOnTargetHex) reasons.extort = 'Soldier must be on hex';
           else if (noActions) reasons.extort = 'No actions left';
         }
         if (!canClaim && isNeutral) {
-          if (tile.business) reasons.claim = 'Has business (extort instead)';
+          if (phase3Locked) reasons.claim = '🔒 Phase 3 — shifts through influence';
+          else if (tile.business) reasons.claim = 'Has business (extort instead)';
           else if (!isSoldier) reasons.claim = 'Need a soldier';
         }
         if (!canSabotage && isEnemy) {
