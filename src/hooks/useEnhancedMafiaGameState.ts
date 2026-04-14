@@ -3519,6 +3519,18 @@ export const useEnhancedMafiaGameState = (
         }
       }
       
+      // --- Loyalty Bar: Average of all deployed soldiers' individual loyalty ---
+      {
+        const playerSoldiersForAvg = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+        if (playerSoldiersForAvg.length > 0) {
+          const avgLoyalty = playerSoldiersForAvg.reduce((sum, u) => {
+            const stats = newState.soldierStats[u.id];
+            return sum + (stats ? stats.loyalty : 50);
+          }, 0) / playerSoldiersForAvg.length;
+          newState.reputation.loyalty = Math.round(avgLoyalty);
+        }
+      }
+      
       // Sync resources.loyalty from reputation.loyalty
       newState.resources.loyalty = Math.round(newState.reputation.loyalty);
       
@@ -4481,8 +4493,14 @@ export const useEnhancedMafiaGameState = (
       }
     }
 
+    // Grand Jury Subpoena penalty — 30% reduction to illegal income at prosecution risk 60+
+    let grandJuryPenaltyAmount = 0;
+    if (state.legalStatus.prosecutionRisk >= GRAND_JURY_THRESHOLD) {
+      grandJuryPenaltyAmount = Math.floor((grossIllegalIncome - copFlipPenaltyAmount - heatPenaltyAmount) * GRAND_JURY_ILLEGAL_PROFIT_PENALTY);
+    }
+
     // Total expenses = maintenance + upkeep + penalties
-    const totalExpenses = soldierMaintenance + communityUpkeep + arrestPenaltyAmount + heatPenaltyAmount + copFlipPenaltyAmount;
+    const totalExpenses = soldierMaintenance + communityUpkeep + arrestPenaltyAmount + heatPenaltyAmount + copFlipPenaltyAmount + grandJuryPenaltyAmount;
     const totalProfit = grossIncome - totalExpenses;
 
     // Apply to money
