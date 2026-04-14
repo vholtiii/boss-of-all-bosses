@@ -485,7 +485,13 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         const meetsToughness = soldierStats && soldierStats.toughness >= 4 && soldierStats.loyalty >= 70;
         const currentGamePhase = (gameState?.gamePhase || 1);
         const canAssaultHQ = isAdjacentToHQ && meetsToughness && currentGamePhase >= 4;
-        const canFlipSoldier = isEnemyHQ && isAdjacentToHQ && currentGamePhase >= 3;
+        
+        // Flip Soldier: requires a player CAPO within 3 hexes of enemy HQ
+        const hasCapoWithin3 = isEnemyHQ && (gameState?.deployedUnits || []).some((u: any) =>
+          u.family === gameState?.playerFamily && u.type === 'capo' &&
+          Math.abs(u.q - tile.q) + Math.abs(u.r - tile.r) + Math.abs(u.s - tile.s) <= 6 // hexDistance * 2
+        );
+        const canFlipSoldier = isEnemyHQ && hasCapoWithin3 && currentGamePhase >= 3;
         
         // Compute reasons for disabled actions (contextually relevant only)
         const reasons: Record<string, string> = {};
@@ -526,8 +532,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           else if (currentGamePhase < 4) reasons.assault_hq = '🔒 Unlocks in Phase 4';
           else if (!meetsToughness) reasons.assault_hq = `Need Tough ≥ 4, Loyalty ≥ 70`;
         }
-        if (isEnemyHQ && isAdjacentToHQ && !canFlipSoldier) {
+        if (isEnemyHQ && !canFlipSoldier) {
           if (currentGamePhase < 3) reasons.flip_soldier = '🔒 Unlocks in Phase 3';
+          else if (!hasCapoWithin3) reasons.flip_soldier = 'Need a Capo within 3 hexes of enemy HQ';
         }
         
         // Filter out empty reasons
@@ -1717,7 +1724,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         }}
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-muted hover:bg-muted/80 text-foreground text-xs font-bold transition-colors"
                       >
-                        🐀 Flip Soldier ($5K)
+                        🐀 Flip Soldier (Capo)
                       </button>
                     ) : reasons.flip_soldier ? (
                       <DisabledAction icon="🐀" label="Flip Soldier" reason={reasons.flip_soldier} />

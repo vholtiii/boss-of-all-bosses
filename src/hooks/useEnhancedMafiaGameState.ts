@@ -5410,52 +5410,51 @@ export const useEnhancedMafiaGameState = (
       const respectGain = Math.floor(aiTerritoryCount / 4) + (aggression > 60 ? 1 : 0);
       opponent.resources.respect = Math.min(100, Math.max(0, (opponent.resources.respect || 0) + respectGain - 0.5));
 
-      // ── AI FLIP SOLDIER (weaken enemy HQ defenses) ──
+      // ── AI FLIP SOLDIER (weaken enemy HQ defenses) — Capo within 3 hexes of enemy HQ ──
       if (aiPhase >= 3 && opponent.resources.money >= FLIP_SOLDIER_COST && Math.random() < (personality === 'aggressive' ? 0.25 : personality === 'opportunistic' ? 0.20 : personality === 'unpredictable' ? 0.18 : 0.12)) {
-        // Find enemy HQs and look for soldiers near them to flip
         const otherFamilies = [state.playerFamily, ...state.aiOpponents.filter(o => o.family !== fam).map(o => o.family)];
         let flipped = false;
         for (const victimFamily of otherFamilies) {
           if ((state.eliminatedFamilies || []).includes(victimFamily)) continue;
           const victimHQ = state.headquarters[victimFamily as keyof typeof state.headquarters];
           if (!victimHQ) continue;
-          const hqNeighbors = getHexNeighbors(victimHQ.q, victimHQ.r, victimHQ.s);
-          // AI must have a unit adjacent to victim HQ
-          const aiHasPresence = state.deployedUnits.some(u => u.family === fam && hqNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s));
-          if (!aiHasPresence) continue;
-          // Find flippable enemy soldiers near their own HQ
-          const enemySoldiersNearHQ = state.deployedUnits.filter(u =>
+          // AI must have a CAPO within 3 hexes of victim HQ
+          const aiCapo = state.deployedUnits
+            .filter(u => u.family === fam && u.type === 'capo' && hexDistance(u, { q: victimHQ.q, r: victimHQ.r, s: victimHQ.s }) <= 3)
+            .sort((a, b) => hexDistance(a, victimHQ) - hexDistance(b, victimHQ))[0];
+          if (!aiCapo) continue;
+          // Target pool: enemy soldiers within 2 hexes of the AI capo
+          const enemySoldiersNearCapo = state.deployedUnits.filter(u =>
             u.family === victimFamily && u.type === 'soldier' &&
-            (u.q === victimHQ.q && u.r === victimHQ.r && u.s === victimHQ.s ||
-             hqNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s))
+            hexDistance(u, aiCapo) <= 2 && hexDistance(u, aiCapo) > 0
           );
-          const flippableTargets = enemySoldiersNearHQ.filter(u => {
+          const flippableTargets = enemySoldiersNearCapo.filter(u => {
             const uStats = state.soldierStats[u.id];
             return uStats && uStats.loyalty < 80 && !(state.flippedSoldiers || []).some(f => f.unitId === u.id);
           });
           if (flippableTargets.length === 0) continue;
-          // Attempt flip
           const target = flippableTargets[Math.floor(Math.random() * flippableTargets.length)];
           const tStats = state.soldierStats[target.id];
           opponent.resources.money -= FLIP_SOLDIER_COST;
           let chance = FLIP_SOLDIER_BASE_CHANCE;
           if (tStats && tStats.loyalty < 60) chance += 0.15;
           if (tStats && tStats.loyalty > 70) chance -= 0.10;
+          // Schemer capo bonus
+          if (aiCapo.personality === 'schemer') chance += 0.10;
           chance = Math.min(0.60, Math.max(0.05, chance));
           if (Math.random() < chance) {
             state.flippedSoldiers = [...(state.flippedSoldiers || []), { unitId: target.id, family: victimFamily, flippedByFamily: fam, hqQ: victimHQ.q, hqR: victimHQ.r, hqS: victimHQ.s }];
             if (victimFamily === state.playerFamily) {
-              state.pendingNotifications.push({ type: 'warning', title: '🐀 Soldier Compromised!', message: `The ${fam} family has flipped one of your soldiers near HQ! Your HQ defense is weakened.` });
+              state.pendingNotifications.push({ type: 'warning', title: '🐀 Soldier Compromised!', message: `The ${fam} family's capo has flipped one of your soldiers! Your HQ defense is weakened.` });
             }
-            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'flip_soldier', detail: `Flipped a ${victimFamily} soldier near their HQ` });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'flip_soldier', detail: `Capo flipped a ${victimFamily} soldier` });
           } else {
-            // Failed — AI loses influence
             opponent.resources.influence = Math.max(0, opponent.resources.influence - FLIP_SOLDIER_FAIL_INFLUENCE_LOSS);
             if (tStats) tStats.loyalty = Math.min(80, tStats.loyalty + 10);
             if (victimFamily === state.playerFamily) {
-              state.pendingNotifications.push({ type: 'info', title: '🛡️ Flip Attempt Foiled', message: `The ${fam} family tried to turn one of your soldiers — but failed! Soldier loyalty increased.` });
+              state.pendingNotifications.push({ type: 'info', title: '🛡️ Flip Attempt Foiled', message: `The ${fam} family's capo tried to turn one of your soldiers — but failed!` });
             }
-            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'flip_soldier_fail', detail: `Failed to flip a ${victimFamily} soldier` });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'flip_soldier_fail', detail: `Capo failed to flip a ${victimFamily} soldier` });
           }
           flipped = true;
           break;
@@ -7427,18 +7426,21 @@ export const useEnhancedMafiaGameState = (
       return state;
     }
 
-    const hqNeighbors = getHexNeighbors(targetQ, targetR, targetS);
-    const hasAdjacentUnit = state.deployedUnits.some(u => u.family === state.playerFamily && hqNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s));
-    if (!hasAdjacentUnit) {
-      state.pendingNotifications = [...state.pendingNotifications, { type: 'warning', title: '⚠️ No Unit Adjacent', message: 'Need a unit adjacent to enemy HQ.' }];
+    // Require a player CAPO within 3 hexes of enemy HQ
+    const actingCapo = state.deployedUnits
+      .filter(u => u.family === state.playerFamily && u.type === 'capo' && hexDistance(u, { q: targetQ, r: targetR, s: targetS }) <= 3)
+      .sort((a, b) => hexDistance(a, { q: targetQ, r: targetR, s: targetS }) - hexDistance(b, { q: targetQ, r: targetR, s: targetS }))[0];
+    if (!actingCapo) {
+      state.pendingNotifications = [...state.pendingNotifications, { type: 'warning', title: '⚠️ No Capo Nearby', message: 'Need a Capo within 3 hexes of enemy HQ.' }];
       return state;
     }
 
-    const enemySoldiersNearHQ = state.deployedUnits.filter(u =>
-      u.family === targetFamily && u.type === 'soldier' && hexDistance(u, { q: targetQ, r: targetR, s: targetS }) <= 1
+    // Target pool: enemy soldiers within 2 hexes of the acting capo
+    const enemySoldiersNearCapo = state.deployedUnits.filter(u =>
+      u.family === targetFamily && u.type === 'soldier' && hexDistance(u, actingCapo) <= 2 && hexDistance(u, actingCapo) > 0
     );
     // FIX #6: Any soldier with loyalty < 80 can be targeted (low loyalty = easier to flip)
-    const flippableTargets = enemySoldiersNearHQ.filter(u => {
+    const flippableTargets = enemySoldiersNearCapo.filter(u => {
       const uStats = state.soldierStats[u.id];
       // Bonanno purge immunity blocks flip attempts
       const hasFlipImmunity = (state.bonannoPurgeImmunity || []).some(i => i.unitId === u.id);
@@ -7446,7 +7448,7 @@ export const useEnhancedMafiaGameState = (
     });
 
     if (flippableTargets.length === 0) {
-      state.pendingNotifications = [...state.pendingNotifications, { type: 'warning', title: '⚠️ No Targets', message: 'No eligible soldiers near enemy HQ.' }];
+      state.pendingNotifications = [...state.pendingNotifications, { type: 'warning', title: '⚠️ No Targets', message: 'No eligible enemy soldiers within 2 hexes of your Capo.' }];
       return state;
     }
 
@@ -7460,10 +7462,7 @@ export const useEnhancedMafiaGameState = (
     else if (targetStats.loyalty > 70) chance -= 0.10;
     const playerInfluence = state.resources.influence || 0;
     if (playerInfluence > 50) chance += (playerInfluence - 50) * 0.005;
-    const schemerAdjacent = state.deployedUnits.some(u =>
-      u.family === state.playerFamily && u.type === 'capo' && u.personality === 'schemer' &&
-      hqNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s)
-    );
+    const schemerAdjacent = actingCapo.personality === 'schemer';
     if (schemerAdjacent) chance += 0.10;
     chance = Math.min(0.70, Math.max(0.05, chance));
 
