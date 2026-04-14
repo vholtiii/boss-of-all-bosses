@@ -1434,6 +1434,46 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             </text>
                           );
                         }
+                        // Suspicious / Confirmed Rat indicators for player soldiers
+                        if (fam === playerFamily) {
+                          const hasConfirmedRat = soldiers.some(s => {
+                            const stats = gameState?.soldierStats?.[s.id];
+                            return stats?.confirmedRat;
+                          });
+                          const hasSuspicious = !hasConfirmedRat && soldiers.some(s => {
+                            const stats = gameState?.soldierStats?.[s.id];
+                            return stats?.suspicious;
+                          });
+                          if (hasConfirmedRat) {
+                            elements.push(
+                              <text
+                                key={`confirmed-rat-${fam}-${key}`}
+                                x={x + baseHexRadius * 0.25 + offsetIdx * 12 - 10}
+                                y={y + baseHexRadius * 0.35 + 12}
+                                fontSize="9"
+                                textAnchor="middle"
+                                className="pointer-events-none"
+                                style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}
+                              >
+                                🐀
+                              </text>
+                            );
+                          } else if (hasSuspicious) {
+                            elements.push(
+                              <text
+                                key={`suspicious-${fam}-${key}`}
+                                x={x + baseHexRadius * 0.25 + offsetIdx * 12 - 10}
+                                y={y + baseHexRadius * 0.35 + 12}
+                                fontSize="9"
+                                textAnchor="middle"
+                                className="pointer-events-none"
+                                style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}
+                              >
+                                ⚠️
+                              </text>
+                            );
+                          }
+                        }
                         offsetIdx++;
                       });
                     }

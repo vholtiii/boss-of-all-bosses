@@ -100,6 +100,9 @@ interface HeadquartersInfoPanelProps {
   actionsRemaining?: number;
   gamePhase?: number;
   flippedSoldiers?: Array<{ unitId: string; family: string; flippedByFamily: string; hqQ: number; hqR: number; hqS: number }>;
+  // Purge Ranks
+  soldierStats?: Record<string, any>;
+  onEliminateSoldier?: (soldierId: string) => void;
 }
 
 const familyColors: Record<string, string> = {
@@ -154,6 +157,8 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   actionsRemaining = 0,
   gamePhase = 1,
   flippedSoldiers = [],
+  soldierStats = {},
+  onEliminateSoldier,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
@@ -969,6 +974,90 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
               })()
             )}
           </div>
+
+          {/* Purge Ranks — Eliminate Suspicious/Confirmed Rats */}
+          {isPlayerFamily && onEliminateSoldier && (() => {
+            const flaggedSoldiers = (deployedUnits || []).filter((u: any) => {
+              if (u.family !== family || u.type !== 'soldier') return false;
+              const stats = soldierStats[u.id];
+              return stats && (stats.suspicious || stats.confirmedRat);
+            });
+
+            if (flaggedSoldiers.length === 0) return null;
+
+            const isActionPhase = turnPhase === 'action';
+            const noActions = actionsRemaining <= 0;
+
+            return (
+              <div className="space-y-2">
+                <h4 className="text-xs font-semibold text-red-400 flex items-center gap-1">
+                  🔫 Purge Ranks
+                </h4>
+                <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-2 space-y-1.5">
+                  <p className="text-[10px] text-muted-foreground">
+                    {flaggedSoldiers.length} soldier{flaggedSoldiers.length !== 1 ? 's' : ''} flagged • Costs 1 Action
+                  </p>
+                  <ScrollArea className="max-h-32">
+                    <div className="space-y-1">
+                      {flaggedSoldiers.map((unit: any) => {
+                        const stats = soldierStats[unit.id];
+                        const isConfirmed = stats?.confirmedRat;
+                        const district = (() => {
+                          const hex = hexMap.find((h: any) => h.q === unit.q && h.r === unit.r && h.s === unit.s);
+                          return hex?.district || '???';
+                        })();
+                        return (
+                          <div
+                            key={unit.id}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded bg-background/50 border border-border/30 text-xs"
+                          >
+                            <span className="text-sm">{isConfirmed ? '🐀' : '⚠️'}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-foreground truncate flex items-center gap-1">
+                                {unit.name || 'Soldier'}
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-[9px] h-4 ${isConfirmed ? 'text-red-400 border-red-400/30' : 'text-yellow-400 border-yellow-400/30'}`}
+                                >
+                                  {isConfirmed ? 'Confirmed Rat' : 'Suspicious'}
+                                </Badge>
+                              </div>
+                              <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                <span>Loyalty: {stats?.loyalty ?? '?'}</span>
+                                <span>•</span>
+                                <span>{district}</span>
+                                {!isConfirmed && stats?.suspiciousTurns > 0 && (
+                                  <span className="text-yellow-400/60">({stats.suspiciousTurns} turns)</span>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="text-[10px] h-6 px-2"
+                              disabled={!isActionPhase || noActions}
+                              onClick={() => onEliminateSoldier(unit.id)}
+                            >
+                              Eliminate
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                  {!isActionPhase && (
+                    <p className="text-[9px] text-muted-foreground italic text-center">Available during Action step</p>
+                  )}
+                  {isActionPhase && noActions && (
+                    <p className="text-[9px] text-muted-foreground italic text-center">No actions remaining</p>
+                  )}
+                  <p className="text-[9px] text-muted-foreground italic">
+                    ⚠️ Eliminating an innocent soldier damages morale and respect
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Business & Territory Summary */}
           <div className="grid grid-cols-2 gap-2">

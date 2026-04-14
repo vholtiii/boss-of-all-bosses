@@ -1252,6 +1252,8 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
             actionsRemaining={gameState.actionsRemaining || 0}
             gamePhase={(gameState as any).gamePhase || 1}
             flippedSoldiers={(gameState as any).flippedSoldiers || []}
+            soldierStats={gameState.soldierStats || {}}
+            onEliminateSoldier={isPlayerHQ ? (soldierId: string) => handleAction({ type: 'eliminate_soldier', targetId: soldierId }) : undefined}
           />
         );
       })()}

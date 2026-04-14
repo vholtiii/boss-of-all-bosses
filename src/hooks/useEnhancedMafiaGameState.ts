@@ -51,6 +51,10 @@ import {
   GRAND_JURY_THRESHOLD, GRAND_JURY_ILLEGAL_PROFIT_PENALTY,
   FEDERAL_INDICTMENT_THRESHOLD, FEDERAL_INDICTMENT_TIMER, FEDERAL_INDICTMENT_DEFENSE_COST,
   PROSECUTION_LAWYER_REDUCTION,
+  PURGE_CONFIRMED_FEAR, PURGE_CONFIRMED_HEAT, PURGE_CONFIRMED_LOYALTY_BOOST,
+  PURGE_INNOCENT_FEAR, PURGE_INNOCENT_HEAT, PURGE_INNOCENT_LOYALTY_PENALTY, PURGE_INNOCENT_RESPECT_LOSS,
+  PURGE_SUSPICION_LOYALTY_THRESHOLD, PURGE_SUSPICION_CLEAR_THRESHOLD, PURGE_SUSPICION_TURNS_REQUIRED,
+  PURGE_BRIBE_CAPTAIN_DISCOVER_CHANCE, PURGE_BRIBE_CHIEF_DISCOVER_CHANCE, PURGE_BRIBE_CHIEF_MAX_REVEALS,
   BUILT_BUSINESS_DEFENSE_BONUS, BUILT_BUSINESS_HEAT_REDUCTION, BUILT_BUSINESS_RESPECT_THRESHOLD, BUILT_BUSINESS_RESPECT_BONUS, BUILT_BUSINESS_LOYALTY_BONUS,
   BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION, BUILT_BIZ_SEIZURE_INCOME_PENALTY, BUILT_BIZ_SEIZURE_RESPECT_LOSS, BUILT_BIZ_SEIZURE_FEAR_LOSS, BUILT_BIZ_SEIZURE_INFLUENCE_GAIN,
   CEASEFIRE_VIOLATION_RESPECT_LOSS, CEASEFIRE_VIOLATION_FEAR_LOSS, TREACHERY_DEBUFF_DURATION, TREACHERY_NEGOTIATION_PENALTY, TreacheryDebuff,
@@ -908,7 +912,7 @@ const createInitialGameState = (
       soldierStats[id] = {
         loyalty: 50, training: 0,
         hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
-        turnsIdle: 0, isMercenary: false, actedThisTurn: false,
+        turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
       };
     }
     const capoNames: Record<string, string> = {
@@ -2206,6 +2210,50 @@ export const useEnhancedMafiaGameState = (
     if (tile.isHeadquarters) return prev;
     const dist = hexDistance(unit, targetLocation);
     const maxScoutRange = unit.type === 'capo' ? 2 : 1;
+
+    // === SELF-SCOUT: scouting own hex reveals if soldier is a confirmed rat ===
+    if (tile.controllingFamily === prev.playerFamily) {
+      if (dist > maxScoutRange) return prev;
+      const unitsOnHex = prev.deployedUnits.filter(u => 
+        u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s && 
+        u.family === prev.playerFamily && u.type === 'soldier' && u.id !== unit.id
+      );
+      if (unitsOnHex.length === 0) {
+        return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
+          type: 'info' as const, title: '👁️ Self-Scout', message: 'No other soldiers on this hex to investigate.',
+        }]};
+      }
+      const newState = cloneStateForMutation(prev);
+      const notifications = [...newState.pendingNotifications];
+      let foundRat = false;
+      for (const target of unitsOnHex) {
+        const isRat = (newState.copFlippedSoldiers || []).some(c => c.unitId === target.id);
+        const stats = newState.soldierStats[target.id];
+        if (stats) {
+          if (isRat) {
+            stats.confirmedRat = true;
+            foundRat = true;
+            notifications.push({
+              type: 'error' as const, title: '🐀 RAT CONFIRMED!',
+              message: `${target.name || 'Soldier'} is a police informant! You can eliminate them via Purge Ranks.`,
+            });
+          } else {
+            // Clear suspicion if scouted and clean
+            stats.suspicious = false;
+            stats.suspiciousTurns = 0;
+            notifications.push({
+              type: 'success' as const, title: '✅ Soldier Clean',
+              message: `${target.name || 'Soldier'} is not an informant.`,
+            });
+          }
+        }
+      }
+      return {
+        ...newState, pendingNotifications: notifications,
+        selectedUnitId: null, availableMoveHexes: [],
+      };
+    }
+
     if (dist < 1 || dist > maxScoutRange) return prev;
 
     // Front Boss blocking: if target hex is hidden by another family, block the scout
@@ -2495,7 +2543,7 @@ export const useEnhancedMafiaGameState = (
           newSoldierStats[newId] = {
             loyalty: 50, training: 0,
             hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
-            turnsIdle: 0, isMercenary: false, actedThisTurn: false,
+            turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
           };
           newResources.soldiers -= 1;
         } else {
@@ -2737,7 +2785,7 @@ export const useEnhancedMafiaGameState = (
               newState.soldierStats[h.unitId] = {
                 loyalty: 50, training: 0, hits: 0, extortions: 0,
                 victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
-                turnsIdle: 0, isMercenary: false, actedThisTurn: false,
+                turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
               };
             }
           }
@@ -2841,7 +2889,7 @@ export const useEnhancedMafiaGameState = (
           newState.soldierStats[freeId] = {
             loyalty: LOYALTY_RECRUIT_START, training: 0, hits: 0, extortions: 0,
             victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
-            turnsIdle: 0, isMercenary: false, actedThisTurn: false,
+            turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
           };
           newState.resources.soldiers += 1;
           newState.pendingNotifications.push({
@@ -3074,6 +3122,19 @@ export const useEnhancedMafiaGameState = (
         }
         // Reset actedThisTurn for next turn
         stats.actedThisTurn = false;
+
+        // === SUSPICION TRACKING (for player soldiers only) ===
+        if (u.family === newState.playerFamily && u.type === 'soldier') {
+          if (stats.loyalty < PURGE_SUSPICION_LOYALTY_THRESHOLD) {
+            stats.suspiciousTurns = (stats.suspiciousTurns || 0) + 1;
+            if (stats.suspiciousTurns >= PURGE_SUSPICION_TURNS_REQUIRED) {
+              stats.suspicious = true;
+            }
+          } else if (stats.loyalty >= PURGE_SUSPICION_CLEAR_THRESHOLD) {
+            stats.suspiciousTurns = 0;
+            stats.suspicious = false;
+          }
+        }
       });
 
       // Tick scouted hexes
@@ -4017,6 +4078,48 @@ export const useEnhancedMafiaGameState = (
             });
           }
         }
+
+        // === PURGE RANKS: Bribe-based confirmedRat discovery (complements existing auto-elimination) ===
+        // For rats NOT already auto-eliminated by Mayor/Chief, flag them via probabilistic discovery
+        const remainingPlayerRats = newState.copFlippedSoldiers.filter(c => c.family === newState.playerFamily);
+        if (remainingPlayerRats.length > 0) {
+          const hasMayorBribe = newState.activeBribes.some(b => b.tier === 'mayor' && b.active);
+          const hasChiefBribe = newState.activeBribes.some(b => b.tier === 'police_chief' && b.active);
+          const hasCaptainBribe = newState.activeBribes.some(b => b.tier === 'police_captain' && b.active);
+
+          if (hasMayorBribe) {
+            // Mayor auto-reveals ALL rats as confirmed
+            for (const rat of remainingPlayerRats) {
+              const stats = newState.soldierStats[rat.unitId];
+              if (stats && !stats.confirmedRat) {
+                stats.confirmedRat = true;
+                turnReport.events.push(`🐀 ${rat.unitName} confirmed as informant by mayor's intelligence.`);
+              }
+            }
+          } else if (hasChiefBribe) {
+            // Chief: 40% per rat, max 2
+            let revealed = 0;
+            for (const rat of remainingPlayerRats) {
+              if (revealed >= PURGE_BRIBE_CHIEF_MAX_REVEALS) break;
+              const stats = newState.soldierStats[rat.unitId];
+              if (stats && !stats.confirmedRat && Math.random() < PURGE_BRIBE_CHIEF_DISCOVER_CHANCE) {
+                stats.confirmedRat = true;
+                revealed++;
+                turnReport.events.push(`🐀 ${rat.unitName} confirmed as informant by chief's intelligence.`);
+              }
+            }
+          } else if (hasCaptainBribe) {
+            // Captain: 25% per rat, max 1
+            for (const rat of remainingPlayerRats) {
+              const stats = newState.soldierStats[rat.unitId];
+              if (stats && !stats.confirmedRat && Math.random() < PURGE_BRIBE_CAPTAIN_DISCOVER_CHANCE) {
+                stats.confirmedRat = true;
+                turnReport.events.push(`🐀 ${rat.unitName} confirmed as informant by captain's intelligence.`);
+                break; // max 1
+              }
+            }
+          }
+        }
       }
 
       // --- COUNTER-INTEL DISCOVERY: Per-turn chance for family-flipped soldiers to be discovered ---
@@ -4712,7 +4815,7 @@ export const useEnhancedMafiaGameState = (
             state.soldierStats[newId] = {
               loyalty: 40 + Math.floor(Math.random() * 30), training: 0,
               hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
-              turnsIdle: 0, isMercenary: true, actedThisTurn: false,
+              turnsIdle: 0, isMercenary: true, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
             };
             // Only capos auto-claim neutral territory on deploy (matches player rules)
             const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
@@ -5342,7 +5445,7 @@ export const useEnhancedMafiaGameState = (
           const anyAiSoldier = state.deployedUnits.find(u => u.family === fam && u.type === 'soldier');
           if (anyAiSoldier) {
             // Boost stats to meet threshold, then promote
-            const stats = state.soldierStats[anyAiSoldier.id] || { loyalty: 50, training: 1, hits: 0, extortions: 2, victories: 3, toughness: 2, racketeering: 3, turnsDeployed: 10, toughnessProgress: 0, turnsIdle: 0, isMercenary: false, actedThisTurn: false };
+            const stats = state.soldierStats[anyAiSoldier.id] || { loyalty: 50, training: 1, hits: 0, extortions: 2, victories: 3, toughness: 2, racketeering: 3, turnsDeployed: 10, toughnessProgress: 0, turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false };
             stats.victories = Math.max(stats.victories, 3);
             stats.racketeering = Math.max(stats.racketeering, 3);
             stats.loyalty = Math.max(stats.loyalty, 60);
@@ -6447,7 +6550,7 @@ export const useEnhancedMafiaGameState = (
               newState.soldierStats[newId] = {
                 loyalty: LOYALTY_MERC_START, training: 0,
                 hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
-                turnsIdle: 0, isMercenary: true, actedThisTurn: false,
+                turnsIdle: 0, isMercenary: true, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
               };
             }
             newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -6493,7 +6596,7 @@ export const useEnhancedMafiaGameState = (
               newState.soldierStats[newId] = {
                 loyalty: LOYALTY_RECRUIT_START, training: 0,
                 hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
-                turnsIdle: 0, isMercenary: false, actedThisTurn: false,
+                turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
               };
             }
             newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -7336,6 +7439,74 @@ export const useEnhancedMafiaGameState = (
             }
           }
           break;
+
+        case 'eliminate_soldier': {
+          // Purge Ranks: eliminate a suspicious or confirmed rat soldier
+          if (newState.turnPhase !== 'action') {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Wrong Phase', message: 'Purge Ranks is only available during the Action phase.' });
+            return newState;
+          }
+          if (newState.actionsRemaining <= 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ No Actions Remaining', message: 'You have used all your actions this turn.' });
+            return newState;
+          }
+          const targetId = action.targetId as string;
+          const targetUnit = newState.deployedUnits.find(u => u.id === targetId && u.family === newState.playerFamily);
+          if (!targetUnit) {
+            newState.pendingNotifications.push({ type: 'error', title: '⚠️ Target Not Found', message: 'Could not find the target soldier.' });
+            return newState;
+          }
+          const targetStats = newState.soldierStats[targetId];
+          if (!targetStats || (!targetStats.suspicious && !targetStats.confirmedRat)) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Invalid Target', message: 'This soldier is neither suspicious nor a confirmed rat.' });
+            return newState;
+          }
+
+          const isActualRat = (newState.copFlippedSoldiers || []).some(c => c.unitId === targetId);
+
+          // Remove soldier
+          newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== targetId);
+          delete newState.soldierStats[targetId];
+          newState.copFlippedSoldiers = (newState.copFlippedSoldiers || []).filter(c => c.unitId !== targetId);
+          newState.actionsRemaining -= 1;
+
+          if (isActualRat) {
+            // Confirmed rat — clean removal
+            newState.reputation.fear = Math.min(100, (newState.reputation.fear || 0) + PURGE_CONFIRMED_FEAR);
+            newState.policeHeat.level = Math.min(100, newState.policeHeat.level + PURGE_CONFIRMED_HEAT);
+            // Loyalty boost to soldiers below 50
+            const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+            for (const s of playerSoldiers) {
+              const ss = newState.soldierStats[s.id];
+              if (ss && ss.loyalty < 50) {
+                const cap = ss.isMercenary ? LOYALTY_MERC_CAP : SOLDIER_LOYALTY_CAP;
+                ss.loyalty = Math.min(cap, ss.loyalty + PURGE_CONFIRMED_LOYALTY_BOOST);
+              }
+            }
+            newState.pendingNotifications.push({
+              type: 'success', title: '🔫 Rat Eliminated',
+              message: `The family dealt with a rat in the ranks. +${PURGE_CONFIRMED_FEAR} fear, +${PURGE_CONFIRMED_HEAT} heat. Low-loyalty soldiers are intimidated into compliance.`,
+            });
+          } else {
+            // Innocent soldier — wrongful kill
+            newState.reputation.fear = Math.min(100, (newState.reputation.fear || 0) + PURGE_INNOCENT_FEAR);
+            newState.policeHeat.level = Math.min(100, newState.policeHeat.level + PURGE_INNOCENT_HEAT);
+            syncRespect(newState, Math.max(0, newState.resources.respect - PURGE_INNOCENT_RESPECT_LOSS));
+            // Loyalty penalty to ALL soldiers
+            const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
+            for (const s of playerSoldiers) {
+              const ss = newState.soldierStats[s.id];
+              if (ss) {
+                ss.loyalty = Math.max(0, ss.loyalty - PURGE_INNOCENT_LOYALTY_PENALTY);
+              }
+            }
+            newState.pendingNotifications.push({
+              type: 'error', title: '💀 Wrongful Elimination',
+              message: `A loyal soldier was wrongfully eliminated. The family questions your judgment. -${PURGE_INNOCENT_RESPECT_LOSS} respect, all soldiers -${PURGE_INNOCENT_LOYALTY_PENALTY} loyalty.`,
+            });
+          }
+          break;
+        }
       }
 
       // Finance values are computed by processEconomy at end of turn — no legacy recalculation here
