@@ -4198,6 +4198,16 @@ export const useEnhancedMafiaGameState = (
       arrestPenaltyAmount = grossIncome - Math.floor(grossIncome * penaltyMultiplier);
     }
 
+    // Cop informant income penalty — -10% illegal income per informant in player family
+    let copFlipPenaltyAmount = 0;
+    {
+      const playerInformants = (state.copFlippedSoldiers || []).filter(c => c.family === state.playerFamily).length;
+      if (playerInformants > 0) {
+        const copPenaltyRate = Math.min(0.50, playerInformants * COP_FLIP_INCOME_PENALTY);
+        copFlipPenaltyAmount = Math.floor(grossIllegalIncome * copPenaltyRate);
+      }
+    }
+
     // Compute heat penalty from gross illegal income
     let heatPenaltyAmount = 0;
     {
@@ -4209,7 +4219,7 @@ export const useEnhancedMafiaGameState = (
         heatPenaltyRate = 0.15;
       }
       if (heatPenaltyRate > 0) {
-        heatPenaltyAmount = Math.floor(grossIllegalIncome * heatPenaltyRate);
+        heatPenaltyAmount = Math.floor((grossIllegalIncome - copFlipPenaltyAmount) * heatPenaltyRate);
       }
     }
 
