@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import mafiaSitdownBg from '@/assets/mafia-sitdown-bg.png';
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
