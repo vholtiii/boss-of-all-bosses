@@ -2733,6 +2733,7 @@ export const useEnhancedMafiaGameState = (
       newState.availableMoveHexes = [];
       newState.deployMode = null;
       newState.availableDeployHexes = [];
+      (newState as any).abandonedThisTurn = 0;
 
       // ============ HIDDEN UNITS RETURN / INTERNAL HIT CHECK ============
       const returningUnits = newState.hiddenUnits.filter(h => newState.turn >= h.returnsOnTurn);
@@ -4739,7 +4740,8 @@ export const useEnhancedMafiaGameState = (
         aiIncome = Math.floor(aiIncome * 1.25);
       }
       const mapScale = state.mapSize === 'small' ? 0.6 : state.mapSize === 'large' ? 1.5 : 1.0;
-      const minIncome = Math.floor((2000 + state.turn * 500) * diffMods.aiIncomeMult * mapScale);
+      const cappedTurn = Math.min(state.turn, 20);
+      const minIncome = Math.floor((2000 + cappedTurn * 500) * diffMods.aiIncomeMult * mapScale);
       aiIncome = Math.max(aiIncome, minIncome);
       opponent.resources.money += aiIncome;
       opponent.resources.lastTurnIncome = aiIncome; // Track for phase calculation
@@ -4759,7 +4761,8 @@ export const useEnhancedMafiaGameState = (
       const isAlerted = (state.aiAlertState || {})[fam] > 0;
       const alertBonus = isAlerted ? 1 : 0;
       const capScale = state.mapSize === 'small' ? -2 : state.mapSize === 'large' ? 4 : 0;
-      const soldierCap = Math.max(8 + alertBonus + diffMods.aiRecruitCapBonus + capScale, 3 + Math.floor(state.turn / 2) + alertBonus + diffMods.aiRecruitCapBonus + capScale);
+      const baseCap = Math.min(Math.max(8, 3 + Math.floor(state.turn / 2)), 18);
+      const soldierCap = baseCap + alertBonus + diffMods.aiRecruitCapBonus + capScale + atWarBonus;
       const currentDeployed = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier').length;
       const totalSoldiers = opponent.resources.soldiers + currentDeployed;
       const wantToRecruit = Math.max(0, soldierCap - totalSoldiers);
@@ -5439,6 +5442,7 @@ export const useEnhancedMafiaGameState = (
           opponent.resources.money -= CAPO_PROMOTION_COST;
           if (turnReport) {
             turnReport.aiActions.push({ family: fam, action: 'promote', detail: `Promoted a soldier to Capo` });
+          }
         }
         // Fallback: forced promotion if AI has territory/money but no eligible soldiers
         if (!bestCandidate && aiCapoCount < 2 && state.hexMap.filter(t => t.controllingFamily === fam).length >= 15 && opponent.resources.money >= CAPO_PROMOTION_COST * 2) {
@@ -5459,7 +5463,6 @@ export const useEnhancedMafiaGameState = (
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'promote', detail: `Force-promoted a soldier to Capo` });
           }
         }
-      }
       }
 
       // ── AI DIPLOMACY: Ceasefire & Alliance proposals (personality-driven) ──
@@ -7507,6 +7510,48 @@ export const useEnhancedMafiaGameState = (
               message: `A loyal soldier was wrongfully eliminated. The family questions your judgment. -${PURGE_INNOCENT_RESPECT_LOSS} respect, all soldiers -${PURGE_INNOCENT_LOYALTY_PENALTY} loyalty.`,
             });
           }
+          break;
+        }
+
+        case 'abandon_territory': {
+          // Abandon an empty hex to escape maintenance cost death spiral
+          if (newState.turnPhase !== 'action') {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Wrong Phase', message: 'Abandon Territory is only available during the Action phase.' });
+            return newState;
+          }
+          const abandonLimit = 2;
+          const abandonedCount = (newState as any).abandonedThisTurn || 0;
+          if (abandonedCount >= abandonLimit) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Limit Reached', message: `You can only abandon ${abandonLimit} territories per turn.` });
+            return newState;
+          }
+          const hexIdx = action.hexIndex as number;
+          const hex = newState.hexMap[hexIdx];
+          if (!hex || hex.controllingFamily !== newState.playerFamily) {
+            newState.pendingNotifications.push({ type: 'error', title: '⚠️ Invalid Hex', message: 'This territory does not belong to your family.' });
+            return newState;
+          }
+          if (hex.isHeadquarters) {
+            newState.pendingNotifications.push({ type: 'error', title: '⚠️ Cannot Abandon HQ', message: 'You cannot abandon your headquarters.' });
+            return newState;
+          }
+          const unitsOnHex = newState.deployedUnits.filter(u => u.q === hex.q && u.r === hex.r && u.s === hex.s && u.family === newState.playerFamily);
+          if (unitsOnHex.length > 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Units Present', message: 'Withdraw all units before abandoning this territory.' });
+            return newState;
+          }
+          if (hex.business) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Business Present', message: 'You cannot abandon a hex with a business. Shut it down first.' });
+            return newState;
+          }
+          // Abandon the hex
+          hex.controllingFamily = 'neutral';
+          (newState as any).abandonedThisTurn = abandonedCount + 1;
+          newState.combatLog = [...(newState.combatLog || []), `🏳️ Abandoned territory at (${hex.q},${hex.r}).`];
+          newState.pendingNotifications.push({
+            type: 'info', title: '🏳️ Territory Abandoned',
+            message: `Your family has withdrawn from a territory. Maintenance costs reduced.`,
+          });
           break;
         }
       }

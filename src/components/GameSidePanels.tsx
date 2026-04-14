@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ import {
   Store,
   HardHat,
   Scale,
+  Flag,
 } from 'lucide-react';
 import { EnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import HitmanPanel from '@/components/HitmanPanel';
@@ -373,6 +375,73 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                       </motion.div>
                     )}
                   </AnimatePresence>
+                </>
+              );
+            })()}
+
+            {/* ── Abandon Territory ── */}
+            {(() => {
+              const abandonedThisTurn = (gameState as any).abandonedThisTurn || 0;
+              const abandonLimit = 2;
+              const eligibleHexes = (gameState.hexMap || [])
+                .map((hex: any, idx: number) => ({ hex, idx }))
+                .filter(({ hex }: any) => {
+                  if (hex.controllingFamily !== gameState.playerFamily) return false;
+                  if (hex.isHeadquarters) return false;
+                  if (hex.business) return false;
+                  const hasUnits = (gameState.deployedUnits || []).some((u: any) => u.q === hex.q && u.r === hex.r && u.s === hex.s && u.family === gameState.playerFamily);
+                  return !hasUnits;
+                });
+              return (
+                <>
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="w-full justify-between text-xs h-8 px-2">
+                        <span className="flex items-center gap-1.5">
+                          <Flag className="h-4 w-4 text-muted-foreground" />
+                          🏳️ Abandon Territory
+                          {eligibleHexes.length > 0 && (
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">
+                              {eligibleHexes.length}
+                            </Badge>
+                          )}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground">{abandonedThisTurn}/{abandonLimit}</span>
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="space-y-1 p-2 bg-muted/30 rounded-md mt-1">
+                        <p className="text-[9px] text-muted-foreground mb-1">
+                          Release empty hexes to reduce maintenance costs. Max {abandonLimit}/turn. No units or businesses allowed.
+                        </p>
+                        {eligibleHexes.length === 0 && (
+                          <p className="text-[10px] text-muted-foreground text-center py-1">No eligible territories</p>
+                        )}
+                        {eligibleHexes.slice(0, 6).map(({ hex, idx }: any) => (
+                          <div key={idx} className="flex items-center justify-between rounded px-2 py-1.5 bg-background/50 border border-border/30">
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-medium text-foreground truncate">
+                                ({hex.q},{hex.r}) · {hex.district}
+                              </p>
+                              <p className="text-[9px] text-muted-foreground">{hex.terrain}</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 px-2 text-[10px]"
+                              disabled={actionsLocked || abandonedThisTurn >= abandonLimit}
+                              onClick={() => onAction({ type: 'abandon_territory', hexIndex: idx })}
+                            >
+                              Abandon
+                            </Button>
+                          </div>
+                        ))}
+                        {eligibleHexes.length > 6 && (
+                          <p className="text-[9px] text-muted-foreground text-center">+{eligibleHexes.length - 6} more</p>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 </>
               );
             })()}
