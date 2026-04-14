@@ -3541,6 +3541,7 @@ export const useEnhancedMafiaGameState = (
       }
       processBribes(newState);
       processPacts(newState);
+      processInfluenceSystem(newState, turnReport);
 
       // ============ WAR & TENSION LIFECYCLE ============
       {
@@ -6540,6 +6541,11 @@ export const useEnhancedMafiaGameState = (
           return result;
         }
         case 'extort_territory': {
+          // Phase 3+ gate: extortion disabled — influence system handles territory
+          if ((newState.gamePhase || 1) >= 3) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase 3 — Influence Era', message: 'Territory now shifts through influence. Position your units and businesses strategically.' });
+            return newState;
+          }
           // Phase gate: Enemy extortion requires Phase 2+
           const extortTile = newState.hexMap.find((t: any) => t.q === action.targetQ && t.r === action.targetR && t.s === action.targetS);
           if (extortTile && extortTile.controllingFamily !== 'neutral' && extortTile.controllingFamily !== newState.playerFamily && (newState.gamePhase || 1) < 2) {
