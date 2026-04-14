@@ -226,6 +226,11 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
                     <p className="text-xs text-primary mt-1">
                       {personalityInfo.icon} +{personalityBonuses[config.type]}% from {personalityInfo.label}
                     </p>
+                   )}
+                  {successBonus > 0 && (
+                    <p className="text-xs text-primary mt-1">
+                      📩 +{successBonus}% — they requested this sitdown
+                    </p>
                   )}
                   {config.type === 'supply_deal' && (playerFear || 0) > 0 && (
                     <p className="text-xs text-red-400 mt-1">
