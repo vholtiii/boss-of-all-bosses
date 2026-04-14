@@ -99,6 +99,7 @@ interface HeadquartersInfoPanelProps {
   activeWars?: Array<{ family1: string; family2: string; turnsRemaining: number }>;
   actionsRemaining?: number;
   gamePhase?: number;
+  flippedSoldiers?: Array<{ unitId: string; family: string; flippedByFamily: string; hqQ: number; hqR: number; hqS: number }>;
 }
 
 const familyColors: Record<string, string> = {
@@ -152,6 +153,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   activeWars = [],
   actionsRemaining = 0,
   gamePhase = 1,
+  flippedSoldiers = [],
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
@@ -988,6 +990,29 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
               </div>
             )}
           </div>
+
+          {/* Flipped Assets section for enemy HQ */}
+          {!isPlayerFamily && (() => {
+            const flippedAtHQ = flippedSoldiers.filter(f => 
+              f.family === family && f.hqQ === headquarters.q && f.hqR === headquarters.r && f.hqS === headquarters.s
+            );
+            const defenseReduction = flippedAtHQ.length * 10;
+            return (
+              <div className="bg-muted/20 border border-muted-foreground/20 rounded-lg p-2">
+                <div className="text-xs font-medium text-foreground flex items-center gap-1">
+                  🐀 Flipped Assets
+                </div>
+                {flippedAtHQ.length > 0 ? (
+                  <div className="mt-1">
+                    <div className="text-sm font-bold text-foreground">{flippedAtHQ.length} rat{flippedAtHQ.length > 1 ? 's' : ''}</div>
+                    <div className="text-xs text-muted-foreground">HQ Defense −{defenseReduction}%</div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground mt-1">No assets</div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Action Buttons for Player Family */}
           {isPlayerFamily && movementPhase && onSelectUnitFromHeadquarters && (

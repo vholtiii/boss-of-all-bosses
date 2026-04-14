@@ -6,7 +6,7 @@ import { ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
-import { ScoutedHex, Safehouse, PlannedHit, SupplyNode, SUPPLY_NODE_CONFIG, SupplyNodeType, FortifiedHex, FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS } from '@/types/game-mechanics';
+import { ScoutedHex, Safehouse, PlannedHit, SupplyNode, SUPPLY_NODE_CONFIG, SupplyNodeType, FortifiedHex, FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, FLIP_SOLDIER_BASE_COST, FLIP_SOLDIER_COST_ESCALATION, FLIP_SOLDIER_BASE_CHANCE } from '@/types/game-mechanics';
 
 interface EnhancedMafiaHexGridProps {
   width: number;
@@ -63,6 +63,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [pinnedHex, setPinnedHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; canAssaultHQ?: boolean; canFlipSoldier?: boolean; negotiateCapoId?: string; pendingNegotiationId?: string; reasons?: Record<string, string> } | null>(null);
   const [planHitUnitMenu, setPlanHitUnitMenu] = useState<{ tile: HexTile; enemyUnits: DeployedUnit[] } | null>(null);
+  const [flipTargetMenu, setFlipTargetMenu] = useState<{ tile: HexTile; actingCapo: DeployedUnit; targets: Array<{ unit: DeployedUnit; loyalty: number; chance: number; cost: number }> } | null>(null);
   const [expandedHQKey, setExpandedHQKey] = useState<string | null>(null);
   const [showLegend, setShowLegend] = useState(false);
   const [combatOverlay, setCombatOverlay] = useState<{
@@ -1413,6 +1414,26 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             </text>
                           );
                         }
+                        // Rat icon on flipped soldiers (only visible for player's flipped assets)
+                        const hasFlippedInGroup = soldiers.some(s => 
+                          (gameState?.flippedSoldiers || []).some((f: any) => f.unitId === s.id && f.flippedByFamily === playerFamily)
+                        );
+                        if (hasFlippedInGroup && fam !== playerFamily) {
+                          elements.push(
+                            <text
+                              key={`rat-${fam}-${key}`}
+                              x={x + baseHexRadius * 0.25 + offsetIdx * 12 + 10}
+                              y={y + baseHexRadius * 0.35 + 12}
+                              fontSize="9"
+                              textAnchor="middle"
+                              className="pointer-events-none"
+                              opacity={0.7}
+                              style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}
+                            >
+                              🐀
+                            </text>
+                          );
+                        }
                         offsetIdx++;
                       });
                     }
@@ -1714,17 +1735,55 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (onAction) onAction({
-                            type: 'flip_soldier',
-                            targetQ: actionMenu.tile.q,
-                            targetR: actionMenu.tile.r,
-                            targetS: actionMenu.tile.s,
+                          const tile = actionMenu.tile;
+                          const targetFamily = tile.isHeadquarters;
+                          if (!targetFamily) return;
+                          // Find acting capo
+                          const actingCapo = (gameState?.deployedUnits || [])
+                            .filter((u: any) => u.family === playerFamily && u.type === 'capo' &&
+                              (Math.abs(u.q - tile.q) + Math.abs(u.r - tile.r) + Math.abs(u.s - tile.s)) / 2 <= 3)
+                            .sort((a: any, b: any) => {
+                              const dA = (Math.abs(a.q - tile.q) + Math.abs(a.r - tile.r) + Math.abs(a.s - tile.s)) / 2;
+                              const dB = (Math.abs(b.q - tile.q) + Math.abs(b.r - tile.r) + Math.abs(b.s - tile.s)) / 2;
+                              return dA - dB;
+                            })[0];
+                          if (!actingCapo) return;
+                          // Build target list
+                          const currentFlippedCount = (gameState?.flippedSoldiers || []).filter((f: any) => f.flippedByFamily === playerFamily).length;
+                          const flipCost = FLIP_SOLDIER_BASE_COST + currentFlippedCount * FLIP_SOLDIER_COST_ESCALATION;
+                          const enemySoldiers = (gameState?.deployedUnits || []).filter((u: any) => {
+                            if (u.family !== targetFamily || u.type !== 'soldier') return false;
+                            const dist = (Math.abs(u.q - actingCapo.q) + Math.abs(u.r - actingCapo.r) + Math.abs(u.s - actingCapo.s)) / 2;
+                            return dist > 0 && dist <= 2;
                           });
+                          const targets = enemySoldiers.filter((u: any) => {
+                            const stats = gameState?.soldierStats?.[u.id];
+                            const hasImmunity = (gameState?.bonannoPurgeImmunity || []).some((i: any) => i.unitId === u.id);
+                            return stats && stats.loyalty < 80 && !(gameState?.flippedSoldiers || []).some((f: any) => f.unitId === u.id) && !hasImmunity;
+                          }).map((u: any) => {
+                            const stats = gameState?.soldierStats?.[u.id];
+                            let chance = FLIP_SOLDIER_BASE_CHANCE;
+                            if (stats.loyalty < 60) chance += 0.15;
+                            else if (stats.loyalty > 70) chance -= 0.10;
+                            const influence = gameState?.resources?.influence || 0;
+                            if (influence > 50) chance += (influence - 50) * 0.005;
+                            if (actingCapo.personality === 'schemer') chance += 0.10;
+                            chance = Math.min(0.70, Math.max(0.05, chance));
+                            return { unit: u, loyalty: stats.loyalty, chance: Math.round(chance * 100), cost: flipCost };
+                          });
+                          if (targets.length === 0) {
+                            if (onAction) onAction({ type: 'flip_soldier', targetQ: tile.q, targetR: tile.r, targetS: tile.s });
+                          } else {
+                            setFlipTargetMenu({ tile, actingCapo, targets });
+                          }
                           setActionMenu(null);
                         }}
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-muted hover:bg-muted/80 text-foreground text-xs font-bold transition-colors"
                       >
-                        🐀 Flip Soldier (Capo)
+                        🐀 Flip Soldier (Capo) — ${(() => {
+                          const count = (gameState?.flippedSoldiers || []).filter((f: any) => f.flippedByFamily === playerFamily).length;
+                          return (FLIP_SOLDIER_BASE_COST + count * FLIP_SOLDIER_COST_ESCALATION).toLocaleString();
+                        })()}
                       </button>
                     ) : reasons.flip_soldier ? (
                       <DisabledAction icon="🐀" label="Flip Soldier" reason={reasons.flip_soldier} />
@@ -1755,6 +1814,60 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         {unit.type === 'capo' ? '👔' : '🔫'} {unit.name || unit.id.split('-').slice(-2).join(' ')}
                       </button>
                     ))}
+                  </div>
+                </foreignObject>
+              );
+            })()}
+
+            {/* Flip Soldier — target picker popup */}
+            {flipTargetMenu && (() => {
+              const { x, y } = getHexPosition(flipTargetMenu.tile.q, flipTargetMenu.tile.r);
+              const menuWidth = 220;
+              const menuHeight = flipTargetMenu.targets.length * 50 + 50;
+              return (
+                <foreignObject x={x - menuWidth / 2} y={y - menuHeight - baseHexRadius} width={menuWidth} height={menuHeight}>
+                  <div className="bg-background/95 backdrop-blur-sm border border-muted-foreground/30 rounded-lg p-2 shadow-xl">
+                    <div className="text-xs font-bold text-foreground text-center mb-1.5">🐀 Select Target to Flip</div>
+                    {flipTargetMenu.targets.map(({ unit, loyalty, chance, cost }) => (
+                      <button
+                        key={unit.id}
+                        onClick={() => {
+                          if (onAction) onAction({
+                            type: 'flip_soldier',
+                            targetQ: flipTargetMenu.tile.q,
+                            targetR: flipTargetMenu.tile.r,
+                            targetS: flipTargetMenu.tile.s,
+                            targetUnitId: unit.id,
+                          });
+                          setFlipTargetMenu(null);
+                        }}
+                        className="flex flex-col w-full px-2 py-1.5 rounded-md bg-muted/30 hover:bg-muted/60 text-foreground text-xs font-medium transition-colors mb-1"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span>🔫 {unit.name || unit.id.split('-').slice(-2).join(' ')}</span>
+                          <span className="text-muted-foreground">${cost.toLocaleString()}</span>
+                        </div>
+                        <div className="flex items-center gap-2 w-full mt-0.5">
+                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div 
+                              className="h-full rounded-full transition-all" 
+                              style={{ 
+                                width: `${loyalty}%`, 
+                                backgroundColor: loyalty < 40 ? '#ef4444' : loyalty < 60 ? '#f59e0b' : '#22c55e' 
+                              }} 
+                            />
+                          </div>
+                          <span className="text-muted-foreground" style={{ fontSize: '10px' }}>Loy {loyalty}</span>
+                          <span style={{ fontSize: '10px', color: chance >= 40 ? '#22c55e' : chance >= 25 ? '#f59e0b' : '#ef4444' }}>{chance}%</span>
+                        </div>
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setFlipTargetMenu(null)}
+                      className="w-full mt-1 px-2 py-1 rounded-md bg-muted/20 hover:bg-muted/40 text-muted-foreground text-xs transition-colors"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </foreignObject>
               );

@@ -39,9 +39,9 @@ import {
   AIPlannedHit, IntelSource, INTEL_SOURCE_LABELS,
   FlippedSoldier,
   CopFlippedSoldier, COP_FLIP_LOYALTY_THRESHOLD, COP_FLIP_BASE_CHANCE, COP_FLIP_LOYALTY_SCALING, COP_FLIP_HEAT_SCALING,
-  COP_FLIP_HEAT_PER_TURN, COP_FLIP_INCOME_PENALTY,
+  COP_FLIP_HEAT_PER_TURN, COP_FLIP_INCOME_PENALTY, COP_FLIP_DISCOVERY_CHANCE,
   HQ_ASSAULT_BASE_CHANCE, HQ_DEFENSE_BONUS, HQ_ASSAULT_MAX_CHANCE, HQ_ASSAULT_MIN_TOUGHNESS, HQ_ASSAULT_MIN_LOYALTY,
-  FLIP_SOLDIER_COST, FLIP_SOLDIER_BASE_CHANCE, FLIP_SOLDIER_FAIL_INFLUENCE_LOSS,
+  FLIP_SOLDIER_BASE_COST, FLIP_SOLDIER_COST_ESCALATION, FLIP_SOLDIER_BASE_CHANCE, FLIP_SOLDIER_FAIL_INFLUENCE_LOSS,
   SITDOWN_COST, SITDOWN_COOLDOWN, SITDOWN_LOYALTY_BONUS, SITDOWN_DEFENSE_PER_SOLDIER,
   CLAIM_TOUGHNESS_GAIN, EXTORTION_TOUGHNESS_GAIN,
   BUILT_BUSINESS_DEFENSE_BONUS, BUILT_BUSINESS_HEAT_REDUCTION, BUILT_BUSINESS_RESPECT_THRESHOLD, BUILT_BUSINESS_RESPECT_BONUS, BUILT_BUSINESS_LOYALTY_BONUS,
@@ -3779,7 +3779,38 @@ export const useEnhancedMafiaGameState = (
           }
         }
       }
-      
+
+      // --- COUNTER-INTEL DISCOVERY: Per-turn chance for family-flipped soldiers to be discovered ---
+      {
+        const discoveredIds: string[] = [];
+        for (const flipped of (newState.flippedSoldiers || [])) {
+          if (Math.random() < COP_FLIP_DISCOVERY_CHANCE) {
+            discoveredIds.push(flipped.unitId);
+            // Remove the unit (executed by the host family's counter-intelligence)
+            newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== flipped.unitId);
+            delete newState.soldierStats[flipped.unitId];
+            const isPlayerAsset = flipped.flippedByFamily === newState.playerFamily;
+            const isPlayerSoldier = flipped.family === newState.playerFamily;
+            if (isPlayerAsset) {
+              newState.pendingNotifications.push({
+                type: 'error' as const,
+                title: '🔍 Rat Discovered!',
+                message: `Your flipped ${flipped.family} soldier was discovered and eliminated by counter-intelligence!`,
+              });
+            } else if (isPlayerSoldier) {
+              newState.pendingNotifications.push({
+                type: 'success' as const,
+                title: '🛡️ Enemy Rat Found!',
+                message: `A ${flipped.flippedByFamily} spy in your ranks was uncovered and dealt with.`,
+              });
+            }
+            if (turnReport) turnReport.events.push(`🔍 A flipped ${flipped.family} soldier (turned by ${flipped.flippedByFamily}) was discovered and eliminated.`);
+          }
+        }
+        if (discoveredIds.length > 0) {
+          newState.flippedSoldiers = (newState.flippedSoldiers || []).filter(f => !discoveredIds.includes(f.unitId));
+        }
+      }
 
       if (newState.hitmanContracts && newState.hitmanContracts.length > 0) {
         const resolvedContracts: string[] = [];
@@ -5411,7 +5442,9 @@ export const useEnhancedMafiaGameState = (
       opponent.resources.respect = Math.min(100, Math.max(0, (opponent.resources.respect || 0) + respectGain - 0.5));
 
       // ── AI FLIP SOLDIER (weaken enemy HQ defenses) — Capo within 3 hexes of enemy HQ ──
-      if (aiPhase >= 3 && opponent.resources.money >= FLIP_SOLDIER_COST && Math.random() < (personality === 'aggressive' ? 0.25 : personality === 'opportunistic' ? 0.20 : personality === 'unpredictable' ? 0.18 : 0.12)) {
+      const aiFlippedCount = (state.flippedSoldiers || []).filter(f => f.flippedByFamily === fam).length;
+      const aiFlipCost = FLIP_SOLDIER_BASE_COST + aiFlippedCount * FLIP_SOLDIER_COST_ESCALATION;
+      if (aiPhase >= 3 && opponent.resources.money >= aiFlipCost && Math.random() < (personality === 'aggressive' ? 0.25 : personality === 'opportunistic' ? 0.20 : personality === 'unpredictable' ? 0.18 : 0.12)) {
         const otherFamilies = [state.playerFamily, ...state.aiOpponents.filter(o => o.family !== fam).map(o => o.family)];
         let flipped = false;
         for (const victimFamily of otherFamilies) {
@@ -5435,7 +5468,7 @@ export const useEnhancedMafiaGameState = (
           if (flippableTargets.length === 0) continue;
           const target = flippableTargets[Math.floor(Math.random() * flippableTargets.length)];
           const tStats = state.soldierStats[target.id];
-          opponent.resources.money -= FLIP_SOLDIER_COST;
+          opponent.resources.money -= aiFlipCost;
           let chance = FLIP_SOLDIER_BASE_CHANCE;
           if (tStats && tStats.loyalty < 60) chance += 0.15;
           if (tStats && tStats.loyalty > 70) chance -= 0.10;
@@ -7421,8 +7454,10 @@ export const useEnhancedMafiaGameState = (
     const targetFamily = tile.isHeadquarters;
     if (targetFamily === state.playerFamily) return state;
 
-    if (state.resources.money < FLIP_SOLDIER_COST) {
-      state.pendingNotifications = [...state.pendingNotifications, { type: 'warning', title: '💰 Not Enough Money', message: `Flipping costs $${FLIP_SOLDIER_COST.toLocaleString()}.` }];
+    const currentFlippedCount = (state.flippedSoldiers || []).filter(f => f.flippedByFamily === state.playerFamily).length;
+    const flipCost = FLIP_SOLDIER_BASE_COST + currentFlippedCount * FLIP_SOLDIER_COST_ESCALATION;
+    if (state.resources.money < flipCost) {
+      state.pendingNotifications = [...state.pendingNotifications, { type: 'warning', title: '💰 Not Enough Money', message: `Flipping costs $${flipCost.toLocaleString()}.` }];
       return state;
     }
 
@@ -7452,8 +7487,10 @@ export const useEnhancedMafiaGameState = (
       return state;
     }
 
-    state.resources.money -= FLIP_SOLDIER_COST;
-    const target = flippableTargets[Math.floor(Math.random() * flippableTargets.length)];
+    state.resources.money -= flipCost;
+    // If a specific target was chosen via UI, use it; otherwise pick randomly
+    const chosenTarget = action.targetUnitId ? flippableTargets.find(u => u.id === action.targetUnitId) : null;
+    const target = chosenTarget || flippableTargets[Math.floor(Math.random() * flippableTargets.length)];
     const targetStats = state.soldierStats[target.id]!;
 
     let chance = FLIP_SOLDIER_BASE_CHANCE;
