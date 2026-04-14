@@ -1896,7 +1896,7 @@ export const useEnhancedMafiaGameState = (
             resources: { ...prev.resources, respect: newRespect },
             combatLog: newCombatLog,
             pendingNotifications: newNotifications,
-            lastCombatResult: { success: true, type: 'hit' as const, q: capo.hex.q, r: capo.hex.r, s: capo.hex.s, title: '🔫 Hit Carried Out', details: `${unit.name || 'Soldier'} was eliminated by the Capo.`, timestamp: Date.now() },
+            lastCombatResult: { success: true, type: 'hit' as const, q: capo.q, r: capo.r, s: capo.s, title: '🔫 Hit Carried Out', details: `${unit.name || 'Soldier'} was eliminated by the Capo.`, timestamp: Date.now() },
           };
         }
 
