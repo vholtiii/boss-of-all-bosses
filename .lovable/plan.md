@@ -1,27 +1,46 @@
 
 
-# Make Family Power Button Distinct — Left Panel Placement
+# Police Flip (Rat) System — Cops Turn Your Soldiers
 
 ## Overview
-Move the Family Power activation UI from the right panel's collapsible section to the **left panel** as a standalone, visually distinct block. It will sit between the phase guidance banner and the "Strategic Actions" collapsible, making it immediately discoverable.
+Add a new mechanic where **police can flip player/AI soldiers** whose loyalty drops too low. This is distinct from the existing player-initiated flip — cops do it automatically each turn. Bribe tiers provide escalating counter-intelligence against cop-flipped rats.
 
-## Changes — Single File: `src/components/GameSidePanels.tsx`
+## Mechanic Design
 
-### 1. Remove Family Power from Right Panel
-Cut the family power block (currently inside "Recruitment & Tactical" collapsible, ~lines 235-275) from the right-side content.
+### Per-Turn Police Flip Check
+- Each turn, every deployed soldier (player and AI) with **loyalty below 40** has a chance of being flipped by cops
+- Base chance: **5% per turn**, +1% for every loyalty point below 40 (so loyalty 30 = 15% chance)
+- Higher family heat increases the chance: +0.5% per heat point above 50
+- Flipped-by-cops soldiers become **informants** — a new status tracked separately from player-flipped soldiers
+- Effect: informant soldiers leak intel to police, increasing heat by +3/turn per informant and reducing that family's illegal income by 10% per informant
 
-### 2. Add Family Power to Left Panel
-Insert a new standalone block between the phase guidance banner (~line 123) and the "Strategic Actions" collapsible (~line 126). It will render only during the tactical phase.
+### Bribe-Based Counter-Intelligence (Tiered)
 
-### 3. Visual Distinction
-- 4px left border in the player's family color
-- Slightly elevated background (`bg-primary/10`) compared to surrounding sections
-- "⚡ FAMILY POWER" small-caps header label
-- Gradient-tinted activate button (family color based) instead of default styling
-- Subtle border glow animation (`animate-pulse` on border opacity) when power is available
-- Muted/dimmed styling when on cooldown or insufficient actions
-- Cost and cooldown info shown as small badges below the button
+| Bribe Level | Effect |
+|---|---|
+| **Patrol Officer** | You are told "a soldier has been compromised" (no name, just a warning notification) |
+| **Police Captain** | You are told **which specific soldier** was flipped (name + location shown) |
+| **Police Chief** | The crooked chief's squad **automatically eliminates** the rat — no heat incurred, soldier removed |
+| **Mayor** | Same as Chief — auto-elimination of any cop-flipped rat, plus immunity from new cop flips for the bribe duration |
 
-## Result
-The Family Power is always visible in the left panel during tactical phase — no collapsible hiding, distinct styling separates it from standard actions.
+### Player Response (without bribes)
+- Without bribes, cop-flipped soldiers are invisible — you just see rising heat and shrinking income
+- Players can manually investigate by scouting their own territory (new action) or raising soldier loyalty above 40 to prevent future flips
+
+## Files Changed
+
+1. **`src/types/game-mechanics.ts`** — Add `CopFlippedSoldier` interface (unitId, family, flippedOnTurn), add `COP_FLIP_LOYALTY_THRESHOLD = 40`, `COP_FLIP_BASE_CHANCE = 0.05` constants
+2. **`src/hooks/useEnhancedMafiaGameState.ts`**:
+   - Add `copFlippedSoldiers: CopFlippedSoldier[]` to game state + initialization + deep clone
+   - Add `processCopFlips()` in turn processing: iterate all soldiers, check loyalty threshold, roll flip chance, add to `copFlippedSoldiers`
+   - In income processing: reduce illegal income by 10% per cop informant in that family
+   - In heat processing: add +3 heat per cop informant
+   - In bribe processing: check active bribes and apply tiered counter-intel (notify, reveal, auto-eliminate)
+   - Mayor bribe: add cop-flip immunity flag during bribe duration
+3. **`src/components/GameSidePanels.tsx`** — If patrol+ bribe detects a rat, show a warning badge/alert in the left panel; if captain+ bribe, show the soldier's name and location
+
+## Balance Notes
+- Loyalty threshold of 40 is intentionally low — only neglected soldiers get flipped
+- This creates a reason to invest in soldier welfare (pay maintenance, station on good hexes)
+- Synergizes with existing bribe system — bribes now have a defensive purpose, not just offensive intel
 
