@@ -3677,7 +3677,110 @@ export const useEnhancedMafiaGameState = (
       }
       newState.policeHeat.level = Math.max(0, newState.policeHeat.level - heatReduction);
       
-      // FIX #2: Process hitman contracts
+      // --- COP FLIP (RAT) SYSTEM: Per-turn processing ---
+      {
+        newState.copFlippedSoldiers = newState.copFlippedSoldiers || [];
+        const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
+        
+        // Step 1: Check for new cop flips on all families
+        for (const family of allFamilies) {
+          // Mayor bribe grants immunity for player family
+          if (family === newState.playerFamily && newState.copFlipImmunityUntil > newState.turn) continue;
+          
+          const familySoldiers = newState.deployedUnits.filter(u => u.family === family && u.type === 'soldier');
+          // Estimate family heat (player has policeHeat, AI families: use a proxy based on territory aggression)
+          const familyHeat = family === newState.playerFamily 
+            ? newState.policeHeat.level 
+            : Math.min(80, 20 + newState.hexMap.filter(t => t.controllingFamily === family).length * 0.8);
+          
+          for (const soldier of familySoldiers) {
+            const stats = newState.soldierStats[soldier.id];
+            if (!stats || stats.loyalty >= COP_FLIP_LOYALTY_THRESHOLD) continue;
+            // Already a cop informant?
+            if (newState.copFlippedSoldiers.some(c => c.unitId === soldier.id)) continue;
+            
+            const loyaltyBelow = COP_FLIP_LOYALTY_THRESHOLD - stats.loyalty;
+            let flipChance = COP_FLIP_BASE_CHANCE + loyaltyBelow * COP_FLIP_LOYALTY_SCALING;
+            if (familyHeat > 50) flipChance += (familyHeat - 50) * COP_FLIP_HEAT_SCALING;
+            flipChance = Math.min(0.50, flipChance);
+            
+            if (Math.random() < flipChance) {
+              newState.copFlippedSoldiers.push({
+                unitId: soldier.id,
+                unitName: soldier.name || 'Soldier',
+                family,
+                flippedOnTurn: newState.turn,
+                hexQ: soldier.q,
+                hexR: soldier.r,
+                hexS: soldier.s,
+              });
+              turnReport.events.push(`🐀 A ${family} soldier has become a police informant!`);
+            }
+          }
+        }
+        
+        // Step 2: Clean up dead informants
+        newState.copFlippedSoldiers = newState.copFlippedSoldiers.filter(c => 
+          newState.deployedUnits.some(u => u.id === c.unitId)
+        );
+        
+        // Step 3: Apply heat penalty for player's informants
+        const playerInformantCount = newState.copFlippedSoldiers.filter(c => c.family === newState.playerFamily).length;
+        if (playerInformantCount > 0) {
+          const heatIncrease = playerInformantCount * COP_FLIP_HEAT_PER_TURN;
+          newState.policeHeat.level = Math.min(100, newState.policeHeat.level + heatIncrease);
+          turnReport.events.push(`🔥 Police informants in your ranks: +${heatIncrease} heat from ${playerInformantCount} rat(s).`);
+        }
+        
+        // Step 4: Bribe-based counter-intelligence for player family
+        const playerRats = newState.copFlippedSoldiers.filter(c => c.family === newState.playerFamily);
+        if (playerRats.length > 0) {
+          const hasMayor = newState.activeBribes.some(b => b.tier === 'mayor' && b.active);
+          const hasChief = newState.activeBribes.some(b => b.tier === 'police_chief' && b.active);
+          const hasCaptain = newState.activeBribes.some(b => b.tier === 'police_captain' && b.active);
+          const hasPatrol = newState.activeBribes.some(b => b.tier === 'patrol_officer' && b.active);
+          
+          if (hasMayor || hasChief) {
+            // Auto-eliminate all player rats — no heat
+            for (const rat of playerRats) {
+              newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== rat.unitId);
+              newState.pendingNotifications.push({
+                type: 'success' as const,
+                title: hasMayor ? '👑 Mayor\'s Squad: Rat Eliminated' : '🛡️ Chief\'s Squad: Rat Eliminated',
+                message: `${rat.unitName} was a police informant. ${hasMayor ? 'The mayor\'s' : 'The chief\'s'} squad eliminated them — no heat incurred.`,
+              });
+              turnReport.events.push(`🔫 ${rat.unitName} (police rat) eliminated by ${hasMayor ? 'mayor' : 'chief'}'s squad.`);
+            }
+            newState.copFlippedSoldiers = newState.copFlippedSoldiers.filter(c => c.family !== newState.playerFamily);
+            
+            // Mayor also grants immunity from future cop flips
+            if (hasMayor) {
+              const mayorBribe = newState.activeBribes.find(b => b.tier === 'mayor' && b.active);
+              if (mayorBribe) {
+                newState.copFlipImmunityUntil = newState.turn + mayorBribe.turnsRemaining;
+              }
+            }
+          } else if (hasCaptain) {
+            // Reveal specific soldier names and locations
+            for (const rat of playerRats) {
+              newState.pendingNotifications.push({
+                type: 'warning' as const,
+                title: '🔍 Captain\'s Intel: Rat Identified',
+                message: `${rat.unitName} at hex (${rat.hexQ},${rat.hexR}) is a police informant! Deal with them before they leak more.`,
+              });
+            }
+          } else if (hasPatrol) {
+            // Generic warning — no specifics
+            newState.pendingNotifications.push({
+              type: 'warning' as const,
+              title: '⚠️ Street Intel: Soldier Compromised',
+              message: `Your patrol contact warns that ${playerRats.length > 1 ? 'soldiers have' : 'a soldier has'} been turned by the cops. Investigate your ranks.`,
+            });
+          }
+        }
+      }
+      
+
       if (newState.hitmanContracts && newState.hitmanContracts.length > 0) {
         const resolvedContracts: string[] = [];
         newState.hitmanContracts = newState.hitmanContracts.map(contract => {
