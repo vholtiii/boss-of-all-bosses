@@ -9151,6 +9151,174 @@ export const useEnhancedMafiaGameState = (
     return state;
   };
 
+  // ============ PHASE 3: INFLUENCE EROSION & PASSIVE EXPANSION ============
+  const processInfluenceSystem = (state: EnhancedMafiaGameState, turnReport: TurnReport) => {
+    if ((state.gamePhase || 1) < 3) return;
+
+    const allFamilies = [state.playerFamily, ...state.aiOpponents.map(o => o.family)];
+
+    // Helper: check if a hex is protected by a family (unit, built business, supply node, or safehouse within range)
+    const isProtectedBy = (hex: HexTile, family: string): boolean => {
+      // Units within range
+      const hasUnit = state.deployedUnits.some(u =>
+        u.family === family && hexDistance(u, hex) <= EROSION_PROTECTION_RANGE
+      );
+      if (hasUnit) return true;
+
+      // Built businesses within range (owned by family)
+      const hasBuiltBiz = state.hexMap.some(t =>
+        t.controllingFamily === family &&
+        t.business?.builtByPlayer &&
+        hexDistance(t, hex) <= EROSION_PROTECTION_RANGE
+      );
+      if (hasBuiltBiz) return true;
+
+      // Supply nodes within range (on family territory)
+      const hasSupply = state.hexMap.some(t =>
+        t.controllingFamily === family &&
+        t.supplyNode &&
+        hexDistance(t, hex) <= EROSION_PROTECTION_RANGE
+      );
+      if (hasSupply) return true;
+
+      // Safehouses within range
+      const hasSafehouse = (state.safehouses || []).some(s =>
+        s.family === family && hexDistance(s, hex) <= EROSION_PROTECTION_RANGE
+      );
+      if (hasSafehouse) return true;
+
+      return false;
+    };
+
+    // Helper: check if a hex is adjacent (1 hex) to a family's influence source
+    const hasAdjacencyFrom = (hex: HexTile, family: string): boolean => {
+      const neighbors = getHexNeighbors(hex.q, hex.r, hex.s);
+      // Unit adjacent
+      const hasUnit = state.deployedUnits.some(u =>
+        u.family === family && neighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s)
+      );
+      if (hasUnit) return true;
+      // Built business adjacent
+      const hasBuiltBiz = state.hexMap.some(t =>
+        t.controllingFamily === family &&
+        t.business?.builtByPlayer &&
+        neighbors.some(n => n.q === t.q && n.r === t.r && n.s === t.s)
+      );
+      if (hasBuiltBiz) return true;
+      // Supply node adjacent
+      const hasSupply = state.hexMap.some(t =>
+        t.controllingFamily === family &&
+        t.supplyNode &&
+        neighbors.some(n => n.q === t.q && n.r === t.r && n.s === t.s)
+      );
+      if (hasSupply) return true;
+      // Safehouse adjacent
+      const hasSafehouse = (state.safehouses || []).some(s =>
+        s.family === family && neighbors.some(n => n.q === s.q && n.r === s.r && n.s === s.s)
+      );
+      if (hasSafehouse) return true;
+      return false;
+    };
+
+    // ── EROSION PASS ──
+    for (const family of allFamilies) {
+      const familyHexes = state.hexMap.filter(t =>
+        t.controllingFamily === family && !t.isHeadquarters
+      );
+      for (const hex of familyHexes) {
+        const isFortified = (state.fortifiedHexes || []).some(f => f.q === hex.q && f.r === hex.r && f.s === hex.s && f.family === family);
+        if (isProtectedBy(hex, family) || isFortified) {
+          hex.erosionCounter = 0;
+        } else {
+          hex.erosionCounter = (hex.erosionCounter || 0) + 1;
+          if (hex.erosionCounter >= EROSION_THRESHOLD) {
+            // Flip to neutral
+            const districtName = hex.district;
+            hex.controllingFamily = 'neutral';
+            hex.erosionCounter = 0;
+            hex.expansionCounter = 0;
+            hex.expansionInfluencer = undefined;
+
+            // Deduct respect/influence
+            if (family === state.playerFamily) {
+              state.resources.respect = Math.max(0, state.resources.respect - EROSION_RESPECT_LOSS);
+              state.resources.influence = Math.max(0, state.resources.influence - EROSION_INFLUENCE_LOSS);
+              syncRespect(state, state.resources.respect);
+              state.pendingNotifications.push({
+                type: 'warning',
+                title: '⚠️ Territory Eroded',
+                message: `Lost control of ${districtName} — influence eroded. -${EROSION_RESPECT_LOSS} Respect, -${EROSION_INFLUENCE_LOSS} Influence.`,
+              });
+              turnReport.territoriesLost.push(districtName);
+              turnReport.resourceDeltas.respect -= EROSION_RESPECT_LOSS;
+              turnReport.resourceDeltas.influence -= EROSION_INFLUENCE_LOSS;
+              turnReport.resourceDeltas.territories -= 1;
+            } else {
+              const opp = state.aiOpponents.find(o => o.family === family);
+              if (opp) {
+                opp.resources.respect = Math.max(0, (opp.resources.respect || 0) - EROSION_RESPECT_LOSS);
+                opp.resources.influence = Math.max(0, (opp.resources.influence || 0) - EROSION_INFLUENCE_LOSS);
+              }
+              turnReport.aiActions.push({ family, action: 'erosion', detail: `Lost ${districtName} to influence erosion` });
+            }
+          }
+        }
+      }
+    }
+
+    // ── EXPANSION PASS (neutral hexes only) ──
+    const neutralHexes = state.hexMap.filter(t => t.controllingFamily === 'neutral' && !t.isHeadquarters);
+    for (const hex of neutralHexes) {
+      const adjacentFamilies = allFamilies.filter(fam => hasAdjacencyFrom(hex, fam));
+
+      if (adjacentFamilies.length === 1) {
+        const influencer = adjacentFamilies[0];
+        if (hex.expansionInfluencer === influencer) {
+          hex.expansionCounter = (hex.expansionCounter || 0) + 1;
+        } else {
+          hex.expansionInfluencer = influencer;
+          hex.expansionCounter = 1;
+        }
+
+        if (hex.expansionCounter >= EXPANSION_THRESHOLD) {
+          // Absorb hex
+          const districtName = hex.district;
+          hex.controllingFamily = influencer as any;
+          hex.expansionCounter = 0;
+          hex.expansionInfluencer = undefined;
+          hex.erosionCounter = 0;
+
+          // Grant respect/influence
+          if (influencer === state.playerFamily) {
+            state.resources.respect += EXPANSION_RESPECT_GAIN;
+            state.resources.influence += EXPANSION_INFLUENCE_GAIN;
+            syncRespect(state, state.resources.respect);
+            state.pendingNotifications.push({
+              type: 'success',
+              title: '🏴 Influence Spread',
+              message: `Your influence has spread to ${districtName}. +${EXPANSION_RESPECT_GAIN} Respect, +${EXPANSION_INFLUENCE_GAIN} Influence.`,
+            });
+            turnReport.territoriesGained.push(districtName);
+            turnReport.resourceDeltas.respect += EXPANSION_RESPECT_GAIN;
+            turnReport.resourceDeltas.influence += EXPANSION_INFLUENCE_GAIN;
+            turnReport.resourceDeltas.territories += 1;
+          } else {
+            const opp = state.aiOpponents.find(o => o.family === influencer);
+            if (opp) {
+              opp.resources.respect = (opp.resources.respect || 0) + EXPANSION_RESPECT_GAIN;
+              opp.resources.influence = (opp.resources.influence || 0) + EXPANSION_INFLUENCE_GAIN;
+            }
+            turnReport.aiActions.push({ family: influencer, action: 'expansion', detail: `Influence spread to ${districtName}` });
+          }
+        }
+      } else {
+        // Contested or no adjacent families — reset
+        hex.expansionCounter = 0;
+        hex.expansionInfluencer = undefined;
+      }
+    }
+  };
+
   // ============ PROCESS PACTS AT END OF TURN ============
   const processPacts = (state: EnhancedMafiaGameState) => {
     // Tick down seizure penalties on businesses
