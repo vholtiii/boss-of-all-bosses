@@ -25,11 +25,11 @@ Starting soldiers vary by family (historically inspired):
 
 | Family | Soldiers | Capos | Boss | Starting Money |
 |---|---|---|---|---|
-| Gambino | 4 | 1 | 1 | $50,000 |
-| Genovese | 4 | 1 | 1 | $50,000 |
-| Lucchese | 3 | 1 | 1 | $50,000 |
-| Bonanno | 2 | 1 | 1 | $50,000 |
-| Colombo | 1 | 1 | 1 | $50,000 |
+| Gambino | 4 | 1 | 1 | $60,000 |
+| Genovese | 4 | 1 | 1 | $45,000 |
+| Lucchese | 3 | 1 | 1 | $70,000 |
+| Bonanno | 2 | 1 | 1 | $40,000 |
+| Colombo | 1 | 1 | 1 | $35,000 |
 
 All units start at their family's HQ hex.
 

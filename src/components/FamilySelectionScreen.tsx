@@ -58,7 +58,7 @@ const families: FamilyInfo[] = [
     id: 'genovese',
     name: 'Genovese',
     motto: '"In this business, you either kill or get killed."',
-    description: 'The most secretive family. Expert infiltrators with unmatched intelligence networks. Hard to pin down and harder to defeat.',
+    description: 'The shadow empire. Masters of legitimate business fronts and money laundering. Their economic engine funds everything while staying hidden in plain sight.',
     color: '#2AA63E',
     difficulty: 'Hard',
     traits: [
@@ -78,7 +78,7 @@ const families: FamilyInfo[] = [
     id: 'lucchese',
     name: 'Lucchese',
     motto: '"Money talks. Everything else walks."',
-    description: 'The traders and smugglers. Control the supply chains and laundering operations. Excellent at turning dirty money clean.',
+    description: 'The silent killers. Superior intelligence networks and surgical precision make them deadly. Lower heat and higher hit rates let them strike without consequences.',
     color: '#4169E1',
     difficulty: 'Easy',
     traits: [
@@ -112,13 +112,13 @@ const families: FamilyInfo[] = [
     powerEffect: 'Remove all soldiers with loyalty below 50. Survivors gain +15 loyalty and 2-turn immunity to enemy flip attempts.',
     powerCost: '1 Tactical Action',
     powerCooldown: '4 turns',
-    startingResources: { money: 40000, soldiers: 3, influence: 8, politicalPower: 15, respect: 35 },
+    startingResources: { money: 40000, soldiers: 2, influence: 8, politicalPower: 15, respect: 35 },
   },
   {
     id: 'colombo',
     name: 'Colombo',
     motto: '"Strike fast. Strike hard. No mercy."',
-    description: 'The wildcards. Aggressive and unpredictable with the strongest military force — but you burn through resources quickly.',
+    description: 'The scrappy survivors. Start with the least but fight the hardest for every dollar. Low resources force creative play — recruitment discounts and fear keep you in the game.',
     color: '#8A2BE2',
     difficulty: 'Hard',
     traits: [
@@ -126,13 +126,13 @@ const families: FamilyInfo[] = [
       { label: 'Economy', icon: <DollarSign className="h-3.5 w-3.5" />, value: 2 },
       { label: 'Fear', icon: <Crown className="h-3.5 w-3.5" />, value: 4 },
     ],
-    bonuses: ['+20% combat power', '-15% recruitment cost', '+15% fear generation'],
+    bonuses: ['+20% income bonus', '-15% recruitment cost', '+15% fear generation'],
     powerName: 'The Persico Succession',
     powerLore: 'When Joe Colombo was shot at the 1971 Unity Day Rally, Carmine Persico seized control and reorganized — a pattern repeated through decades of assassinations and internal wars.',
     powerEffect: 'Instantly promote a soldier to capo when one of your capos is killed. Reactive trigger — no turn required.',
     powerCost: '1 Tactical Action',
     powerCooldown: 'Once per game',
-    startingResources: { money: 35000, soldiers: 3, influence: 18, politicalPower: 10, respect: 25 },
+    startingResources: { money: 35000, soldiers: 1, influence: 18, politicalPower: 10, respect: 25 },
   },
 ];
 
