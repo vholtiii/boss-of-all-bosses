@@ -397,9 +397,13 @@ export interface EnhancedMafiaGameState {
   lastLawyerTurn: number;
   lawyerActiveUntil: number;
   ricoTimer: number;
-  arrestedSoldiers: Array<{ unitId: string; returnTurn: number }>;
+  prosecutionTimer: number;
+  federalIndictmentTimer: number;
+  federalIndictmentActive: boolean;
+  federalIndictmentRecoveryTurn: number;
+  arrestedSoldiers: Array<{ unitId: string; returnTurn: number; source?: 'heat' | 'prosecution' }>;
   arrestedCapos: Array<{ unitId: string; returnTurn: number }>;
-  gameOver?: { type: 'rico'; turn: number } | null;
+  gameOver?: { type: 'rico' | 'federal_indictment'; turn: number } | null;
   pendingBusinessBuild?: { businessType: string; cost: number; isLegal: boolean } | null;
   
   // Blind hit system
