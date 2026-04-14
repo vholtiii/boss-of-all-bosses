@@ -1235,6 +1235,12 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     if (!pending) return null;
                     return (
                       <g className="pointer-events-none">
+                        {pending.ready && (
+                          <circle cx={x + baseHexRadius * 0.6} cy={y - baseHexRadius * 0.7} r={12} fill="none" stroke="#D4AF37" strokeWidth="1.5" opacity="0.6">
+                            <animate attributeName="r" values="8;14;8" dur="1.5s" repeatCount="indefinite" />
+                            <animate attributeName="opacity" values="0.7;0.1;0.7" dur="1.5s" repeatCount="indefinite" />
+                          </circle>
+                        )}
                         <circle cx={x + baseHexRadius * 0.6} cy={y - baseHexRadius * 0.7} r={8} fill={pending.ready ? '#D4AF37' : '#6B7280'} stroke="#ffffff" strokeWidth="1" />
                         <text x={x + baseHexRadius * 0.6} y={y - baseHexRadius * 0.7 + 3.5} textAnchor="middle" fontSize="9" className="select-none">{pending.ready ? '🤝' : '📩'}</text>
                       </g>
@@ -2156,6 +2162,24 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     <p className="text-xs text-muted-foreground">
                       {pending.ready ? 'Available to negotiate this turn' : 'Negotiation available next turn'}
                     </p>
+                    {pending.ready && onAction && (
+                      <button
+                        className="mt-1 w-full px-2 py-1 rounded bg-yellow-600/80 hover:bg-yellow-500/80 text-black text-[10px] font-bold transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAction({
+                            type: 'open_negotiate',
+                            targetQ: pending.targetQ,
+                            targetR: pending.targetR,
+                            targetS: pending.targetS,
+                            capoId: pending.capoId,
+                            pendingNegotiationId: pending.id,
+                          });
+                        }}
+                      >
+                        🤝 Sit Down Now
+                      </button>
+                    )}
                   </div>
                 );
               })()}
