@@ -4249,6 +4249,7 @@ export const useEnhancedMafiaGameState = (
     state.finances.communityUpkeep = communityUpkeep;
     state.finances.arrestPenalty = arrestPenaltyAmount;
     state.finances.heatPenalty = heatPenaltyAmount;
+    state.finances.copFlipPenalty = copFlipPenaltyAmount;
   };
 
   // ============ PROCESS BRIBES ============
