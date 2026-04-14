@@ -516,6 +516,18 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                                       <MapPin className="h-2.5 w-2.5" />
                                       {district}
                                     </div>
+                                    {unit.type === 'soldier' && soldierStats[unit.id] && (() => {
+                                      const ss = soldierStats[unit.id];
+                                      return (
+                                        <div className="flex flex-wrap gap-1 mt-0.5">
+                                          <span className={`text-[9px] px-1 rounded ${ss.loyalty >= 70 ? 'bg-green-500/20 text-green-400' : ss.loyalty >= 40 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>♥ {ss.loyalty}</span>
+                                          <span className="text-[9px] px-1 rounded bg-blue-500/20 text-blue-400">🎯 {ss.training}</span>
+                                          <span className="text-[9px] px-1 rounded bg-orange-500/20 text-orange-400">💪 {ss.toughness}</span>
+                                          <span className="text-[9px] px-1 rounded bg-purple-500/20 text-purple-400">⚔ {ss.victories}</span>
+                                          <span className="text-[9px] px-1 rounded bg-amber-500/20 text-amber-400">💰 {ss.racketeering}</span>
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
                                   {highlighted && <div className="w-2 h-2 rounded-full bg-mafia-gold animate-pulse" />}
                                 </button>
