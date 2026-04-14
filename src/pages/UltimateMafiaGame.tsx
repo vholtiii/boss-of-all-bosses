@@ -824,7 +824,14 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 <p><span className="text-foreground font-semibold">🏠 Safehouse:</span> Select a capo on your territory to establish a secondary deploy point lasting 5 turns.</p>
               )}
               {gameState.selectedMoveAction === 'send_word' && (
-                <p><span className="text-foreground font-semibold">📩 Send Word:</span> Select a capo, then click an enemy hex to request a sitdown. Costs 1 tactical action. The negotiation becomes available next turn during the Action step — the capo doesn't need to stay nearby.</p>
+                <div>
+                  <p className="font-semibold text-foreground mb-1">📩 Send Word — How it works:</p>
+                  <ol className="list-decimal list-inside space-y-0.5 text-muted-foreground">
+                    <li><span className="text-foreground">Select a Capo</span> on the map</li>
+                    <li><span className="text-foreground">Click an enemy hex</span> to request a sitdown (costs 1 tactical action)</li>
+                    <li><span className="text-foreground">Next turn</span>, use the <span className="text-yellow-400 font-semibold">🤝 Sit Down</span> button below or click the hex on the map</li>
+                  </ol>
+                </div>
               )}
               {gameState.selectedMoveAction === 'move' && (
                 <p className="italic">Select a tactical action above to see its description. No regular movement in this phase.</p>
@@ -832,6 +839,51 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             </div>
           </div>
         )}
+
+        {/* Pending Sitdowns Tracker */}
+        {(() => {
+          const pendingNegs = (gameState as any).pendingNegotiations || [];
+          if (pendingNegs.length === 0) return null;
+          return (
+            <div className="mt-2 flex flex-wrap gap-2 items-center">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Sitdowns:</span>
+              {pendingNegs.map((p: any) => (
+                <div 
+                  key={p.id} 
+                  className={cn(
+                    "flex items-center gap-1.5 px-2 py-1 rounded border text-xs",
+                    p.ready 
+                      ? "bg-yellow-900/30 border-yellow-500/40 text-yellow-300 animate-pulse" 
+                      : "bg-muted/30 border-border text-muted-foreground"
+                  )}
+                >
+                  <span>{p.ready ? '🤝' : '📩'}</span>
+                  <span className="font-medium">{p.capoName}</span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="capitalize">{p.targetFamily}</span>
+                  {p.ready ? (
+                    <button
+                      className="ml-1 px-1.5 py-0.5 rounded bg-yellow-600/80 hover:bg-yellow-500/80 text-black text-[10px] font-bold transition-colors"
+                      onClick={() => setNegotiationState({
+                        open: true,
+                        targetQ: p.targetQ,
+                        targetR: p.targetR,
+                        targetS: p.targetS,
+                        capoId: p.capoId,
+                        scope: 'territory' as const,
+                        pendingNegotiationId: p.id,
+                      })}
+                    >
+                      Sit Down
+                    </button>
+                  ) : (
+                    <span className="text-[10px] italic">next turn</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
       
       {/* Center - Resources */}
