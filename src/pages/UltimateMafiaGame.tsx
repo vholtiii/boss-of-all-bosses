@@ -1411,6 +1411,8 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
           // Boss (family-level) negotiation
           const enemyFamilies = gameState.aiOpponents.map((o: any) => o.family).filter((f: string) => !(gameState as any).eliminatedFamilies?.includes(f));
           const targetFam = negotiationState.targetFamily || enemyFamilies[0] || '';
+          const incomingSitdownId = (negotiationState as any).incomingSitdownId;
+          const successBonus = (negotiationState as any).successBonus || 0;
           return (
             <NegotiationDialog
               open={negotiationState.open}
@@ -1418,12 +1420,22 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               scope="family"
               negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               onNegotiate={(type, extraData) => {
-                performAction({
-                  type: 'boss_negotiate',
-                  negotiationType: type,
-                  targetFamily: targetFam,
-                  extraData,
-                });
+                if (incomingSitdownId) {
+                  performAction({
+                    type: 'accept_incoming_sitdown',
+                    sitdownId: incomingSitdownId,
+                    negotiationType: type,
+                    targetFamily: targetFam,
+                    extraData,
+                  });
+                } else {
+                  performAction({
+                    type: 'boss_negotiate',
+                    negotiationType: type,
+                    targetFamily: targetFam,
+                    extraData,
+                  });
+                }
                 setNegotiationState(null);
               }}
               enemyFamily={targetFam}
@@ -1432,7 +1444,8 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               playerMoney={gameState.resources.money}
               enemyStrength={0}
               hexIncome={0}
-              availableEnemyFamilies={enemyFamilies}
+              availableEnemyFamilies={incomingSitdownId ? undefined : enemyFamilies}
+              successBonus={successBonus}
               treacheryTurnsRemaining={(gameState as any).treacheryDebuff?.turnsRemaining || 0}
             />
           );
