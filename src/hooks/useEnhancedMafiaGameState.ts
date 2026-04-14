@@ -2731,7 +2731,16 @@ export const useEnhancedMafiaGameState = (
 
       // ============ PENDING NEGOTIATIONS LIFECYCLE ============
       newState.pendingNegotiations = newState.pendingNegotiations || [];
-      // Expire "ready" negotiations that weren't used last turn
+      // Expire "ready" negotiations — ignoring a sitdown increases tension
+      const expiredNegs = newState.pendingNegotiations.filter(p => p.ready);
+      for (const expired of expiredNegs) {
+        addPairTension(newState, newState.playerFamily, expired.targetFamily, 8);
+        newState.pendingNotifications.push({
+          type: 'warning' as const,
+          title: '😤 Sitdown Snubbed',
+          message: `The ${expired.targetFamily} family is offended you ignored their sitdown. Tension +8.`,
+        });
+      }
       newState.pendingNegotiations = newState.pendingNegotiations.filter(p => !p.ready);
       // Promote "pending" (from last turn) to "ready"
       newState.pendingNegotiations = newState.pendingNegotiations.map(p => ({ ...p, ready: true }));
