@@ -9,6 +9,9 @@ export interface SoldierStats {
   racketeering: number;  // 0-5 (+1 per successful extortion)
   turnsDeployed: number; // internal tracker for training calc
   toughnessProgress: number; // 0.0-1.0 fractional progress toward next toughness point
+  turnsIdle: number;     // consecutive turns without an action
+  isMercenary: boolean;  // true = mercenary (bought), false = local recruit
+  actedThisTurn: boolean; // reset each turn, set true on hit/extort/claim/move
 }
 
 export const CLAIM_TOUGHNESS_GAIN = 0.25; // +0.25 progress per territory claim (4 claims = +1 toughness)
@@ -573,7 +576,22 @@ export const LOYALTY_ACTION_BONUS = 2;         // +2 loyalty per successful acti
 export const LOYALTY_COMBAT_BONUS = 5;         // +5 loyalty per survived combat encounter
 export const LOYALTY_INCOME_HEX_BONUS = 3;     // +3 loyalty/turn if on hex with business >= threshold
 export const LOYALTY_INCOME_HEX_THRESHOLD = 4000; // minimum business income for hex loyalty bonus
-export const LOYALTY_UNPAID_PENALTY = 2;       // -2 loyalty/turn when family can't afford maintenance
+export const LOYALTY_UNPAID_PENALTY = 3;       // -3 loyalty/turn when family can't afford maintenance (was 2)
+
+// ============ LOYALTY SYSTEM REFINEMENT ============
+export const LOYALTY_IDLE_DECAY = 2;           // -2 loyalty/turn if no action for 2+ consecutive turns
+export const LOYALTY_IDLE_THRESHOLD = 2;       // turns idle before decay kicks in
+export const LOYALTY_CAPO_AURA = 2;            // +2 loyalty/turn for soldiers within range of friendly capo
+export const LOYALTY_CAPO_AURA_RANGE = 2;      // hex range for capo aura
+export const LOYALTY_HQ_COMFORT = 1;           // +1 loyalty/turn for soldiers at HQ
+export const LOYALTY_MERC_CAP = 70;            // mercenary loyalty hard cap
+export const LOYALTY_MERC_START = 35;          // mercenary starting loyalty
+export const LOYALTY_RECRUIT_START = 50;       // local recruit starting loyalty
+export const LOYALTY_RECRUIT_EARLY_BONUS = 1;  // +1 loyalty/turn for local recruits first N turns
+export const LOYALTY_RECRUIT_EARLY_TURNS = 5;  // turns that early bonus applies
+export const LOYALTY_FAILED_ACTION_PENALTY = 5; // -5 loyalty when hit or extortion fails
+export const LOYALTY_ENEMY_TERRITORY_PENALTY = 2; // -2 loyalty/turn on or adjacent to enemy hex
+export const LOYALTY_NEUTRAL_HEX_PENALTY = 2;  // -2 loyalty/turn stationed on neutral hex
 
 // ============ CAPO COMBAT PROTECTION ============
 export const CAPO_WOUND_LOYALTY_PENALTY = 10;  // -10 loyalty when capo is wounded in combat
