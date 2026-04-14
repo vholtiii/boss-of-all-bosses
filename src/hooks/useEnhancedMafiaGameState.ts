@@ -3835,6 +3835,7 @@ export const useEnhancedMafiaGameState = (
               q: hq.q, r: hq.r, s: hq.s,
               movesRemaining: 0,
               maxMoves: 2,
+              level: 1,
             });
             // Apply loyalty penalty
             const stats = newState.soldierStats[soldierId];
