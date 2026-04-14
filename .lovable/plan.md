@@ -1,21 +1,20 @@
 
 
-# Add Sound Cue to Escort-Triggered Elimination
+# Add "Marked for Death" Timer to Deployed Units List
 
-## Problem
-When a Capo escorts a marked soldier and carries out the hit, no sound plays. The existing combat sound system triggers on `lastCombatResult` changes, but the escort handler never sets that field.
+## Change
 
-## Fix
+**File: `src/components/HeadquartersInfoPanel.tsx` (~line 522-524)**
 
-**File: `src/hooks/useEnhancedMafiaGameState.ts` (~line 1887-1899)**
+After the loyalty badge for each soldier, add a conditional ☠️ timer badge when `soldierStats[unit.id].markedForDeath` is true:
 
-In the return block of the marked-soldier escort handler, add `lastCombatResult` to the returned state:
-
-```ts
-lastCombatResult: { success: true, type: 'hit' as const, timestamp: Date.now() },
+```tsx
+{ss.markedForDeath && ss.markedTurnsRemaining > 0 && (
+  <span className="text-[9px] px-1 rounded mt-0.5 bg-red-900/30 text-red-400 animate-pulse">
+    ☠️ {ss.markedTurnsRemaining}t
+  </span>
+)}
 ```
 
-This will cause the existing `useEffect` in `UltimateMafiaGame.tsx` (line ~116) to detect the combat result and play `hit_success` + `success` sound sequence automatically — no additional wiring needed.
-
-One line added to one file.
+This displays a pulsing red badge like "☠️ 3t" next to the loyalty indicator, showing how many turns remain before the mark expires. One small addition, one file.
 
