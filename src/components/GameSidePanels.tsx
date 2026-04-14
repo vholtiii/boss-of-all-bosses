@@ -103,6 +103,50 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           <StatusBar label="Prosecution Risk" value={legalStatus.prosecutionRisk} max={100} color="bg-orange-500" />
         </div>
 
+        {/* ── Cop Flip (Rat) Warnings ── */}
+        {(() => {
+          const copRats = (gameState.copFlippedSoldiers || []).filter(c => c.family === gameState.playerFamily);
+          if (copRats.length === 0) return null;
+          
+          const hasCaptainPlus = (gameState.activeBribes || []).some(b => 
+            b.active && (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'mayor')
+          );
+          const hasPatrol = (gameState.activeBribes || []).some(b => b.active && b.tier === 'patrol_officer');
+          
+          return (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                <span className="text-xs font-bold text-destructive">
+                  🐀 {copRats.length} Informant{copRats.length > 1 ? 's' : ''} in Your Ranks
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                +{copRats.length * 3} heat/turn · -{copRats.length * 10}% illegal income
+              </p>
+              {hasCaptainPlus ? (
+                <div className="space-y-1">
+                  {copRats.map(rat => (
+                    <div key={rat.unitId} className="text-[10px] text-destructive/80 flex items-center gap-1">
+                      <span>🔍</span>
+                      <span className="font-medium">{rat.unitName}</span>
+                      <span className="text-muted-foreground">at ({rat.hexQ},{rat.hexR})</span>
+                    </div>
+                  ))}
+                </div>
+              ) : hasPatrol ? (
+                <p className="text-[10px] text-yellow-400 italic">
+                  ⚠️ Street contact confirms compromised soldier(s) — bribe a Captain for names.
+                </p>
+              ) : (
+                <p className="text-[10px] text-muted-foreground italic">
+                  Bribe a Patrol Officer or higher to identify rats.
+                </p>
+              )}
+            </div>
+          );
+        })()}
+
         <Separator />
 
         {/* ── Phase guidance banner ── */}
