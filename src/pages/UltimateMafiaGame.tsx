@@ -147,6 +147,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     open: boolean;
     scope: 'family';
     targetFamily: string;
+    incomingSitdownId?: string;
+    successBonus?: number;
   } | null>(null);
 
   // Plan Hit mode — 2-step: select soldier, then select target hex+unit
