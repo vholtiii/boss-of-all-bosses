@@ -1414,6 +1414,26 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             </text>
                           );
                         }
+                        // Rat icon on flipped soldiers (only visible for player's flipped assets)
+                        const hasFlippedInGroup = soldiers.some(s => 
+                          (gameState?.flippedSoldiers || []).some((f: any) => f.unitId === s.id && f.flippedByFamily === playerFamily)
+                        );
+                        if (hasFlippedInGroup && fam !== playerFamily) {
+                          elements.push(
+                            <text
+                              key={`rat-${fam}-${key}`}
+                              x={x + baseHexRadius * 0.25 + offsetIdx * 12 + 10}
+                              y={y + baseHexRadius * 0.35 + 12}
+                              fontSize="9"
+                              textAnchor="middle"
+                              className="pointer-events-none"
+                              opacity={0.7}
+                              style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}
+                            >
+                              🐀
+                            </text>
+                          );
+                        }
                         offsetIdx++;
                       });
                     }
@@ -1794,6 +1814,60 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         {unit.type === 'capo' ? '👔' : '🔫'} {unit.name || unit.id.split('-').slice(-2).join(' ')}
                       </button>
                     ))}
+                  </div>
+                </foreignObject>
+              );
+            })()}
+
+            {/* Flip Soldier — target picker popup */}
+            {flipTargetMenu && (() => {
+              const { x, y } = getHexPosition(flipTargetMenu.tile.q, flipTargetMenu.tile.r);
+              const menuWidth = 220;
+              const menuHeight = flipTargetMenu.targets.length * 50 + 50;
+              return (
+                <foreignObject x={x - menuWidth / 2} y={y - menuHeight - baseHexRadius} width={menuWidth} height={menuHeight}>
+                  <div className="bg-background/95 backdrop-blur-sm border border-muted-foreground/30 rounded-lg p-2 shadow-xl">
+                    <div className="text-xs font-bold text-foreground text-center mb-1.5">🐀 Select Target to Flip</div>
+                    {flipTargetMenu.targets.map(({ unit, loyalty, chance, cost }) => (
+                      <button
+                        key={unit.id}
+                        onClick={() => {
+                          if (onAction) onAction({
+                            type: 'flip_soldier',
+                            targetQ: flipTargetMenu.tile.q,
+                            targetR: flipTargetMenu.tile.r,
+                            targetS: flipTargetMenu.tile.s,
+                            targetUnitId: unit.id,
+                          });
+                          setFlipTargetMenu(null);
+                        }}
+                        className="flex flex-col w-full px-2 py-1.5 rounded-md bg-muted/30 hover:bg-muted/60 text-foreground text-xs font-medium transition-colors mb-1"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span>🔫 {unit.name || unit.id.split('-').slice(-2).join(' ')}</span>
+                          <span className="text-muted-foreground">${cost.toLocaleString()}</span>
+                        </div>
+                        <div className="flex items-center gap-2 w-full mt-0.5">
+                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div 
+                              className="h-full rounded-full transition-all" 
+                              style={{ 
+                                width: `${loyalty}%`, 
+                                backgroundColor: loyalty < 40 ? '#ef4444' : loyalty < 60 ? '#f59e0b' : '#22c55e' 
+                              }} 
+                            />
+                          </div>
+                          <span className="text-muted-foreground" style={{ fontSize: '10px' }}>Loy {loyalty}</span>
+                          <span style={{ fontSize: '10px', color: chance >= 40 ? '#22c55e' : chance >= 25 ? '#f59e0b' : '#ef4444' }}>{chance}%</span>
+                        </div>
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setFlipTargetMenu(null)}
+                      className="w-full mt-1 px-2 py-1 rounded-md bg-muted/20 hover:bg-muted/40 text-muted-foreground text-xs transition-colors"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </foreignObject>
               );
