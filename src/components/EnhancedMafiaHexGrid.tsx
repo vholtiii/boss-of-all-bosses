@@ -1715,17 +1715,55 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (onAction) onAction({
-                            type: 'flip_soldier',
-                            targetQ: actionMenu.tile.q,
-                            targetR: actionMenu.tile.r,
-                            targetS: actionMenu.tile.s,
+                          const tile = actionMenu.tile;
+                          const targetFamily = tile.isHeadquarters;
+                          if (!targetFamily) return;
+                          // Find acting capo
+                          const actingCapo = (gameState?.deployedUnits || [])
+                            .filter((u: any) => u.family === playerFamily && u.type === 'capo' &&
+                              (Math.abs(u.q - tile.q) + Math.abs(u.r - tile.r) + Math.abs(u.s - tile.s)) / 2 <= 3)
+                            .sort((a: any, b: any) => {
+                              const dA = (Math.abs(a.q - tile.q) + Math.abs(a.r - tile.r) + Math.abs(a.s - tile.s)) / 2;
+                              const dB = (Math.abs(b.q - tile.q) + Math.abs(b.r - tile.r) + Math.abs(b.s - tile.s)) / 2;
+                              return dA - dB;
+                            })[0];
+                          if (!actingCapo) return;
+                          // Build target list
+                          const currentFlippedCount = (gameState?.flippedSoldiers || []).filter((f: any) => f.flippedByFamily === playerFamily).length;
+                          const flipCost = FLIP_SOLDIER_BASE_COST + currentFlippedCount * FLIP_SOLDIER_COST_ESCALATION;
+                          const enemySoldiers = (gameState?.deployedUnits || []).filter((u: any) => {
+                            if (u.family !== targetFamily || u.type !== 'soldier') return false;
+                            const dist = (Math.abs(u.q - actingCapo.q) + Math.abs(u.r - actingCapo.r) + Math.abs(u.s - actingCapo.s)) / 2;
+                            return dist > 0 && dist <= 2;
                           });
+                          const targets = enemySoldiers.filter((u: any) => {
+                            const stats = gameState?.soldierStats?.[u.id];
+                            const hasImmunity = (gameState?.bonannoPurgeImmunity || []).some((i: any) => i.unitId === u.id);
+                            return stats && stats.loyalty < 80 && !(gameState?.flippedSoldiers || []).some((f: any) => f.unitId === u.id) && !hasImmunity;
+                          }).map((u: any) => {
+                            const stats = gameState?.soldierStats?.[u.id];
+                            let chance = FLIP_SOLDIER_BASE_CHANCE;
+                            if (stats.loyalty < 60) chance += 0.15;
+                            else if (stats.loyalty > 70) chance -= 0.10;
+                            const influence = gameState?.resources?.influence || 0;
+                            if (influence > 50) chance += (influence - 50) * 0.005;
+                            if (actingCapo.personality === 'schemer') chance += 0.10;
+                            chance = Math.min(0.70, Math.max(0.05, chance));
+                            return { unit: u, loyalty: stats.loyalty, chance: Math.round(chance * 100), cost: flipCost };
+                          });
+                          if (targets.length === 0) {
+                            if (onAction) onAction({ type: 'flip_soldier', targetQ: tile.q, targetR: tile.r, targetS: tile.s });
+                          } else {
+                            setFlipTargetMenu({ tile, actingCapo, targets });
+                          }
                           setActionMenu(null);
                         }}
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-muted hover:bg-muted/80 text-foreground text-xs font-bold transition-colors"
                       >
-                        🐀 Flip Soldier (Capo)
+                        🐀 Flip Soldier (Capo) — ${(() => {
+                          const count = (gameState?.flippedSoldiers || []).filter((f: any) => f.flippedByFamily === playerFamily).length;
+                          return (FLIP_SOLDIER_BASE_COST + count * FLIP_SOLDIER_COST_ESCALATION).toLocaleString();
+                        })()}
                       </button>
                     ) : reasons.flip_soldier ? (
                       <DisabledAction icon="🐀" label="Flip Soldier" reason={reasons.flip_soldier} />
