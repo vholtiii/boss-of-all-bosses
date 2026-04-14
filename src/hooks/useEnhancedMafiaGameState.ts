@@ -5525,6 +5525,7 @@ export const useEnhancedMafiaGameState = (
           }
         }
       }
+      } // end Phase 3 claim/extort else block
 
       // ── DEPLOY CAPO ──
       const caposAtHQ = state.deployedUnits.filter(u =>
