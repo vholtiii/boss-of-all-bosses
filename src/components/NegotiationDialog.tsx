@@ -26,6 +26,7 @@ interface NegotiationDialogProps {
   // For boss negotiation — choose target family
   availableEnemyFamilies?: string[];
   onSelectTargetFamily?: (family: string) => void;
+  successBonus?: number;
 }
 
 const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
