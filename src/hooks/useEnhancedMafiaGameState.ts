@@ -38,6 +38,8 @@ import {
   AI_PLAN_HIT_CHANCE, AI_PLAN_HIT_SUCCESS_RATE, AI_PLAN_HIT_DURATION,
   AIPlannedHit, IntelSource, INTEL_SOURCE_LABELS,
   FlippedSoldier,
+  CopFlippedSoldier, COP_FLIP_LOYALTY_THRESHOLD, COP_FLIP_BASE_CHANCE, COP_FLIP_LOYALTY_SCALING, COP_FLIP_HEAT_SCALING,
+  COP_FLIP_HEAT_PER_TURN, COP_FLIP_INCOME_PENALTY,
   HQ_ASSAULT_BASE_CHANCE, HQ_DEFENSE_BONUS, HQ_ASSAULT_MAX_CHANCE, HQ_ASSAULT_MIN_TOUGHNESS, HQ_ASSAULT_MIN_LOYALTY,
   FLIP_SOLDIER_COST, FLIP_SOLDIER_BASE_CHANCE, FLIP_SOLDIER_FAIL_INFLUENCE_LOSS,
   SITDOWN_COST, SITDOWN_COOLDOWN, SITDOWN_LOYALTY_BONUS, SITDOWN_DEFENSE_PER_SOLDIER,
@@ -196,6 +198,8 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   capoNegotiationCooldown: state.capoNegotiationCooldown || 0,
   events: [...(state.events || [])],
   flippedSoldiers: (state.flippedSoldiers || []).map(f => ({ ...f })),
+  copFlippedSoldiers: (state.copFlippedSoldiers || []).map(f => ({ ...f })),
+  copFlipImmunityUntil: state.copFlipImmunityUntil || 0,
   eliminatedFamilies: [...(state.eliminatedFamilies || [])],
   sitdownCooldownUntil: state.sitdownCooldownUntil || 0,
   supplyNodes: (state.supplyNodes || []).map(n => ({ ...n })),
@@ -429,6 +433,10 @@ export interface EnhancedMafiaGameState {
   flippedSoldiers: FlippedSoldier[];
   eliminatedFamilies: string[];
   sitdownCooldownUntil: number;
+  
+  // Cop Flip (Rat) system
+  copFlippedSoldiers: CopFlippedSoldier[];
+  copFlipImmunityUntil: number; // turn number until which mayor bribe grants immunity
   
   // Supply lines
   supplyNodes: SupplyNode[];
@@ -970,6 +978,8 @@ const createInitialGameState = (
     flippedSoldiers: [],
     eliminatedFamilies: [],
     sitdownCooldownUntil: 0,
+    copFlippedSoldiers: [],
+    copFlipImmunityUntil: 0,
     supplyNodes,
     supplyStockpile: [],
     supplyDealPacts: [],
@@ -3667,7 +3677,110 @@ export const useEnhancedMafiaGameState = (
       }
       newState.policeHeat.level = Math.max(0, newState.policeHeat.level - heatReduction);
       
-      // FIX #2: Process hitman contracts
+      // --- COP FLIP (RAT) SYSTEM: Per-turn processing ---
+      {
+        newState.copFlippedSoldiers = newState.copFlippedSoldiers || [];
+        const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
+        
+        // Step 1: Check for new cop flips on all families
+        for (const family of allFamilies) {
+          // Mayor bribe grants immunity for player family
+          if (family === newState.playerFamily && newState.copFlipImmunityUntil > newState.turn) continue;
+          
+          const familySoldiers = newState.deployedUnits.filter(u => u.family === family && u.type === 'soldier');
+          // Estimate family heat (player has policeHeat, AI families: use a proxy based on territory aggression)
+          const familyHeat = family === newState.playerFamily 
+            ? newState.policeHeat.level 
+            : Math.min(80, 20 + newState.hexMap.filter(t => t.controllingFamily === family).length * 0.8);
+          
+          for (const soldier of familySoldiers) {
+            const stats = newState.soldierStats[soldier.id];
+            if (!stats || stats.loyalty >= COP_FLIP_LOYALTY_THRESHOLD) continue;
+            // Already a cop informant?
+            if (newState.copFlippedSoldiers.some(c => c.unitId === soldier.id)) continue;
+            
+            const loyaltyBelow = COP_FLIP_LOYALTY_THRESHOLD - stats.loyalty;
+            let flipChance = COP_FLIP_BASE_CHANCE + loyaltyBelow * COP_FLIP_LOYALTY_SCALING;
+            if (familyHeat > 50) flipChance += (familyHeat - 50) * COP_FLIP_HEAT_SCALING;
+            flipChance = Math.min(0.50, flipChance);
+            
+            if (Math.random() < flipChance) {
+              newState.copFlippedSoldiers.push({
+                unitId: soldier.id,
+                unitName: soldier.name || 'Soldier',
+                family,
+                flippedOnTurn: newState.turn,
+                hexQ: soldier.q,
+                hexR: soldier.r,
+                hexS: soldier.s,
+              });
+              turnReport.events.push(`🐀 A ${family} soldier has become a police informant!`);
+            }
+          }
+        }
+        
+        // Step 2: Clean up dead informants
+        newState.copFlippedSoldiers = newState.copFlippedSoldiers.filter(c => 
+          newState.deployedUnits.some(u => u.id === c.unitId)
+        );
+        
+        // Step 3: Apply heat penalty for player's informants
+        const playerInformantCount = newState.copFlippedSoldiers.filter(c => c.family === newState.playerFamily).length;
+        if (playerInformantCount > 0) {
+          const heatIncrease = playerInformantCount * COP_FLIP_HEAT_PER_TURN;
+          newState.policeHeat.level = Math.min(100, newState.policeHeat.level + heatIncrease);
+          turnReport.events.push(`🔥 Police informants in your ranks: +${heatIncrease} heat from ${playerInformantCount} rat(s).`);
+        }
+        
+        // Step 4: Bribe-based counter-intelligence for player family
+        const playerRats = newState.copFlippedSoldiers.filter(c => c.family === newState.playerFamily);
+        if (playerRats.length > 0) {
+          const hasMayor = newState.activeBribes.some(b => b.tier === 'mayor' && b.active);
+          const hasChief = newState.activeBribes.some(b => b.tier === 'police_chief' && b.active);
+          const hasCaptain = newState.activeBribes.some(b => b.tier === 'police_captain' && b.active);
+          const hasPatrol = newState.activeBribes.some(b => b.tier === 'patrol_officer' && b.active);
+          
+          if (hasMayor || hasChief) {
+            // Auto-eliminate all player rats — no heat
+            for (const rat of playerRats) {
+              newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== rat.unitId);
+              newState.pendingNotifications.push({
+                type: 'success' as const,
+                title: hasMayor ? '👑 Mayor\'s Squad: Rat Eliminated' : '🛡️ Chief\'s Squad: Rat Eliminated',
+                message: `${rat.unitName} was a police informant. ${hasMayor ? 'The mayor\'s' : 'The chief\'s'} squad eliminated them — no heat incurred.`,
+              });
+              turnReport.events.push(`🔫 ${rat.unitName} (police rat) eliminated by ${hasMayor ? 'mayor' : 'chief'}'s squad.`);
+            }
+            newState.copFlippedSoldiers = newState.copFlippedSoldiers.filter(c => c.family !== newState.playerFamily);
+            
+            // Mayor also grants immunity from future cop flips
+            if (hasMayor) {
+              const mayorBribe = newState.activeBribes.find(b => b.tier === 'mayor' && b.active);
+              if (mayorBribe) {
+                newState.copFlipImmunityUntil = newState.turn + mayorBribe.turnsRemaining;
+              }
+            }
+          } else if (hasCaptain) {
+            // Reveal specific soldier names and locations
+            for (const rat of playerRats) {
+              newState.pendingNotifications.push({
+                type: 'warning' as const,
+                title: '🔍 Captain\'s Intel: Rat Identified',
+                message: `${rat.unitName} at hex (${rat.hexQ},${rat.hexR}) is a police informant! Deal with them before they leak more.`,
+              });
+            }
+          } else if (hasPatrol) {
+            // Generic warning — no specifics
+            newState.pendingNotifications.push({
+              type: 'warning' as const,
+              title: '⚠️ Street Intel: Soldier Compromised',
+              message: `Your patrol contact warns that ${playerRats.length > 1 ? 'soldiers have' : 'a soldier has'} been turned by the cops. Investigate your ranks.`,
+            });
+          }
+        }
+      }
+      
+
       if (newState.hitmanContracts && newState.hitmanContracts.length > 0) {
         const resolvedContracts: string[] = [];
         newState.hitmanContracts = newState.hitmanContracts.map(contract => {
@@ -4085,6 +4198,16 @@ export const useEnhancedMafiaGameState = (
       arrestPenaltyAmount = grossIncome - Math.floor(grossIncome * penaltyMultiplier);
     }
 
+    // Cop informant income penalty — -10% illegal income per informant in player family
+    let copFlipPenaltyAmount = 0;
+    {
+      const playerInformants = (state.copFlippedSoldiers || []).filter(c => c.family === state.playerFamily).length;
+      if (playerInformants > 0) {
+        const copPenaltyRate = Math.min(0.50, playerInformants * COP_FLIP_INCOME_PENALTY);
+        copFlipPenaltyAmount = Math.floor(grossIllegalIncome * copPenaltyRate);
+      }
+    }
+
     // Compute heat penalty from gross illegal income
     let heatPenaltyAmount = 0;
     {
@@ -4096,12 +4219,12 @@ export const useEnhancedMafiaGameState = (
         heatPenaltyRate = 0.15;
       }
       if (heatPenaltyRate > 0) {
-        heatPenaltyAmount = Math.floor(grossIllegalIncome * heatPenaltyRate);
+        heatPenaltyAmount = Math.floor((grossIllegalIncome - copFlipPenaltyAmount) * heatPenaltyRate);
       }
     }
 
     // Total expenses = maintenance + upkeep + penalties
-    const totalExpenses = soldierMaintenance + communityUpkeep + arrestPenaltyAmount + heatPenaltyAmount;
+    const totalExpenses = soldierMaintenance + communityUpkeep + arrestPenaltyAmount + heatPenaltyAmount + copFlipPenaltyAmount;
     const totalProfit = grossIncome - totalExpenses;
 
     // Apply to money
@@ -4112,7 +4235,7 @@ export const useEnhancedMafiaGameState = (
     const postPenaltyLegalIncome = totalProfitPenalty > 0 
       ? Math.floor(grossLegalIncome * Math.max(0.1, (100 - totalProfitPenalty) / 100))
       : grossLegalIncome;
-    const postPenaltyIllegalIncome = Math.max(0, grossIllegalIncome - heatPenaltyAmount - (totalProfitPenalty > 0 ? (arrestPenaltyAmount - (grossLegalIncome - postPenaltyLegalIncome)) : 0));
+    const postPenaltyIllegalIncome = Math.max(0, grossIllegalIncome - heatPenaltyAmount - copFlipPenaltyAmount - (totalProfitPenalty > 0 ? (arrestPenaltyAmount - (grossLegalIncome - postPenaltyLegalIncome)) : 0));
     
     state.finances.totalIncome = grossIncome;
     state.finances.totalExpenses = totalExpenses;
@@ -4126,6 +4249,7 @@ export const useEnhancedMafiaGameState = (
     state.finances.communityUpkeep = communityUpkeep;
     state.finances.arrestPenalty = arrestPenaltyAmount;
     state.finances.heatPenalty = heatPenaltyAmount;
+    state.finances.copFlipPenalty = copFlipPenaltyAmount;
   };
 
   // ============ PROCESS BRIBES ============

@@ -55,6 +55,7 @@ export interface BusinessFinances {
   communityUpkeep?: number;
   arrestPenalty?: number;
   heatPenalty?: number;
+  copFlipPenalty?: number;
 }
 
 export interface PoliceHeat {

@@ -138,6 +138,25 @@ export interface FlippedSoldier {
   hqS: number;
 }
 
+// ============ COP FLIP (RAT) SYSTEM ============
+export const COP_FLIP_LOYALTY_THRESHOLD = 40;
+export const COP_FLIP_BASE_CHANCE = 0.05;        // 5% base per turn
+export const COP_FLIP_LOYALTY_SCALING = 0.01;    // +1% per loyalty point below threshold
+export const COP_FLIP_HEAT_SCALING = 0.005;      // +0.5% per heat point above 50
+export const COP_FLIP_HEAT_PER_TURN = 3;         // +3 heat/turn per informant
+export const COP_FLIP_INCOME_PENALTY = 0.10;     // -10% illegal income per informant
+export const COP_FLIP_DISCOVERY_CHANCE = 0.08;    // 8% per turn counter-intel discovery (for player-flipped soldiers)
+
+export interface CopFlippedSoldier {
+  unitId: string;
+  unitName: string;
+  family: string;       // which family the soldier belongs to
+  flippedOnTurn: number;
+  hexQ: number;
+  hexR: number;
+  hexS: number;
+}
+
 // ============ FAMILY BONUSES ============
 export interface FamilyBonuses {
   combatBonus: number;        // % modifier
