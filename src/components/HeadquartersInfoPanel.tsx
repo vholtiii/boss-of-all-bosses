@@ -100,6 +100,9 @@ interface HeadquartersInfoPanelProps {
   actionsRemaining?: number;
   gamePhase?: number;
   flippedSoldiers?: Array<{ unitId: string; family: string; flippedByFamily: string; hqQ: number; hqR: number; hqS: number }>;
+  // Purge Ranks
+  soldierStats?: Record<string, any>;
+  onEliminateSoldier?: (soldierId: string) => void;
 }
 
 const familyColors: Record<string, string> = {
