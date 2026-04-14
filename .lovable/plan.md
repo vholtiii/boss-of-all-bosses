@@ -1,66 +1,62 @@
 
 
-# Run 3 Game Simulations — Balance & Bug Assessment
+# Fix Top 4 Gamebreaking Issues
 
-## What
-Write a Node.js simulation script that extracts the core game loop logic (economy, AI turns, combat, heat, prosecution, loyalty, victory checks) from the 9100-line game state hook and runs 3 complete games of 50 turns each with different families and difficulties. Output a detailed analysis report.
+## 1. Cap AI Minimum Income (line 4742)
 
-## Why a Script (Not Manual Play)
-The game state logic is entirely in `useEnhancedMafiaGameState.ts` — a single React hook with all mechanics inline. A headless simulation can run 50 turns in seconds, testing interactions that would take hours of manual play.
+**Problem**: `(2000 + turn * 500)` grows unbounded — AI earns $27k/turn by turn 50 even with zero territory.
 
-## Simulation Design
+**Fix**: Cap the turn-scaling component at turn 20, so max floor is `(2000 + 20 * 500) = $12,000` before difficulty/map modifiers:
+```
+const cappedTurn = Math.min(state.turn, 20);
+const minIncome = Math.floor((2000 + cappedTurn * 500) * diffMods.aiIncomeMult * mapScale);
+```
 
-### 3 Game Scenarios
-1. **Gambino / Normal / Medium map** — baseline balanced game
-2. **Colombo / Hard / Small map** — worst starting position (1 soldier) on hardest settings
-3. **Genovese / Easy / Large map** — best economy family on easiest settings
+This caps AI minimum income at ~$12k (normal/medium), ~$7.2k (easy), ~$18k (hard) — still meaningful but not runaway.
 
-### Player Strategy (Automated)
-Each turn the simulated player will:
-- Deploy available soldiers to adjacent neutral hexes
-- Claim neutral hexes, extort businesses
-- Recruit soldiers when affordable (up to soft cap)
-- Build businesses when eligible (Phase 2+)
-- End turn → full end-turn processing runs
+## 2. Cap AI Recruit Soft Cap (line 4762)
 
-### Metrics Tracked Per Turn
-- Player money, soldiers, territories, respect, heat, prosecution risk
-- AI money, soldiers, territories per family
-- Events fired (arrests, wars, bankruptcy warnings, game over)
-- Victory progress
-- Phase transitions
+**Problem**: `3 + floor(turn/2)` is unbounded — AI can field 28+ soldiers by turn 50.
 
-### Analysis Output (Written to `/mnt/documents/`)
-A markdown report covering:
+**Fix**: Hard-cap the formula at 18 soldiers (before bonuses):
+```
+const baseCap = Math.min(Math.max(8, 3 + Math.floor(state.turn / 2)), 18);
+const soldierCap = baseCap + alertBonus + diffMods.aiRecruitCapBonus + capScale + atWarBonus;
+```
 
-**Balance Assessment**
-- Income curves (player vs AI) — is AI minimum income too generous?
-- Territory expansion rates — does any family snowball?
-- Phase progression timing — are thresholds reachable?
-- Victory achievability — can any victory condition be met in 50 turns?
+This keeps late-game AI armies manageable (18-24 depending on bonuses) instead of infinite growth.
 
-**Bug Detection**
-- Negative money / resource underflows
-- Array index out-of-bounds or undefined access patterns
-- Infinite loops in BFS/pathfinding
-- Dead code paths (unreachable conditions)
-- State corruption (unit counts mismatch, orphaned stats)
+## 3. Fix Forced Capo Promotion Dead Code (lines 5432-5462)
 
-**Gamebreaking Mechanics**
-- AI minimum income floor (`2000 + turn*500`) — grows to $27k/turn by turn 50 regardless of territory
-- Soldier recruit cap (`max(8, 3+turn/2)`) — unbounded growth
-- Heat/prosecution death spirals — can heat cascade into unrecoverable state?
-- Bankruptcy cascade — does debt→desertion→less income→more debt loop?
-- Loyalty death spiral — idle decay + enemy territory penalty stacking
+**Problem**: Missing closing brace — the fallback block at line 5444 is nested *inside* the `if (bestCandidate)` block, so `!bestCandidate` is always false there (dead code).
 
-## Technical Approach
-1. Extract key functions and constants from the game state file into a standalone Node.js script
-2. Replicate the core loop: `createInitialState → (playerActions + endTurn) × 50`
-3. Strip React hooks (`useState`, `useCallback`) — use plain functions
-4. Use the seeded PRNG (mulberry32) for reproducibility
-5. Log per-turn snapshots to build the analysis
+**Fix**: Add the missing closing brace after line 5441's `turnReport` push, so the fallback sits at the same level as `if (bestCandidate)`:
+```
+        if (bestCandidate) {
+          // ... promote logic ...
+          if (turnReport) {
+            turnReport.aiActions.push(...);
+          }
+        }  // <-- this brace was missing
+        // Fallback: forced promotion if AI has territory/money but no eligible soldiers
+        if (!bestCandidate && ...) {
+```
 
-## Files
-- `/tmp/simulate.js` — simulation script (ephemeral)
-- `/mnt/documents/game_simulation_report.md` — final analysis report
+## 4. Add "Abandon Territory" Action
+
+**Problem**: Players can't release empty hexes, trapping them in a $150/turn community upkeep death spiral.
+
+**Implementation**:
+- Add a new action type `'abandon_territory'` in the `performAction` switch in `useEnhancedMafiaGameState.ts`
+- Logic: Release a player-controlled hex (set `controllingFamily = null`, clear business) if no units are on it and it's not the HQ. Costs 0 actions, available during Action phase. Limit: 2 hexes per turn to prevent exploits.
+- Add an "Abandon Territory" button in the Strategic Actions section of `GameSidePanels.tsx` that shows a list of empty (no units, no business) player hexes with individual abandon buttons
+- Track `abandonedThisTurn` counter in state to enforce the 2/turn limit
+
+### Files Changed
+1. **`src/hooks/useEnhancedMafiaGameState.ts`** — 4 edits:
+   - Line 4742: Cap AI min income at turn 20
+   - Line 4762: Hard-cap AI recruit at 18 base
+   - Lines 5432-5462: Fix brace nesting for forced capo promotion
+   - Add `case 'abandon_territory'` handler (~30 lines)
+2. **`src/components/GameSidePanels.tsx`** — Add Abandon Territory UI in Strategic Actions section (after Purge Ranks)
 
