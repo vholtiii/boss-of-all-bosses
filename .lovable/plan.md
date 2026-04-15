@@ -1,88 +1,77 @@
 
 
-# Phase 3: Influence Erosion & Passive Expansion
+# In-Game Quick Reference Guide + Downloadable PDF Cheat Sheet
 
-## What Changes for the Player
-In Phase 3+, you can no longer manually claim or extort territory. Instead, your empire grows and shrinks organically based on where you position your units, businesses, safehouses, and supply lines.
-
-**Gaining territory**: Neutral hexes adjacent to your influence sources are slowly absorbed (+2 Respect, +3 Influence per hex gained).
-
-**Losing territory**: Hexes far from any protection source decay and flip neutral (-2 Respect, -3 Influence per hex lost).
-
-This creates a strategic shift — Phase 3 is about defending and positioning, not grabbing.
+## Overview
+Replace the current basic tutorial dialog with a comprehensive, searchable **Quick Reference Panel** accessible anytime during gameplay, plus generate a **downloadable PDF cheat sheet** covering all mechanics.
 
 ---
 
-## Mechanics
+## Part 1: In-Game Quick Reference Panel
 
-### Influence Erosion (Losing Territory)
-Each turn in Phase 3+, for every family-controlled hex (excluding HQ):
-1. Check if hex is **protected** — within 2 hexes of any: friendly unit, built business, supply node, or safehouse
-2. If **not protected**: increment `erosionCounter` by 1
-3. If **protected or fortified**: reset `erosionCounter` to 0
-4. When `erosionCounter >= 3`: hex flips to **neutral**, family loses **-2 Respect, -3 Influence**
-5. Notification: "⚠️ Lost control of [District] — influence eroded"
+### Design
+- Replace the existing `TutorialSystem.tsx` with a new `GameGuide.tsx` component
+- Opens as a full-height side sheet (not a small dialog) for better readability
+- Organized by category with collapsible accordion sections
+- Each section has a short, scannable summary with key numbers highlighted
+- Searchable via a text filter at the top
 
-### Passive Expansion (Gaining Territory)
-Each turn in Phase 3+, for every **neutral hex only**:
-1. Check if hex is adjacent (1 hex) to any family's unit, built business, safehouse, or supply node
-2. If **exactly one family** has adjacency: increment `expansionCounter` by 1 for that family
-3. If **multiple families** have adjacency: contested — counter resets, no expansion
-4. When `expansionCounter >= 2`: hex flips to the influencing family, grants **+2 Respect, +3 Influence**
-5. Notification: "🏴 Your influence has spread to [District]"
+### Categories & Content
 
-**Key rule**: Passive expansion only works on neutral hexes — you cannot passively take rival territory.
+| Section | Key Info Covered |
+|---------|-----------------|
+| **Turn Structure** | 3 steps: Deploy → Tactical → Action, skip buttons, action budgets |
+| **Resources** | Money, Soldiers, Respect, Influence — what each does |
+| **Territory** | Claiming, extorting, abandoning, Phase 3 influence erosion/expansion |
+| **Combat** | Blind hits, scouted hits, planned hits, success rates, heat tiers |
+| **Units** | Soldiers vs Capos, movement, toughness, loyalty, promotion |
+| **Economy** | Business types, income calc, maintenance, legal construction, supply lines |
+| **Diplomacy** | Ceasefires, alliances, Send Word, supply deals, tension/war |
+| **Tactical Actions** | Scout, fortify, safehouse, escort, recruitment — 3-action budget |
+| **Police & Heat** | 4 heat tiers, corruption bribes, prosecution risk |
+| **Phases** | Phase 1-4 milestones, what unlocks at each |
+| **Special Actions** | Hitman contracts, HQ assault, boss sitdown, family powers |
+| **Victory** | Territory %, Commission Vote, elimination |
 
-### Disabled Actions
-- **Claim Territory** — blocked with "🔒 Phase 3 — Territory shifts through influence"
-- **Extort Business** — blocked with same message
-- Applies to both player and AI families when their phase >= 3
+### UI Details
+- Triggered from the existing Info button in the top bar (replaces tutorial)
+- Uses `Sheet` component (slides in from right)
+- `ScrollArea` for content, `Accordion` for sections
+- `Input` field at top for filtering sections by keyword
+- Each section uses icons, bold key numbers, and compact formatting
+- Phase-specific tips highlighted with colored badges
+
+### Technical Changes
+- **New file**: `src/components/GameGuide.tsx` — full reference panel
+- **Edit**: `src/pages/UltimateMafiaGame.tsx` — swap `TutorialSystem` import for `GameGuide`, update state/props
+- **Remove**: Old `TutorialSystem.tsx` (or keep as legacy)
 
 ---
 
-## Constants
-```text
-EROSION_THRESHOLD         = 3     (turns unprotected before hex flips neutral)
-EROSION_PROTECTION_RANGE  = 2     (hex distance to count as protected)
-EXPANSION_THRESHOLD       = 2     (turns adjacent before neutral hex is absorbed)
-EROSION_RESPECT_LOSS      = -2
-EROSION_INFLUENCE_LOSS    = -3
-EXPANSION_RESPECT_GAIN    = +2
-EXPANSION_INFLUENCE_GAIN  = +3
-```
+## Part 2: Downloadable PDF Cheat Sheet
+
+### Design
+- 4-6 page PDF with all mechanics summarized in a compact, printable format
+- Dark theme matching the game's noir aesthetic
+- Two-column layout for density
+- Generated via a Python script using reportlab
+
+### Content Structure
+1. **Page 1**: Turn flow diagram, resource overview, phase milestones
+2. **Page 2**: Territory actions (claim, extort, abandon) + Phase 3 influence rules
+3. **Page 3**: Combat matrix (blind/scouted/planned hit success rates & heat)
+4. **Page 4**: Economy (income, maintenance, supply lines, businesses)
+5. **Page 5**: Units (soldier stats, capo promotion, loyalty, toughness)
+6. **Page 6**: Diplomacy, police heat tiers, corruption, victory conditions
+
+### Delivery
+- Generated to `/mnt/documents/` as a downloadable artifact
+- Also add a "Download Guide" button in the in-game reference panel
 
 ---
 
-## Technical Changes
-
-### 1. `src/hooks/useEnhancedMafiaGameState.ts`
-
-**HexTile interface** — add three optional fields:
-- `erosionCounter?: number`
-- `expansionCounter?: number`
-- `expansionInfluencer?: string`
-
-**New function `processInfluenceSystem(state)`** — called during end-of-turn processing, only when `gamePhase >= 3`:
-- **Erosion pass**: Loop all family-controlled hexes (skip HQ). For each, check if any friendly unit, built business, supply node, or safehouse exists within 2 hexes. If unprotected, increment erosion counter. If protected or fortified, reset to 0. At threshold 3, flip hex to neutral, deduct respect/influence, log event.
-- **Expansion pass**: Loop all neutral hexes. For each, check adjacency (1 hex) to any family's units, built businesses, safehouses, or supply nodes. If exactly one family has presence, increment that family's expansion counter. If contested (2+ families), reset counter. At threshold 2, flip hex to that family, grant respect/influence, log event.
-- Generate combat log entries and fire notifications for all territory changes.
-
-**Block player Claim** (~line 7928 in `processClaimTerritory`): Return early with notification if `gamePhase >= 3`.
-
-**Block player Extort** (~line 6535 in `extort_territory` case): Return early with notification if `gamePhase >= 3`.
-
-**Block AI Claim/Extort** (~line 5437): Skip AI claim/extort logic when `opponent.resources?.cachedPhase >= 3`.
-
-### 2. `src/components/EnhancedMafiaHexGrid.tsx`
-- Set `canClaim = false` and `canExtort = false` when `gamePhase >= 3`
-- Show lock icon with text: "🔒 Phase 3 — Territory shifts through influence"
-
-### 3. `src/components/GameSidePanels.tsx`
-- Gray out Extort Business button in Phase 3+ with lock indicator and tooltip
-
-### 4. `src/components/PhaseInfographic.tsx`
-- Add Phase 3 note: "Claiming & Extortion disabled — territory shifts through influence"
-
-### 5. `src/types/game-mechanics.ts`
-- Add influence system constants (thresholds, respect/influence values)
+## Implementation Order
+1. Build `GameGuide.tsx` in-game reference panel
+2. Wire it into `UltimateMafiaGame.tsx`
+3. Generate the PDF cheat sheet
 
