@@ -13,7 +13,7 @@ import { useEnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import SaveLoadDialog from '@/components/SaveLoadDialog';
 import EnemyHexActionDialog from '@/components/EnemyHexActionDialog';
-import TutorialSystem from '@/components/TutorialSystem';
+import GameGuide from '@/components/GameGuide';
 import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
 import TurnSummaryModal from '@/components/TurnSummaryModal';
 import CommissionVoteModal from '@/components/CommissionVoteModal';
@@ -1461,11 +1461,10 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
         onTestSound={playSound}
       />
 
-      {/* Tutorial System */}
-      <TutorialSystem
+      {/* Game Guide */}
+      <GameGuide
         isOpen={showTutorial}
         onClose={() => setShowTutorial(false)}
-        onComplete={() => setShowTutorial(false)}
       />
 
       {/* Turn Summary Modal */}
