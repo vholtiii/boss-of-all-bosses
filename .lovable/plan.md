@@ -1,77 +1,51 @@
 
 
-# In-Game Quick Reference Guide + Downloadable PDF Cheat Sheet
+# Make Respect & Influence Harder to Accumulate
 
-## Overview
-Replace the current basic tutorial dialog with a comprehensive, searchable **Quick Reference Panel** accessible anytime during gameplay, plus generate a **downloadable PDF cheat sheet** covering all mechanics.
+Goal: slow down passive gains so reaching 70+ feels earned and the high-tier bonuses (recruitment discount, HQ assault buff, bonus action thresholds) actually matter.
 
----
+## Approach: Diminishing Returns + Reduced Base Gains
 
-## Part 1: In-Game Quick Reference Panel
+Rather than nerfing single sources, apply two layered changes that compound naturally.
 
-### Design
-- Replace the existing `TutorialSystem.tsx` with a new `GameGuide.tsx` component
-- Opens as a full-height side sheet (not a small dialog) for better readability
-- Organized by category with collapsible accordion sections
-- Each section has a short, scannable summary with key numbers highlighted
-- Searchable via a text filter at the top
+### 1. Diminishing Returns Curve (above 60)
 
-### Categories & Content
+All passive Respect/Influence gains get scaled down as you approach the cap:
 
-| Section | Key Info Covered |
-|---------|-----------------|
-| **Turn Structure** | 3 steps: Deploy → Tactical → Action, skip buttons, action budgets |
-| **Resources** | Money, Soldiers, Respect, Influence — what each does |
-| **Territory** | Claiming, extorting, abandoning, Phase 3 influence erosion/expansion |
-| **Combat** | Blind hits, scouted hits, planned hits, success rates, heat tiers |
-| **Units** | Soldiers vs Capos, movement, toughness, loyalty, promotion |
-| **Economy** | Business types, income calc, maintenance, legal construction, supply lines |
-| **Diplomacy** | Ceasefires, alliances, Send Word, supply deals, tension/war |
-| **Tactical Actions** | Scout, fortify, safehouse, escort, recruitment — 3-action budget |
-| **Police & Heat** | 4 heat tiers, corruption bribes, prosecution risk |
-| **Phases** | Phase 1-4 milestones, what unlocks at each |
-| **Special Actions** | Hitman contracts, HQ assault, boss sitdown, family powers |
-| **Victory** | Territory %, Commission Vote, elimination |
+| Current value | Gain multiplier |
+|---------------|-----------------|
+| 0–59          | 1.0x (full)     |
+| 60–74         | 0.6x            |
+| 75–89         | 0.35x           |
+| 90–100        | 0.15x           |
 
-### UI Details
-- Triggered from the existing Info button in the top bar (replaces tutorial)
-- Uses `Sheet` component (slides in from right)
-- `ScrollArea` for content, `Accordion` for sections
-- `Input` field at top for filtering sections by keyword
-- Each section uses icons, bold key numbers, and compact formatting
-- Phase-specific tips highlighted with colored badges
+Applies to: passive turn income, business-owned bonuses, territory control bonuses, alliance bonuses. Does **NOT** apply to combat rewards (Blind Hit +20 Respect, Planned Hit +10, etc.) — those should remain high-impact "earned" spikes.
 
-### Technical Changes
-- **New file**: `src/components/GameGuide.tsx` — full reference panel
-- **Edit**: `src/pages/UltimateMafiaGame.tsx` — swap `TutorialSystem` import for `GameGuide`, update state/props
-- **Remove**: Old `TutorialSystem.tsx` (or keep as legacy)
+### 2. Reduce Base Passive Gains (~30%)
+
+In `useEnhancedMafiaGameState.ts`, trim the per-turn passive trickle:
+- Per-business respect bonus: reduce ~30%
+- Per-territory influence bonus: reduce ~30%
+- Alliance/diplomacy passive bonuses: reduce ~30%
+
+Combat-earned and milestone-earned gains stay untouched.
+
+### 3. Slightly Steeper Decay Above 70
+
+Bump the existing -0.5/turn decay to **-1.0/turn when above 70**. Keeps high stats from being "set and forget" without punishing mid-tier players.
 
 ---
 
-## Part 2: Downloadable PDF Cheat Sheet
+## Expected Impact
 
-### Design
-- 4-6 page PDF with all mechanics summarized in a compact, printable format
-- Dark theme matching the game's noir aesthetic
-- Two-column layout for density
-- Generated via a Python script using reportlab
+- Players hit 50 around turn 12–15 (was ~10)
+- Reaching 80 now requires combat success or active play (was ~turn 18 passively)
+- Reaching 100 becomes rare, making the recruitment discount cap and HQ assault buff feel like genuine achievements
 
-### Content Structure
-1. **Page 1**: Turn flow diagram, resource overview, phase milestones
-2. **Page 2**: Territory actions (claim, extort, abandon) + Phase 3 influence rules
-3. **Page 3**: Combat matrix (blind/scouted/planned hit success rates & heat)
-4. **Page 4**: Economy (income, maintenance, supply lines, businesses)
-5. **Page 5**: Units (soldier stats, capo promotion, loyalty, toughness)
-6. **Page 6**: Diplomacy, police heat tiers, corruption, victory conditions
+## Files Touched
 
-### Delivery
-- Generated to `/mnt/documents/` as a downloadable artifact
-- Also add a "Download Guide" button in the in-game reference panel
+1. **`src/hooks/useEnhancedMafiaGameState.ts`** — add `applyDiminishingReturns()` helper, wrap passive Respect/Influence gain sites, reduce base values, adjust decay
+2. **`src/components/GameGuide.tsx`** — update Resources section to mention diminishing returns above 60 and steeper decay above 70
 
----
-
-## Implementation Order
-1. Build `GameGuide.tsx` in-game reference panel
-2. Wire it into `UltimateMafiaGame.tsx`
-3. Generate the PDF cheat sheet
+No new constants file; values inlined.
 
