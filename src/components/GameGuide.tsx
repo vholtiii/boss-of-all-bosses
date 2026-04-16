@@ -80,9 +80,16 @@ const sections: GuideSection[] = [
         <Stat label="👥 Soldiers" value="Your fighting force" color="text-red-400" />
         <Stat label="⭐ Respect" value="Unlocks phases & abilities" color="text-yellow-400" />
         <Stat label="🔮 Influence" value="Territory expansion power" color="text-purple-400" />
-        <Tip>Respect gates phase progression. Earn it through combat, territory control, and diplomacy.</Tip>
-      </div>
-    ),
+        <div className="space-y-1 mt-2">
+          <p className="text-xs font-semibold">Diminishing Returns (Respect & Influence):</p>
+          <Stat label="0–59" value="100% passive gain" color="text-green-400" />
+          <Stat label="60–74" value="60% passive gain" color="text-yellow-400" />
+          <Stat label="75–89" value="35% passive gain" color="text-orange-400" />
+          <Stat label="90–100" value="15% passive gain" color="text-red-400" />
+          <Stat label="Decay above 70" value="-1.0/turn (vs -0.5 below)" color="text-red-400" />
+        </div>
+        <Tip>Respect gates phase progression. Passive gains slow above 60 — combat rewards (Hits, expansion) bypass diminishing returns and remain the fastest path to 80+.</Tip>
+      </div>),
   },
   {
     id: 'territory',
