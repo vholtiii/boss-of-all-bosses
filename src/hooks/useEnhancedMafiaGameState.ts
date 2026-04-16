@@ -4066,29 +4066,47 @@ export const useEnhancedMafiaGameState = (
         newState.policeHeat.reductionPerTurn = reduction;
       }
       
-      // --- Per-turn Influence growth ---
+      // --- Diminishing returns helper for passive Respect/Influence gains ---
+      // 0–59: 1.0x | 60–74: 0.6x | 75–89: 0.35x | 90+: 0.15x
+      // Combat-earned spikes (Blind/Planned Hits, expansion) bypass this.
+      const applyDiminishingReturns = (current: number, rawGain: number): number => {
+        if (rawGain <= 0) return rawGain;
+        const mult = current >= 90 ? 0.15 : current >= 75 ? 0.35 : current >= 60 ? 0.6 : 1.0;
+        return rawGain * mult;
+      };
+      // Steeper decay above 70 to prevent "set and forget" high stats
+      const passiveDecay = (current: number): number => (current > 70 ? 1.0 : 0.5);
+
+      // --- Per-turn Influence growth (reduced base ~30%) ---
       const playerControlledHexes = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).length;
       const activeAlliances = newState.alliances.filter(a => a.active).length;
-      const influenceGain = Math.floor(playerControlledHexes / 3) + activeAlliances;
-      const influenceDecay = 0.5;
-      newState.resources.influence = Math.min(100, Math.max(0, newState.resources.influence + influenceGain - influenceDecay));
+      // Was: floor(hexes/3) + alliances. Now: hexes/4 + alliances*0.7 → ~30% less
+      const rawInfluenceGain = (playerControlledHexes / 4) + activeAlliances * 0.7;
+      const scaledInfluenceGain = applyDiminishingReturns(newState.resources.influence, rawInfluenceGain);
+      const influenceDecay = passiveDecay(newState.resources.influence);
+      newState.resources.influence = Math.min(100, Math.max(0, newState.resources.influence + scaledInfluenceGain - influenceDecay));
       // Sync influence with streetInfluence
       newState.reputation.streetInfluence = Math.round(newState.resources.influence);
       
-      // --- Per-turn Respect growth ---
+      // --- Per-turn Respect growth (reduced base ~30%) ---
       const hexesWithBusinesses = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily && t.business).length;
-      const incomeRespectGain = Math.min(5, Math.floor(newState.finances.totalIncome / 5000));
-      const respectGain = Math.floor(hexesWithBusinesses / 5) + incomeRespectGain;
-      const respectDecay = 0.5;
-      newState.reputation.respect = Math.min(100, Math.max(0, newState.reputation.respect + respectGain - respectDecay));
+      // Income gain: was min(5, income/5000). Reduced ~30%: cap 3, divisor 7000.
+      const incomeRespectGain = Math.min(3, newState.finances.totalIncome / 7000);
+      // Business gain: was hexes/5. Now hexes/7 (~30% less).
+      const rawRespectGain = (hexesWithBusinesses / 7) + incomeRespectGain;
+      const scaledRespectGain = applyDiminishingReturns(newState.reputation.respect, rawRespectGain);
+      const respectDecay = passiveDecay(newState.reputation.respect);
+      newState.reputation.respect = Math.min(100, Math.max(0, newState.reputation.respect + scaledRespectGain - respectDecay));
       
-      // District control bonus: Staten Island +3 respect/turn
+      // District control bonus: Staten Island +3 respect/turn (also subject to diminishing returns)
       if (hasPlayerDistrictBonus(newState, 'respect')) {
-        newState.reputation.respect = Math.min(100, newState.reputation.respect + 3);
+        const bonus = applyDiminishingReturns(newState.reputation.respect, 3);
+        newState.reputation.respect = Math.min(100, newState.reputation.respect + bonus);
       }
-      // Secondary: Staten Island +1 influence/turn
+      // Secondary: Staten Island +1 influence/turn (also subject to diminishing returns)
       if (hasPlayerDistrictBonus(newState, 'influence_gain')) {
-        newState.resources.influence = Math.min(100, (newState.resources.influence || 0) + 1);
+        const bonus = applyDiminishingReturns(newState.resources.influence, 1);
+        newState.resources.influence = Math.min(100, (newState.resources.influence || 0) + bonus);
       }
       // FIX #3: Sync resources.respect with reputation.respect (single source of truth)
       syncRespect(newState, newState.reputation.respect);
