@@ -17,6 +17,7 @@ interface NegotiationDialogProps {
   capoPersonality?: CapoPersonality;
   enemyFamily: string;
   playerReputation: number;
+  playerInfluence?: number;
   playerFear?: number;
   playerMoney: number;
   enemyStrength: number;
@@ -31,7 +32,7 @@ interface NegotiationDialogProps {
 
 const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   open, onClose, onNegotiate, scope, capoName, capoPersonality,
-  enemyFamily, playerReputation, playerFear, playerMoney, enemyStrength, hexIncome,
+  enemyFamily, playerReputation, playerInfluence = 0, playerFear, playerMoney, enemyStrength, hexIncome,
   negotiationUsedThisTurn, treacheryTurnsRemaining, availableEnemyFamilies, onSelectTargetFamily,
   successBonus = 0,
 }) => {
@@ -49,21 +50,28 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   // Filter negotiation types by scope
   const filteredTypes = NEGOTIATION_TYPES.filter(n => n.scope === scope);
 
+  const treacheryDebuff = (treacheryTurnsRemaining || 0) > 0 ? 20 : 0;
+
   const getSuccessChance = useCallback((type: NegotiationType) => {
     const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
     let chance = config.baseSuccess;
     if (scope === 'territory') {
       chance += personalityBonuses[type] || 0;
       chance += personalityBonuses.all || 0;
+      chance += Math.floor(playerReputation / 5);
+    } else {
+      // Boss-level: respect & influence carry the family's clout
+      chance += Math.floor(playerReputation / 4);
+      chance += Math.floor(playerInfluence / 5);
     }
-    chance += Math.floor(playerReputation / 5);
     if (type === 'supply_deal') {
       chance += Math.floor((playerFear || 0) / 5);
     }
     if (type === 'bribe_territory') chance -= enemyStrength * 5;
     chance += successBonus;
+    chance -= treacheryDebuff;
     return Math.max(5, Math.min(95, chance));
-  }, [personalityBonuses, playerReputation, playerFear, enemyStrength, scope, successBonus]);
+  }, [personalityBonuses, playerReputation, playerInfluence, playerFear, enemyStrength, scope, successBonus, treacheryDebuff]);
 
   const getCost = useCallback((type: NegotiationType) => {
     const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
