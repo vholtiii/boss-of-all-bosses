@@ -945,6 +945,40 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             </div>
           );
         })()}
+
+        {/* Boss Diplomacy quick-launch button */}
+        {(() => {
+          const bossCd = (gameState as any).bossNegotiationCooldown || 0;
+          const enemyFamilies = gameState.aiOpponents
+            .map((o: any) => o.family)
+            .filter((f: string) => !((gameState as any).eliminatedFamilies || []).includes(f));
+          if (enemyFamilies.length === 0) return null;
+          const disabled = bossCd > 0;
+          return (
+            <div className="mt-2 flex items-center">
+              <button
+                onClick={() => {
+                  if (disabled) return;
+                  setNegotiationState({
+                    open: true,
+                    scope: 'family',
+                    targetFamily: enemyFamilies[0],
+                  });
+                }}
+                disabled={disabled}
+                title={disabled ? `Boss must wait ${bossCd} more turn(s)` : 'Open Boss-level diplomacy: ceasefire, alliance, supply deal'}
+                className={cn(
+                  "px-3 py-1 rounded-md border text-xs font-bold transition-all",
+                  disabled
+                    ? "bg-muted/30 border-muted text-muted-foreground cursor-not-allowed opacity-60"
+                    : "bg-mafia-gold/15 border-mafia-gold/50 text-mafia-gold hover:bg-mafia-gold/25 hover:border-mafia-gold shadow-sm"
+                )}
+              >
+                🏛️ Boss Diplomacy {disabled && `(${bossCd}t)`}
+              </button>
+            </div>
+          );
+        })()}
       </div>
       
       {/* Center - Resources */}
