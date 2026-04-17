@@ -1,63 +1,35 @@
 
 
-# Refine Capo & Boss Negotiations
+# Fix Deployed Units List — Show All Soldiers + Click to Select
 
-Three improvements: clearer alerts for AI sitdowns, smoother execution UX, and Respect/Influence factored into Boss-level negotiation success.
+## Problem
+The "Deployed Units" section in the Boss/HQ dropdown only shows ~3 soldiers when more exist. List is either being clipped by a fixed-height container or rendering only a slice of the array. Clicking a unit also doesn't pan/select it on the map.
 
----
+## Investigation Plan
+Locate the deployed units list rendering in:
+- `src/components/HeadquartersInfoPanel.tsx` (likely)
+- or `src/components/GameSidePanels.tsx`
 
-## 1. Stronger Alerts When AI Sends Word
+Look for: a fixed `max-h-*` class without scroll, a `.slice(0, 3)`, or missing `ScrollArea` wrapper. Also check if list items have an `onClick` that selects the unit and centers the map on its hex.
 
-**Problem**: Incoming sitdowns appear as a small badge in the top bar that's easy to miss. No sound, no toast, no center-screen prompt.
+## Fix
 
-**Changes** in `useEnhancedMafiaGameState.ts` (the `pushSitdown` block ~line 5623):
-- Push a `pendingNotification` with type `info`, title `"📩 {Family} Wants to Talk"`, message describing the proposed deal + turns to respond
-- Add a `combatLog` entry so it appears in the turn summary modal
+### 1. Make full list visible
+Wrap the deployed units list in a `<ScrollArea>` with a sensible max-height (e.g. `max-h-64`) so all units render and become scrollable when the list grows beyond panel space. Remove any `.slice()` truncation.
 
-**Changes** in `UltimateMafiaGame.tsx` top-bar incoming sitdown chips:
-- Increase visibility: larger pill, gold pulsing border (currently muted primary), "📩 NEW" sparkle when first received
-- Add turn-count warning color when `turnsLeft <= 1` (red pulse — about to expire and cost tension)
+### 2. Click-to-select on map
+Each unit row becomes a clickable button that:
+- Sets the unit as the selected unit in game state
+- Pans/centers the map on the unit's hex (using existing map-pan logic — same pattern used by the "Locate" actions in sitdown notifications)
+- Highlights the row on hover (cursor pointer + bg accent)
 
----
-
-## 2. Clearer Execution UX for Both Capo & Boss Negotiations
-
-**Capo Send Word ready-state**:
-- When a `pendingNegotiation` flips from `pending` → `ready` at turn start, fire a notification: `"🤝 Sitdown Ready — {Family} territory at ({q},{r})"` with a "Locate" action that pans the map to the hex
-- Add a top-bar pulsing chip mirroring the Incoming Sitdowns chip pattern but for outgoing-ready ones (currently only shown deeper in panels)
-
-**Boss negotiation entry point**:
-- Add a persistent "🏛️ Boss Diplomacy" button to the top bar (next to incoming sitdowns) that opens `NegotiationDialog` with `scope='family'`, letting players initiate ceasefires/alliances/supply deals without hunting through menus
-- Disable + tooltip when `bossNegotiationCooldown > 0`
-
----
-
-## 3. Respect & Influence Factor Into Boss Negotiation Success
-
-**Current**: `getSuccessChance` in `NegotiationDialog.tsx` adds `floor(respect/5)` for ALL negotiations — but the variable is called `playerReputation`, and Influence is ignored entirely.
-
-**New formula for `scope='family'` (Boss) negotiations**:
-```
-chance = baseSuccess
-       + floor(respect / 4)        // up to +25 at cap
-       + floor(influence / 5)      // up to +20 at cap
-       + successBonus              // AI-requested sitdown bonus
-       - treacheryDebuff          // -20 if active
-```
-
-For `scope='territory'` (Capo) negotiations, keep current behavior (capo personality + small respect contribution) — those are about the capo's local clout, not family reputation.
-
-**Wire-up**:
-- `NegotiationDialog` already receives `playerReputation`. Add a new `playerInfluence` prop
-- Update `UltimateMafiaGame.tsx` to pass `gameState.resources.influence` (or equivalent field — verify exact name)
-- Update the success chance breakdown shown to player: add a line `"⭐ +{x}% from Respect ({respect})"` and `"🏛️ +{y}% from Influence ({inf})"` for boss negotiations
-
----
+### 3. Visual polish
+- Show unit type icon (Capo vs Soldier), name, hex coords, and a small status badge (wounded/marked-for-death) per row
+- Sticky header showing total count (e.g. "Deployed Units (7)")
 
 ## Files Touched
+1. **`src/components/HeadquartersInfoPanel.tsx`** (or `GameSidePanels.tsx` — confirmed during implementation) — wrap list in `ScrollArea`, remove truncation, add click handler
+2. **`src/pages/UltimateMafiaGame.tsx`** — pass map-pan/select callback prop if not already wired
 
-1. **`src/hooks/useEnhancedMafiaGameState.ts`** — toast/log on `pushSitdown`, ready-flip notification for outgoing pending negotiations
-2. **`src/pages/UltimateMafiaGame.tsx`** — visual upgrade for incoming chips, new "Boss Diplomacy" top-bar button, pass `playerInfluence` prop
-3. **`src/components/NegotiationDialog.tsx`** — accept `playerInfluence`, update boss-scope success formula, show influence/respect breakdown lines
-4. **`src/components/GameGuide.tsx`** — note that Respect & Influence boost Boss negotiation success
+No new dependencies; `ScrollArea` already exists in the UI kit.
 
