@@ -217,6 +217,7 @@ const sections: GuideSection[] = [
           <Stat label="Auto-War" value="Triggers at high tension" color="text-red-400" />
           <Stat label="Treachery" value="Breaking pacts = lasting debuff" color="text-red-400" />
         </div>
+        <Tip>Boss negotiation success: +1% per 4 Respect, +1% per 5 Influence. Treachery debuff: -20%.</Tip>
         <Tip>Boss Sitdown ($2,000) teleports soldiers to HQ for emergency defense.</Tip>
       </div>
     ),
