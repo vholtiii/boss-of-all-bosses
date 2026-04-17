@@ -2755,8 +2755,19 @@ export const useEnhancedMafiaGameState = (
         });
       }
       newState.pendingNegotiations = newState.pendingNegotiations.filter(p => !p.ready);
-      // Promote "pending" (from last turn) to "ready"
+      // Promote "pending" (from last turn) to "ready" — and notify the player
+      const newlyReady = newState.pendingNegotiations.filter(p => !p.ready);
       newState.pendingNegotiations = newState.pendingNegotiations.map(p => ({ ...p, ready: true }));
+      for (const ready of newlyReady) {
+        const famLabel = ready.targetFamily.charAt(0).toUpperCase() + ready.targetFamily.slice(1);
+        newState.pendingNotifications.push({
+          type: 'info' as const,
+          title: `🤝 Sitdown Ready — ${famLabel}`,
+          message: `${ready.capoName} is ready to negotiate over the territory at (${ready.targetQ}, ${ready.targetR}). Click "Sit Down" in the top bar to begin.`,
+        });
+        newState.combatLog = newState.combatLog || [];
+        newState.combatLog.push(`🤝 Sitdown ready: ${ready.capoName} → ${famLabel} territory at (${ready.targetQ}, ${ready.targetR})`);
+      }
 
       // ============ INCOMING SITDOWNS EXPIRATION ============
       newState.incomingSitdowns = newState.incomingSitdowns || [];
@@ -5633,9 +5644,11 @@ export const useEnhancedMafiaGameState = (
           const dealLabel = deal === 'ceasefire' ? 'Ceasefire' : deal === 'alliance' ? 'Alliance' : deal === 'supply_deal' ? 'Supply Deal' : 'Safe Passage';
           state.pendingNotifications.push({
             type: 'info' as const,
-            title: `📩 ${famLabel} Requests Sitdown`,
-            message: `The ${famLabel} family wants to discuss a ${dealLabel}. Accept or decline in the Incoming Sitdowns panel.`,
+            title: `📩 ${famLabel} Wants to Talk`,
+            message: `The ${famLabel} family proposes a ${dealLabel}. You have 2 turns to respond — accept it from the Incoming Sitdowns chip in the top bar.`,
           });
+          state.combatLog = state.combatLog || [];
+          state.combatLog.push(`📩 ${famLabel} requested a sitdown — proposed: ${dealLabel} (expires in 2 turns)`);
         };
         
         // Diplomatic: ceasefire at Phase 2+, alliance at Phase 3+ if relationship > 30

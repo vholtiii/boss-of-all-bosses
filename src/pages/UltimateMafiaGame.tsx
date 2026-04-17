@@ -894,23 +894,33 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           const dealLabels: Record<string, string> = { ceasefire: '🕊️ Ceasefire', alliance: '⚖️ Alliance', supply_deal: '🚚 Supply Deal', safe_passage: '🛤️ Safe Passage' };
           return (
             <div className="mt-2 flex flex-wrap gap-2 items-center">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Incoming:</span>
+              <span className="text-[10px] text-mafia-gold uppercase tracking-wider font-semibold">📩 Incoming Sitdowns:</span>
               {incoming.map((s: any) => {
                 const turnsLeft = s.expiresOnTurn - gameState.turn;
                 const famLabel = s.fromFamily.charAt(0).toUpperCase() + s.fromFamily.slice(1);
+                const isUrgent = turnsLeft <= 1;
+                const isFresh = s.turnRequested === gameState.turn;
                 return (
                   <div 
                     key={s.id}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded border bg-primary/10 border-primary/30 text-xs animate-pulse"
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border-2 text-xs animate-pulse shadow-lg",
+                      isUrgent
+                        ? "bg-red-500/15 border-red-500/60 text-red-200 shadow-red-500/30"
+                        : "bg-mafia-gold/10 border-mafia-gold/60 text-mafia-gold shadow-mafia-gold/20"
+                    )}
                   >
-                    <span>📩</span>
-                    <span className="font-medium capitalize">{famLabel}</span>
-                    <span className="text-muted-foreground">—</span>
+                    <span className="text-base">📩</span>
+                    {isFresh && <span className="text-[9px] font-black bg-mafia-gold text-black px-1 rounded">NEW</span>}
+                    <span className="font-bold capitalize">{famLabel}</span>
+                    <span className="opacity-70">—</span>
                     <span>{dealLabels[s.proposedDeal] || s.proposedDeal}</span>
-                    <span className="text-[10px] text-muted-foreground">({turnsLeft}t)</span>
-                    <span className="text-[10px] text-primary">+{s.successBonus}%</span>
+                    <span className={cn("text-[10px] font-bold", isUrgent ? "text-red-300" : "opacity-70")}>
+                      {isUrgent ? `⚠️ ${turnsLeft}t left!` : `(${turnsLeft}t)`}
+                    </span>
+                    <span className="text-[10px] text-green-400">+{s.successBonus}%</span>
                     <button
-                      className="ml-1 px-1.5 py-0.5 rounded bg-primary/80 hover:bg-primary text-primary-foreground text-[10px] font-bold transition-colors"
+                      className="ml-1 px-2 py-0.5 rounded bg-primary hover:bg-primary/80 text-primary-foreground text-[10px] font-bold transition-colors"
                       onClick={() => {
                         setNegotiationState({
                           open: true,
@@ -932,6 +942,40 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                   </div>
                 );
               })}
+            </div>
+          );
+        })()}
+
+        {/* Boss Diplomacy quick-launch button */}
+        {(() => {
+          const bossCd = (gameState as any).bossNegotiationCooldown || 0;
+          const enemyFamilies = gameState.aiOpponents
+            .map((o: any) => o.family)
+            .filter((f: string) => !((gameState as any).eliminatedFamilies || []).includes(f));
+          if (enemyFamilies.length === 0) return null;
+          const disabled = bossCd > 0;
+          return (
+            <div className="mt-2 flex items-center">
+              <button
+                onClick={() => {
+                  if (disabled) return;
+                  setNegotiationState({
+                    open: true,
+                    scope: 'family',
+                    targetFamily: enemyFamilies[0],
+                  });
+                }}
+                disabled={disabled}
+                title={disabled ? `Boss must wait ${bossCd} more turn(s)` : 'Open Boss-level diplomacy: ceasefire, alliance, supply deal'}
+                className={cn(
+                  "px-3 py-1 rounded-md border text-xs font-bold transition-all",
+                  disabled
+                    ? "bg-muted/30 border-muted text-muted-foreground cursor-not-allowed opacity-60"
+                    : "bg-mafia-gold/15 border-mafia-gold/50 text-mafia-gold hover:bg-mafia-gold/25 hover:border-mafia-gold shadow-sm"
+                )}
+              >
+                🏛️ Boss Diplomacy {disabled && `(${bossCd}t)`}
+              </button>
             </div>
           );
         })()}
@@ -1440,6 +1484,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               }}
               enemyFamily={targetFam}
               playerReputation={gameState.reputation.respect}
+              playerInfluence={gameState.resources.influence || 0}
               playerFear={(gameState.reputation as any).fear || 0}
               playerMoney={gameState.resources.money}
               enemyStrength={0}
