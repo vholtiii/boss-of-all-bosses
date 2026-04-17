@@ -235,9 +235,24 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
                       {personalityInfo.icon} +{personalityBonuses[config.type]}% from {personalityInfo.label}
                     </p>
                    )}
+                  {scope === 'family' && Math.floor(playerReputation / 4) > 0 && (
+                    <p className="text-xs text-blue-400 mt-1">
+                      ⭐ +{Math.floor(playerReputation / 4)}% from Respect ({playerReputation})
+                    </p>
+                  )}
+                  {scope === 'family' && Math.floor(playerInfluence / 5) > 0 && (
+                    <p className="text-xs text-purple-400 mt-1">
+                      🏛️ +{Math.floor(playerInfluence / 5)}% from Influence ({playerInfluence})
+                    </p>
+                  )}
                   {successBonus > 0 && (
                     <p className="text-xs text-primary mt-1">
                       📩 +{successBonus}% — they requested this sitdown
+                    </p>
+                  )}
+                  {treacheryDebuff > 0 && (
+                    <p className="text-xs text-red-400 mt-1">
+                      🗡️ -{treacheryDebuff}% from Treachery debuff
                     </p>
                   )}
                   {config.type === 'supply_deal' && (playerFear || 0) > 0 && (
