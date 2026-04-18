@@ -8255,7 +8255,9 @@ export const useEnhancedMafiaGameState = (
     
     if (targetQ !== undefined) {
       const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
-      if (!tile || tile.controllingFamily === state.playerFamily || tile.isHeadquarters) return state;
+      const _isExecPlan = !!action._executingPlan;
+      if (!tile) return state;
+      if (!_isExecPlan && (tile.controllingFamily === state.playerFamily || tile.isHeadquarters)) return state;
 
       // Check ceasefire — BLOCK hits entirely during active ceasefire
       const hasCeasefire = state.ceasefires.some(c => c.active && c.family === tile.controllingFamily);
