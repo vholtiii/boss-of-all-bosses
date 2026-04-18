@@ -544,58 +544,12 @@ const getHexNeighbors = (q:number,r:number,s:number) =>
   hexNeighborDirections.map(d => ({q:q+d.q, r:r+d.r, s:s+d.s}));
 
 // ============ COLOMBO SUCCESSION HELPER ============
-const triggerColomboSuccession = (state: EnhancedMafiaGameState, deadCapoFamily: string, deadCapoQ: number, deadCapoR: number, deadCapoS: number) => {
-  // Only trigger for Colombo family and if not already used
-  if (deadCapoFamily !== 'colombo') return;
-  const power = FAMILY_POWERS.colombo;
-  if (!power) return;
-  
-  const isPlayer = deadCapoFamily === state.playerFamily;
-  const usedKey = deadCapoFamily;
-  
-  if ((state.familyPowerUsedForever || {})[usedKey]) return;
-  
-  // Find nearest soldier to promote
-  const familySoldiers = state.deployedUnits.filter(u => u.family === deadCapoFamily && u.type === 'soldier');
-  if (familySoldiers.length === 0) return;
-  
-  // Pick highest loyalty soldier near the dead capo's position
-  const scored = familySoldiers.map(u => ({
-    unit: u,
-    dist: hexDistance(u, { q: deadCapoQ, r: deadCapoR, s: deadCapoS }),
-    loyalty: (state.soldierStats[u.id]?.loyalty || 0),
-  })).sort((a, b) => b.loyalty - a.loyalty || a.dist - b.dist);
-  
-  const best = scored[0];
-  if (!best) return;
-  
-  // Promote to capo
-  const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
-  const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
-  const capoName = `Capo ${Math.floor(Math.random() * 100)}`;
-  
-  const idx = state.deployedUnits.findIndex(u => u.id === best.unit.id);
-  if (idx !== -1) {
-    state.deployedUnits[idx] = {
-      ...state.deployedUnits[idx],
-      type: 'capo' as const,
-      maxMoves: 3,
-      movesRemaining: 0,
-      name: capoName,
-      personality: randomPersonality,
-      level: 1,
-    };
-  }
-  
-  state.familyPowerUsedForever = { ...(state.familyPowerUsedForever || {}), [usedKey]: true };
-  
-  if (isPlayer) {
-    state.pendingNotifications.push({
-      type: 'success',
-      title: '👑 Persico Succession!',
-      message: `${capoName} has been instantly promoted to capo to fill the void. The family endures.`,
-    });
-  }
+// NOTE: Persico Succession is now an ACTIVE one-time-per-game ability triggered via
+// the 'execute_persico_promotion' action. The auto-on-capo-death trigger has been
+// disabled by design — players choose when to anoint a Capo.
+const triggerColomboSuccession = (_state: EnhancedMafiaGameState, _deadCapoFamily: string, _deadCapoQ: number, _deadCapoR: number, _deadCapoS: number) => {
+  // Intentionally no-op. Power is purely active now.
+  return;
 };
 
 // ============ TENSION HELPERS ============
