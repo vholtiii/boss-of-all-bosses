@@ -8498,11 +8498,42 @@ export const useEnhancedMafiaGameState = (
         // ============ VICTORY ============
         const targetFamily = tile.controllingFamily;
         
+        // Removal logic: Plan Hits and Hitman kill capos. Regular scouted hits only WOUND capos.
+        const killedAnyCapo = { fam: '' as string, q: 0, r: 0, s: 0 };
         enemyUnits.forEach(eu => {
+          if (eu.type === 'capo' && !_isExecPlan) {
+            // Wound the capo instead of killing
+            if (state.soldierStats[eu.id]) {
+              state.soldierStats[eu.id].loyalty = Math.max(0, state.soldierStats[eu.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
+            }
+            eu.woundedTurnsRemaining = CAPO_WOUND_DURATION;
+            eu.maxMoves = Math.max(1, (eu.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+            state.pendingNotifications = [...state.pendingNotifications, {
+              type: 'warning' as const, title: '🩸 Enemy Capo Wounded',
+              message: `You wounded an enemy capo from the ${eu.family} family. They survive but are weakened for ${CAPO_WOUND_DURATION} turns. Use Plan Hit or a Hitman to kill capos outright.`,
+            }];
+            return;
+          }
           const idx = state.deployedUnits.indexOf(eu);
-          if (idx !== -1) state.deployedUnits.splice(idx, 1);
+          if (idx !== -1) {
+            state.deployedUnits.splice(idx, 1);
+            if (eu.type === 'capo') {
+              // Capo killed (plan hit / hitman path) — full cleanup
+              delete state.soldierStats[eu.id];
+              killedAnyCapo.fam = eu.family;
+              killedAnyCapo.q = eu.q; killedAnyCapo.r = eu.r; killedAnyCapo.s = eu.s;
+            }
+          }
         });
-        tile.controllingFamily = 'neutral'; // Hit clears enemy control — player must Claim next turn
+        // Trigger Colombo succession + sync legacy units when a capo dies
+        if (killedAnyCapo.fam) {
+          triggerColomboSuccession(state, killedAnyCapo.fam, killedAnyCapo.q, killedAnyCapo.r, killedAnyCapo.s);
+          syncLegacyUnits(state);
+        }
+        // Only clear hex control if the tile actually belonged to the target family (skip for plan hits on neutral/player hexes)
+        if (tile.controllingFamily && tile.controllingFamily !== 'neutral' && tile.controllingFamily !== state.playerFamily && !tile.isHeadquarters) {
+          tile.controllingFamily = 'neutral'; // Hit clears enemy control — player must Claim next turn
+        }
         // Tension: territory hit on rival hex
         addPairTension(state, state.playerFamily, targetFamily, TENSION_TERRITORY_HIT);
         // Hole #4: check supply sabotage
