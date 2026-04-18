@@ -6939,14 +6939,81 @@ export const useEnhancedMafiaGameState = (
           }
           
           if (newState.playerFamily === 'colombo') {
-            // Persico Succession is passive/reactive — inform the player
+            // Persico Succession: enter active selection mode. Player will click a soldier on the map.
+            const playerSoldiers = newState.deployedUnits.filter(u => u.family === 'colombo' && u.type === 'soldier');
+            const currentCapos = newState.deployedUnits.filter(u => u.family === 'colombo' && u.type === 'capo').length;
+            if (playerSoldiers.length === 0) {
+              newState.pendingNotifications.push({ type: 'warning', title: '👑 No Soldiers', message: 'You need at least one soldier on the map to anoint a Capo.' });
+              return newState;
+            }
+            if (currentCapos >= MAX_CAPOS) {
+              newState.pendingNotifications.push({ type: 'warning', title: '👑 Capo Cap Reached', message: `You already have the maximum of ${MAX_CAPOS} capos.` });
+              return newState;
+            }
+            newState.persicoSelectionActive = true;
             newState.pendingNotifications.push({
-              type: 'info', title: '👑 Persico Succession',
-              message: 'This power activates automatically when a capo dies — a soldier is instantly promoted to replace them.',
+              type: 'info', title: '👑 Persico Succession Armed',
+              message: 'Click any of your soldiers on the map to instantly anoint them as a Capo. Click the power button again to cancel.',
             });
             return newState;
           }
           
+          return newState;
+        }
+        case 'cancel_persico_selection': {
+          newState.persicoSelectionActive = false;
+          return newState;
+        }
+        case 'execute_persico_promotion': {
+          if (!newState.persicoSelectionActive) return newState;
+          if (newState.playerFamily !== 'colombo') return newState;
+          if ((newState.familyPowerUsedForever || {}).colombo) {
+            newState.persicoSelectionActive = false;
+            return newState;
+          }
+          const power = FAMILY_POWERS.colombo;
+          const soldierId = action.unitId as string;
+          const soldier = newState.deployedUnits.find(u => u.id === soldierId && u.family === 'colombo' && u.type === 'soldier');
+          if (!soldier) {
+            newState.pendingNotifications.push({ type: 'warning', title: '👑 Invalid Target', message: 'Select one of your own soldiers to anoint.' });
+            return newState;
+          }
+          const currentCapos = newState.deployedUnits.filter(u => u.family === 'colombo' && u.type === 'capo').length;
+          if (currentCapos >= MAX_CAPOS) {
+            newState.persicoSelectionActive = false;
+            newState.pendingNotifications.push({ type: 'warning', title: '👑 Capo Cap Reached', message: `You already have ${MAX_CAPOS} capos — cannot promote.` });
+            return newState;
+          }
+          if (newState.tacticalActionsRemaining < (power?.cost || 1)) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚡ Not Enough Actions', message: 'Persico Succession costs 1 tactical action.' });
+            return newState;
+          }
+          // Promote in place: convert soldier → capo
+          const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
+          const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
+          const capoName = `Capo ${Math.floor(Math.random() * 100)} (Persico)`;
+          const idx = newState.deployedUnits.findIndex(u => u.id === soldierId);
+          if (idx !== -1) {
+            newState.deployedUnits[idx] = {
+              ...newState.deployedUnits[idx],
+              type: 'capo' as const,
+              maxMoves: 3,
+              movesRemaining: newState.deployedUnits[idx].movesRemaining,
+              name: capoName,
+              personality: randomPersonality,
+              level: 1,
+            };
+          }
+          // Clear soldier stats — capos don't use soldierStats lifecycle
+          delete newState.soldierStats[soldierId];
+          syncLegacyUnits(newState);
+          newState.familyPowerUsedForever = { ...(newState.familyPowerUsedForever || {}), colombo: true };
+          newState.persicoSelectionActive = false;
+          newState.tacticalActionsRemaining = Math.max(0, newState.tacticalActionsRemaining - (power?.cost || 1));
+          newState.pendingNotifications.push({
+            type: 'success', title: '👑 Persico Succession!',
+            message: `${capoName} has been instantly anointed as a Capo. The family endures.`,
+          });
           return newState;
         }
         // recruit_capo case removed — capos are only obtainable via promote_capo
