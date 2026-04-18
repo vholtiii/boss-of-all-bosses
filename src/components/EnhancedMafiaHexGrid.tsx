@@ -1387,8 +1387,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         if (fam !== playerFamily && !hexRevealed) return;
                         const firstSoldier = soldiers[0];
                         const isSelected = soldiers.some(s => s.id === selectedUnitId);
-                        const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action');
+                        const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action' || gameState?.persicoSelectionActive);
                         const hasMark = fam === playerFamily && soldiers.some(s => gameState?.soldierStats?.[s.id]?.markedForDeath);
+                        const persicoArmed = !!gameState?.persicoSelectionActive && fam === playerFamily;
                         elements.push(
                           <SoldierIcon
                             key={`soldier-${fam}-${key}`}
@@ -1397,11 +1398,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             family={fam as any}
                             count={soldiers.length}
                             isPlayerFamily={fam === playerFamily}
-                            selected={isSelected}
+                            selected={isSelected || persicoArmed}
                             markedForDeath={hasMark}
                             onClick={isClickable ? (e) => {
                               e.stopPropagation();
                               setPinnedHex(tile);
+                              if (persicoArmed && onAction) {
+                                // Anoint this soldier as Capo
+                                onAction({ type: 'execute_persico_promotion', unitId: soldiers[0].id });
+                                return;
+                              }
                               if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
                                 onSelectUnit('soldier', { q: tile.q, r: tile.r, s: tile.s });
                               }
