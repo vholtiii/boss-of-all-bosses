@@ -257,6 +257,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     luccheseBoostedDistrict: state.luccheseBoostedDistrict ? { ...state.luccheseBoostedDistrict } : null,
     bonannoPurgeImmunity: (state.bonannoPurgeImmunity || []).map(i => ({ ...i })),
     incomingSitdowns: (state.incomingSitdowns || []).map(s => ({ ...s })),
+    persicoSelectionActive: !!state.persicoSelectionActive,
   });
 
 // ============ UNIT TYPES ============
@@ -510,6 +511,9 @@ export interface EnhancedMafiaGameState {
   
   // AI-initiated sitdown requests
   incomingSitdowns: IncomingSitdown[];
+
+  // Active selection mode for Colombo Persico Succession promotion
+  persicoSelectionActive?: boolean;
   
   territories: Array<{
     district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
