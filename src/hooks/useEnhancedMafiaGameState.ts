@@ -8315,8 +8315,19 @@ export const useEnhancedMafiaGameState = (
       const isScouted = state.scoutedHexes.some(s => s.q === targetQ && s.r === targetR && s.s === targetS);
 
       const enemyUnits = state.deployedUnits.filter(u => 
-        u.family === tile.controllingFamily && u.q === targetQ && u.r === targetR && u.s === targetS
+        u.family === tile.controllingFamily && u.family !== state.playerFamily && u.q === targetQ && u.r === targetR && u.s === targetS
       );
+      // Plan Hit: include the targeted unit even if it's on a hex not controlled by its family
+      if (_isExecPlan && state.plannedHit?.targetUnitId) {
+        const planTarget = state.deployedUnits.find(u =>
+          u.id === state.plannedHit!.targetUnitId &&
+          u.q === targetQ && u.r === targetR && u.s === targetS &&
+          u.family !== state.playerFamily
+        );
+        if (planTarget && !enemyUnits.includes(planTarget)) {
+          enemyUnits.push(planTarget);
+        }
+      }
 
       // ============ BLIND HIT: CIVILIAN RISK ============
       if (!isScouted && enemyUnits.length === 0) {
