@@ -257,6 +257,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     luccheseBoostedDistrict: state.luccheseBoostedDistrict ? { ...state.luccheseBoostedDistrict } : null,
     bonannoPurgeImmunity: (state.bonannoPurgeImmunity || []).map(i => ({ ...i })),
     incomingSitdowns: (state.incomingSitdowns || []).map(s => ({ ...s })),
+    persicoSelectionActive: !!state.persicoSelectionActive,
   });
 
 // ============ UNIT TYPES ============
@@ -510,6 +511,9 @@ export interface EnhancedMafiaGameState {
   
   // AI-initiated sitdown requests
   incomingSitdowns: IncomingSitdown[];
+
+  // Active selection mode for Colombo Persico Succession promotion
+  persicoSelectionActive?: boolean;
   
   territories: Array<{
     district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
@@ -540,58 +544,12 @@ const getHexNeighbors = (q:number,r:number,s:number) =>
   hexNeighborDirections.map(d => ({q:q+d.q, r:r+d.r, s:s+d.s}));
 
 // ============ COLOMBO SUCCESSION HELPER ============
-const triggerColomboSuccession = (state: EnhancedMafiaGameState, deadCapoFamily: string, deadCapoQ: number, deadCapoR: number, deadCapoS: number) => {
-  // Only trigger for Colombo family and if not already used
-  if (deadCapoFamily !== 'colombo') return;
-  const power = FAMILY_POWERS.colombo;
-  if (!power) return;
-  
-  const isPlayer = deadCapoFamily === state.playerFamily;
-  const usedKey = deadCapoFamily;
-  
-  if ((state.familyPowerUsedForever || {})[usedKey]) return;
-  
-  // Find nearest soldier to promote
-  const familySoldiers = state.deployedUnits.filter(u => u.family === deadCapoFamily && u.type === 'soldier');
-  if (familySoldiers.length === 0) return;
-  
-  // Pick highest loyalty soldier near the dead capo's position
-  const scored = familySoldiers.map(u => ({
-    unit: u,
-    dist: hexDistance(u, { q: deadCapoQ, r: deadCapoR, s: deadCapoS }),
-    loyalty: (state.soldierStats[u.id]?.loyalty || 0),
-  })).sort((a, b) => b.loyalty - a.loyalty || a.dist - b.dist);
-  
-  const best = scored[0];
-  if (!best) return;
-  
-  // Promote to capo
-  const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
-  const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
-  const capoName = `Capo ${Math.floor(Math.random() * 100)}`;
-  
-  const idx = state.deployedUnits.findIndex(u => u.id === best.unit.id);
-  if (idx !== -1) {
-    state.deployedUnits[idx] = {
-      ...state.deployedUnits[idx],
-      type: 'capo' as const,
-      maxMoves: 3,
-      movesRemaining: 0,
-      name: capoName,
-      personality: randomPersonality,
-      level: 1,
-    };
-  }
-  
-  state.familyPowerUsedForever = { ...(state.familyPowerUsedForever || {}), [usedKey]: true };
-  
-  if (isPlayer) {
-    state.pendingNotifications.push({
-      type: 'success',
-      title: '👑 Persico Succession!',
-      message: `${capoName} has been instantly promoted to capo to fill the void. The family endures.`,
-    });
-  }
+// NOTE: Persico Succession is now an ACTIVE one-time-per-game ability triggered via
+// the 'execute_persico_promotion' action. The auto-on-capo-death trigger has been
+// disabled by design — players choose when to anoint a Capo.
+const triggerColomboSuccession = (_state: EnhancedMafiaGameState, _deadCapoFamily: string, _deadCapoQ: number, _deadCapoR: number, _deadCapoS: number) => {
+  // Intentionally no-op. Power is purely active now.
+  return;
 };
 
 // ============ TENSION HELPERS ============
@@ -6935,14 +6893,81 @@ export const useEnhancedMafiaGameState = (
           }
           
           if (newState.playerFamily === 'colombo') {
-            // Persico Succession is passive/reactive — inform the player
+            // Persico Succession: enter active selection mode. Player will click a soldier on the map.
+            const playerSoldiers = newState.deployedUnits.filter(u => u.family === 'colombo' && u.type === 'soldier');
+            const currentCapos = newState.deployedUnits.filter(u => u.family === 'colombo' && u.type === 'capo').length;
+            if (playerSoldiers.length === 0) {
+              newState.pendingNotifications.push({ type: 'warning', title: '👑 No Soldiers', message: 'You need at least one soldier on the map to anoint a Capo.' });
+              return newState;
+            }
+            if (currentCapos >= MAX_CAPOS) {
+              newState.pendingNotifications.push({ type: 'warning', title: '👑 Capo Cap Reached', message: `You already have the maximum of ${MAX_CAPOS} capos.` });
+              return newState;
+            }
+            newState.persicoSelectionActive = true;
             newState.pendingNotifications.push({
-              type: 'info', title: '👑 Persico Succession',
-              message: 'This power activates automatically when a capo dies — a soldier is instantly promoted to replace them.',
+              type: 'info', title: '👑 Persico Succession Armed',
+              message: 'Click any of your soldiers on the map to instantly anoint them as a Capo. Click the power button again to cancel.',
             });
             return newState;
           }
           
+          return newState;
+        }
+        case 'cancel_persico_selection': {
+          newState.persicoSelectionActive = false;
+          return newState;
+        }
+        case 'execute_persico_promotion': {
+          if (!newState.persicoSelectionActive) return newState;
+          if (newState.playerFamily !== 'colombo') return newState;
+          if ((newState.familyPowerUsedForever || {}).colombo) {
+            newState.persicoSelectionActive = false;
+            return newState;
+          }
+          const power = FAMILY_POWERS.colombo;
+          const soldierId = action.unitId as string;
+          const soldier = newState.deployedUnits.find(u => u.id === soldierId && u.family === 'colombo' && u.type === 'soldier');
+          if (!soldier) {
+            newState.pendingNotifications.push({ type: 'warning', title: '👑 Invalid Target', message: 'Select one of your own soldiers to anoint.' });
+            return newState;
+          }
+          const currentCapos = newState.deployedUnits.filter(u => u.family === 'colombo' && u.type === 'capo').length;
+          if (currentCapos >= MAX_CAPOS) {
+            newState.persicoSelectionActive = false;
+            newState.pendingNotifications.push({ type: 'warning', title: '👑 Capo Cap Reached', message: `You already have ${MAX_CAPOS} capos — cannot promote.` });
+            return newState;
+          }
+          if (newState.tacticalActionsRemaining < (power?.cost || 1)) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚡ Not Enough Actions', message: 'Persico Succession costs 1 tactical action.' });
+            return newState;
+          }
+          // Promote in place: convert soldier → capo
+          const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
+          const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
+          const capoName = `Capo ${Math.floor(Math.random() * 100)} (Persico)`;
+          const idx = newState.deployedUnits.findIndex(u => u.id === soldierId);
+          if (idx !== -1) {
+            newState.deployedUnits[idx] = {
+              ...newState.deployedUnits[idx],
+              type: 'capo' as const,
+              maxMoves: 3,
+              movesRemaining: newState.deployedUnits[idx].movesRemaining,
+              name: capoName,
+              personality: randomPersonality,
+              level: 1,
+            };
+          }
+          // Clear soldier stats — capos don't use soldierStats lifecycle
+          delete newState.soldierStats[soldierId];
+          syncLegacyUnits(newState);
+          newState.familyPowerUsedForever = { ...(newState.familyPowerUsedForever || {}), colombo: true };
+          newState.persicoSelectionActive = false;
+          newState.tacticalActionsRemaining = Math.max(0, newState.tacticalActionsRemaining - (power?.cost || 1));
+          newState.pendingNotifications.push({
+            type: 'success', title: '👑 Persico Succession!',
+            message: `${capoName} has been instantly anointed as a Capo. The family endures.`,
+          });
           return newState;
         }
         // recruit_capo case removed — capos are only obtainable via promote_capo
@@ -8251,7 +8276,9 @@ export const useEnhancedMafiaGameState = (
     
     if (targetQ !== undefined) {
       const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
-      if (!tile || tile.controllingFamily === state.playerFamily || tile.isHeadquarters) return state;
+      const _isExecPlan = !!action._executingPlan;
+      if (!tile) return state;
+      if (!_isExecPlan && (tile.controllingFamily === state.playerFamily || tile.isHeadquarters)) return state;
 
       // Check ceasefire — BLOCK hits entirely during active ceasefire
       const hasCeasefire = state.ceasefires.some(c => c.active && c.family === tile.controllingFamily);
@@ -8309,8 +8336,19 @@ export const useEnhancedMafiaGameState = (
       const isScouted = state.scoutedHexes.some(s => s.q === targetQ && s.r === targetR && s.s === targetS);
 
       const enemyUnits = state.deployedUnits.filter(u => 
-        u.family === tile.controllingFamily && u.q === targetQ && u.r === targetR && u.s === targetS
+        u.family === tile.controllingFamily && u.family !== state.playerFamily && u.q === targetQ && u.r === targetR && u.s === targetS
       );
+      // Plan Hit: include the targeted unit even if it's on a hex not controlled by its family
+      if (_isExecPlan && state.plannedHit?.targetUnitId) {
+        const planTarget = state.deployedUnits.find(u =>
+          u.id === state.plannedHit!.targetUnitId &&
+          u.q === targetQ && u.r === targetR && u.s === targetS &&
+          u.family !== state.playerFamily
+        );
+        if (planTarget && !enemyUnits.includes(planTarget)) {
+          enemyUnits.push(planTarget);
+        }
+      }
 
       // ============ BLIND HIT: CIVILIAN RISK ============
       if (!isScouted && enemyUnits.length === 0) {
@@ -8481,11 +8519,42 @@ export const useEnhancedMafiaGameState = (
         // ============ VICTORY ============
         const targetFamily = tile.controllingFamily;
         
+        // Removal logic: Plan Hits and Hitman kill capos. Regular scouted hits only WOUND capos.
+        const killedAnyCapo = { fam: '' as string, q: 0, r: 0, s: 0 };
         enemyUnits.forEach(eu => {
+          if (eu.type === 'capo' && !_isExecPlan) {
+            // Wound the capo instead of killing
+            if (state.soldierStats[eu.id]) {
+              state.soldierStats[eu.id].loyalty = Math.max(0, state.soldierStats[eu.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
+            }
+            eu.woundedTurnsRemaining = CAPO_WOUND_DURATION;
+            eu.maxMoves = Math.max(1, (eu.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+            state.pendingNotifications = [...state.pendingNotifications, {
+              type: 'warning' as const, title: '🩸 Enemy Capo Wounded',
+              message: `You wounded an enemy capo from the ${eu.family} family. They survive but are weakened for ${CAPO_WOUND_DURATION} turns. Use Plan Hit or a Hitman to kill capos outright.`,
+            }];
+            return;
+          }
           const idx = state.deployedUnits.indexOf(eu);
-          if (idx !== -1) state.deployedUnits.splice(idx, 1);
+          if (idx !== -1) {
+            state.deployedUnits.splice(idx, 1);
+            if (eu.type === 'capo') {
+              // Capo killed (plan hit / hitman path) — full cleanup
+              delete state.soldierStats[eu.id];
+              killedAnyCapo.fam = eu.family;
+              killedAnyCapo.q = eu.q; killedAnyCapo.r = eu.r; killedAnyCapo.s = eu.s;
+            }
+          }
         });
-        tile.controllingFamily = 'neutral'; // Hit clears enemy control — player must Claim next turn
+        // Trigger Colombo succession + sync legacy units when a capo dies
+        if (killedAnyCapo.fam) {
+          triggerColomboSuccession(state, killedAnyCapo.fam, killedAnyCapo.q, killedAnyCapo.r, killedAnyCapo.s);
+          syncLegacyUnits(state);
+        }
+        // Only clear hex control if the tile actually belonged to the target family (skip for plan hits on neutral/player hexes)
+        if (tile.controllingFamily && tile.controllingFamily !== 'neutral' && tile.controllingFamily !== state.playerFamily && !tile.isHeadquarters) {
+          tile.controllingFamily = 'neutral'; // Hit clears enemy control — player must Claim next turn
+        }
         // Tension: territory hit on rival hex
         addPairTension(state, state.playerFamily, targetFamily, TENSION_TERRITORY_HIT);
         // Hole #4: check supply sabotage

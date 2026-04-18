@@ -307,6 +307,7 @@ const sections: GuideSection[] = [
         <div className="space-y-1">
           <p className="text-xs font-semibold">Family Powers (Tactical Phase):</p>
           <Stat label="Each family" value="1 unique active ability" />
+          <Stat label="👑 Colombo — Persico Succession" value="Active: click then select a soldier to instantly promote to Capo. One use per game." color="text-purple-400" />
         </div>
         <Tip>Hitman contracts bypass normal combat — great for eliminating key Capos.</Tip>
       </div>

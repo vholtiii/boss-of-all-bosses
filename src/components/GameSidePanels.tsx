@@ -185,8 +185,21 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           if (!power) return null;
           const cd = (gameState as any).familyPowerCooldowns?.[gameState.playerFamily] || 0;
           const usedForever = power.oneTimeUse && (gameState as any).familyPowerUsedForever?.[gameState.playerFamily];
-          const isPassive = gameState.playerFamily === 'colombo';
-          const canUse = !usedForever && cd <= 0 && gameState.tacticalActionsRemaining >= power.cost && !isPassive && isTacticalPhase;
+          const isColombo = gameState.playerFamily === 'colombo';
+          const persicoActive = !!(gameState as any).persicoSelectionActive;
+          const colomboSoldierCount = isColombo ? (gameState.deployedUnits || []).filter(u => u.family === 'colombo' && u.type === 'soldier').length : 0;
+          const colomboCapoCount = isColombo ? (gameState.deployedUnits || []).filter(u => u.family === 'colombo' && u.type === 'capo').length : 0;
+          const MAX_CAPOS_LOCAL = 4;
+          const colomboBlockReason = isColombo ? (
+            usedForever ? 'Already used this game' :
+            colomboCapoCount >= MAX_CAPOS_LOCAL ? `Capo cap reached (${MAX_CAPOS_LOCAL})` :
+            colomboSoldierCount === 0 ? 'No soldiers available to anoint' :
+            !isTacticalPhase ? 'Available in Tactical phase' :
+            gameState.tacticalActionsRemaining < power.cost ? `Need ${power.cost} tactical action` : ''
+          ) : '';
+          const canUse = isColombo
+            ? (!usedForever && colomboSoldierCount > 0 && colomboCapoCount < MAX_CAPOS_LOCAL && gameState.tacticalActionsRemaining >= power.cost && isTacticalPhase)
+            : (!usedForever && cd <= 0 && gameState.tacticalActionsRemaining >= power.cost && isTacticalPhase);
           const familyColorMap: Record<string, string> = {
             gambino: 'border-families-gambino',
             genovese: 'border-families-genovese',
@@ -218,6 +231,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               familyBorderColor,
               familyGradient,
               canUse && "shadow-[0_0_8px_hsl(var(--primary)/0.15)]",
+              persicoActive && "ring-2 ring-mafia-gold shadow-[0_0_16px_hsl(var(--mafia-gold)/0.5)]",
               !isTacticalPhase && "opacity-40"
             )}>
               <div className="flex items-center gap-1.5">
@@ -232,14 +246,36 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 {gameState.playerFamily === 'genovese' && 'Hide hex for 3 turns: unscoutable, -30% hit/sabotage'}
                 {gameState.playerFamily === 'lucchese' && '+50% district income + extract $1K/rival hex tribute'}
                 {gameState.playerFamily === 'bonanno' && 'Remove soldiers <50 loyalty; survivors +15 loyalty, flip immune'}
-                {gameState.playerFamily === 'colombo' && 'Auto-promotes a soldier when a capo dies (passive)'}
+                {gameState.playerFamily === 'colombo' && 'Active: click to enter selection mode, then click any of your soldiers on the map to instantly promote them to Capo. One use per game.'}
               </div>
-              <div className="flex items-center gap-1.5">
-                {cd > 0 && <span className="text-[10px] text-muted-foreground">⏳ Cooldown: {cd}t</span>}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {!isColombo && cd > 0 && <span className="text-[10px] text-muted-foreground">⏳ Cooldown: {cd}t</span>}
                 {usedForever && <span className="text-[10px] text-muted-foreground">✓ Used (once per game)</span>}
-                {isPassive && <span className="text-[10px] text-muted-foreground">🔄 Reactive — triggers automatically</span>}
+                {isColombo && !usedForever && (
+                  <span className="text-[10px] text-muted-foreground">
+                    Soldiers: {colomboSoldierCount} · Capos: {colomboCapoCount}/{MAX_CAPOS_LOCAL}
+                  </span>
+                )}
+                {persicoActive && (
+                  <span className="text-[10px] font-semibold text-mafia-gold animate-pulse">🎯 Click a soldier on the map…</span>
+                )}
               </div>
-              {!isPassive && (
+              {isColombo ? (
+                <Button
+                  className={cn(
+                    "w-full py-2 text-xs font-semibold bg-gradient-to-r text-white",
+                    persicoActive ? "from-destructive/80 to-destructive/60" : familyBtnGradient,
+                    (canUse || persicoActive) && "hover:brightness-110",
+                    !canUse && !persicoActive && "opacity-50 cursor-not-allowed"
+                  )}
+                  disabled={!canUse && !persicoActive}
+                  title={!canUse && !persicoActive ? colomboBlockReason : ''}
+                  onClick={() => onAction(persicoActive ? { type: 'cancel_persico_selection' } : { type: 'use_family_power' })}
+                >
+                  <Crown className="h-3.5 w-3.5 mr-1.5" />
+                  {persicoActive ? 'Cancel Selection' : '👑 Anoint a Capo'}
+                </Button>
+              ) : (
                 <Button
                   className={cn(
                     "w-full py-2 text-xs font-semibold bg-gradient-to-r text-white",

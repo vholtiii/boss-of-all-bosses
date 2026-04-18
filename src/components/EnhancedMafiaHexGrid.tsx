@@ -621,6 +621,18 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           >Cancel</button>
         </div>
       )}
+      {/* Persico Succession selection banner */}
+      {gameState?.persicoSelectionActive && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-6 py-2 rounded-full bg-mafia-gold/90 backdrop-blur-sm border border-mafia-gold/40 shadow-lg flex items-center gap-3">
+          <span className="text-sm font-bold text-noir-dark">
+            👑 Click any of your soldiers to anoint them as Capo
+          </span>
+          <button
+            className="text-xs text-noir-dark/80 hover:text-noir-dark underline font-semibold"
+            onClick={() => onAction?.({ type: 'cancel_persico_selection' })}
+          >Cancel</button>
+        </div>
+      )}
       {/* Controls */}
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
         <div className="flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-3 border border-noir-light shadow-lg">
@@ -1387,8 +1399,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         if (fam !== playerFamily && !hexRevealed) return;
                         const firstSoldier = soldiers[0];
                         const isSelected = soldiers.some(s => s.id === selectedUnitId);
-                        const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action');
+                        const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action' || gameState?.persicoSelectionActive);
                         const hasMark = fam === playerFamily && soldiers.some(s => gameState?.soldierStats?.[s.id]?.markedForDeath);
+                        const persicoArmed = !!gameState?.persicoSelectionActive && fam === playerFamily;
                         elements.push(
                           <SoldierIcon
                             key={`soldier-${fam}-${key}`}
@@ -1397,11 +1410,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             family={fam as any}
                             count={soldiers.length}
                             isPlayerFamily={fam === playerFamily}
-                            selected={isSelected}
+                            selected={isSelected || persicoArmed}
                             markedForDeath={hasMark}
                             onClick={isClickable ? (e) => {
                               e.stopPropagation();
                               setPinnedHex(tile);
+                              if (persicoArmed && onAction) {
+                                // Anoint this soldier as Capo
+                                onAction({ type: 'execute_persico_promotion', unitId: soldiers[0].id });
+                                return;
+                              }
                               if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
                                 onSelectUnit('soldier', { q: tile.q, r: tile.r, s: tile.s });
                               }
