@@ -38,6 +38,7 @@ import CapoPromotionPanel from '@/components/CapoPromotionPanel';
 import CorruptionPanel from '@/components/CorruptionPanel';
 import VictoryTracker from '@/components/VictoryTracker';
 import PhaseInfographic from '@/components/PhaseInfographic';
+import ThreatBoardPanel from '@/components/ThreatBoardPanel';
 import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType, SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, Safehouse, getTensionPairKey, WAR_TENSION_THRESHOLD, FAMILY_POWERS } from '@/types/game-mechanics';
 import { Anchor, Wrench, Truck, Wine, Fish, Package, Link2 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
@@ -1014,7 +1015,8 @@ export const RightSidePanel: React.FC<{
   highlightedSupplyHex?: { q: number; r: number; s: number } | null;
   onHighlightFamily?: (family: string | null) => void;
   highlightedFamily?: string | null;
-}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily }) => {
+  onSelectUnit?: (unitType: string, hex: { q: number; r: number; s: number }) => void;
+}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily, onSelectUnit }) => {
   const [openSection, setOpenSection] = useState<string>('');
   const { playSound } = useSoundSystem();
   const toggle = (id: string) => {
@@ -1026,6 +1028,9 @@ export const RightSidePanel: React.FC<{
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
+        {/* ── Threat Board (consolidated alerts) ── */}
+        <ThreatBoardPanel gameState={gameState} onSelectUnit={onSelectUnit} />
+
         {/* ── Territory Control ── */}
         <div className="pb-3 border-b border-border">
           <h3 className="text-sm font-bold text-primary font-playfair mb-3 uppercase tracking-wider">Territory Control</h3>
