@@ -1015,7 +1015,8 @@ export const RightSidePanel: React.FC<{
   highlightedSupplyHex?: { q: number; r: number; s: number } | null;
   onHighlightFamily?: (family: string | null) => void;
   highlightedFamily?: string | null;
-}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily }) => {
+  onSelectUnit?: (unitType: string, hex: { q: number; r: number; s: number }) => void;
+}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily, onSelectUnit }) => {
   const [openSection, setOpenSection] = useState<string>('');
   const { playSound } = useSoundSystem();
   const toggle = (id: string) => {
@@ -1027,6 +1028,9 @@ export const RightSidePanel: React.FC<{
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
+        {/* ── Threat Board (consolidated alerts) ── */}
+        <ThreatBoardPanel gameState={gameState} onSelectUnit={onSelectUnit} />
+
         {/* ── Territory Control ── */}
         <div className="pb-3 border-b border-border">
           <h3 className="text-sm font-bold text-primary font-playfair mb-3 uppercase tracking-wider">Territory Control</h3>
