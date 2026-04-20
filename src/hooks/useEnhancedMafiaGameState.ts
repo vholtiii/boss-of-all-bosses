@@ -87,6 +87,8 @@ import {
   // Influence system
   EROSION_THRESHOLD, EROSION_PROTECTION_RANGE, EXPANSION_THRESHOLD,
   EROSION_RESPECT_LOSS, EROSION_INFLUENCE_LOSS, EXPANSION_RESPECT_GAIN, EXPANSION_INFLUENCE_GAIN,
+  // Alerts log
+  AlertEntry, AlertCategory, categorizeAlert,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -184,6 +186,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   hexMap: state.hexMap.map(t => ({ ...t, business: t.business ? { ...t.business } : undefined })),
   deployedUnits: (state.deployedUnits || []).map(u => ({ ...u, escortingSoldierIds: u.escortingSoldierIds ? [...u.escortingSoldierIds] : undefined })),
   pendingNotifications: [...(state.pendingNotifications || [])],
+  alertsLog: [...(state.alertsLog || [])],
   soldierStats: Object.fromEntries(
     Object.entries(state.soldierStats || {}).map(([k, v]) => [k, { ...v }])
   ),
@@ -381,6 +384,8 @@ export interface EnhancedMafiaGameState {
   familyBonuses: FamilyBonuses;
   lastTurnIncome: number;
   pendingNotifications: Array<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; message?: string }>;
+  alertsLog: AlertEntry[];
+  alertsLastSeenTurn?: number;
   
   // Move phase systems
   scoutedHexes: ScoutedHex[];
@@ -990,6 +995,8 @@ const createInitialGameState = (
     familyBonuses: bonuses,
     lastTurnIncome: 0,
     pendingNotifications: [],
+    alertsLog: [],
+    alertsLastSeenTurn: 0,
     scoutedHexes: [],
     safehouses: [],
     fortifiedHexes: [],
@@ -2683,6 +2690,42 @@ export const useEnhancedMafiaGameState = (
       newState.policeHeat.bribedOfficials = newState.policeHeat.bribedOfficials || [];
       newState.aiAlertState = newState.aiAlertState || {};
       
+      // ============ PACT EXPIRING ALERTS (1 turn left) ============
+      const famName = (f: string) => f.charAt(0).toUpperCase() + f.slice(1);
+      (newState.ceasefires || []).forEach(c => {
+        if (c.active && c.turnsRemaining === 1) {
+          newState.pendingNotifications.push({
+            type: 'warning' as const, title: '⏳ Ceasefire Expiring',
+            message: `Your ceasefire with ${famName(c.family)} expires next turn.`,
+          });
+        }
+      });
+      (newState.alliances || []).forEach(a => {
+        if (a.active && a.turnsRemaining === 1) {
+          newState.pendingNotifications.push({
+            type: 'warning' as const, title: '⏳ Alliance Expiring',
+            message: `Your alliance with ${famName(a.alliedFamily)} expires next turn.`,
+          });
+        }
+      });
+      (newState.safePassagePacts || []).forEach(p => {
+        if (p.active && p.turnsRemaining === 1) {
+          newState.pendingNotifications.push({
+            type: 'warning' as const, title: '⏳ Safe Passage Expiring',
+            message: `Safe passage with ${famName(p.targetFamily)} expires next turn.`,
+          });
+        }
+      });
+      (newState.supplyDealPacts || []).forEach(p => {
+        if (p.active && p.turnsRemaining === 1) {
+          const other = p.buyerFamily === newState.playerFamily ? p.targetFamily : p.buyerFamily;
+          newState.pendingNotifications.push({
+            type: 'warning' as const, title: '⏳ Supply Deal Expiring',
+            message: `Supply deal with ${famName(other)} expires next turn.`,
+          });
+        }
+      });
+      
       // ============ PURGE MARK EXPIRY ============
       for (const unitId of Object.keys(newState.soldierStats)) {
         const ss = newState.soldierStats[unitId];
@@ -3777,6 +3820,20 @@ export const useEnhancedMafiaGameState = (
         const heat = newState.policeHeat.level;
         const lawyerActive = (newState.lawyerActiveUntil || 0) >= newState.turn;
 
+        // Heat tier crossing alerts (upward only)
+        const tierFor = (h: number) => h >= 90 ? 4 : h >= 70 ? 3 : h >= 50 ? 2 : h >= 30 ? 1 : 0;
+        const oldTier = tierFor(prevHeat);
+        const newTier = tierFor(heat);
+        if (newTier > oldTier && newTier >= 1) {
+          const tierLabels = ['', '⚠️ Heat Tier 1 — Income Penalty', '🚔 Heat Tier 2 — Soldier Arrests', '👔 Heat Tier 3 — Capo Arrests', '🚨 Heat Tier 4 — RICO Investigation'];
+          const tierMsgs = ['', 'Heat hit 30+. Illegal businesses earn less.', 'Heat hit 50+. Soldier arrests possible each turn.', 'Heat hit 70+. Capos can be arrested.', 'Heat hit 90+. RICO timer started — game over in 5 turns at this level!'];
+          newState.pendingNotifications.push({
+            type: newTier >= 3 ? 'error' as const : 'warning' as const,
+            title: tierLabels[newTier],
+            message: tierMsgs[newTier],
+          });
+        }
+
         // Tier 1: 30+ → income penalty applied in processEconomy
         // (handled via state flag, not here)
 
@@ -3861,6 +3918,12 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications.push({
               type: 'error' as const, title: '🚨 GAME OVER — RICO Indictment',
               message: `5 consecutive turns at critical heat. Your entire organization has been dismantled by the feds.`,
+            });
+          } else {
+            newState.pendingNotifications.push({
+              type: 'error' as const,
+              title: `⏱️ RICO Timer ${newState.ricoTimer}/5`,
+              message: `Heat still at 90+. ${5 - newState.ricoTimer} turn${5 - newState.ricoTimer === 1 ? '' : 's'} until federal indictment.`,
             });
           }
         } else {
@@ -4363,6 +4426,16 @@ export const useEnhancedMafiaGameState = (
       newState.territories = buildLegacyTerritories(newState.hexMap);
       updateVictoryProgress(newState);
       updateGamePhase(newState);
+      
+      // ============ ALERTS LOG: prune old entries ============
+      // Keep entries from the last 2 turns. Critical unread (error/warning) get +1 turn grace.
+      const cutoff = newState.turn - 2;
+      const criticalCutoff = newState.turn - 3;
+      newState.alertsLog = (newState.alertsLog || []).filter(a => {
+        if (a.turn >= cutoff) return true;
+        if (!a.read && (a.type === 'error' || a.type === 'warning') && a.turn >= criticalCutoff) return true;
+        return false;
+      });
       
       return newState;
     });
@@ -9591,7 +9664,33 @@ export const useEnhancedMafiaGameState = (
 
 
   const clearNotifications = useCallback(() => {
-    setGameState(prev => ({ ...prev, pendingNotifications: [] }));
+    setGameState(prev => {
+      // Mirror notifications into the persistent alerts log before clearing
+      if (!prev.pendingNotifications || prev.pendingNotifications.length === 0) return prev;
+      const newEntries: AlertEntry[] = prev.pendingNotifications.map((n, i) => ({
+        id: `alert-${prev.turn}-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 7)}`,
+        turn: prev.turn,
+        type: n.type,
+        category: categorizeAlert(n.title, n.message),
+        title: n.title,
+        message: n.message,
+        read: false,
+        timestamp: Date.now(),
+      }));
+      return {
+        ...prev,
+        pendingNotifications: [],
+        alertsLog: [...(prev.alertsLog || []), ...newEntries],
+      };
+    });
+  }, []);
+
+  const markAlertsRead = useCallback(() => {
+    setGameState(prev => ({
+      ...prev,
+      alertsLog: (prev.alertsLog || []).map(a => a.read ? a : { ...a, read: true }),
+      alertsLastSeenTurn: prev.turn,
+    }));
   }, []);
 
   // ============ WINNER CHECK ============
@@ -9616,6 +9715,7 @@ export const useEnhancedMafiaGameState = (
     deployUnit,
     isWinner,
     clearNotifications,
+    markAlertsRead,
     fortifyUnit,
     setMoveAction,
     startEscort,
