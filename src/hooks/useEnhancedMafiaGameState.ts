@@ -3883,6 +3883,12 @@ export const useEnhancedMafiaGameState = (
               type: 'error' as const, title: '🚨 GAME OVER — RICO Indictment',
               message: `5 consecutive turns at critical heat. Your entire organization has been dismantled by the feds.`,
             });
+          } else {
+            newState.pendingNotifications.push({
+              type: 'error' as const,
+              title: `⏱️ RICO Timer ${newState.ricoTimer}/5`,
+              message: `Heat still at 90+. ${5 - newState.ricoTimer} turn${5 - newState.ricoTimer === 1 ? '' : 's'} until federal indictment.`,
+            });
           }
         } else {
           // Reset RICO timer if heat drops below 90
