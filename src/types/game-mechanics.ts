@@ -1,3 +1,31 @@
+// ============ ALERTS LOG ============
+export type AlertCategory = 'combat' | 'diplomacy' | 'economy' | 'territory' | 'intel' | 'phase' | 'system';
+
+export interface AlertEntry {
+  id: string;
+  turn: number;
+  type: 'success' | 'error' | 'warning' | 'info';
+  category: AlertCategory;
+  title: string;
+  message?: string;
+  hexRef?: { q: number; r: number; s: number };
+  unitRef?: { type: 'soldier' | 'capo'; q: number; r: number; s: number };
+  read: boolean;
+  timestamp: number;
+}
+
+// Auto-categorize an alert from its title text (no source-site changes needed)
+export const categorizeAlert = (title: string, message?: string): AlertCategory => {
+  const t = `${title} ${message || ''}`.toLowerCase();
+  if (/phase \d|commission|🆙|👑|victory|game over|rico/i.test(t)) return 'phase';
+  if (/war|hit|kill|wound|assault|combat|sabotage|safehouse|attack|capo .*(killed|wounded|recovered)|hitman|bounty|mark/i.test(t)) return 'combat';
+  if (/sitdown|pact|alliance|ceasefire|truce|negotiat|diplomac|treaty|share profits|safe passage|supply deal|snubbed/i.test(t)) return 'diplomacy';
+  if (/income|money|cash|bankrupt|business|supply|stockpile|loan|extort|earnings|laundering|economy/i.test(t)) return 'economy';
+  if (/territory|hex|district|claim|erod|expansion|control|boundar|fortif/i.test(t)) return 'territory';
+  if (/scout|intel|bribe|rat|informant|stale|fresh|reveal|spy|espionage/i.test(t)) return 'intel';
+  return 'system';
+};
+
 // ============ HITMAN SYSTEM ============
 export interface SoldierStats {
   loyalty: number;       // 0-80 for soldiers, 0-99 for capos
