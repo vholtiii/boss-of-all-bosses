@@ -1,34 +1,94 @@
 
 
-# Build the Threat Board Panel
+# Alerts System Overhaul — Coverage + Persistent Alerts Log (Revised Retention)
 
-A single consolidated right-sidebar section that surfaces every active threat and opportunity in one place, replacing the need to scan 5 different panels each turn.
+Two parts: (1) a new persistent **Alerts Log** menu that captures every alert, and (2) filling **coverage gaps** for important gameplay events that currently fire silently.
 
-## What Goes In It
+---
 
-A new collapsible section in the right sidebar titled **"⚠️ Threat Board"** with up to 5 grouped subsections (each rendered only if it has entries):
+## Part 1 — Alerts Log
 
-1. **🎯 Incoming Hits** — rival Plan Hits detected against your units (fog-of-war gated: only shown if you have intel on that rival per existing `fog-of-war` rules). Shows target unit + turns until execution.
-2. **🔪 Active Hitman Contracts** — yours (with ETA + target) and any against you that intel reveals.
-3. **⚔️ Wars & Ceasefires** — every active war, ceasefire timer, and pact about to expire (≤2 turns). Pulls from existing diplomacy state.
-4. **🌊 Erosion / Expansion Watch** — Phase 3+ only. Districts where your hexes are 1 turn from flipping neutral via erosion, OR rival hexes 1 turn from flipping yours via expansion.
-5. **💰 Bounties & Marks** — bounties placed on your capos, soldiers marked-for-death, low-loyalty (<40) soldiers at betrayal risk.
+### What you get
+A new top-bar bell icon (next to the Sound/Settings gear) with an unread-count badge. Clicking it opens a dropdown panel listing recent alerts from the current game session, grouped by turn (newest first).
 
-Each row is **click-to-pan**: clicking pans the map to the relevant hex/unit (reuses the same handler the Deployed Units list now uses).
+```
+🔔 Alerts (3 new)
+─────────────────
+▼ Turn 14 (current)
+  🟥 War declared by Genovese        2m ago  [Pan to HQ]
+  🟧 Supply line to Docks severed    just now [View]
+  🟦 Phase 3 reached                  just now
+▼ Turn 13
+  🟩 Capo Bruno promoted             — 
+  🟧 Soldier loyalty critical (32)   — [Pan to unit]
+─────────────────
+[Filter ▾ All | Critical | Combat | Diplomacy | Economy]
+```
 
-## Behavior
+### Behavior
+- **Source of truth**: every `pendingNotifications` push is also appended to a new `alertsLog` array on game state (each entry: `{ id, turn, type, category, title, message, hexRef?, unitRef?, read, timestamp }`).
+- **Per-turn grouping**: collapsible turn sections. Current turn auto-expanded; previous turn collapsed.
+- **Unread tracking**: opening the log marks visible items as read. Bell badge shows count of unread `error`/`warning` alerts only.
+- **Categories**: Combat, Diplomacy, Economy, Territory, Intel, Phase, System — derived at emission time from a new `category` field.
+- **Click-to-pan**: alerts referencing a hex/unit get a "Pan to" action (reuses existing `selectUnit` callback).
+- **Filter chips**: All / Critical (errors+warnings) / each category.
+- **Retention**: **alerts persist for 2 turns after the turn they were emitted, then auto-expire from the log.** At the start of each turn, prune entries older than `currentTurn - 2`. Critical unread alerts (errors/warnings) get a 1-turn grace extension so they aren't pruned the same turn the player might first see them.
+- **Persists in saves**: the (pruned) log is included in `useGameSaveLoad` payload so reloading mid-game keeps the recent window.
+- **Toasts unchanged**: existing transient toasts still fire. The log is *additional* — a 2-turn rolling record so missed toasts can be reviewed before they age out.
 
-- **Default state**: collapsed (matches existing right-sidebar default-collapsed memory rule).
-- **Header badge**: shows total threat count, e.g. `⚠️ Threat Board (4)` — colored red if ≥1 incoming hit or war, amber if only soft threats, hidden if 0.
-- **Empty state**: when expanded with 0 threats, show "All quiet. No active threats." in muted text.
-- **Auto-expand override**: on the first turn an incoming hit is detected, briefly auto-expand once and pulse the header (then respect user collapse).
-- **No new game state**: purely a derived/read-only view of existing state (`plannedHit`, `hitmanContracts`, `tensionMatrix`, `wars`, `pacts`, `deployedUnits`, `soldierStats`, `influenceErosion`, `bounties`).
+---
+
+## Part 2 — Coverage Gaps to Fill
+
+Audit found these important events currently fire **no alert** (or only push to the silent `combatLog`). Adding emissions for:
+
+### Phase & Progression
+- 🆙 **Phase advancement** (1→2, 2→3, 3→4) summarizing what just unlocked.
+- 👑 **Commission Vote called by an AI**.
+
+### Combat & Threats
+- 🎯 **Rival declares war on you** (AI-initiated).
+- 🔪 **Hitman contract resolved against you** (success or failure).
+- 💣 **Bounty placed on your family** by a rival.
+- 🏚️ **Your safehouse captured / destroyed**.
+- 💀 **Your capo wounded** (promote from combatLog to alert).
+- 💚 **Your capo recovered** from wounds.
+
+### Diplomacy
+- ⏳ **Ceasefire / alliance / safe-passage expiring next turn** (fires once at exactly 1 turn left).
+- 🤝 **AI accepts/rejects your sitdown** (verify — emit if missing).
+- 📜 **Pact signed/broken by AI**.
+
+### Territory (Phase 3+)
+- 🌊 **A player hex flipped to neutral via erosion** (the actual flip).
+- 📈 **A neutral hex expanded into rival control adjacent to you**.
+- 🏆 **Reached 60% district control** / **lost 60% district control**.
+
+### Economy & Heat
+- 💸 **Supply line severed** (your business affected).
+- 🚨 **Heat tier crossed upward** (Tier 1→2, 2→3, 3→4).
+- ⏱️ **RICO timer tick** (each turn at 90+ heat: "RICO 2/5").
+- 💰 **Bankruptcy warning** (cash + projected income < 0 next turn).
+
+### Loyalty & Internal
+- ⚠️ **Soldier loyalty crosses below 40** (first time only).
+- 🐀 **Rat suspected** (promote existing espionage events to alerts).
+
+### Intel
+- 🕵️ **Bribe / intel source expired**.
+- 👁️ **Scout intel on a critical target went stale** (rival capo you had eyes on).
+
+Each gap is a one-line `pendingNotifications.push({...})` at the existing event site, plus the new `category` tag. No mechanic changes.
+
+---
 
 ## Files Touched
 
-1. **`src/components/ThreatBoardPanel.tsx`** (new) — derives all 5 sections from game state, renders collapsible card with click-to-pan rows.
-2. **`src/components/GameSidePanels.tsx`** — mount `<ThreatBoardPanel />` near the top of the right sidebar (above existing rival/supply sections), pass game state + `onPanToHex` callback.
-3. **`src/pages/UltimateMafiaGame.tsx`** — wire the existing pan-to-hex callback (already created for the Deployed Units fix) through to the new panel.
+1. **`src/types/game-mechanics.ts`** — extend pending notification type with optional `category`, `hexRef`, `unitRef`, `id`.
+2. **`src/hooks/useEnhancedMafiaGameState.ts`** — add `alertsLog` to state; append on every notification push; add ~20 new emission sites; **prune entries older than 2 turns at turn start** (with 1-turn grace for unread critical alerts); clear log on new game.
+3. **`src/pages/UltimateMafiaGame.tsx`** — render new `<AlertsLogButton />` in top bar; pass `selectUnit` for click-to-pan.
+4. **`src/components/AlertsLogPanel.tsx`** *(new)* — bell button + dropdown popover with grouped/filterable list, unread tracking, click-to-pan rows. Reuses ThreatBoard row visual language.
+5. **`src/hooks/useGameSaveLoad.ts`** — include pruned `alertsLog` in save/load payload.
 
-No new dependencies. No state-shape changes. No strategic mechanic changes — purely surfacing what already exists.
+No new dependencies.
 
