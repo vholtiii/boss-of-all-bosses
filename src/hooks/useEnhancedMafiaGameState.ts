@@ -4371,6 +4371,16 @@ export const useEnhancedMafiaGameState = (
       updateVictoryProgress(newState);
       updateGamePhase(newState);
       
+      // ============ ALERTS LOG: prune old entries ============
+      // Keep entries from the last 2 turns. Critical unread (error/warning) get +1 turn grace.
+      const cutoff = newState.turn - 2;
+      const criticalCutoff = newState.turn - 3;
+      newState.alertsLog = (newState.alertsLog || []).filter(a => {
+        if (a.turn >= cutoff) return true;
+        if (!a.read && (a.type === 'error' || a.type === 'warning') && a.turn >= criticalCutoff) return true;
+        return false;
+      });
+      
       return newState;
     });
   }, []);
