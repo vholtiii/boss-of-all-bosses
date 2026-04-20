@@ -2690,6 +2690,42 @@ export const useEnhancedMafiaGameState = (
       newState.policeHeat.bribedOfficials = newState.policeHeat.bribedOfficials || [];
       newState.aiAlertState = newState.aiAlertState || {};
       
+      // ============ PACT EXPIRING ALERTS (1 turn left) ============
+      const famName = (f: string) => f.charAt(0).toUpperCase() + f.slice(1);
+      (newState.ceasefires || []).forEach(c => {
+        if (c.active && c.turnsRemaining === 1) {
+          newState.pendingNotifications.push({
+            type: 'warning' as const, title: '⏳ Ceasefire Expiring',
+            message: `Your ceasefire with ${famName(c.family)} expires next turn.`,
+          });
+        }
+      });
+      (newState.alliances || []).forEach(a => {
+        if (a.active && a.turnsRemaining === 1) {
+          newState.pendingNotifications.push({
+            type: 'warning' as const, title: '⏳ Alliance Expiring',
+            message: `Your alliance with ${famName(a.alliedFamily)} expires next turn.`,
+          });
+        }
+      });
+      (newState.safePassagePacts || []).forEach(p => {
+        if (p.active && p.turnsRemaining === 1) {
+          newState.pendingNotifications.push({
+            type: 'warning' as const, title: '⏳ Safe Passage Expiring',
+            message: `Safe passage with ${famName(p.targetFamily)} expires next turn.`,
+          });
+        }
+      });
+      (newState.supplyDealPacts || []).forEach(p => {
+        if (p.active && p.turnsRemaining === 1) {
+          const other = p.buyerFamily === newState.playerFamily ? p.targetFamily : p.buyerFamily;
+          newState.pendingNotifications.push({
+            type: 'warning' as const, title: '⏳ Supply Deal Expiring',
+            message: `Supply deal with ${famName(other)} expires next turn.`,
+          });
+        }
+      });
+      
       // ============ PURGE MARK EXPIRY ============
       for (const unitId of Object.keys(newState.soldierStats)) {
         const ss = newState.soldierStats[unitId];
