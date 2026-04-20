@@ -9664,7 +9664,33 @@ export const useEnhancedMafiaGameState = (
 
 
   const clearNotifications = useCallback(() => {
-    setGameState(prev => ({ ...prev, pendingNotifications: [] }));
+    setGameState(prev => {
+      // Mirror notifications into the persistent alerts log before clearing
+      if (!prev.pendingNotifications || prev.pendingNotifications.length === 0) return prev;
+      const newEntries: AlertEntry[] = prev.pendingNotifications.map((n, i) => ({
+        id: `alert-${prev.turn}-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 7)}`,
+        turn: prev.turn,
+        type: n.type,
+        category: categorizeAlert(n.title, n.message),
+        title: n.title,
+        message: n.message,
+        read: false,
+        timestamp: Date.now(),
+      }));
+      return {
+        ...prev,
+        pendingNotifications: [],
+        alertsLog: [...(prev.alertsLog || []), ...newEntries],
+      };
+    });
+  }, []);
+
+  const markAlertsRead = useCallback(() => {
+    setGameState(prev => ({
+      ...prev,
+      alertsLog: (prev.alertsLog || []).map(a => a.read ? a : { ...a, read: true }),
+      alertsLastSeenTurn: prev.turn,
+    }));
   }, []);
 
   // ============ WINNER CHECK ============
@@ -9689,6 +9715,7 @@ export const useEnhancedMafiaGameState = (
     deployUnit,
     isWinner,
     clearNotifications,
+    markAlertsRead,
     fortifyUnit,
     setMoveAction,
     startEscort,
