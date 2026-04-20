@@ -87,6 +87,8 @@ import {
   // Influence system
   EROSION_THRESHOLD, EROSION_PROTECTION_RANGE, EXPANSION_THRESHOLD,
   EROSION_RESPECT_LOSS, EROSION_INFLUENCE_LOSS, EXPANSION_RESPECT_GAIN, EXPANSION_INFLUENCE_GAIN,
+  // Alerts log
+  AlertEntry, AlertCategory, categorizeAlert,
 } from '@/types/game-mechanics';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -184,6 +186,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   hexMap: state.hexMap.map(t => ({ ...t, business: t.business ? { ...t.business } : undefined })),
   deployedUnits: (state.deployedUnits || []).map(u => ({ ...u, escortingSoldierIds: u.escortingSoldierIds ? [...u.escortingSoldierIds] : undefined })),
   pendingNotifications: [...(state.pendingNotifications || [])],
+  alertsLog: [...(state.alertsLog || [])],
   soldierStats: Object.fromEntries(
     Object.entries(state.soldierStats || {}).map(([k, v]) => [k, { ...v }])
   ),
@@ -381,6 +384,8 @@ export interface EnhancedMafiaGameState {
   familyBonuses: FamilyBonuses;
   lastTurnIncome: number;
   pendingNotifications: Array<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; message?: string }>;
+  alertsLog: AlertEntry[];
+  alertsLastSeenTurn?: number;
   
   // Move phase systems
   scoutedHexes: ScoutedHex[];
@@ -990,6 +995,8 @@ const createInitialGameState = (
     familyBonuses: bonuses,
     lastTurnIncome: 0,
     pendingNotifications: [],
+    alertsLog: [],
+    alertsLastSeenTurn: 0,
     scoutedHexes: [],
     safehouses: [],
     fortifiedHexes: [],
