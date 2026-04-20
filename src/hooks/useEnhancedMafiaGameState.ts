@@ -3784,6 +3784,20 @@ export const useEnhancedMafiaGameState = (
         const heat = newState.policeHeat.level;
         const lawyerActive = (newState.lawyerActiveUntil || 0) >= newState.turn;
 
+        // Heat tier crossing alerts (upward only)
+        const tierFor = (h: number) => h >= 90 ? 4 : h >= 70 ? 3 : h >= 50 ? 2 : h >= 30 ? 1 : 0;
+        const oldTier = tierFor(prevHeat);
+        const newTier = tierFor(heat);
+        if (newTier > oldTier && newTier >= 1) {
+          const tierLabels = ['', '⚠️ Heat Tier 1 — Income Penalty', '🚔 Heat Tier 2 — Soldier Arrests', '👔 Heat Tier 3 — Capo Arrests', '🚨 Heat Tier 4 — RICO Investigation'];
+          const tierMsgs = ['', 'Heat hit 30+. Illegal businesses earn less.', 'Heat hit 50+. Soldier arrests possible each turn.', 'Heat hit 70+. Capos can be arrested.', 'Heat hit 90+. RICO timer started — game over in 5 turns at this level!'];
+          newState.pendingNotifications.push({
+            type: newTier >= 3 ? 'error' as const : 'warning' as const,
+            title: tierLabels[newTier],
+            message: tierMsgs[newTier],
+          });
+        }
+
         // Tier 1: 30+ → income penalty applied in processEconomy
         // (handled via state flag, not here)
 
