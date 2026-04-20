@@ -15,6 +15,7 @@ import SaveLoadDialog from '@/components/SaveLoadDialog';
 import EnemyHexActionDialog from '@/components/EnemyHexActionDialog';
 import GameGuide from '@/components/GameGuide';
 import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
+import AlertsLogPanel from '@/components/AlertsLogPanel';
 import TurnSummaryModal from '@/components/TurnSummaryModal';
 import CommissionVoteModal from '@/components/CommissionVoteModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
@@ -70,6 +71,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     deployUnit,
     isWinner,
     clearNotifications,
+    markAlertsRead,
     fortifyUnit,
     setMoveAction,
     startEscort,
@@ -677,6 +679,12 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         <SaveLoadDialog 
           gameState={gameState} 
           onLoadGame={handleLoadGame}
+        />
+        <AlertsLogPanel
+          alerts={gameState.alertsLog || []}
+          currentTurn={gameState.turn}
+          onMarkAllRead={markAlertsRead}
+          onSelectUnit={(unitType, hex) => selectUnit(unitType, hex)}
         />
         <Button
           variant="outline"
