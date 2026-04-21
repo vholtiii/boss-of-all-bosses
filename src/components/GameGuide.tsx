@@ -154,7 +154,7 @@ const sections: GuideSection[] = [
         </div>
         <div className="space-y-1">
           <p className="text-xs font-semibold">Capos (Promoted Soldiers):</p>
-          <Stat label="Movement" value="3 moves, 5-hex fly range" />
+          <Stat label="Movement" value="3 moves, 3-hex fly range" />
           <Stat label="Auto-Claim" value="Territory claimed automatically" />
           <Stat label="Abilities" value="Scout 2-hex, build safehouses, negotiate" />
           <Stat label="Promotion" value="Requires loyalty 70+, toughness 3+" />

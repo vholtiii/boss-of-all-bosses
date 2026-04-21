@@ -1671,7 +1671,7 @@ export const useEnhancedMafiaGameState = (
         (prev.safePassagePacts || []).some(p => p.active && p.targetFamily === family);
 
       if (unitType === 'capo') {
-        // Capo movement — fly up to 5 hexes
+        // Capo movement — fly up to CAPO_FLY_RANGE hexes
         // Capos CAN enter rival hexes with enemy soldiers ONLY if safe passage is active
         const range = Math.min(CAPO_FLY_RANGE, unit.movesRemaining);
         const candidateHexes = getHexesInRange(unit.q, unit.r, unit.s, range);
@@ -2592,7 +2592,7 @@ export const useEnhancedMafiaGameState = (
             const safehouseNeighbors = getHexNeighbors(sh.q, sh.r, sh.s);
             candidates = [...candidates, ...safehouseNeighbors];
           } else {
-            // Capos can deploy up to 5 hexes from safehouse
+            // Capos can deploy up to CAPO_FLY_RANGE hexes from safehouse
             const safehouseRange = getHexesInRange(sh.q, sh.r, sh.s, CAPO_FLY_RANGE);
             candidates = [...candidates, ...safehouseRange];
           }
