@@ -2868,6 +2868,60 @@ export const useEnhancedMafiaGameState = (
       
       newState.turn += 1;
 
+      // ============ A1: PENDING CLAIM FINALIZATION ============
+      // For every hex with a pendingClaim from the previous turn:
+      //   • If a friendly unit is on or adjacent → finalize (controllingFamily = family),
+      //     grant diminishing-return respect/influence (A4).
+      //   • Else → revert to neutral (claim wasted, no refund).
+      const finalizedByFam: Record<string, number> = {};
+      const wastedByFam: Record<string, number> = {};
+      for (const tile of newState.hexMap) {
+        if (!tile.pendingClaim) continue;
+        const claimFam = tile.pendingClaim.family;
+        const sinceTurn = tile.pendingClaim.sinceTurn;
+        // Only resolve claims initiated on a previous turn (1+ turn presence required).
+        if (newState.turn <= sinceTurn) continue;
+        const onHex = newState.deployedUnits.some(u => u.family === claimFam && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+        const adjUnit = !onHex && getHexNeighbors(tile.q, tile.r, tile.s).some(n =>
+          newState.deployedUnits.some(u => u.family === claimFam && u.q === n.q && u.r === n.r && u.s === n.s)
+        );
+        if (onHex || adjUnit) {
+          // Finalize
+          tile.controllingFamily = claimFam as any;
+          tile.pendingClaim = undefined;
+          finalizedByFam[claimFam] = (finalizedByFam[claimFam] || 0) + 1;
+          // A4: diminishing returns — count this family's hex total *before* increment so first ones get full reward
+          if (claimFam === newState.playerFamily) {
+            const hexCount = getFamilyHexCount(newState, claimFam); // includes the tile we just finalized
+            const rewards = getClaimRewards(hexCount);
+            if (rewards.respect > 0) newState.reputation.respect = Math.min(100, newState.reputation.respect + rewards.respect);
+            if (rewards.influence > 0) newState.reputation.streetInfluence = Math.min(100, newState.reputation.streetInfluence + rewards.influence);
+          }
+        } else {
+          // Revert
+          tile.pendingClaim = undefined;
+          wastedByFam[claimFam] = (wastedByFam[claimFam] || 0) + 1;
+        }
+      }
+      const playerFinalized = finalizedByFam[newState.playerFamily] || 0;
+      const playerWasted = wastedByFam[newState.playerFamily] || 0;
+      if (playerFinalized > 0) {
+        const tier = getClaimRewards(getFamilyHexCount(newState, newState.playerFamily));
+        const rewardLabel = tier.respect === 0
+          ? 'no prestige (saturated empire)'
+          : `+${tier.respect} Respect, +${tier.influence} Influence per hex`;
+        newState.pendingNotifications = [...(newState.pendingNotifications || []), {
+          type: 'success' as const, title: '🏴 Territory Secured',
+          message: `Finalized ${playerFinalized} contested ${playerFinalized === 1 ? 'hex' : 'hexes'} (${rewardLabel}).`,
+        }];
+      }
+      if (playerWasted > 0) {
+        newState.pendingNotifications = [...(newState.pendingNotifications || []), {
+          type: 'warning' as const, title: '⏳ Claims Wasted',
+          message: `${playerWasted} contested ${playerWasted === 1 ? 'hex' : 'hexes'} reverted to neutral — no unit on or adjacent.`,
+        }];
+      }
+
       // ============ CONTESTED HEX RESOLUTION ============
       newState.contestedHexes = newState.contestedHexes || [];
       const resolvedContested: typeof newState.contestedHexes = [];
