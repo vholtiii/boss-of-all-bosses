@@ -1673,7 +1673,7 @@ export const useEnhancedMafiaGameState = (
       if (unitType === 'capo') {
         // Capo movement — fly up to 5 hexes
         // Capos CAN enter rival hexes with enemy soldiers ONLY if safe passage is active
-        const range = Math.min(5, unit.movesRemaining);
+        const range = Math.min(CAPO_FLY_RANGE, unit.movesRemaining);
         const candidateHexes = getHexesInRange(unit.q, unit.r, unit.s, range);
         const validHexes = candidateHexes.filter(h => {
           const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
@@ -2173,7 +2173,7 @@ export const useEnhancedMafiaGameState = (
       // After free move or if moves remain, recalculate available hexes
       if (updatedUnit.movesRemaining > 0 || isFreeMove) {
         if (updatedUnit.type === 'capo') {
-          const range = Math.min(5, updatedUnit.movesRemaining);
+          const range = Math.min(CAPO_FLY_RANGE, updatedUnit.movesRemaining);
           const candidates = getHexesInRange(updatedUnit.q, updatedUnit.r, updatedUnit.s, range);
           newAvailableMoves = candidates.filter(h => {
             const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
@@ -2593,7 +2593,7 @@ export const useEnhancedMafiaGameState = (
             candidates = [...candidates, ...safehouseNeighbors];
           } else {
             // Capos can deploy up to 5 hexes from safehouse
-            const safehouseRange = getHexesInRange(sh.q, sh.r, sh.s, 5);
+            const safehouseRange = getHexesInRange(sh.q, sh.r, sh.s, CAPO_FLY_RANGE);
             candidates = [...candidates, ...safehouseRange];
           }
         }
