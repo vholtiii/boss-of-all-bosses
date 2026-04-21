@@ -946,6 +946,39 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             </>
                           );
                         })()}
+                        {/* A1: Pending claim indicator — 40% opacity family fill + dashed border + ⏳ */}
+                        {tile.pendingClaim && (() => {
+                          const claimColor = familyColors[tile.pendingClaim.family] || '#888888';
+                          return (
+                            <>
+                              <polygon
+                                points={getHexPoints(x, y, baseHexRadius)}
+                                fill={claimColor}
+                                opacity={0.4}
+                                className="pointer-events-none"
+                              />
+                              <polygon
+                                points={getHexPoints(x, y, baseHexRadius + 1)}
+                                fill="none"
+                                stroke={claimColor}
+                                strokeWidth={2}
+                                strokeDasharray="4 3"
+                                className="pointer-events-none"
+                              >
+                                <animate attributeName="stroke-opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite" />
+                              </polygon>
+                              <text
+                                x={x - baseHexRadius * 0.55}
+                                y={y - baseHexRadius * 0.4}
+                                textAnchor="middle"
+                                fontSize="9"
+                                className="pointer-events-none select-none"
+                              >
+                                ⏳
+                              </text>
+                            </>
+                          );
+                        })()}
                       </>
                     );
                   })()}
