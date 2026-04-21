@@ -311,6 +311,9 @@ export interface HexTile {
   erosionCounter?: number;
   expansionCounter?: number;
   expansionInfluencer?: string;
+  // A1: Pending claim — tile is "contested" by a family but not finalized.
+  // Does not count toward victory, district control, or income until finalized.
+  pendingClaim?: { family: string; sinceTurn: number };
 }
 
 export type TurnPhase = 'deploy' | 'move' | 'action' | 'waiting';
