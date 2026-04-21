@@ -8174,12 +8174,15 @@ export const useEnhancedMafiaGameState = (
     const playerUnits = [...playerUnitsOnHex, ...playerUnitsAdjacent];
     if (playerUnits.length === 0) return state;
 
-    tile.controllingFamily = state.playerFamily;
-    // Hole #5: check encroachment on neutral hex claims
+    // A1 + A3: claim is now PENDING — hex enters contested state, awaits 1 turn
+    // of presence to finalize. Heat applies on initiation.
+    const claimed = applyPendingClaim(state, tile, state.playerFamily, true);
+    if (!claimed) return state;
+    // Hole #5: encroachment tension still triggers on claim *attempt*
     checkEncroachment(state, targetQ, targetR, targetS, state.playerFamily);
 
-    // Auto-move: move the selected soldier to the claimed hex (fall back to first adjacent soldier)
-    const selectedSoldier = action.unitId 
+    // Auto-move: move the selected soldier to the contested hex (fall back to first adjacent soldier)
+    const selectedSoldier = action.unitId
       ? playerUnits.find(u => u.id === action.unitId && u.type === 'soldier')
       : null;
     const soldierToMove = selectedSoldier || playerUnitsAdjacent.find(u => u.type === 'soldier');
@@ -8190,19 +8193,7 @@ export const useEnhancedMafiaGameState = (
     }
     // Capos do NOT move — they claim at range
 
-    // Community expansion: +1 respect, +1 influence, no money
-    let respectGain = 1;
-    let influenceGain = 1;
-    const hasRecruitedSoldier = playerUnits.some(u => u.recruited);
-    if (hasRecruitedSoldier) {
-      respectGain += 1;
-      influenceGain += 1;
-    }
-    state.reputation.respect = Math.min(100, state.reputation.respect + respectGain);
-    state.reputation.streetInfluence = Math.min(100, state.reputation.streetInfluence + influenceGain);
-
-    const claimBonus = hasRecruitedSoldier ? ' (Recruit bonus!)' : '';
-    // Toughness progress for the claiming soldier
+    // Toughness progress for the claiming soldier (still earned for initiating)
     let toughnessMsg = '';
     const claimingSoldier = soldierToMove || playerUnitsOnHex.find(u => u.type === 'soldier');
     if (claimingSoldier && state.soldierStats[claimingSoldier.id]) {
@@ -8215,14 +8206,14 @@ export const useEnhancedMafiaGameState = (
           toughnessMsg = ` 💪 Soldier toughness increased to ${sStats.toughness}!`;
         }
       }
-      // Mark claiming soldier as active
       sStats.actedThisTurn = true;
       sStats.turnsIdle = 0;
     }
 
+    const heatGain = tile.business ? 6 : 3;
     state.pendingNotifications = [...state.pendingNotifications, {
-      type: 'success' as const, title: '🏴 Territory Claimed!',
-      message: `Your family takes ${tile.district} under its wing.${claimBonus} (+${respectGain} Respect, +${influenceGain} Influence)${toughnessMsg}`,
+      type: 'info' as const, title: '⏳ Territory Contested',
+      message: `${tile.district || 'Territory'} is now contested by your family. Hold a unit on or adjacent for 1 turn to finalize the claim. Heat +${heatGain}.${toughnessMsg}`,
     }];
 
     syncLegacyUnits(state);
