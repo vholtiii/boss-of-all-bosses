@@ -5622,10 +5622,11 @@ export const useEnhancedMafiaGameState = (
         if (!tile) continue;
         
         if (tile.controllingFamily === 'neutral' && !tile.business && !tile.isHeadquarters) {
-          tile.controllingFamily = fam;
-          // Hole #5: encroachment check for AI neutral hex claims
-          checkEncroachment(state, tile.q, tile.r, tile.s, fam);
-          aiActionsRemaining--;
+          // A1: AI claim is now PENDING — finalizes after 1 turn of presence.
+          if (applyPendingClaim(state, tile, fam, false)) {
+            checkEncroachment(state, tile.q, tile.r, tile.s, fam);
+            aiActionsRemaining--;
+          }
         }
       }
 
