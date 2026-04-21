@@ -2121,40 +2121,55 @@ export const useEnhancedMafiaGameState = (
       let bonusRespect = 0;
       let pendingClaimHeatGain = 0; // A3: heat applied below if capo auto-claims a neutral hex
       const isWoundedCapo = unit.type === 'capo' && (unit.woundedTurnsRemaining || 0) > 0;
+      let intrusionClearedFamily: string | null = null; // for player-intrudes-on-rival-pending notification
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
-          if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters && unit.type === 'capo' && !isWoundedCapo) {
-            const hasCompletedBusiness = tile.business && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
+          // A1 rival intrusion: clear a rival family's pending claim when player enters
+          let workingTile = tile;
+          if (workingTile.pendingClaim && workingTile.pendingClaim.family !== prev.playerFamily) {
+            intrusionClearedFamily = workingTile.pendingClaim.family;
+            workingTile = { ...workingTile, pendingClaim: undefined };
+          }
+          if (workingTile.controllingFamily === 'neutral' && !workingTile.isHeadquarters && unit.type === 'capo' && !isWoundedCapo) {
+            const hasCompletedBusiness = workingTile.business && !(workingTile.business.constructionProgress !== undefined && workingTile.business.constructionProgress < (workingTile.business.constructionGoal || 3));
             if (hasCompletedBusiness) {
               // Capo auto-extorts any completed business on arrival (legal pays less)
               const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
-              const basePayout = tile.business.isLegal ? 1500 : 3000;
+              const basePayout = workingTile.business.isLegal ? 1500 : 3000;
               bonusMoney = Math.floor(basePayout * respectPayoutMult);
-              bonusRespect = tile.business.isLegal ? 3 : 5;
+              bonusRespect = workingTile.business.isLegal ? 3 : 5;
               autoExtortNotification = {
                 type: 'success' as const,
                 title: '💰 Capo Auto-Extortion!',
-                message: `${unit.name || 'Your Capo'} set up a protection racket on the ${tile.business.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
+                message: `${unit.name || 'Your Capo'} set up a protection racket on the ${workingTile.business.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
               };
               // Auto-extort still finalizes ownership immediately (untouched per plan).
-              return { ...tile, controllingFamily: prev.playerFamily, business: tile.business ? { ...tile.business, isExtorted: true } : undefined };
+              return { ...workingTile, controllingFamily: prev.playerFamily, business: workingTile.business ? { ...workingTile.business, isExtorted: true } : undefined };
             } else {
               // A1: Capo auto-claim now produces a PENDING claim, not finalized.
               // A3: heat applies on initiation.
-              if (!tile.pendingClaim || tile.pendingClaim.family === prev.playerFamily) {
-                pendingClaimHeatGain = tile.business ? 6 : 3;
+              if (!workingTile.pendingClaim || workingTile.pendingClaim.family === prev.playerFamily) {
+                pendingClaimHeatGain = workingTile.business ? 6 : 3;
                 autoExtortNotification = {
                   type: 'info' as const,
                   title: '⏳ Territory Contested',
                   message: `${unit.name || 'Your Capo'} marked this territory. Hold for 1 turn to finalize. Heat +${pendingClaimHeatGain}.`,
                 };
-                return { ...tile, pendingClaim: { family: prev.playerFamily, sinceTurn: prev.turn } };
+                return { ...workingTile, pendingClaim: { family: prev.playerFamily, sinceTurn: prev.turn } };
               }
             }
           }
+          return workingTile;
         }
         return tile;
       });
+      if (intrusionClearedFamily) {
+        const famName = intrusionClearedFamily.charAt(0).toUpperCase() + intrusionClearedFamily.slice(1);
+        prev.pendingNotifications = [...(prev.pendingNotifications || []), {
+          type: 'info' as const, title: '⏳ Rival Claim Broken',
+          message: `Your unit disrupted a ${famName} contested claim — the hex is back to neutral.`,
+        }];
+      }
       // Apply pending-claim heat if capo auto-claim landed a contested hex
       if (pendingClaimHeatGain > 0) {
         prev.policeHeat = prev.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
