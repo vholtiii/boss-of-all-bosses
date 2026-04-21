@@ -2684,6 +2684,7 @@ export const useEnhancedMafiaGameState = (
       let autoExtortNotification: typeof prev.pendingNotifications[0] | null = null;
       let bonusMoney = 0;
       let bonusRespect = 0;
+      let pendingClaimHeatGain = 0; // A3
       const deployedUnit = unitType === 'capo' ? newDeployedUnits.find(u => u.family === family && u.type === 'capo' && u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s) : null;
       const isWoundedCapo = deployedUnit && (deployedUnit.woundedTurnsRemaining || 0) > 0;
       const newHexMap = prev.hexMap.map(tile => {
@@ -2700,14 +2701,20 @@ export const useEnhancedMafiaGameState = (
                 title: '💰 Capo Auto-Extortion!',
                 message: `${deployedUnit?.name || 'Your Capo'} set up a protection racket on the ${tile.business.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
               };
+              // Auto-extort still finalizes ownership immediately (untouched per plan).
+              return { ...tile, controllingFamily: family as any, business: tile.business ? { ...tile.business, isExtorted: true } : undefined };
             } else {
-              autoExtortNotification = {
-                type: 'info' as const,
-                title: '🏴 Territory Claimed',
-                message: `${deployedUnit?.name || 'Your Capo'} claimed this territory on deployment.`,
-              };
+              // A1: pending claim, not finalized
+              if (!tile.pendingClaim || tile.pendingClaim.family === family) {
+                pendingClaimHeatGain = tile.business ? 6 : 3;
+                autoExtortNotification = {
+                  type: 'info' as const,
+                  title: '⏳ Territory Contested',
+                  message: `${deployedUnit?.name || 'Your Capo'} marked this territory on deployment. Hold for 1 turn to finalize. Heat +${pendingClaimHeatGain}.`,
+                };
+                return { ...tile, pendingClaim: { family: family as string, sinceTurn: prev.turn } };
+              }
             }
-            return { ...tile, controllingFamily: family as any, business: tile.business ? { ...tile.business, isExtorted: true } : undefined };
           }
           if (unitType === 'capo' && tile.controllingFamily === family && !tile.isHeadquarters) {
             return tile; // already owned
@@ -2720,6 +2727,10 @@ export const useEnhancedMafiaGameState = (
         newResources = { ...newResources, money: newResources.money + bonusMoney, respect: Math.min(100, (newResources.respect || 0) + bonusRespect) };
         // Sync reputation.respect to match
         prev.reputation.respect = newResources.respect;
+      }
+      if (pendingClaimHeatGain > 0) {
+        prev.policeHeat = prev.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
+        prev.policeHeat.level = Math.min(100, (prev.policeHeat.level || 0) + pendingClaimHeatGain);
       }
 
       const notifications = autoExtortNotification
