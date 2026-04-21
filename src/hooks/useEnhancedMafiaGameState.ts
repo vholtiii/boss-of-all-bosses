@@ -645,6 +645,62 @@ const checkEncroachment = (state: EnhancedMafiaGameState, q: number, r: number, 
   });
 };
 
+// ============ A1/A3/A4 + B3: PENDING CLAIM HELPERS ============
+// Capo fly range (B3): reduced from 5 → 3 to slow expansion.
+const CAPO_FLY_RANGE = 3;
+
+// A4: Diminishing claim rewards based on family's currently-finalized hex count.
+// 1–10 → +1/+1, 11–20 → +0.5/+0.5, 21+ → 0/0.
+const getClaimRewards = (familyHexCount: number): { respect: number; influence: number } => {
+  if (familyHexCount <= 10) return { respect: 1, influence: 1 };
+  if (familyHexCount <= 20) return { respect: 0.5, influence: 0.5 };
+  return { respect: 0, influence: 0 };
+};
+
+// Count hexes a family currently owns (finalized only — pending claims do not count).
+const getFamilyHexCount = (state: EnhancedMafiaGameState, family: string): number =>
+  state.hexMap.filter(t => t.controllingFamily === family).length;
+
+// A1 + A3: Mark a neutral hex as a pending claim.
+// Sets pendingClaim, applies heat (+3, +6 if business). Respect/influence are
+// granted only on finalization at next turn-start.
+const applyPendingClaim = (
+  state: EnhancedMafiaGameState,
+  tile: HexTile,
+  family: string,
+  isPlayer: boolean
+): boolean => {
+  if (!tile || tile.isHeadquarters) return false;
+  if (tile.controllingFamily !== 'neutral') return false;
+  // Don't overwrite a live pending claim from another family — rival intrusion handles that.
+  if (tile.pendingClaim && tile.pendingClaim.family !== family) return false;
+  tile.pendingClaim = { family, sinceTurn: state.turn };
+  // A3: heat applies on claim initiation. Player only.
+  if (isPlayer) {
+    const heatGain = tile.business ? 6 : 3;
+    state.policeHeat = state.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
+    state.policeHeat.level = Math.min(100, (state.policeHeat.level || 0) + heatGain);
+  }
+  return true;
+};
+
+// Rival intrusion: a unit of another family entering a contested hex wastes
+// the claim (cleared, no combat).
+const clearRivalIntrusion = (state: EnhancedMafiaGameState, q: number, r: number, s: number, intrudingFamily: string) => {
+  const tile = state.hexMap.find(t => t.q === q && t.r === r && t.s === s);
+  if (!tile || !tile.pendingClaim) return;
+  if (tile.pendingClaim.family === intrudingFamily) return;
+  const wasPlayerClaim = tile.pendingClaim.family === state.playerFamily;
+  const intruderName = intrudingFamily.charAt(0).toUpperCase() + intrudingFamily.slice(1);
+  tile.pendingClaim = undefined;
+  if (wasPlayerClaim) {
+    state.pendingNotifications = [...(state.pendingNotifications || []), {
+      type: 'warning' as const, title: '⏳ Claim Broken',
+      message: `${intruderName} intruded on your contested ${tile.district || 'territory'} — your claim was wasted.`,
+    }];
+  }
+};
+
 // Hole #4: Check supply sabotage (hex capture severs a supply route)
 const checkSupplySabotage = (state: EnhancedMafiaGameState, capturedQ: number, capturedR: number, capturedS: number, capturingFamily: string) => {
   const allFamilies = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
