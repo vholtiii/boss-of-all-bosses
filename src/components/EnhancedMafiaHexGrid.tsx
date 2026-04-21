@@ -2335,6 +2335,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 { icon: '🎖️', label: 'Promotion Ceremony' },
                 { icon: '🛡️', label: 'Safehouse' },
                 { icon: '⚔️', label: 'Contested (hold 1 turn)' },
+                { icon: '⏳', label: 'Pending Claim (finalize next turn)' },
                 { icon: '⚓', label: 'Supply Node: Docks' },
                 { icon: '🔧', label: 'Supply Node: Union Hall' },
                 { icon: '🚛', label: 'Supply Node: Trucking' },
