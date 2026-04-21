@@ -5395,6 +5395,8 @@ export const useEnhancedMafiaGameState = (
           unit.q = target.q;
           unit.r = target.r;
           unit.s = target.s;
+          // A1: Rival intrusion — AI unit entering a hex pending-claimed by another family clears it.
+          clearRivalIntrusion(state, target.q, target.r, target.s, fam);
 
           const targetTile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
           const isCommunityHex = targetTile && targetTile.controllingFamily === state.playerFamily && !targetTile.business && !targetTile.isHeadquarters;
