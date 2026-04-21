@@ -311,6 +311,9 @@ export interface HexTile {
   erosionCounter?: number;
   expansionCounter?: number;
   expansionInfluencer?: string;
+  // A1: Pending claim — tile is "contested" by a family but not finalized.
+  // Does not count toward victory, district control, or income until finalized.
+  pendingClaim?: { family: string; sinceTurn: number };
 }
 
 export type TurnPhase = 'deploy' | 'move' | 'action' | 'waiting';
@@ -640,6 +643,62 @@ const checkEncroachment = (state: EnhancedMafiaGameState, q: number, r: number, 
       addPairTension(state, claimingFamily, rivalFamily, TENSION_ENCROACHMENT);
     }
   });
+};
+
+// ============ A1/A3/A4 + B3: PENDING CLAIM HELPERS ============
+// Capo fly range (B3): reduced from 5 → 3 to slow expansion.
+const CAPO_FLY_RANGE = 3;
+
+// A4: Diminishing claim rewards based on family's currently-finalized hex count.
+// 1–10 → +1/+1, 11–20 → +0.5/+0.5, 21+ → 0/0.
+const getClaimRewards = (familyHexCount: number): { respect: number; influence: number } => {
+  if (familyHexCount <= 10) return { respect: 1, influence: 1 };
+  if (familyHexCount <= 20) return { respect: 0.5, influence: 0.5 };
+  return { respect: 0, influence: 0 };
+};
+
+// Count hexes a family currently owns (finalized only — pending claims do not count).
+const getFamilyHexCount = (state: EnhancedMafiaGameState, family: string): number =>
+  state.hexMap.filter(t => t.controllingFamily === family).length;
+
+// A1 + A3: Mark a neutral hex as a pending claim.
+// Sets pendingClaim, applies heat (+3, +6 if business). Respect/influence are
+// granted only on finalization at next turn-start.
+const applyPendingClaim = (
+  state: EnhancedMafiaGameState,
+  tile: HexTile,
+  family: string,
+  isPlayer: boolean
+): boolean => {
+  if (!tile || tile.isHeadquarters) return false;
+  if (tile.controllingFamily !== 'neutral') return false;
+  // Don't overwrite a live pending claim from another family — rival intrusion handles that.
+  if (tile.pendingClaim && tile.pendingClaim.family !== family) return false;
+  tile.pendingClaim = { family, sinceTurn: state.turn };
+  // A3: heat applies on claim initiation. Player only.
+  if (isPlayer) {
+    const heatGain = tile.business ? 6 : 3;
+    state.policeHeat = state.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
+    state.policeHeat.level = Math.min(100, (state.policeHeat.level || 0) + heatGain);
+  }
+  return true;
+};
+
+// Rival intrusion: a unit of another family entering a contested hex wastes
+// the claim (cleared, no combat).
+const clearRivalIntrusion = (state: EnhancedMafiaGameState, q: number, r: number, s: number, intrudingFamily: string) => {
+  const tile = state.hexMap.find(t => t.q === q && t.r === r && t.s === s);
+  if (!tile || !tile.pendingClaim) return;
+  if (tile.pendingClaim.family === intrudingFamily) return;
+  const wasPlayerClaim = tile.pendingClaim.family === state.playerFamily;
+  const intruderName = intrudingFamily.charAt(0).toUpperCase() + intrudingFamily.slice(1);
+  tile.pendingClaim = undefined;
+  if (wasPlayerClaim) {
+    state.pendingNotifications = [...(state.pendingNotifications || []), {
+      type: 'warning' as const, title: '⏳ Claim Broken',
+      message: `${intruderName} intruded on your contested ${tile.district || 'territory'} — your claim was wasted.`,
+    }];
+  }
 };
 
 // Hole #4: Check supply sabotage (hex capture severs a supply route)
@@ -1612,9 +1671,9 @@ export const useEnhancedMafiaGameState = (
         (prev.safePassagePacts || []).some(p => p.active && p.targetFamily === family);
 
       if (unitType === 'capo') {
-        // Capo movement — fly up to 5 hexes
+        // Capo movement — fly up to CAPO_FLY_RANGE hexes
         // Capos CAN enter rival hexes with enemy soldiers ONLY if safe passage is active
-        const range = Math.min(5, unit.movesRemaining);
+        const range = Math.min(CAPO_FLY_RANGE, unit.movesRemaining);
         const candidateHexes = getHexesInRange(unit.q, unit.r, unit.s, range);
         const validHexes = candidateHexes.filter(h => {
           const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
@@ -2060,35 +2119,62 @@ export const useEnhancedMafiaGameState = (
       let autoExtortNotification: typeof prev.pendingNotifications[0] | null = null;
       let bonusMoney = 0;
       let bonusRespect = 0;
+      let pendingClaimHeatGain = 0; // A3: heat applied below if capo auto-claims a neutral hex
       const isWoundedCapo = unit.type === 'capo' && (unit.woundedTurnsRemaining || 0) > 0;
+      let intrusionClearedFamily: string | null = null; // for player-intrudes-on-rival-pending notification
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
-          if (tile.controllingFamily === 'neutral' && !tile.isHeadquarters && unit.type === 'capo' && !isWoundedCapo) {
-            const hasCompletedBusiness = tile.business && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
+          // A1 rival intrusion: clear a rival family's pending claim when player enters
+          let workingTile = tile;
+          if (workingTile.pendingClaim && workingTile.pendingClaim.family !== prev.playerFamily) {
+            intrusionClearedFamily = workingTile.pendingClaim.family;
+            workingTile = { ...workingTile, pendingClaim: undefined };
+          }
+          if (workingTile.controllingFamily === 'neutral' && !workingTile.isHeadquarters && unit.type === 'capo' && !isWoundedCapo) {
+            const hasCompletedBusiness = workingTile.business && !(workingTile.business.constructionProgress !== undefined && workingTile.business.constructionProgress < (workingTile.business.constructionGoal || 3));
             if (hasCompletedBusiness) {
               // Capo auto-extorts any completed business on arrival (legal pays less)
               const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
-              const basePayout = tile.business.isLegal ? 1500 : 3000;
+              const basePayout = workingTile.business.isLegal ? 1500 : 3000;
               bonusMoney = Math.floor(basePayout * respectPayoutMult);
-              bonusRespect = tile.business.isLegal ? 3 : 5;
+              bonusRespect = workingTile.business.isLegal ? 3 : 5;
               autoExtortNotification = {
                 type: 'success' as const,
                 title: '💰 Capo Auto-Extortion!',
-                message: `${unit.name || 'Your Capo'} set up a protection racket on the ${tile.business.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
+                message: `${unit.name || 'Your Capo'} set up a protection racket on the ${workingTile.business.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
               };
+              // Auto-extort still finalizes ownership immediately (untouched per plan).
+              return { ...workingTile, controllingFamily: prev.playerFamily, business: workingTile.business ? { ...workingTile.business, isExtorted: true } : undefined };
             } else {
-              // Capo auto-claims empty/legal territory — no money bonus
-              autoExtortNotification = {
-                type: 'info' as const,
-                title: '🏴 Territory Claimed',
-                message: `${unit.name || 'Your Capo'} claimed this territory on arrival.`,
-              };
+              // A1: Capo auto-claim now produces a PENDING claim, not finalized.
+              // A3: heat applies on initiation.
+              if (!workingTile.pendingClaim || workingTile.pendingClaim.family === prev.playerFamily) {
+                pendingClaimHeatGain = workingTile.business ? 6 : 3;
+                autoExtortNotification = {
+                  type: 'info' as const,
+                  title: '⏳ Territory Contested',
+                  message: `${unit.name || 'Your Capo'} marked this territory. Hold for 1 turn to finalize. Heat +${pendingClaimHeatGain}.`,
+                };
+                return { ...workingTile, pendingClaim: { family: prev.playerFamily, sinceTurn: prev.turn } };
+              }
             }
-            return { ...tile, controllingFamily: prev.playerFamily, business: tile.business ? { ...tile.business, isExtorted: true } : undefined };
           }
+          return workingTile;
         }
         return tile;
       });
+      if (intrusionClearedFamily) {
+        const famName = intrusionClearedFamily.charAt(0).toUpperCase() + intrusionClearedFamily.slice(1);
+        prev.pendingNotifications = [...(prev.pendingNotifications || []), {
+          type: 'info' as const, title: '⏳ Rival Claim Broken',
+          message: `Your unit disrupted a ${famName} contested claim — the hex is back to neutral.`,
+        }];
+      }
+      // Apply pending-claim heat if capo auto-claim landed a contested hex
+      if (pendingClaimHeatGain > 0) {
+        prev.policeHeat = prev.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
+        prev.policeHeat.level = Math.min(100, (prev.policeHeat.level || 0) + pendingClaimHeatGain);
+      }
 
       // Apply capo extortion bonuses
       let newResources = prev.resources;
@@ -2102,7 +2188,7 @@ export const useEnhancedMafiaGameState = (
       // After free move or if moves remain, recalculate available hexes
       if (updatedUnit.movesRemaining > 0 || isFreeMove) {
         if (updatedUnit.type === 'capo') {
-          const range = Math.min(5, updatedUnit.movesRemaining);
+          const range = Math.min(CAPO_FLY_RANGE, updatedUnit.movesRemaining);
           const candidates = getHexesInRange(updatedUnit.q, updatedUnit.r, updatedUnit.s, range);
           newAvailableMoves = candidates.filter(h => {
             const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
@@ -2521,8 +2607,8 @@ export const useEnhancedMafiaGameState = (
             const safehouseNeighbors = getHexNeighbors(sh.q, sh.r, sh.s);
             candidates = [...candidates, ...safehouseNeighbors];
           } else {
-            // Capos can deploy up to 5 hexes from safehouse
-            const safehouseRange = getHexesInRange(sh.q, sh.r, sh.s, 5);
+            // Capos can deploy up to CAPO_FLY_RANGE hexes from safehouse
+            const safehouseRange = getHexesInRange(sh.q, sh.r, sh.s, CAPO_FLY_RANGE);
             candidates = [...candidates, ...safehouseRange];
           }
         }
@@ -2613,6 +2699,7 @@ export const useEnhancedMafiaGameState = (
       let autoExtortNotification: typeof prev.pendingNotifications[0] | null = null;
       let bonusMoney = 0;
       let bonusRespect = 0;
+      let pendingClaimHeatGain = 0; // A3
       const deployedUnit = unitType === 'capo' ? newDeployedUnits.find(u => u.family === family && u.type === 'capo' && u.q === targetLocation.q && u.r === targetLocation.r && u.s === targetLocation.s) : null;
       const isWoundedCapo = deployedUnit && (deployedUnit.woundedTurnsRemaining || 0) > 0;
       const newHexMap = prev.hexMap.map(tile => {
@@ -2629,14 +2716,20 @@ export const useEnhancedMafiaGameState = (
                 title: '💰 Capo Auto-Extortion!',
                 message: `${deployedUnit?.name || 'Your Capo'} set up a protection racket on the ${tile.business.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
               };
+              // Auto-extort still finalizes ownership immediately (untouched per plan).
+              return { ...tile, controllingFamily: family as any, business: tile.business ? { ...tile.business, isExtorted: true } : undefined };
             } else {
-              autoExtortNotification = {
-                type: 'info' as const,
-                title: '🏴 Territory Claimed',
-                message: `${deployedUnit?.name || 'Your Capo'} claimed this territory on deployment.`,
-              };
+              // A1: pending claim, not finalized
+              if (!tile.pendingClaim || tile.pendingClaim.family === family) {
+                pendingClaimHeatGain = tile.business ? 6 : 3;
+                autoExtortNotification = {
+                  type: 'info' as const,
+                  title: '⏳ Territory Contested',
+                  message: `${deployedUnit?.name || 'Your Capo'} marked this territory on deployment. Hold for 1 turn to finalize. Heat +${pendingClaimHeatGain}.`,
+                };
+                return { ...tile, pendingClaim: { family: family as string, sinceTurn: prev.turn } };
+              }
             }
-            return { ...tile, controllingFamily: family as any, business: tile.business ? { ...tile.business, isExtorted: true } : undefined };
           }
           if (unitType === 'capo' && tile.controllingFamily === family && !tile.isHeadquarters) {
             return tile; // already owned
@@ -2649,6 +2742,10 @@ export const useEnhancedMafiaGameState = (
         newResources = { ...newResources, money: newResources.money + bonusMoney, respect: Math.min(100, (newResources.respect || 0) + bonusRespect) };
         // Sync reputation.respect to match
         prev.reputation.respect = newResources.respect;
+      }
+      if (pendingClaimHeatGain > 0) {
+        prev.policeHeat = prev.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
+        prev.policeHeat.level = Math.min(100, (prev.policeHeat.level || 0) + pendingClaimHeatGain);
       }
 
       const notifications = autoExtortNotification
@@ -2785,6 +2882,60 @@ export const useEnhancedMafiaGameState = (
       newState.incomingSitdowns = newState.incomingSitdowns.filter(s => s.expiresOnTurn > newState.turn + 1);
       
       newState.turn += 1;
+
+      // ============ A1: PENDING CLAIM FINALIZATION ============
+      // For every hex with a pendingClaim from the previous turn:
+      //   • If a friendly unit is on or adjacent → finalize (controllingFamily = family),
+      //     grant diminishing-return respect/influence (A4).
+      //   • Else → revert to neutral (claim wasted, no refund).
+      const finalizedByFam: Record<string, number> = {};
+      const wastedByFam: Record<string, number> = {};
+      for (const tile of newState.hexMap) {
+        if (!tile.pendingClaim) continue;
+        const claimFam = tile.pendingClaim.family;
+        const sinceTurn = tile.pendingClaim.sinceTurn;
+        // Only resolve claims initiated on a previous turn (1+ turn presence required).
+        if (newState.turn <= sinceTurn) continue;
+        const onHex = newState.deployedUnits.some(u => u.family === claimFam && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+        const adjUnit = !onHex && getHexNeighbors(tile.q, tile.r, tile.s).some(n =>
+          newState.deployedUnits.some(u => u.family === claimFam && u.q === n.q && u.r === n.r && u.s === n.s)
+        );
+        if (onHex || adjUnit) {
+          // Finalize
+          tile.controllingFamily = claimFam as any;
+          tile.pendingClaim = undefined;
+          finalizedByFam[claimFam] = (finalizedByFam[claimFam] || 0) + 1;
+          // A4: diminishing returns — count this family's hex total *before* increment so first ones get full reward
+          if (claimFam === newState.playerFamily) {
+            const hexCount = getFamilyHexCount(newState, claimFam); // includes the tile we just finalized
+            const rewards = getClaimRewards(hexCount);
+            if (rewards.respect > 0) newState.reputation.respect = Math.min(100, newState.reputation.respect + rewards.respect);
+            if (rewards.influence > 0) newState.reputation.streetInfluence = Math.min(100, newState.reputation.streetInfluence + rewards.influence);
+          }
+        } else {
+          // Revert
+          tile.pendingClaim = undefined;
+          wastedByFam[claimFam] = (wastedByFam[claimFam] || 0) + 1;
+        }
+      }
+      const playerFinalized = finalizedByFam[newState.playerFamily] || 0;
+      const playerWasted = wastedByFam[newState.playerFamily] || 0;
+      if (playerFinalized > 0) {
+        const tier = getClaimRewards(getFamilyHexCount(newState, newState.playerFamily));
+        const rewardLabel = tier.respect === 0
+          ? 'no prestige (saturated empire)'
+          : `+${tier.respect} Respect, +${tier.influence} Influence per hex`;
+        newState.pendingNotifications = [...(newState.pendingNotifications || []), {
+          type: 'success' as const, title: '🏴 Territory Secured',
+          message: `Finalized ${playerFinalized} contested ${playerFinalized === 1 ? 'hex' : 'hexes'} (${rewardLabel}).`,
+        }];
+      }
+      if (playerWasted > 0) {
+        newState.pendingNotifications = [...(newState.pendingNotifications || []), {
+          type: 'warning' as const, title: '⏳ Claims Wasted',
+          message: `${playerWasted} contested ${playerWasted === 1 ? 'hex' : 'hexes'} reverted to neutral — no unit on or adjacent.`,
+        }];
+      }
 
       // ============ CONTESTED HEX RESOLUTION ============
       newState.contestedHexes = newState.contestedHexes || [];
@@ -5244,6 +5395,8 @@ export const useEnhancedMafiaGameState = (
           unit.q = target.q;
           unit.r = target.r;
           unit.s = target.s;
+          // A1: Rival intrusion — AI unit entering a hex pending-claimed by another family clears it.
+          clearRivalIntrusion(state, target.q, target.r, target.s, fam);
 
           const targetTile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
           const isCommunityHex = targetTile && targetTile.controllingFamily === state.playerFamily && !targetTile.business && !targetTile.isHeadquarters;
@@ -5438,10 +5591,10 @@ export const useEnhancedMafiaGameState = (
                 const isNeutral = prevOwner === 'neutral';
                 
                 if (isNeutral) {
-                  // Neutral hex: capos auto-claim (matches player rules), soldiers don't
+                  // A1: AI capo auto-claim now produces PENDING claim, not finalized.
                   if (unit.type === 'capo') {
-                    tile.controllingFamily = fam;
-                    // Hole #5: encroachment check for neutral claims by AI
+                    applyPendingClaim(state, tile, fam, false);
+                    // Hole #5: encroachment check still triggers on claim attempt
                     checkEncroachment(state, target.q, target.r, target.s, fam);
                   }
                 } else {
@@ -5540,10 +5693,11 @@ export const useEnhancedMafiaGameState = (
         if (!tile) continue;
         
         if (tile.controllingFamily === 'neutral' && !tile.business && !tile.isHeadquarters) {
-          tile.controllingFamily = fam;
-          // Hole #5: encroachment check for AI neutral hex claims
-          checkEncroachment(state, tile.q, tile.r, tile.s, fam);
-          aiActionsRemaining--;
+          // A1: AI claim is now PENDING — finalizes after 1 turn of presence.
+          if (applyPendingClaim(state, tile, fam, false)) {
+            checkEncroachment(state, tile.q, tile.r, tile.s, fam);
+            aiActionsRemaining--;
+          }
         }
       }
 
@@ -8115,12 +8269,15 @@ export const useEnhancedMafiaGameState = (
     const playerUnits = [...playerUnitsOnHex, ...playerUnitsAdjacent];
     if (playerUnits.length === 0) return state;
 
-    tile.controllingFamily = state.playerFamily;
-    // Hole #5: check encroachment on neutral hex claims
+    // A1 + A3: claim is now PENDING — hex enters contested state, awaits 1 turn
+    // of presence to finalize. Heat applies on initiation.
+    const claimed = applyPendingClaim(state, tile, state.playerFamily, true);
+    if (!claimed) return state;
+    // Hole #5: encroachment tension still triggers on claim *attempt*
     checkEncroachment(state, targetQ, targetR, targetS, state.playerFamily);
 
-    // Auto-move: move the selected soldier to the claimed hex (fall back to first adjacent soldier)
-    const selectedSoldier = action.unitId 
+    // Auto-move: move the selected soldier to the contested hex (fall back to first adjacent soldier)
+    const selectedSoldier = action.unitId
       ? playerUnits.find(u => u.id === action.unitId && u.type === 'soldier')
       : null;
     const soldierToMove = selectedSoldier || playerUnitsAdjacent.find(u => u.type === 'soldier');
@@ -8131,19 +8288,7 @@ export const useEnhancedMafiaGameState = (
     }
     // Capos do NOT move — they claim at range
 
-    // Community expansion: +1 respect, +1 influence, no money
-    let respectGain = 1;
-    let influenceGain = 1;
-    const hasRecruitedSoldier = playerUnits.some(u => u.recruited);
-    if (hasRecruitedSoldier) {
-      respectGain += 1;
-      influenceGain += 1;
-    }
-    state.reputation.respect = Math.min(100, state.reputation.respect + respectGain);
-    state.reputation.streetInfluence = Math.min(100, state.reputation.streetInfluence + influenceGain);
-
-    const claimBonus = hasRecruitedSoldier ? ' (Recruit bonus!)' : '';
-    // Toughness progress for the claiming soldier
+    // Toughness progress for the claiming soldier (still earned for initiating)
     let toughnessMsg = '';
     const claimingSoldier = soldierToMove || playerUnitsOnHex.find(u => u.type === 'soldier');
     if (claimingSoldier && state.soldierStats[claimingSoldier.id]) {
@@ -8156,14 +8301,14 @@ export const useEnhancedMafiaGameState = (
           toughnessMsg = ` 💪 Soldier toughness increased to ${sStats.toughness}!`;
         }
       }
-      // Mark claiming soldier as active
       sStats.actedThisTurn = true;
       sStats.turnsIdle = 0;
     }
 
+    const heatGain = tile.business ? 6 : 3;
     state.pendingNotifications = [...state.pendingNotifications, {
-      type: 'success' as const, title: '🏴 Territory Claimed!',
-      message: `Your family takes ${tile.district} under its wing.${claimBonus} (+${respectGain} Respect, +${influenceGain} Influence)${toughnessMsg}`,
+      type: 'info' as const, title: '⏳ Territory Contested',
+      message: `${tile.district || 'Territory'} is now contested by your family. Hold a unit on or adjacent for 1 turn to finalize the claim. Heat +${heatGain}.${toughnessMsg}`,
     }];
 
     syncLegacyUnits(state);
