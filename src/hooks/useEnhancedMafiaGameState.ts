@@ -5520,10 +5520,10 @@ export const useEnhancedMafiaGameState = (
                 const isNeutral = prevOwner === 'neutral';
                 
                 if (isNeutral) {
-                  // Neutral hex: capos auto-claim (matches player rules), soldiers don't
+                  // A1: AI capo auto-claim now produces PENDING claim, not finalized.
                   if (unit.type === 'capo') {
-                    tile.controllingFamily = fam;
-                    // Hole #5: encroachment check for neutral claims by AI
+                    applyPendingClaim(state, tile, fam, false);
+                    // Hole #5: encroachment check still triggers on claim attempt
                     checkEncroachment(state, target.q, target.r, target.s, fam);
                   }
                 } else {
