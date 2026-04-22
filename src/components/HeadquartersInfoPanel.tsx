@@ -181,7 +181,6 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (isDraggingRef.current) return;
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         onClose();
       }
