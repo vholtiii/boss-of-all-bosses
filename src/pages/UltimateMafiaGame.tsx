@@ -629,10 +629,88 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               ? 'bg-destructive/20 border-destructive/40 text-destructive'
               : 'bg-amber-500/20 border-amber-500/30 text-amber-400';
           const threatLabel = threatCount === 0 ? '✓' : threatHasIncoming ? '⚠' : '';
+          const threatSections = buildThreatSections(gameState);
+          const popoverEmptyTone = 'text-emerald-400/80';
           const threatBadge = (
-            <span className={cn('px-2 py-0.5 rounded-full text-[10px] border', threatTone, threatHasIncoming && 'animate-pulse')}>
-              🚨 Threats: {threatCount} {threatLabel}
-            </span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  data-no-sound
+                  className={cn(
+                    'px-2 py-0.5 rounded-full text-[10px] border cursor-pointer hover:brightness-125 transition',
+                    threatTone,
+                    threatHasIncoming && 'animate-pulse'
+                  )}
+                >
+                  🚨 Threats: {threatCount} {threatLabel}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="center" sideOffset={6} className="w-80 max-h-[480px] overflow-y-auto p-2 bg-card border-border">
+                {threatSections.length === 0 ? (
+                  <p className={cn('text-xs italic px-2 py-3 text-center', popoverEmptyTone)}>
+                    ✓ All clear. No active threats.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {threatSections.map(section => (
+                      <div key={section.id}>
+                        <div className="flex items-center gap-1.5 px-1 mb-1">
+                          <span className="text-[11px]">{section.iconEmoji}</span>
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            {section.title}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/60">({section.rows.length})</span>
+                        </div>
+                        <div className="space-y-0.5">
+                          {section.rows.map(row => {
+                            const clickable = !!(row.hex && row.unitType);
+                            return (
+                              <button
+                                key={row.id}
+                                type="button"
+                                data-no-sound
+                                disabled={!clickable}
+                                onClick={() => {
+                                  if (clickable && row.hex && row.unitType) {
+                                    selectUnit(row.unitType as 'soldier' | 'capo', row.hex);
+                                  }
+                                }}
+                                className={cn(
+                                  'w-full text-left rounded border px-2 py-1 flex items-center justify-between gap-2 transition-colors',
+                                  row.severity === 'critical'
+                                    ? 'border-destructive/30 bg-destructive/5'
+                                    : 'border-border bg-background/40',
+                                  clickable
+                                    ? 'cursor-pointer hover:bg-accent/40 hover:border-primary/40'
+                                    : 'cursor-default opacity-90'
+                                )}
+                              >
+                                <span className="text-[11px] font-medium text-foreground truncate">
+                                  {row.label}
+                                </span>
+                                {row.badge && (
+                                  <span
+                                    className={cn(
+                                      'text-[9px] h-4 px-1.5 rounded border shrink-0 inline-flex items-center',
+                                      row.badge.tone === 'danger' && 'bg-destructive/20 border-destructive/40 text-destructive',
+                                      row.badge.tone === 'warn' && 'bg-amber-500/20 border-amber-500/40 text-amber-400',
+                                      row.badge.tone === 'muted' && 'bg-muted/30 border-muted text-muted-foreground'
+                                    )}
+                                  >
+                                    {row.badge.text}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
           );
 
           if (!hasCooldowns && expiringPacts.length === 0 && totalSoldiers === 0) {
