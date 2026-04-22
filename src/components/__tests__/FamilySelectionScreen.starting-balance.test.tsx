@@ -6,7 +6,7 @@ const EXPECTED = {
   genovese: { money: 45000, soldiers: 4, influence: 15, politicalPower: 25, respect: 25 },
   lucchese: { money: 70000, soldiers: 3, influence: 12, politicalPower: 20, respect: 10 },
   bonanno: { money: 40000, soldiers: 2, influence: 8, politicalPower: 15, respect: 25 },
-  colombo: { money: 35000, soldiers: 1, influence: 10, politicalPower: 10, respect: 15 },
+  colombo: { money: 35000, soldiers: 1, influence: 12.5, politicalPower: 10, respect: 15 },
 } as const;
 
 describe("FamilySelectionScreen starting balance", () => {
@@ -24,13 +24,13 @@ describe("FamilySelectionScreen starting balance", () => {
     }
   );
 
-  it("influence ladder: gambino > genovese > lucchese > colombo > bonanno", () => {
+  it("influence ladder: gambino > genovese > colombo > lucchese > bonanno", () => {
     const inf = (id: string) =>
       FAMILIES.find((f) => f.id === id)!.startingResources.influence;
     expect(inf("gambino")).toBeGreaterThan(inf("genovese"));
-    expect(inf("genovese")).toBeGreaterThan(inf("lucchese"));
-    expect(inf("lucchese")).toBeGreaterThan(inf("colombo"));
-    expect(inf("colombo")).toBeGreaterThan(inf("bonanno"));
+    expect(inf("genovese")).toBeGreaterThan(inf("colombo"));
+    expect(inf("colombo")).toBeGreaterThan(inf("lucchese"));
+    expect(inf("lucchese")).toBeGreaterThan(inf("bonanno"));
   });
 
   it("respect floor: no family starts below 10", () => {

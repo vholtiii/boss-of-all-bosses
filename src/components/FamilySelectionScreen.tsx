@@ -133,7 +133,7 @@ export const FAMILIES: FamilyInfo[] = [
     powerEffect: 'Instantly promote a soldier to capo when one of your capos is killed. Reactive trigger — no turn required.',
     powerCost: '1 Tactical Action',
     powerCooldown: 'Once per game',
-    startingResources: { money: 35000, soldiers: 1, influence: 10, politicalPower: 10, respect: 15 },
+    startingResources: { money: 35000, soldiers: 1, influence: 12.5, politicalPower: 10, respect: 15 },
   },
 ];
 
