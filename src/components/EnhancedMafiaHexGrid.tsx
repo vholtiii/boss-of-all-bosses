@@ -2385,14 +2385,15 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             <div className="border-t border-border pt-1.5 mt-1.5">
               <div className="text-[10px] font-bold text-foreground/80 uppercase tracking-wider mb-1">Rival Unit Visibility</div>
               {[
-                'Scout intel (fresh)',
-                'Rat (flipped soldier in their family)',
-                'Captain bribe (target family only)',
-                'Chief / Mayor bribe (all rivals)',
-                'Active alliance or supply deal',
-                'On your claimed territory',
-                'Capo vision (within 2 hexes)',
-                'Rival HQ hex',
+                'Scout intel (fresh, per-hex)',
+                'Rat (flipped soldier inside their family)',
+                'Captain bribe — TARGET family only',
+                'Chief bribe — ALL rivals (map-wide)',
+                'Mayor bribe — ALL rivals (map-wide)',
+                'Active alliance or supply deal (that rival)',
+                'Rival on your claimed territory',
+                'Capo vision (within 2 hexes of your capo)',
+                'Rival HQ hex (always public)',
               ].map(label => (
                 <div key={label} className="text-[10px] text-muted-foreground">• {label}</div>
               ))}

@@ -92,10 +92,10 @@ export interface BribeTierConfig {
 }
 
 export const BRIBE_TIERS: BribeTierConfig[] = [
-  { tier: 'patrol_officer', label: 'Patrol Officer', cost: 500, baseSuccess: 80, duration: 3, description: '-30% street heat, -2 heat/turn' },
-  { tier: 'police_captain', label: 'Police Captain', cost: 2000, baseSuccess: 60, duration: 5, description: '20% economic pressure + reveals target family positions & intel' },
-  { tier: 'police_chief', label: 'Police Chief', cost: 8000, baseSuccess: 40, duration: 7, description: '+50% intel + reveals all rival positions & movements' },
-  { tier: 'mayor', label: 'Mayor', cost: 25000, baseSuccess: 25, duration: 10, description: 'Shut down rival territory + full map intel & movements' },
+  { tier: 'patrol_officer', label: 'Patrol Officer', cost: 500, baseSuccess: 80, duration: 3, description: '-30% street heat, -2 heat/turn (no intel)' },
+  { tier: 'police_captain', label: 'Police Captain', cost: 2000, baseSuccess: 60, duration: 5, description: '20% economic pressure + reveals TARGET family units & fortifications (target-scoped)' },
+  { tier: 'police_chief', label: 'Police Chief', cost: 8000, baseSuccess: 40, duration: 7, description: '+50% intel + reveals ALL rivals\' units & movements (map-wide)' },
+  { tier: 'mayor', label: 'Mayor', cost: 25000, baseSuccess: 25, duration: 10, description: 'Shut down rival territory + ALL rivals\' units & full map intel (map-wide)' },
 ];
 
 export interface BribeContract {

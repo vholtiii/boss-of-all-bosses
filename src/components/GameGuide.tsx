@@ -239,7 +239,7 @@ const sections: GuideSection[] = [
         </div>
         <Stat label="Intel Decay" value="Fresh → Stale over time" color="text-yellow-400" />
         <Tip>Fresh intel gives combat bonuses. Re-scout before major attacks!</Tip>
-        <Tip>Soldiers can't see rival units by proximity. Reveal via scout, rat, Captain bribe (one family), Chief/Mayor bribe (all families), pact, or capo vision.</Tip>
+        <Tip>Soldiers can't see rival units by proximity. Reveal via scout, rat in their family, Captain bribe (target family only), Chief/Mayor bribe (all rivals, map-wide), pact, or capo vision.</Tip>
       </div>
     ),
   },
@@ -259,10 +259,10 @@ const sections: GuideSection[] = [
         </div>
         <div className="space-y-1">
           <p className="text-xs font-semibold">Corruption Tiers:</p>
-          <Stat label="Patrol Officer" value="Small heat reduction" />
-          <Stat label="Police Captain" value="Moderate + reveals fortifications" />
-          <Stat label="Police Chief" value="Large reduction + map intel" />
-          <Stat label="Mayor" value="Maximum protection" />
+          <Stat label="Patrol Officer" value="Small heat reduction (no intel)" />
+          <Stat label="Police Captain" value="Reveals TARGET family's units & fortifications" />
+          <Stat label="Police Chief" value="Reveals ALL rivals' units & intel (map-wide)" />
+          <Stat label="Mayor" value="Full map intel + maximum protection (all rivals)" />
         </div>
         <div className="space-y-1">
           <p className="text-xs font-semibold">Counter-Heat Actions:</p>
