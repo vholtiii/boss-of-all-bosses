@@ -599,6 +599,8 @@ export const TACTICAL_ACTIONS_PER_TURN = 3;
 export interface HiddenUnit {
   unitId: string;
   returnsOnTurn: number;
+  /** Owning family — defaults to player on legacy entries. Required for AI parity. */
+  family?: string;
 }
 
 export interface AIBounty {

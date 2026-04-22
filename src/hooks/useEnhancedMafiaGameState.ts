@@ -1098,7 +1098,7 @@ const createInitialGameState = (
         otherFamilies.forEach(x => { relationships[x] = Math.floor(Math.random() * 40) - 20; });
         return {
           family: f, personality: p.personality,
-          resources: { money: 35000 + Math.floor(Math.random() * 15000), soldiers: 2, influence: 8 + Math.floor(Math.random() * 8), respect: 15 + Math.floor(Math.random() * 10) },
+          resources: { money: 35000 + Math.floor(Math.random() * 15000), soldiers: 2, influence: 8 + Math.floor(Math.random() * 8), respect: 15 + Math.floor(Math.random() * 10), heat: 0 },
           strategy: { primaryGoal: p.primaryGoal, riskTolerance: p.riskTolerance, aggressionLevel: p.aggressionLevel, cooperationTendency: p.cooperationTendency, focusAreas: p.focusAreas },
           relationships, lastAction: null, nextAction: null,
         };
@@ -3031,46 +3031,63 @@ export const useEnhancedMafiaGameState = (
       (newState as any).abandonedThisTurn = 0;
 
       // ============ HIDDEN UNITS RETURN / INTERNAL HIT CHECK ============
+      // Now family-aware: AI hidden soldiers (from civilian hits during AI turns) return to their own HQ.
       const returningUnits = newState.hiddenUnits.filter(h => newState.turn >= h.returnsOnTurn);
       if (returningUnits.length > 0) {
-        const hq = newState.headquarters[newState.playerFamily];
         let returnedCount = 0;
         let eliminatedCount = 0;
+        let aiReturnedCount = 0;
+        let aiEliminatedCount = 0;
 
         returningUnits.forEach(h => {
           const stats = newState.soldierStats[h.unitId];
           const loyalty = stats?.loyalty ?? 50;
+          const ownerFam = h.family || newState.playerFamily;
+          const isPlayer = ownerFam === newState.playerFamily;
 
           if (loyalty < INTERNAL_HIT_LOYALTY_THRESHOLD) {
             // ===== INTERNAL FAMILY HIT: soldier eliminated =====
-            eliminatedCount++;
-            if (turnReport) turnReport.resourceDeltas.soldiers--;
-            delete newState.soldierStats[h.unitId];
+            if (isPlayer) {
+              eliminatedCount++;
+              if (turnReport) turnReport.resourceDeltas.soldiers--;
+              delete newState.soldierStats[h.unitId];
 
-            // Heat reduction — family cleaned up its mess
-            newState.policeHeat.level = Math.max(0, newState.policeHeat.level - INTERNAL_HIT_HEAT_REDUCTION);
+              // Heat reduction — family cleaned up its mess
+              newState.policeHeat.level = Math.max(0, newState.policeHeat.level - INTERNAL_HIT_HEAT_REDUCTION);
 
-            // Morale risk: each remaining soldier may lose loyalty
-            Object.keys(newState.soldierStats).forEach(sid => {
-              if (Math.random() < INTERNAL_HIT_MORALE_RISK) {
-                newState.soldierStats[sid] = {
-                  ...newState.soldierStats[sid],
-                  loyalty: Math.max(0, newState.soldierStats[sid].loyalty - INTERNAL_HIT_MORALE_PENALTY),
-                };
+              // Morale risk: each remaining soldier may lose loyalty
+              Object.keys(newState.soldierStats).forEach(sid => {
+                if (Math.random() < INTERNAL_HIT_MORALE_RISK) {
+                  newState.soldierStats[sid] = {
+                    ...newState.soldierStats[sid],
+                    loyalty: Math.max(0, newState.soldierStats[sid].loyalty - INTERNAL_HIT_MORALE_PENALTY),
+                  };
+                }
+              });
+
+              newState.pendingNotifications.push({
+                type: 'error',
+                title: '🔪 Internal Family Hit',
+                message: `A disloyal soldier (loyalty: ${loyalty}/${INTERNAL_HIT_LOYALTY_THRESHOLD}) was eliminated by the family. -${INTERNAL_HIT_HEAT_REDUCTION} heat. Warning: remaining crew morale may suffer.`,
+              });
+            } else {
+              aiEliminatedCount++;
+              delete newState.soldierStats[h.unitId];
+              const opp = newState.aiOpponents.find(o => o.family === ownerFam);
+              if (opp) {
+                opp.resources.soldiers = Math.max(0, opp.resources.soldiers - 1);
+                opp.resources.heat = Math.max(0, (opp.resources.heat || 0) - INTERNAL_HIT_HEAT_REDUCTION);
               }
-            });
-
-            newState.pendingNotifications.push({
-              type: 'error',
-              title: '🔪 Internal Family Hit',
-              message: `A disloyal soldier (loyalty: ${loyalty}/${INTERNAL_HIT_LOYALTY_THRESHOLD}) was eliminated by the family. -${INTERNAL_HIT_HEAT_REDUCTION} heat. Warning: remaining crew morale may suffer.`,
-            });
+              if (turnReport) turnReport.aiActions.push({ family: ownerFam, action: 'internal_hit', detail: `Eliminated a disloyal soldier returning from hiding (loyalty ${loyalty})` });
+            }
           } else {
             // ===== LOYAL SOLDIER: returns to HQ =====
-            returnedCount++;
+            const hq = newState.headquarters[ownerFam];
+            if (!hq) return;
+            if (isPlayer) returnedCount++; else aiReturnedCount++;
             newState.deployedUnits.push({
               id: h.unitId,
-              family: newState.playerFamily,
+              family: ownerFam as any,
               type: 'soldier',
               q: hq.q, r: hq.r, s: hq.s,
               movesRemaining: 0,
@@ -3099,6 +3116,8 @@ export const useEnhancedMafiaGameState = (
         if (turnReport) {
           if (returnedCount > 0) turnReport.events.push(`${returnedCount} soldier(s) returned from hiding.`);
           if (eliminatedCount > 0) turnReport.events.push(`🔪 Internal hit: ${eliminatedCount} disloyal soldier(s) eliminated by the family (loyalty below ${INTERNAL_HIT_LOYALTY_THRESHOLD}). -${INTERNAL_HIT_HEAT_REDUCTION} heat each. Morale risk applied.`);
+          if (aiReturnedCount > 0) turnReport.events.push(`🕵️ ${aiReturnedCount} rival soldier(s) returned from hiding to their HQ.`);
+          if (aiEliminatedCount > 0) turnReport.events.push(`🔪 ${aiEliminatedCount} rival soldier(s) eliminated internally after disloyal return from hiding.`);
         }
 
       }
@@ -5008,6 +5027,101 @@ export const useEnhancedMafiaGameState = (
     }).filter(b => b.active);
   };
 
+  // ============ AI HIT PARITY HELPERS ============
+  // These helpers mirror the player-hit consequences so AI hits incur the same risks.
+
+  /** True if the given family has a fresh-or-stale scout entry on this hex. */
+  const aiHasScoutIntel = (state: EnhancedMafiaGameState, _fam: string, q: number, r: number, s: number): boolean => {
+    // ScoutedHex is a shared global pool (no scouter-family tag). For parity purposes,
+    // any active scout entry counts as intel. AI scouts via Dellacroce or proximity proxy.
+    return (state.scoutedHexes || []).some(h => h.q === q && h.r === r && h.s === s);
+  };
+
+  /** Apply tier-scaled heat to the AI family's resources.heat (mirrors player policeHeat). */
+  const applyAIHeat = (state: EnhancedMafiaGameState, fam: string, totalUnits: number, hitType: 'scouted' | 'blind' | 'planned') => {
+    const opp = state.aiOpponents.find(o => o.family === fam);
+    if (!opp) return;
+    let baseHeat = Math.min(25, 8 + totalUnits * 2);
+    if (hitType === 'scouted') baseHeat = Math.floor(baseHeat / 2);
+    else if (hitType === 'blind') baseHeat = Math.floor(baseHeat * 1.5);
+    opp.resources.heat = Math.min(100, (opp.resources.heat || 0) + baseHeat);
+  };
+
+  /** AI commits a civilian hit on an unscouted empty rival hex — max heat, soldier hides. */
+  const applyAICivilianHit = (state: EnhancedMafiaGameState, fam: string, attackerUnit: any, districtName: string, turnReport?: TurnReport) => {
+    const opp = state.aiOpponents.find(o => o.family === fam);
+    if (opp) opp.resources.heat = 100;
+    // Remove attacker from board → hidden roster, return check on loyalty after HIDING_DURATION turns.
+    const idx = state.deployedUnits.indexOf(attackerUnit);
+    if (idx !== -1) state.deployedUnits.splice(idx, 1);
+    state.hiddenUnits = [...(state.hiddenUnits || []), {
+      unitId: attackerUnit.id,
+      family: fam,
+      returnsOnTurn: state.turn + HIDING_DURATION,
+    }];
+    const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
+    state.pendingNotifications.push({
+      type: 'info' as const,
+      title: `💀 ${famLabel} Civilian Hit`,
+      message: `The ${fam} family hit an empty rival hex in ${districtName} — civilians caught in the crossfire. Their heat maxed out and a soldier vanished into hiding.`,
+    });
+    if (turnReport) turnReport.aiActions.push({ family: fam, action: 'civilian_hit', detail: `Blind hit on civilians in ${districtName} — heat maxed, soldier in hiding` });
+  };
+
+  /** Place a bounty on the AI family from the targeted rival (mirrors player blind-hit bounty). */
+  const placeBountyOnAI = (state: EnhancedMafiaGameState, attackerFam: string, victimFam: string, turnReport?: TurnReport) => {
+    if (!victimFam || victimFam === attackerFam || victimFam === 'neutral') return;
+    state.aiBounties = [...(state.aiBounties || []), {
+      targetFamily: attackerFam,
+      fromFamily: victimFam,
+      expiresOnTurn: state.turn + BOUNTY_DURATION,
+    }];
+    if (turnReport) turnReport.aiActions.push({ family: attackerFam, action: 'bounty_placed', detail: `${victimFam} placed a bounty on the ${attackerFam} family for ${BOUNTY_DURATION} turns` });
+  };
+
+  /** Break alliances/ceasefires when AI attacks a pact-bound family. Applies same penalties as player. */
+  const applyAIDiplomacyPenalties = (state: EnhancedMafiaGameState, attackerFam: string, victimFam: string, turnReport?: TurnReport) => {
+    if (!victimFam || victimFam === attackerFam) return;
+    const attacker = state.aiOpponents.find(o => o.family === attackerFam);
+    if (!attacker) return;
+
+    // Ceasefire break (player ↔ AI)
+    if (victimFam === state.playerFamily) {
+      const cfIdx = (state.ceasefires || []).findIndex(c => c.active && c.family === attackerFam);
+      if (cfIdx !== -1) {
+        state.ceasefires[cfIdx].active = false;
+        attacker.resources.respect = Math.max(0, (attacker.resources.respect || 0) - 15);
+        state.pendingNotifications.push({
+          type: 'warning' as const,
+          title: '⚠️ Ceasefire Broken!',
+          message: `The ${attackerFam} family attacked you, breaking your ceasefire. Their respect dropped 15.`,
+        });
+        if (turnReport) turnReport.aiActions.push({ family: attackerFam, action: 'ceasefire_break', detail: `Broke ceasefire with you — lost 15 respect` });
+      }
+      // Alliance break
+      const aIdx = (state.alliances || []).findIndex(a => a.active && a.alliedFamily === attackerFam);
+      if (aIdx !== -1) {
+        state.alliances[aIdx].active = false;
+        attacker.resources.respect = Math.max(0, (attacker.resources.respect || 0) - 25);
+        state.reputation.familyRelationships[attackerFam] = (state.reputation.familyRelationships[attackerFam] || 0) - 40;
+        state.pendingNotifications.push({
+          type: 'error' as const,
+          title: '💔 Alliance Betrayed!',
+          message: `The ${attackerFam} family broke your alliance by attacking you! Their respect crashed by 25 and your relationship with them collapsed.`,
+        });
+        if (turnReport) turnReport.aiActions.push({ family: attackerFam, action: 'alliance_break', detail: `Betrayed alliance with you — lost 25 respect, relationship -40` });
+      }
+    }
+    // AI ↔ AI alliance (relationship penalty between the two AIs)
+    if (victimFam !== state.playerFamily) {
+      const victim = state.aiOpponents.find(o => o.family === victimFam);
+      if (victim) {
+        victim.relationships[attackerFam] = (victim.relationships[attackerFam] || 0) - 40;
+        attacker.relationships[victimFam] = (attacker.relationships[victimFam] || 0) - 40;
+      }
+    }
+  };
+
   // ============ AI TURN ============
   const processAITurn = (state: EnhancedMafiaGameState, turnReport?: TurnReport) => {
     state.aiOpponents = state.aiOpponents || [];
@@ -5460,6 +5574,9 @@ export const useEnhancedMafiaGameState = (
 
               if (aiStrength >= enemyUnitsHere.length || Math.random() < combatWillingness) {
                 aiActionsRemaining--; // Deduct action point for combat
+                // ===== AI HIT PARITY: classify scout state for this attack =====
+                const isAIScoutedHit = aiHasScoutIntel(state, fam, target.q, target.r, target.s);
+                const aiHitType: 'scouted' | 'blind' = isAIScoutedHit ? 'scouted' : 'blind';
                 // Safehouse defense bonus: defenders on safehouse hex are harder to kill
               const isTargetSafehouse = state.safehouses.some(s => s.q === target.q && s.r === target.r && s.s === target.s);
                 // Built business defense bonus: player-built businesses on this hex grant defenders +20% protection
@@ -5467,7 +5584,9 @@ export const useEnhancedMafiaGameState = (
                 const builtBizDefBonus = isDefenderBuiltBiz ? (BUILT_BUSINESS_DEFENSE_BONUS / 100) : 0;
                 // District control bonus: Queens +5% hit success for AI attacker
                 const aiQueensHitBonus = hasFamilyDistrictBonus(state, fam, 'hit_bonus') ? 0.05 : 0;
-                const baseKillChance = (isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) - builtBizDefBonus : 0.7 - builtBizDefBonus) + aiQueensHitBonus;
+                // Scout-tier hit modifier (mirrors player): scouted +15% / blind -20%
+                const scoutMod = isAIScoutedHit ? (SCOUT_INTEL_BONUS / 100) : -BLIND_HIT_PENALTY;
+                const baseKillChance = (isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) - builtBizDefBonus : 0.7 - builtBizDefBonus) + aiQueensHitBonus + scoutMod;
                 enemyUnitsHere.forEach(eu => {
                   // Capos cannot be killed in regular combat — only wounded
                   if (eu.type === 'capo') {
@@ -5579,16 +5698,31 @@ export const useEnhancedMafiaGameState = (
                     if (idx !== -1) state.deployedUnits.splice(idx, 1);
                   }
                 }
+                // ===== AI HIT PARITY: heat, bounty, diplomacy =====
+                const totalAIInvolved = aiStrength + enemyUnitsHere.length;
+                applyAIHeat(state, fam, totalAIInvolved, aiHitType);
+                // Bounty: blind hits against rivals trigger 3-turn revenge bounty by each victim family
+                if (aiHitType === 'blind') {
+                  const victimFamSet = new Set(enemyUnitsHere.map(u => u.family).filter(f => f !== fam));
+                  victimFamSet.forEach(vf => placeBountyOnAI(state, fam, vf as string, turnReport));
+                }
+                // Diplomacy penalties: if attacking pact-bound rivals, break the pact
+                const attackedFamSet = new Set<string>();
+                enemyUnitsHere.forEach(u => attackedFamSet.add(u.family));
+                if (tile.controllingFamily && tile.controllingFamily !== 'neutral') attackedFamSet.add(tile.controllingFamily as string);
+                attackedFamSet.forEach(vf => applyAIDiplomacyPenalties(state, fam, vf, turnReport));
+
                 if (enemyUnitsHere.some(u => u.family === state.playerFamily)) {
                   // Hole #6: AI attacks player → tension
                   addPairTension(state, fam, state.playerFamily, TENSION_TERRITORY_HIT);
                   checkSupplySabotage(state, target.q, target.r, target.s, fam);
+                  const heatNote = aiHitType === 'blind' ? ' Their reckless approach drew police heat.' : '';
                   state.pendingNotifications.push({
                     type: 'warning' as const,
                     title: `⚔️ ${fam.charAt(0).toUpperCase() + fam.slice(1)} Attack!`,
-                    message: `The ${fam} family attacked your units in ${tile.district || 'unknown territory'}!`,
+                    message: `The ${fam} family attacked your units in ${tile.district || 'unknown territory'}!${heatNote}`,
                   });
-                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'attack', detail: `Attacked your units in ${tile.district}` });
+                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'attack', detail: `${aiHitType === 'blind' ? 'Blind-hit' : 'Scouted hit on'} your units in ${tile.district}` });
                 }
                 // Log AI-to-AI combat + Hole #1: AI-vs-AI tension
                 const aiVictims = enemyUnitsHere.filter(u => u.family !== state.playerFamily);
@@ -5598,7 +5732,7 @@ export const useEnhancedMafiaGameState = (
                     addPairTension(state, fam, vf, TENSION_TERRITORY_HIT);
                     checkSupplySabotage(state, target.q, target.r, target.s, fam);
                   });
-                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'ai_combat', detail: `Fought ${victimFams.join(', ')} in ${tile.district}` });
+                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'ai_combat', detail: `${aiHitType === 'blind' ? 'Blind-hit' : 'Scouted hit on'} ${victimFams.join(', ')} in ${tile.district}` });
                 }
               } else {
                 // AI declined to fight — revert position
@@ -5619,10 +5753,24 @@ export const useEnhancedMafiaGameState = (
                     checkEncroachment(state, target.q, target.r, target.s, fam);
                   }
                 } else {
+                  // ===== AI HIT PARITY: blind capture of empty rival hex = civilian hit risk =====
+                  const aiCaptureScouted = aiHasScoutIntel(state, fam, target.q, target.r, target.s);
                   // Territory freeze: skip claiming ceasefire family hexes
                   const prevOwnerCeasefire = (state.ceasefires || []).some(c => c.active && (c.family === prevOwner || (prevOwner === state.playerFamily && c.family === fam)));
                   if (prevOwnerCeasefire) {
                     // Can't claim — ceasefire territory freeze
+                  } else if (!aiCaptureScouted && unit.type !== 'capo') {
+                    // Blind capture of empty rival hex by a soldier — same risk as player blind hit on empty rival hex.
+                    // Apply civilian-hit consequences and revert position so the soldier doesn't claim.
+                    applyAICivilianHit(state, fam, unit, tile.district || 'unknown territory', turnReport);
+                    // Diplomacy + bounty (still attacked the rival family)
+                    if (prevOwner && (prevOwner as string) !== 'neutral') {
+                      placeBountyOnAI(state, fam, prevOwner as string, turnReport);
+                      applyAIDiplomacyPenalties(state, fam, prevOwner as string, turnReport);
+                      addPairTension(state, fam, prevOwner as string, TENSION_TERRITORY_HIT);
+                    }
+                    // Unit was removed from board by applyAICivilianHit — exit this neighbor loop iteration
+                    break;
                   } else if (aiActionsRemaining > 0) {
                     // Built business protection: requires a Capo to seize
                     const isPlayerBuiltBiz2 = prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted;
@@ -5644,6 +5792,10 @@ export const useEnhancedMafiaGameState = (
                         });
                       }
                       tile.controllingFamily = fam;
+                      // ===== AI HIT PARITY: capturing rival hex incurs heat (scouted tier — capo or scouted soldier) =====
+                      applyAIHeat(state, fam, 1, 'scouted');
+                      // Diplomacy: capturing pact-bound rival's hex still breaks the pact
+                      applyAIDiplomacyPenalties(state, fam, prevOwner as string, turnReport);
                       // Hole #6: AI captures enemy territory → tension
                       addPairTension(state, fam, prevOwner as string, TENSION_TERRITORY_HIT);
                       checkSupplySabotage(state, target.q, target.r, target.s, fam);

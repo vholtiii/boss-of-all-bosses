@@ -116,6 +116,8 @@ export interface AIOpponent {
     soldiers: number;
     influence: number;
     respect: number;
+    /** AI police heat 0-100 — mirrors player's policeHeat.level */
+    heat?: number;
     lastTurnIncome?: number;
     commissionCooldownUntil?: number;
     cachedPhase?: number;
