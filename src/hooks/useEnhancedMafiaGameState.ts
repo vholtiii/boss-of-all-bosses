@@ -995,7 +995,7 @@ const createInitialGameState = (
     
     resources: {
       money: Math.floor((startingResources?.money ?? 50000) * diffMods.playerMoneyMult),
-      respect: startingResources?.respect ?? 25,
+      respect: startingResources?.respect ?? 15,
       soldiers: startingResources?.soldiers ?? 2,
       influence: startingResources?.influence ?? 10,
       politicalPower: startingResources?.politicalPower ?? 30,
@@ -1120,8 +1120,8 @@ const createInitialGameState = (
     seasonalEvents: [],
     
     reputation: {
-      respect: startingResources?.respect ?? 25,
-      reputation: 20, loyalty: 75, fear: 15,
+        respect: startingResources?.respect ?? 15,
+        reputation: 20, loyalty: 75, fear: 15,
       streetInfluence: startingResources?.influence ?? 10,
       familyRelationships: Object.fromEntries(
         allFamilies.filter(f => f !== family).map(f => [f, Math.floor(Math.random() * 30) - 15])
@@ -4306,7 +4306,11 @@ export const useEnhancedMafiaGameState = (
       // Income gain: was min(5, income/5000). Reduced ~30%: cap 3, divisor 7000.
       const incomeRespectGain = Math.min(3, newState.finances.totalIncome / 7000);
       // Business gain: was hexes/5. Now hexes/7 (~30% less).
-      const rawRespectGain = (hexesWithBusinesses / 7) + incomeRespectGain;
+      let rawRespectGain = (hexesWithBusinesses / 7) + incomeRespectGain;
+      // Phase 1 dampener: halve passive respect gains in early game (combat spikes & claim rewards bypass).
+      if (newState.currentPhase === 1) {
+        rawRespectGain *= 0.5;
+      }
       const scaledRespectGain = applyDiminishingReturns(newState.reputation.respect, rawRespectGain);
       const respectDecay = passiveDecay(newState.reputation.respect);
       newState.reputation.respect = Math.min(100, Math.max(0, newState.reputation.respect + scaledRespectGain - respectDecay));
