@@ -5469,7 +5469,7 @@ export const useEnhancedMafiaGameState = (
                         state.soldierStats[eu.id].loyalty = Math.max(0, state.soldierStats[eu.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
                       }
                       eu.woundedTurnsRemaining = CAPO_WOUND_DURATION;
-                      eu.maxMoves = Math.max(1, (eu.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+                      eu.maxMoves = Math.max(1, (eu.maxMoves || 2) - CAPO_WOUND_MOVE_PENALTY);
                       if (eu.family === state.playerFamily) {
                         state.pendingNotifications.push({
                           type: 'warning' as const,
@@ -8757,7 +8757,7 @@ export const useEnhancedMafiaGameState = (
               state.soldierStats[eu.id].loyalty = Math.max(0, state.soldierStats[eu.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
             }
             eu.woundedTurnsRemaining = CAPO_WOUND_DURATION;
-            eu.maxMoves = Math.max(1, (eu.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+            eu.maxMoves = Math.max(1, (eu.maxMoves || 2) - CAPO_WOUND_MOVE_PENALTY);
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'warning' as const, title: '🩸 Enemy Capo Wounded',
               message: `You wounded an enemy capo from the ${eu.family} family. They survive but are weakened for ${CAPO_WOUND_DURATION} turns. Use Plan Hit or a Hitman to kill capos outright.`,
@@ -9018,7 +9018,7 @@ export const useEnhancedMafiaGameState = (
               state.soldierStats[capo.id].loyalty = Math.max(0, state.soldierStats[capo.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
             }
             capo.woundedTurnsRemaining = CAPO_WOUND_DURATION;
-            capo.maxMoves = Math.max(1, (capo.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+            capo.maxMoves = Math.max(1, (capo.maxMoves || 2) - CAPO_WOUND_MOVE_PENALTY);
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'warning' as const, title: '🩸 Capo Wounded!',
               message: `Your capo was wounded during the assault on ${tile.district}. Wounded for ${CAPO_WOUND_DURATION} turns.`,
@@ -9050,7 +9050,7 @@ export const useEnhancedMafiaGameState = (
             state.soldierStats[capo.id].loyalty = Math.max(0, state.soldierStats[capo.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
           }
           capo.woundedTurnsRemaining = CAPO_WOUND_DURATION;
-          capo.maxMoves = Math.max(1, (capo.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+          capo.maxMoves = Math.max(1, (capo.maxMoves || 2) - CAPO_WOUND_MOVE_PENALTY);
           state.pendingNotifications = [...state.pendingNotifications, {
             type: 'warning' as const, title: '🩸 Capo Wounded!',
             message: `Your capo was wounded in the failed attack on ${tile.district}. Wounded for ${CAPO_WOUND_DURATION} turns.`,
