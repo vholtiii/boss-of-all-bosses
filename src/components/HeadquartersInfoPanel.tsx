@@ -238,21 +238,14 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   return (
     <motion.div
       ref={panelRef}
-      drag
-      dragMomentum={false}
-      dragConstraints={{ left: -(window.innerWidth - 400), right: 0, top: 0, bottom: window.innerHeight - 200 }}
-      onDragStart={() => { isDraggingRef.current = true; }}
-      onDragEnd={() => { setTimeout(() => { isDraggingRef.current = false; }, 100); }}
-      initial={{ opacity: 0, x: 80 }}
+      initial={{ opacity: 0, x: -80 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 80 }}
+      exit={{ opacity: 0, x: -80 }}
       transition={{ type: 'tween', duration: 0.25 }}
-      className="fixed top-4 right-4 z-40 w-96 max-h-[calc(100vh-2rem)] overflow-y-auto"
-      style={{ cursor: 'grab' }}
-      whileDrag={{ cursor: 'grabbing' }}
+      className="fixed left-4 top-52 bottom-12 z-40 w-96 overflow-hidden"
     >
-      <Card className="bg-gradient-to-br from-noir-dark to-background border-noir-light shadow-xl">
-        <CardHeader className="pb-4">
+      <Card className="bg-gradient-to-br from-noir-dark to-background border-noir-light shadow-xl h-full flex flex-col">
+        <CardHeader className="pb-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-3 text-mafia-gold font-playfair text-base">
               <Building2 className="h-5 w-5" style={{ color: familyColor }} />
@@ -272,7 +265,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
           </div>
         </CardHeader>
         
-        <CardContent className="space-y-4 pt-0">
+        <CardContent className="space-y-3 pt-0 pb-4 flex-1 overflow-y-auto pr-2">
           {/* Financial Overview — Player Only */}
           {isPlayerFamily && finances ? (
             <div className="space-y-2">
