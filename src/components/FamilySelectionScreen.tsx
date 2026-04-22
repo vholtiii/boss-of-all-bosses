@@ -34,7 +34,7 @@ interface FamilyInfo {
   };
 }
 
-const families: FamilyInfo[] = [
+export const FAMILIES: FamilyInfo[] = [
   {
     id: 'gambino',
     name: 'Gambino',
