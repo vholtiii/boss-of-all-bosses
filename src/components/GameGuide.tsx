@@ -87,8 +87,11 @@ const sections: GuideSection[] = [
           <Stat label="75–89" value="35% passive gain" color="text-orange-400" />
           <Stat label="90–100" value="15% passive gain" color="text-red-400" />
           <Stat label="Decay above 70" value="-1.0/turn (vs -0.5 below)" color="text-red-400" />
+          <Stat label="Phase 1 Start" value="15 respect (was 25)" color="text-orange-400" />
+          <Stat label="Phase 1 Passive" value="×0.5 multiplier (combat spikes unaffected)" color="text-orange-400" />
         </div>
         <Tip>Respect gates phase progression. Passive gains slow above 60 — combat rewards (Hits, expansion) bypass diminishing returns and remain the fastest path to 80+.</Tip>
+        <Tip>Phase 1 is intentionally a slower respect climb: lower starting value and halved passive gain. Hits and claim rewards still pay full respect.</Tip>
       </div>),
   },
   {
