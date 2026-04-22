@@ -268,11 +268,20 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
         <CardContent className="space-y-3 pt-0 pb-4 flex-1 overflow-y-auto pr-2">
           {/* Financial Overview — Player Only */}
           {isPlayerFamily && finances ? (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-mafia-gold font-playfair flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Financial Overview
-              </h3>
+            <Collapsible open={openSections.financial} onOpenChange={() => toggleSection('financial')} className="space-y-2">
+              <CollapsibleTrigger className="w-full flex items-center justify-between text-sm font-semibold text-mafia-gold font-playfair hover:opacity-80 transition-opacity">
+                <span className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Financial Overview
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className={`text-[10px] font-mono ${finances.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {finances.totalProfit >= 0 ? '+' : ''}${finances.totalProfit.toLocaleString()}/t
+                  </span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${openSections.financial ? 'rotate-180' : ''}`} />
+                </span>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-2">
 
               {/* Cash on Hand */}
               {totalMoney !== undefined && (
