@@ -5022,6 +5022,14 @@ export const useEnhancedMafiaGameState = (
       if (!hq) return;
       const aiPhase = calculatePhaseForFamily(state, fam);
 
+      // Reset per-turn move budget for this AI family's units (mirror player reset).
+      // Mattresses only locks the player's units; AI families always reset.
+      state.deployedUnits = state.deployedUnits.map(u => {
+        if (u.family !== fam) return u;
+        const baseMoves = u.type === 'capo' ? CAPO_MOVES_PER_TURN : 2;
+        return { ...u, movesRemaining: baseMoves };
+      });
+
       // ── INCOME (difficulty-scaled) ──
       let aiIncome = 0;
       // Compute AI family's connected supply nodes via BFS
