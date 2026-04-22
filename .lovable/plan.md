@@ -1,68 +1,53 @@
 
 
-# Difficulty Settings Audit
+# Make the Threat Board Always Visible
 
-## What's working ✅
+## Problem
 
-| Modifier         | Easy | Normal | Hard | Status | Where it's applied |
-|------------------|------|--------|------|--------|--------------------|
-| `playerMoneyMult` | 1.5× | 1.0× | 0.75× | ✅ Wired | `createInitialGameState` line 997 — multiplies player starting money |
-| `aiIncomeMult`   | 0.6× | 1.0× | 1.5× | ✅ Wired | AI per-turn income + minimum-income floor (line 5215) |
-| `aiRecruitCapBonus` | 0 | 0 | +2 | ✅ Wired | AI soldier cap (line 5236) |
-| `eventCostMult`  | 0.7× | 1.0× | 1.3× | ✅ Wired | Random event costs (line 6705) |
-| AI starting soldiers (difficulty branch) | 2–3 | 2–3 | **3–4** | ✅ Wired & **test-locked** | Line 1101 — Hard adds +1 soldier; covered by `ai-starting-resources.test.ts` |
+`ThreatBoardPanel` is rendered inside `GameSidePanels.tsx` (right sidebar, top of the panel stack), but it returns `null` whenever there are zero active threats:
 
-The AI test suite already validates Hard's +1 soldier bonus and the [2, 4] range across 30 randomized trials.
+```ts
+if (totalCount === 0) return null;
+```
 
-## What's broken ⚠️
+Since incoming hits, wars, hitman contracts, erosion, and bounties are all rare (especially in Phase 1), most players never see the panel at all and conclude it doesn't exist. There's also no top-bar indicator pointing to it.
 
-Two declared modifiers are **dead code** — they exist in the `DIFFICULTY_MODIFIERS` table but are never read anywhere in the codebase:
+## Fix
 
-1. **`policeHeatMult`** (Easy 0.7× / Hard 1.3×)
-   - Intent: scale police heat the player accrues from actions.
-   - Reality: heat is added at flat values regardless of difficulty. Easy mode players get the same RICO pressure as Hard mode players.
+### 1. Always render the Threat Board header
 
-2. **`hitSuccessBonus`** (Easy +10% / Hard −10%)
-   - Intent: shift hit success rates so Easy is more forgiving and Hard punishes failed contracts.
-   - Reality: hit success rolls (scout/blind/planned) are computed without this bonus. The Family Selection screen's "weaker AI / stronger AI" copy implies this works; it doesn't.
+Remove the `totalCount === 0` early return. When there are no threats, show a calm "All Clear" state instead:
 
-Both are silently inert — no error, no warning, just no effect. The result: **Easy and Hard are noticeably less differentiated than the modifier table suggests.**
+- Header still says **THREAT BOARD** with the alert-triangle icon (muted/green tint instead of amber/red).
+- Badge shows `0` in muted styling.
+- Collapsed by default; expanding reveals "All quiet. No active threats." (the empty-state copy already exists in the component).
+- No pulse animation, no border glow when count is 0.
 
-## Proposed fix
+### 2. Tone tiers (already partially there, just extend to "calm")
 
-### Part A — Wire the two missing modifiers
+- `count === 0` → muted/emerald tone, neutral border, no pulse.
+- `count > 0, no critical` → amber (current "warn" styling).
+- `count > 0, critical present` → destructive red + pulse if incoming hit (current behavior).
 
-1. **`policeHeatMult`** — find every `state.policeHeat.level += X` (and equivalents in claim/extort/hit/sabotage handlers), and multiply the increment by `state.difficultyModifiers.policeHeatMult` before adding. Single helper `applyHeat(state, amount)` in the hook would be cleanest; will grep the current sites and either factor a helper or scale inline at each call site (≤6 spots expected).
+### 3. Status HUD entry (top bar)
 
-2. **`hitSuccessBonus`** — find the hit-resolution math (scout/blind/planned tiers) and add `+ diffMods.hitSuccessBonus` to the success probability before the random roll. Clamp to `[0.05, 0.99]` to avoid degenerate cases.
+Add a small **Threats** badge to the top-bar status HUD strip (per `mem://ui/status-hud`) that mirrors the count and tone, so the player sees `Threats: 0` / `Threats: 3 ⚠` at a glance and knows where to look in the right sidebar.
 
-### Part B — Lock with tests
-
-New file: `src/hooks/__tests__/difficulty-modifiers.test.ts` covering:
-- Player starting money: Easy = 1.5× Normal, Hard = 0.75× Normal (locks line 997).
-- AI starting soldiers Hard ≥ 3 (already covered, but re-asserted in the consolidated suite).
-- `policeHeatMult` applied: simulate one heat-generating action on Easy vs Hard via a small unit-testable helper, assert ratio ≈ 0.7 / 1.3 of Normal. (If extracting a helper turns out invasive, fall back to asserting `state.difficultyModifiers.policeHeatMult` is consumed by spying on the heat-add path.)
-- `hitSuccessBonus` applied: stub `Math.random` and assert a borderline hit succeeds on Easy and fails on Hard given the same roll.
-
-### Part C — Memory
-
-Update `mem://gameplay/difficulty-levels` to record:
-- The 6-modifier table with each modifier's call-site.
-- A note that `policeHeatMult` and `hitSuccessBonus` were previously dead and are now active.
+- Click on the badge could optionally scroll the right sidebar to top — nice-to-have, not required for this pass.
 
 ## Files Touched
 
-- `src/hooks/useEnhancedMafiaGameState.ts` — apply `policeHeatMult` to all heat-add sites; apply `hitSuccessBonus` to hit success calculations (clamped).
-- `src/hooks/__tests__/difficulty-modifiers.test.ts` — new test file.
-- `mem://gameplay/difficulty-levels` — document the now-complete modifier wiring.
+- `src/components/ThreatBoardPanel.tsx` — remove the `totalCount === 0` early return; add muted "All Clear" tone branch for zero-count header styling.
+- `src/components/GameSidePanels.tsx` (or wherever the top-bar HUD strip lives — will grep for status HUD badges) — add a Threats badge that reads the same `aiPlannedHits` / `activeWars` / `hitmanContracts` / etc. counts.
 
 ## Verification
 
-- Start an Easy game, perform a claim → heat increment ≈ 0.7× Normal.
-- Start a Hard game, perform a hit on a known target → success probability is 10pp lower than Normal.
-- All existing tests continue to pass; new difficulty-modifiers test passes.
+- Start a new game → right sidebar shows "THREAT BOARD · 0" in muted tone, collapsed.
+- Expand it → "All quiet. No active threats."
+- Trigger a war or get a planned hit detected → badge turns amber/red, count updates, pulse on incoming hits.
+- Top-bar Threats badge mirrors the same count and tone.
 
 ## What Doesn't Change
 
-Modifier values themselves (Easy 1.5×/0.6×/0.7×/+10% etc.). Player starting money scaling. AI income scaling. AI recruit cap. Event cost scaling. AI starting soldier scaling. Family bonuses. Phase gates.
+Threat detection logic (incoming hits, wars, ceasefires, erosion, bounties, marks). Auto-expand on first incoming hit. Click-to-jump-to-unit behavior. Badge color tiers when threats > 0.
 
