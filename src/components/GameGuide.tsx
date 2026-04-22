@@ -235,11 +235,11 @@ const sections: GuideSection[] = [
           <Stat label="🔍 Scout" value="Reveal enemy info (1-hex soldier, 2-hex capo)" />
           <Stat label="🏰 Fortify" value="+25% defense bonus, max 4 per family" />
           <Stat label="🏠 Safehouse" value="$2,500, deploy node + 10% defense" />
-          <Stat label="🚶 Escort" value="Protect supply lines & units" />
           <Stat label="👥 Recruit" value="$3,000 loyal / $1,500 mercenary" />
         </div>
         <Stat label="Intel Decay" value="Fresh → Stale over time" color="text-yellow-400" />
         <Tip>Fresh intel gives combat bonuses. Re-scout before major attacks!</Tip>
+        <Tip>Soldiers can't see rival units by proximity. Reveal via scout, rat, Captain bribe (one family), Chief/Mayor bribe (all families), pact, or capo vision.</Tip>
       </div>
     ),
   },
