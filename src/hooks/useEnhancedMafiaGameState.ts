@@ -5555,6 +5555,9 @@ export const useEnhancedMafiaGameState = (
 
               if (aiStrength >= enemyUnitsHere.length || Math.random() < combatWillingness) {
                 aiActionsRemaining--; // Deduct action point for combat
+                // ===== AI HIT PARITY: classify scout state for this attack =====
+                const isAIScoutedHit = aiHasScoutIntel(state, fam, target.q, target.r, target.s);
+                const aiHitType: 'scouted' | 'blind' = isAIScoutedHit ? 'scouted' : 'blind';
                 // Safehouse defense bonus: defenders on safehouse hex are harder to kill
               const isTargetSafehouse = state.safehouses.some(s => s.q === target.q && s.r === target.r && s.s === target.s);
                 // Built business defense bonus: player-built businesses on this hex grant defenders +20% protection
@@ -5562,7 +5565,9 @@ export const useEnhancedMafiaGameState = (
                 const builtBizDefBonus = isDefenderBuiltBiz ? (BUILT_BUSINESS_DEFENSE_BONUS / 100) : 0;
                 // District control bonus: Queens +5% hit success for AI attacker
                 const aiQueensHitBonus = hasFamilyDistrictBonus(state, fam, 'hit_bonus') ? 0.05 : 0;
-                const baseKillChance = (isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) - builtBizDefBonus : 0.7 - builtBizDefBonus) + aiQueensHitBonus;
+                // Scout-tier hit modifier (mirrors player): scouted +15% / blind -20%
+                const scoutMod = isAIScoutedHit ? (SCOUT_INTEL_BONUS / 100) : -BLIND_HIT_PENALTY;
+                const baseKillChance = (isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) - builtBizDefBonus : 0.7 - builtBizDefBonus) + aiQueensHitBonus + scoutMod;
                 enemyUnitsHere.forEach(eu => {
                   // Capos cannot be killed in regular combat — only wounded
                   if (eu.type === 'capo') {
