@@ -1,69 +1,53 @@
 
 
-# Match AI Movement Limits to Player
+# Clarify Captain vs Chief Intel Scope for Rival Unit Visibility
 
-The recent capo nerf only fully applied to the player. The AI movement loop still uses old hardcoded numbers, and AI units never get their `movesRemaining` reset each turn — so AI behavior is inconsistent with player rules.
+You're right — Captain is **target-scoped** (only the bribed family's intel), Chief is **map-wide** (all rivals). The visibility rule needs to respect that, not treat Captain as a global reveal.
 
-## Bugs to Fix
+## Updated Visibility Rules for Rival Units
 
-1. **AI capos move 3 hexes per move (player gets 2 in P1, 4 in P2+)**
-   `useEnhancedMafiaGameState.ts:5243` — `unit.type === 'soldier' ? (2 + alertBonus) : 3`
-   `useEnhancedMafiaGameState.ts:5247` — `getHexesInRange(..., Math.min(3, movesLeft))`
+A rival unit is visible ONLY if at least one of these is true:
 
-2. **AI soldiers can move 3 hexes when alerted (player capped at 2)**
-   Same line 5243 — `2 + alertBonus` lets alerted AI soldiers exceed the player's hard cap of 2.
+1. **Fresh scout intel** on that hex (soldier 1-hex, capo 2-hex)
+2. **Flipped soldier (rat)** in that rival's family
+3. **Active Police Captain bribe targeting that specific rival family** → reveals only that family's units
+4. **Active Police Chief or Mayor bribe** → reveals ALL rival families' units (map-wide)
+5. **Active supply deal / alliance pact** with that rival
+6. **Rival unit standing on YOUR claimed territory**
+7. **Rival HQ hex**
+8. **Capo vision** (capo's own 2-hex sight radius)
 
-3. **AI units never get `movesRemaining` reset per turn**
-   `useEnhancedMafiaGameState.ts:1453` — the tactical-phase reset explicitly skips non-player units (`if (u.family !== prev.playerFamily) return u;`). AI units only get fresh moves on initial spawn / promotion, then rely on whatever was left from the previous AI turn. This is a latent bug independent of the nerf.
+**Removed**: Plain soldier adjacency reveal.
 
-## Changes
+## Files Touched
 
-### 1. `src/hooks/useEnhancedMafiaGameState.ts` — AI movement loop (~line 5243)
+1. **`src/hooks/useEnhancedMafiaGameState.ts`** — visibility predicate:
+   - Drop the soldier-adjacency branch.
+   - Corruption check splits into two branches:
+     - `activeBribes.some(b => b.active && b.tier === 'police_captain' && b.targetFamily === rivalUnit.family)` → visible
+     - `activeBribes.some(b => b.active && (b.tier === 'police_chief' || b.tier === 'mayor'))` → visible (any rival)
+   - Keep all other branches (scout intel, rats, pacts, on-your-turf, HQ, capo vision).
 
-Replace the hardcoded caps with the same constants/helpers the player uses:
+2. **`src/components/EnhancedMafiaHexGrid.tsx`** — map legend tooltip lists: scout intel, rat, Captain bribe (target only), Chief/Mayor bribe (all rivals), pact, on your turf, capo vision, rival HQ.
 
-```ts
-const aiCapoRange = getCapoFlyRange(state.gamePhase);
-const baseMoves = unit.type === 'capo' ? CAPO_MOVES_PER_TURN : 2; // no alertBonus on movement
-let movesLeft = Math.min(unit.movesRemaining, baseMoves);
-```
+3. **`src/components/GameGuide.tsx`** — Scout/Intel section: "Soldiers can't see rival units by proximity. Reveal via scout, rat, Captain bribe (one family), Chief/Mayor bribe (all families), or pact."
 
-And the capo neighbor calculation (~line 5247):
+4. **`src/components/CorruptionPanel.tsx`** — tier descriptions clarify: Captain reveals **target family** units & fortifications; Chief reveals **all rival** units & fortifications map-wide.
 
-```ts
-const neighbors = unit.type === 'soldier'
-  ? getHexNeighbors(unit.q, unit.r, unit.s)
-  : getHexesInRange(unit.q, unit.r, unit.s, Math.min(aiCapoRange, movesLeft));
-```
-
-The `alertBonus` stays applied to AI **recruitment** and **action budget** (its current other uses) — only stripped from per-turn movement to match the player.
-
-### 2. `src/hooks/useEnhancedMafiaGameState.ts` — AI turn-start move reset
-
-At AI turn start (inside `processAITurn`, before the AI movement loop, after Mattresses check), add a reset for AI units of the family being processed:
-
-```ts
-state.deployedUnits = state.deployedUnits.map(u => {
-  if (u.family !== fam) return u;
-  if ((state.mattressesState || {}).active && fam === state.playerFamily) return u;
-  const baseMoves = u.type === 'capo' ? CAPO_MOVES_PER_TURN : 2;
-  return { ...u, movesRemaining: baseMoves };
-});
-```
-
-This mirrors the player reset at line 1452–1458 so each AI family gets a fresh 2-move budget per turn.
-
-### 3. Sanity sweep
-
-Search for any other hardcoded `3` related to capo movement/range in the AI paths (defense loop at 5226–5234 only checks distance, not move budget — fine; no other offenders found).
+5. **Memory updates**
+   - `mem://gameplay/scout-system` — adjacency removed; Captain (target) and Chief/Mayor (all) corruption reveal rival units.
+   - `mem://gameplay/fog-of-war` — same.
+   - `mem://gameplay/intel-bribes` — note Captain unlocks unit visibility for the targeted family only; Chief/Mayor extend it map-wide.
 
 ## Verification
 
-- Promote an AI capo (or wait for one to spawn). In Phase 1, observe AI capo never traverses more than 2 hexes per move and 2 moves per turn. In Phase 2+, max 4 hexes per move.
-- Confirm AI soldiers never move more than 2 hexes per turn even when alerted (bounty/safehouse capture).
-- Confirm AI units actually move on every AI turn (no stuck-at-zero-moves units after turn 2+).
+- Soldier adjacent to rival hex → rivals NOT visible.
+- Patrol Officer bribe → no unit reveal (heat tier only).
+- Captain bribe targeting Gambino → Gambino units visible; Genovese/Lucchese/etc still hidden.
+- Chief or Mayor bribe → all rival units visible map-wide.
+- Scout / rat / capo vision / on-your-turf / HQ / pact reveals unchanged.
 
 ## What Doesn't Change
 
-- AI recruitment alert bonus, AI action budget, AI personality logic, combat, claiming, deployment, fortify, scout — all unchanged. Only the per-turn movement caps and reset are aligned with the player.
+- Capo vision, scout mechanics, intel decay, pact reveals, on-your-turf reveal, HQ visibility, Patrol Officer (heat-only), combat, AI behavior, bribe costs/durations/success rates.
 
