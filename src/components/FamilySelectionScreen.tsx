@@ -53,7 +53,7 @@ const families: FamilyInfo[] = [
     powerEffect: 'Scout a target hex and all 6 adjacent hexes (7 total revealed).',
     powerCost: '2 Tactical Actions',
     powerCooldown: '3 turns',
-    startingResources: { money: 60000, soldiers: 4, influence: 15, politicalPower: 40, respect: 30 },
+    startingResources: { money: 60000, soldiers: 4, influence: 15, politicalPower: 40, respect: 20 },
   },
   {
     id: 'genovese',
@@ -73,7 +73,7 @@ const families: FamilyInfo[] = [
     powerEffect: 'Hide a hex as neutral for 3 turns. While disguised: unscoutable by enemies, -30% hit and sabotage success against it, zero police heat.',
     powerCost: '1 Tactical Action',
     powerCooldown: '2 turns',
-    startingResources: { money: 45000, soldiers: 4, influence: 10, politicalPower: 25, respect: 20 },
+    startingResources: { money: 45000, soldiers: 4, influence: 10, politicalPower: 25, respect: 10 },
   },
   {
     id: 'lucchese',
@@ -93,7 +93,7 @@ const families: FamilyInfo[] = [
     powerEffect: '+50% income from all businesses in the target district. Extract $1,000 tribute from each rival-owned hex in that district.',
     powerCost: '1 Tactical Action',
     powerCooldown: '3 turns',
-    startingResources: { money: 70000, soldiers: 3, influence: 12, politicalPower: 20, respect: 15 },
+    startingResources: { money: 70000, soldiers: 3, influence: 12, politicalPower: 20, respect: 10 },
   },
   {
     id: 'bonanno',
@@ -113,7 +113,7 @@ const families: FamilyInfo[] = [
     powerEffect: 'Remove all soldiers with loyalty below 50. Survivors gain +15 loyalty and 2-turn immunity to enemy flip attempts.',
     powerCost: '1 Tactical Action',
     powerCooldown: '4 turns',
-    startingResources: { money: 40000, soldiers: 2, influence: 8, politicalPower: 15, respect: 35 },
+    startingResources: { money: 40000, soldiers: 2, influence: 8, politicalPower: 15, respect: 25 },
   },
   {
     id: 'colombo',
@@ -133,7 +133,7 @@ const families: FamilyInfo[] = [
     powerEffect: 'Instantly promote a soldier to capo when one of your capos is killed. Reactive trigger — no turn required.',
     powerCost: '1 Tactical Action',
     powerCooldown: 'Once per game',
-    startingResources: { money: 35000, soldiers: 1, influence: 18, politicalPower: 10, respect: 25 },
+    startingResources: { money: 35000, soldiers: 1, influence: 18, politicalPower: 10, respect: 15 },
   },
 ];
 
