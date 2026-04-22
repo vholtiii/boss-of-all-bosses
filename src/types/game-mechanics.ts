@@ -160,7 +160,7 @@ export const PHASE_CONFIGS: PhaseConfig[] = [
 ];
 
 // ============ COMMISSION VOTE ============
-export const COMMISSION_VOTE_COST = 15000;
+export const COMMISSION_VOTE_COST = 35000;
 export const COMMISSION_VOTE_COOLDOWN = 10;
 export const COMMISSION_MIN_SURVIVORS = 2;
 export const COMMISSION_VOTE_RELATIONSHIP_THRESHOLD = 60;
@@ -383,14 +383,14 @@ export interface SafePassagePact {
 
 // ============ RECRUITMENT COSTS ============
 export const SOLDIER_COST = 1500;  // Mercenary (buy) cost
-export const LOCAL_SOLDIER_COST = 300;  // Recruited (loyal) cost
+export const LOCAL_SOLDIER_COST = 600;  // Recruited (loyal) cost
 export const SOLDIER_MAINTENANCE = 600;  // Per-turn upkeep per soldier
 export const RECRUIT_TERRITORY_REQUIREMENT = 10;  // Hexes needed to recruit locally
 export const CAPO_COST = 1500;
 export const MAX_HITMEN = 3;
 
 // ============ HITMAN CONTRACT SYSTEM ============
-export const HITMAN_CONTRACT_COST = 30000;
+export const HITMAN_CONTRACT_COST = 40000;
 export const HITMAN_BASE_SUCCESS = 90;       // open field
 export const HITMAN_FORTIFIED_SUCCESS = 65;
 export const HITMAN_SAFEHOUSE_SUCCESS = 55;
