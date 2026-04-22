@@ -180,6 +180,17 @@ const DIFFICULTY_MODIFIERS: Record<Difficulty, DifficultyModifiers> = {
   hard: { playerMoneyMult: 0.75, aiIncomeMult: 1.5, aiRecruitCapBonus: 2, policeHeatMult: 1.3, hitSuccessBonus: -0.10, eventCostMult: 1.3 },
 };
 
+// ============ HEAT HELPER ============
+// Applies a heat increment scaled by the active difficulty's policeHeatMult.
+// Use for all player-action-driven heat (claim/extort/hit/sabotage/etc.).
+// Passive/loyalty/informant heat is intentionally NOT scaled here.
+export const applyPlayerHeat = (state: EnhancedMafiaGameState, amount: number): void => {
+  state.policeHeat = state.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
+  const mult = state.difficultyModifiers?.policeHeatMult ?? 1;
+  const scaled = Math.max(0, Math.round(amount * mult));
+  state.policeHeat.level = Math.min(100, (state.policeHeat.level || 0) + scaled);
+};
+
 // ============ IMMUTABLE STATE CLONE HELPER ============
 const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGameState => ({
   ...state,
@@ -685,8 +696,7 @@ const applyPendingClaim = (
   // A3: heat applies on claim initiation. Player only.
   if (isPlayer) {
     const heatGain = tile.business ? 6 : 3;
-    state.policeHeat = state.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
-    state.policeHeat.level = Math.min(100, (state.policeHeat.level || 0) + heatGain);
+    applyPlayerHeat(state, heatGain);
   }
   return true;
 };
@@ -2180,8 +2190,7 @@ export const useEnhancedMafiaGameState = (
       }
       // Apply pending-claim heat if capo auto-claim landed a contested hex
       if (pendingClaimHeatGain > 0) {
-        prev.policeHeat = prev.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
-        prev.policeHeat.level = Math.min(100, (prev.policeHeat.level || 0) + pendingClaimHeatGain);
+        applyPlayerHeat(prev, pendingClaimHeatGain);
       }
 
       // Apply capo extortion bonuses
@@ -2752,8 +2761,7 @@ export const useEnhancedMafiaGameState = (
         prev.reputation.respect = newResources.respect;
       }
       if (pendingClaimHeatGain > 0) {
-        prev.policeHeat = prev.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
-        prev.policeHeat.level = Math.min(100, (prev.policeHeat.level || 0) + pendingClaimHeatGain);
+        applyPlayerHeat(prev, pendingClaimHeatGain);
       }
 
       const notifications = autoExtortNotification
@@ -7969,7 +7977,7 @@ export const useEnhancedMafiaGameState = (
           newState.warSummitState = { active: true, turnsRemaining: WAR_SUMMIT_DURATION };
           // Immediate effects: +10 fear, +8 heat, +3 loyalty
           newState.reputation.fear = Math.min(100, (newState.reputation.fear || 0) + WAR_SUMMIT_FEAR_BONUS);
-          newState.policeHeat.level = Math.min(100, newState.policeHeat.level + WAR_SUMMIT_HEAT_COST);
+          applyPlayerHeat(newState, WAR_SUMMIT_HEAT_COST);
           newState.deployedUnits.filter(u => u.family === newState.playerFamily).forEach(u => {
             const stats = newState.soldierStats[u.id];
             if (stats) {
@@ -8385,7 +8393,7 @@ export const useEnhancedMafiaGameState = (
     tile.business = undefined;
 
     // Increase police heat (+15)
-    state.policeHeat.level = Math.min(100, state.policeHeat.level + 15);
+    applyPlayerHeat(state, 15);
 
     // Damage relationship with owning family
     if (state.reputation.familyRelationships[tile.controllingFamily] !== undefined) {
@@ -8872,7 +8880,7 @@ export const useEnhancedMafiaGameState = (
         } else if (targetOnCurrentHex) {
           // Target relocated but we followed them → reduced +10% bonus + penalties
           chance += PLAN_HIT_RELOCATED_BONUS / 100;
-          state.policeHeat.level = Math.min(100, state.policeHeat.level + PLAN_HIT_RELOCATED_HEAT);
+          applyPlayerHeat(state, PLAN_HIT_RELOCATED_HEAT);
           state.planHitCooldownUntil = state.turn + PLAN_HIT_COOLDOWN;
           state.pendingNotifications = [...state.pendingNotifications, {
             type: 'warning', title: '🎯 Target Relocated',
@@ -8897,7 +8905,9 @@ export const useEnhancedMafiaGameState = (
         state.plannedHit = null; // Consume the plan either way
       }
       
-      chance = Math.max(0.1, Math.min(0.95, chance));
+      // Difficulty modifier: Easy +10pp, Hard -10pp on hit success
+      chance += state.difficultyModifiers?.hitSuccessBonus ?? 0;
+      chance = Math.max(0.05, Math.min(0.99, chance));
 
       // Heat scales with battle size — modified by hit type
       const totalUnitsInvolved = attackers + defenders;
@@ -9258,7 +9268,7 @@ export const useEnhancedMafiaGameState = (
         });
         state.combatLog = [...(state.combatLog || []), `💀 Hit on ${tile.district} failed! ${failDetails}`];
       }
-      state.policeHeat.level = Math.min(100, state.policeHeat.level + heatGain);
+      applyPlayerHeat(state, heatGain);
     }
     
     syncLegacyUnits(state);
@@ -9401,7 +9411,7 @@ export const useEnhancedMafiaGameState = (
         }
       }
       const extortionFailed = !state.lastCombatResult?.success;
-      state.policeHeat.level = Math.min(100, state.policeHeat.level + (isEnemy ? 12 : 8) + (extortionFailed ? 5 : 0));
+      applyPlayerHeat(state, (isEnemy ? 12 : 8) + (extortionFailed ? 5 : 0));
     }
 
     syncLegacyUnits(state);
