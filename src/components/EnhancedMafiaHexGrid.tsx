@@ -1466,8 +1466,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       });
 
                       soldiersByFamily.forEach((soldiers, fam) => {
-                        // Fog of War: hide rival units unless hex is revealed
-                        if (fam !== playerFamily && !hexRevealed) return;
+                       // Fog of War: hide rival soldiers unless visible per intel rules
+                        if (fam !== playerFamily && !isRivalUnitVisible(tile, fam)) return;
                         const firstSoldier = soldiers[0];
                         const isSelected = soldiers.some(s => s.id === selectedUnitId);
                         const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action' || gameState?.persicoSelectionActive);
