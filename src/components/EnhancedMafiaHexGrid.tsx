@@ -99,6 +99,44 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
   const activeBribes = gameState?.activeBribes || [];
 
+  // Hex distance helper (cube coords)
+  const hexDistance = (a: { q: number; r: number; s: number }, b: { q: number; r: number; s: number }): number =>
+    (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(a.s - b.s)) / 2;
+
+  // Fog of War: should a RIVAL unit at this hex be visible to the player?
+  // Independent of hex tile reveal — units have stricter rules.
+  const isRivalUnitVisible = (tile: HexTile, rivalFamily: string): boolean => {
+    // Always visible: rival units standing on player-controlled hexes
+    if (tile.controllingFamily === playerFamily) return true;
+    // Always visible: rival HQ hex (locations are public knowledge)
+    if (tile.isHeadquarters) return true;
+    // Active scout intel on this hex
+    if (scoutedHexes.some((s: ScoutedHex) => s.q === tile.q && s.r === tile.r && s.s === tile.s)) return true;
+    // Police Chief / Mayor bribery reveals all rival units map-wide
+    if (activeBribes.some((b: any) => (b.tier === 'police_chief' || b.tier === 'mayor') && b.active)) return true;
+    // Police Captain bribery on this rival's family
+    if (activeBribes.some((b: any) => b.tier === 'police_captain' && b.active && b.targetFamily === rivalFamily)) return true;
+    // Legacy bribed officials
+    if (bribedOfficials.some((o: any) => o.id === 'captain_rodriguez')) return true;
+    if (bribedOfficials.some((o: any) => o.permissions?.includes('rival_intelligence'))) return true;
+    // Active alliance with this rival family — share intel
+    if ((gameState?.alliances || []).some((a: any) => a.active && a.alliedFamily === rivalFamily)) return true;
+    // Active supply deal where player buys from this rival — shared logistics
+    if ((gameState?.supplyDealPacts || []).some((p: any) => p.active && p.buyerFamily === playerFamily && p.targetFamily === rivalFamily)) return true;
+    // Adjacent vision: within 1 hex of any player soldier, within 2 of any player capo
+    for (const u of deployedUnits) {
+      if (u.family !== playerFamily) continue;
+      const range = u.type === 'capo' ? 2 : 1;
+      if (hexDistance({ q: u.q, r: u.r, s: u.s }, tile) <= range) return true;
+    }
+    // Within 1 hex of a player safehouse
+    const playerSafehouses = (gameState?.safehouses || []).filter((sh: any) => sh.family === playerFamily);
+    for (const sh of playerSafehouses) {
+      if (hexDistance({ q: sh.q, r: sh.r, s: sh.s }, tile) <= 1) return true;
+    }
+    return false;
+  };
+
   // Fog of War: check if a rival hex's intel is revealed
   const isHexRevealed = (tile: HexTile): boolean => {
     // Player's own hexes and neutral hexes are always visible
@@ -1399,8 +1437,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       const hexRevealed = isHexRevealed(tile);
 
                       caposByFamily.forEach((capos, fam) => {
-                        // Fog of War: hide rival units unless hex is revealed
-                        if (fam !== playerFamily && !hexRevealed) return;
+                       // Fog of War: hide rival capos unless visible per intel rules
+                        if (fam !== playerFamily && !isRivalUnitVisible(tile, fam)) return;
                         const capo = capos[0];
                         const isSelected = selectedUnitId === capo.id;
                         const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action');
@@ -1428,8 +1466,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       });
 
                       soldiersByFamily.forEach((soldiers, fam) => {
-                        // Fog of War: hide rival units unless hex is revealed
-                        if (fam !== playerFamily && !hexRevealed) return;
+                       // Fog of War: hide rival soldiers unless visible per intel rules
+                        if (fam !== playerFamily && !isRivalUnitVisible(tile, fam)) return;
                         const firstSoldier = soldiers[0];
                         const isSelected = soldiers.some(s => s.id === selectedUnitId);
                         const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action' || gameState?.persicoSelectionActive);
