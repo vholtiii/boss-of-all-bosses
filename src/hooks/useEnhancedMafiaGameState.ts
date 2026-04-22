@@ -5679,16 +5679,31 @@ export const useEnhancedMafiaGameState = (
                     if (idx !== -1) state.deployedUnits.splice(idx, 1);
                   }
                 }
+                // ===== AI HIT PARITY: heat, bounty, diplomacy =====
+                const totalAIInvolved = aiStrength + enemyUnitsHere.length;
+                applyAIHeat(state, fam, totalAIInvolved, aiHitType);
+                // Bounty: blind hits against rivals trigger 3-turn revenge bounty by each victim family
+                if (aiHitType === 'blind') {
+                  const victimFamSet = new Set(enemyUnitsHere.map(u => u.family).filter(f => f !== fam));
+                  victimFamSet.forEach(vf => placeBountyOnAI(state, fam, vf as string, turnReport));
+                }
+                // Diplomacy penalties: if attacking pact-bound rivals, break the pact
+                const attackedFamSet = new Set<string>();
+                enemyUnitsHere.forEach(u => attackedFamSet.add(u.family));
+                if (tile.controllingFamily && tile.controllingFamily !== 'neutral') attackedFamSet.add(tile.controllingFamily as string);
+                attackedFamSet.forEach(vf => applyAIDiplomacyPenalties(state, fam, vf, turnReport));
+
                 if (enemyUnitsHere.some(u => u.family === state.playerFamily)) {
                   // Hole #6: AI attacks player → tension
                   addPairTension(state, fam, state.playerFamily, TENSION_TERRITORY_HIT);
                   checkSupplySabotage(state, target.q, target.r, target.s, fam);
+                  const heatNote = aiHitType === 'blind' ? ' Their reckless approach drew police heat.' : '';
                   state.pendingNotifications.push({
                     type: 'warning' as const,
                     title: `⚔️ ${fam.charAt(0).toUpperCase() + fam.slice(1)} Attack!`,
-                    message: `The ${fam} family attacked your units in ${tile.district || 'unknown territory'}!`,
+                    message: `The ${fam} family attacked your units in ${tile.district || 'unknown territory'}!${heatNote}`,
                   });
-                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'attack', detail: `Attacked your units in ${tile.district}` });
+                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'attack', detail: `${aiHitType === 'blind' ? 'Blind-hit' : 'Scouted hit on'} your units in ${tile.district}` });
                 }
                 // Log AI-to-AI combat + Hole #1: AI-vs-AI tension
                 const aiVictims = enemyUnitsHere.filter(u => u.family !== state.playerFamily);
@@ -5698,7 +5713,7 @@ export const useEnhancedMafiaGameState = (
                     addPairTension(state, fam, vf, TENSION_TERRITORY_HIT);
                     checkSupplySabotage(state, target.q, target.r, target.s, fam);
                   });
-                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'ai_combat', detail: `Fought ${victimFams.join(', ')} in ${tile.district}` });
+                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'ai_combat', detail: `${aiHitType === 'blind' ? 'Blind-hit' : 'Scouted hit on'} ${victimFams.join(', ')} in ${tile.district}` });
                 }
               } else {
                 // AI declined to fight — revert position
