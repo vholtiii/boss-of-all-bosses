@@ -162,11 +162,22 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   onEliminateSoldier,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
-  const isDraggingRef = useRef(false);
   const [bossExpanded, setBossExpanded] = useState(false);
   const [sitdownOpen, setSitdownOpen] = useState(false);
   const [selectedSitdownIds, setSelectedSitdownIds] = useState<string[]>([]);
   const [declareWarOpen, setDeclareWarOpen] = useState(false);
+
+  // Collapsible section states
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    financial: true,
+    units: true,
+    boss: false,
+    threats: false,
+    strategic: false,
+    diplomacy: false,
+  });
+  const toggleSection = (key: string) =>
+    setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
