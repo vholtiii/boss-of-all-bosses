@@ -356,8 +356,9 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                   <div className="text-xs font-bold text-emerald-400">${finances.cleanMoney.toLocaleString()}</div>
                 </div>
               </div>
-            </div>
-          ) : (
+              </CollapsibleContent>
+            </Collapsible>
+
             /* Rival HQ — limited info */
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-mafia-gold font-playfair flex items-center gap-2">
