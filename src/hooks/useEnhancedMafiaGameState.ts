@@ -5745,7 +5745,7 @@ export const useEnhancedMafiaGameState = (
                     // Apply civilian-hit consequences and revert position so the soldier doesn't claim.
                     applyAICivilianHit(state, fam, unit, tile.district || 'unknown territory', turnReport);
                     // Diplomacy + bounty (still attacked the rival family)
-                    if (prevOwner && prevOwner !== 'neutral') {
+                    if (prevOwner && (prevOwner as string) !== 'neutral') {
                       placeBountyOnAI(state, fam, prevOwner as string, turnReport);
                       applyAIDiplomacyPenalties(state, fam, prevOwner as string, turnReport);
                       addPairTension(state, fam, prevOwner as string, TENSION_TERRITORY_HIT);
