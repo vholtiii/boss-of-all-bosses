@@ -6,7 +6,7 @@ import { ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
-import { ScoutedHex, Safehouse, PlannedHit, SupplyNode, SUPPLY_NODE_CONFIG, SupplyNodeType, FortifiedHex, FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, FLIP_SOLDIER_BASE_COST, FLIP_SOLDIER_COST_ESCALATION, FLIP_SOLDIER_BASE_CHANCE } from '@/types/game-mechanics';
+import { ScoutedHex, Safehouse, PlannedHit, SupplyNode, SUPPLY_NODE_CONFIG, SupplyNodeType, FortifiedHex, FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, FLIP_SOLDIER_BASE_COST, FLIP_SOLDIER_COST_ESCALATION, FLIP_SOLDIER_BASE_CHANCE, SUPPLY_DEPENDENCIES } from '@/types/game-mechanics';
 
 interface EnhancedMafiaHexGridProps {
   width: number;
@@ -2188,6 +2188,100 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       <p><span className="text-muted-foreground">Income:</span> ${displayHex.business.income.toLocaleString()}/turn</p>
                     )}
                   </>
+                );
+              })()}
+              {/* Income contribution sub-card (player-owned hex with business) */}
+              {displayHex.business && displayHex.controllingFamily === playerFamily && (() => {
+                const isUnderConstruction = displayHex.business.constructionGoal && (displayHex.business.constructionProgress ?? 0) < displayHex.business.constructionGoal;
+                if (isUnderConstruction) return null;
+
+                const baseIncome = displayHex.business.income || 0;
+                const bizType = displayHex.business.type || (displayHex.business as any).businessType || '';
+                const deps = SUPPLY_DEPENDENCIES[bizType];
+                const hasSupplyDep = !!(deps && deps.length > 0);
+
+                // Compute family connectivity to supply nodes
+                let supplyConnected: boolean | undefined;
+                if (hasSupplyDep) {
+                  const familyHexSet = new Set((gameState?.hexMap || [])
+                    .filter((t: any) => t.controllingFamily === playerFamily)
+                    .map((t: any) => `${t.q},${t.r},${t.s}`));
+                  const connectedNodeTypes = new Set<SupplyNodeType>();
+                  ((gameState as any)?.supplyNodes || []).forEach((node: any) => {
+                    if (familyHexSet.has(`${node.q},${node.r},${node.s}`)) {
+                      connectedNodeTypes.add(node.type as SupplyNodeType);
+                    }
+                  });
+                  supplyConnected = deps!.some(d => connectedNodeTypes.has(d));
+                }
+
+                // Detect actively decaying severance: supplyConnected === false AND stockpile depleted past buffer
+                let severedDecayActive = false;
+                let decayPct = 0;
+                if (supplyConnected === false) {
+                  const stockEntry = ((gameState as any)?.supplyStockpile || []).find(
+                    (e: any) => e.family === playerFamily && deps!.includes(e.nodeType)
+                  );
+                  const turnsSinceDisconnected = stockEntry?.turnsSinceDisconnected ?? 0;
+                  if (turnsSinceDisconnected > 2) {
+                    severedDecayActive = true;
+                    const decayTurns = turnsSinceDisconnected - 2;
+                    const mult = Math.max(0.2, 1 - (0.1 * decayTurns));
+                    decayPct = Math.round((1 - mult) * 100);
+                  }
+                }
+
+                // Effective income: mirror logic — capo full, soldier 30%, player-built 100%, plus decay
+                const hexKey2 = `${displayHex.q},${displayHex.r},${displayHex.s}`;
+                const hexUnits2 = unitsByHex.get(hexKey2) || [];
+                const hasCapo2 = hexUnits2.some(u => u.family === playerFamily && u.type === 'capo');
+                const hasSoldier2 = hexUnits2.some(u => u.family === playerFamily && u.type === 'soldier');
+                const isPlayerBuilt = !displayHex.business.isExtorted;
+                let effective = Math.floor(baseIncome * 0.1);
+                if (isPlayerBuilt) effective = baseIncome;
+                else if (hasCapo2) effective = baseIncome;
+                else if (hasSoldier2) effective = Math.floor(baseIncome * 0.3);
+                if (severedDecayActive) {
+                  const mult = Math.max(0.2, 1 - (0.1 * Math.max(0, decayPct / 10)));
+                  effective = Math.floor(effective * mult);
+                }
+
+                // Heat per turn from illegal business (rough estimate: base 1, bigger biz 2)
+                const isIllegal = displayHex.business.isLegal === false;
+                const heatContribution = isIllegal ? (baseIncome >= 3000 ? 2 : 1) : 0;
+
+                // Erosion: only if active counter > 0 and player owns
+                const erosionCounter = (displayHex as any).erosionCounter || 0;
+                const EROSION_THRESHOLD = 3;
+                const turnsToFlip = erosionCounter > 0 ? Math.max(1, EROSION_THRESHOLD - erosionCounter) : 0;
+
+                // Passive influence: Phase 3+, hex owned and stable (no erosion), with adjacent enemy presence creates passive contribution
+                const phase = (gameState as any)?.gamePhase || 1;
+                const showPassiveGain = phase >= 3 && erosionCounter === 0;
+
+                return (
+                  <div className="mt-1 p-1.5 rounded border bg-emerald-900/20 border-emerald-500/30 space-y-0.5">
+                    <p className="font-bold text-xs text-emerald-300">💵 Economy</p>
+                    <p className="text-xs">
+                      <span className="text-muted-foreground">Income:</span> ${effective.toLocaleString()}/turn
+                      {effective !== baseIncome && <span className="text-muted-foreground"> (base ${baseIncome.toLocaleString()})</span>}
+                    </p>
+                    {hasSupplyDep && supplyConnected === true && (
+                      <p className="text-xs text-green-400">📦 Supply: ✅ Connected</p>
+                    )}
+                    {hasSupplyDep && severedDecayActive && (
+                      <p className="text-xs text-red-400">📦 Supply: ⚠️ Severed (-{decayPct}%/turn decay)</p>
+                    )}
+                    {heatContribution > 0 && (
+                      <p className="text-xs text-amber-400">🔥 Heat/turn: +{heatContribution}</p>
+                    )}
+                    {turnsToFlip > 0 && (
+                      <p className="text-xs text-red-400">🌊 Eroding ({turnsToFlip}t until flip)</p>
+                    )}
+                    {showPassiveGain && (
+                      <p className="text-xs text-blue-300">📈 Contributing to passive influence/respect</p>
+                    )}
+                  </div>
                 );
               })()}
               {displayHex.supplyNode && (() => {
