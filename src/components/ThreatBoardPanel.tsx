@@ -11,6 +11,7 @@ import {
   Swords,
   Waves,
   DollarSign,
+  Gavel,
 } from 'lucide-react';
 import { EnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { getTensionPairKey } from '@/types/game-mechanics';
@@ -227,10 +228,113 @@ const ThreatBoardPanel: React.FC<ThreatBoardPanelProps> = ({ gameState, onSelect
     }
   }
 
+  // ── 6. Law Enforcement (Heat, Prosecution Risk, RICO, Jailed) ──
+  const lawRows: ThreatRow[] = [];
+  const heat = (gameState as any).policeHeat?.level || 0;
+  const ricoTimer = (gameState as any).ricoTimer || 0;
+  const risk = (gameState as any).legalStatus?.prosecutionRisk || 0;
+  const prosTimer = (gameState as any).prosecutionTimer || 0;
+  const fedTimer = (gameState as any).federalIndictmentTimer || 0;
+
+  // Heat tiers
+  if (heat >= 90) {
+    lawRows.push({
+      id: 'heat-rico',
+      label: `RICO investigation — ${Math.max(1, 5 - ricoTimer)}t fuse`,
+      sub: `Heat ${Math.round(heat)}/100 — federal indictment imminent`,
+      badge: { text: 'RICO', tone: 'danger' },
+      severity: 'critical',
+    });
+  } else if (heat >= 70) {
+    lawRows.push({
+      id: 'heat-critical',
+      label: `Heat critical (${Math.round(heat)}/100)`,
+      sub: 'Capo arrests possible each turn',
+      badge: { text: 'TIER 3', tone: 'danger' },
+      severity: 'critical',
+    });
+  } else if (heat >= 50) {
+    lawRows.push({
+      id: 'heat-high',
+      label: `Heat high (${Math.round(heat)}/100)`,
+      sub: '~20% soldier arrest chance per turn',
+      badge: { text: 'TIER 2', tone: 'warn' },
+      severity: 'soft',
+    });
+  } else if (heat >= 30) {
+    lawRows.push({
+      id: 'heat-elevated',
+      label: `Heat elevated (${Math.round(heat)}/100)`,
+      sub: 'Illegal income penalized',
+      badge: { text: 'TIER 1', tone: 'warn' },
+      severity: 'soft',
+    });
+  }
+
+  // Prosecution Risk tiers
+  if (risk >= 90 && fedTimer > 0) {
+    lawRows.push({
+      id: 'prosecution-federal',
+      label: `Federal indictment in ${Math.max(1, 3 - fedTimer)}t`,
+      sub: `Prosecution risk ${Math.round(risk)}/100`,
+      badge: { text: 'INDICTMENT', tone: 'danger' },
+      severity: 'critical',
+    });
+  } else if (risk >= 50 && prosTimer > 0) {
+    lawRows.push({
+      id: 'prosecution-arrest',
+      label: `Soldier indictment in ${Math.max(1, 3 - prosTimer)}t`,
+      sub: `Prosecution risk ${Math.round(risk)}/100`,
+      badge: { text: 'INDICTMENT', tone: 'danger' },
+      severity: 'critical',
+    });
+  } else if (risk >= 50) {
+    lawRows.push({
+      id: 'prosecution-risk-high',
+      label: `Prosecution risk ${Math.round(risk)}/100`,
+      sub: 'Sustained risk triggers grand jury',
+      badge: { text: 'RISK', tone: 'warn' },
+      severity: 'soft',
+    });
+  } else if (risk >= 30) {
+    lawRows.push({
+      id: 'prosecution-risk-climbing',
+      label: `Prosecution risk climbing (${Math.round(risk)}/100)`,
+      sub: 'Bribe officials or hire a lawyer',
+      badge: { text: 'RISK', tone: 'warn' },
+      severity: 'soft',
+    });
+  }
+
+  // Jailed soldiers / capos
+  const jailedSoldiers = (gameState as any).arrestedSoldiers || [];
+  for (const a of jailedSoldiers) {
+    const remaining = Math.max(0, a.returnTurn - turn);
+    lawRows.push({
+      id: `jailed-soldier-${a.unitId}`,
+      label: `Soldier jailed${a.source === 'prosecution' ? ' (federal)' : ''}`,
+      sub: `Returns in ${remaining}t · maintenance still due`,
+      badge: { text: `${remaining}t`, tone: 'warn' },
+      severity: 'soft',
+    });
+  }
+  const jailedCapos = (gameState as any).arrestedCapos || [];
+  for (const a of jailedCapos) {
+    const remaining = Math.max(0, a.returnTurn - turn);
+    lawRows.push({
+      id: `jailed-capo-${a.unitId}`,
+      label: `Capo jailed`,
+      sub: `Returns in ${remaining}t · maintenance still due`,
+      badge: { text: `${remaining}t`, tone: 'danger' },
+      severity: 'critical',
+    });
+  }
+
   const sections: ThreatSection[] = [
     { id: 'incoming', title: 'Incoming Hits', icon: <Crosshair className="h-3 w-3 text-destructive" />, rows: incomingHits },
     { id: 'hitman', title: 'Hitman Contracts', icon: <Skull className="h-3 w-3 text-amber-400" />, rows: hitmanRows },
     { id: 'diplomacy', title: 'Wars & Ceasefires', icon: <Swords className="h-3 w-3 text-destructive" />, rows: diplomacyRows },
+    { id: 'law', title: 'Law Enforcement', icon: <Gavel className="h-3 w-3 text-amber-400" />, rows: lawRows },
     { id: 'erosion', title: 'Territory Watch', icon: <Waves className="h-3 w-3 text-amber-400" />, rows: erosionRows },
     { id: 'bounties', title: 'Bounties & Marks', icon: <DollarSign className="h-3 w-3 text-destructive" />, rows: bountyRows },
   ].filter(s => s.rows.length > 0);

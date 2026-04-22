@@ -609,6 +609,18 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             if (s.markedForDeath) { threatCount++; threatHasCritical = true; }
             else if (s.loyalty < 40 && u.type === 'soldier') threatCount++;
           }
+          // Law Enforcement
+          const _heat = (gameState as any).policeHeat?.level || 0;
+          const _risk = (gameState as any).legalStatus?.prosecutionRisk || 0;
+          if (_heat >= 70) { threatCount++; threatHasCritical = true; }
+          else if (_heat >= 30) { threatCount++; }
+          if (_risk >= 50) {
+            threatCount++;
+            if (((gameState as any).prosecutionTimer || 0) > 0 || ((gameState as any).federalIndictmentTimer || 0) > 0) threatHasCritical = true;
+          } else if (_risk >= 30) { threatCount++; }
+          threatCount += ((gameState as any).arrestedSoldiers || []).length;
+          const _capJail = ((gameState as any).arrestedCapos || []).length;
+          if (_capJail > 0) { threatCount += _capJail; threatHasCritical = true; }
           const threatTone = threatCount === 0
             ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
             : threatHasCritical
