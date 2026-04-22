@@ -5008,6 +5008,101 @@ export const useEnhancedMafiaGameState = (
     }).filter(b => b.active);
   };
 
+  // ============ AI HIT PARITY HELPERS ============
+  // These helpers mirror the player-hit consequences so AI hits incur the same risks.
+
+  /** True if the given family has a fresh-or-stale scout entry on this hex. */
+  const aiHasScoutIntel = (state: EnhancedMafiaGameState, _fam: string, q: number, r: number, s: number): boolean => {
+    // ScoutedHex is a shared global pool (no scouter-family tag). For parity purposes,
+    // any active scout entry counts as intel. AI scouts via Dellacroce or proximity proxy.
+    return (state.scoutedHexes || []).some(h => h.q === q && h.r === r && h.s === s);
+  };
+
+  /** Apply tier-scaled heat to the AI family's resources.heat (mirrors player policeHeat). */
+  const applyAIHeat = (state: EnhancedMafiaGameState, fam: string, totalUnits: number, hitType: 'scouted' | 'blind' | 'planned') => {
+    const opp = state.aiOpponents.find(o => o.family === fam);
+    if (!opp) return;
+    let baseHeat = Math.min(25, 8 + totalUnits * 2);
+    if (hitType === 'scouted') baseHeat = Math.floor(baseHeat / 2);
+    else if (hitType === 'blind') baseHeat = Math.floor(baseHeat * 1.5);
+    opp.resources.heat = Math.min(100, (opp.resources.heat || 0) + baseHeat);
+  };
+
+  /** AI commits a civilian hit on an unscouted empty rival hex — max heat, soldier hides. */
+  const applyAICivilianHit = (state: EnhancedMafiaGameState, fam: string, attackerUnit: any, districtName: string, turnReport?: TurnReport) => {
+    const opp = state.aiOpponents.find(o => o.family === fam);
+    if (opp) opp.resources.heat = 100;
+    // Remove attacker from board → hidden roster, return check on loyalty after HIDING_DURATION turns.
+    const idx = state.deployedUnits.indexOf(attackerUnit);
+    if (idx !== -1) state.deployedUnits.splice(idx, 1);
+    state.hiddenUnits = [...(state.hiddenUnits || []), {
+      unitId: attackerUnit.id,
+      family: fam,
+      returnsOnTurn: state.turn + HIDING_DURATION,
+    }];
+    const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
+    state.pendingNotifications.push({
+      type: 'info' as const,
+      title: `💀 ${famLabel} Civilian Hit`,
+      message: `The ${fam} family hit an empty rival hex in ${districtName} — civilians caught in the crossfire. Their heat maxed out and a soldier vanished into hiding.`,
+    });
+    if (turnReport) turnReport.aiActions.push({ family: fam, action: 'civilian_hit', detail: `Blind hit on civilians in ${districtName} — heat maxed, soldier in hiding` });
+  };
+
+  /** Place a bounty on the AI family from the targeted rival (mirrors player blind-hit bounty). */
+  const placeBountyOnAI = (state: EnhancedMafiaGameState, attackerFam: string, victimFam: string, turnReport?: TurnReport) => {
+    if (!victimFam || victimFam === attackerFam || victimFam === 'neutral') return;
+    state.aiBounties = [...(state.aiBounties || []), {
+      targetFamily: attackerFam,
+      fromFamily: victimFam,
+      expiresOnTurn: state.turn + BOUNTY_DURATION,
+    }];
+    if (turnReport) turnReport.aiActions.push({ family: attackerFam, action: 'bounty_placed', detail: `${victimFam} placed a bounty on the ${attackerFam} family for ${BOUNTY_DURATION} turns` });
+  };
+
+  /** Break alliances/ceasefires when AI attacks a pact-bound family. Applies same penalties as player. */
+  const applyAIDiplomacyPenalties = (state: EnhancedMafiaGameState, attackerFam: string, victimFam: string, turnReport?: TurnReport) => {
+    if (!victimFam || victimFam === attackerFam) return;
+    const attacker = state.aiOpponents.find(o => o.family === attackerFam);
+    if (!attacker) return;
+
+    // Ceasefire break (player ↔ AI)
+    if (victimFam === state.playerFamily) {
+      const cfIdx = (state.ceasefires || []).findIndex(c => c.active && c.family === attackerFam);
+      if (cfIdx !== -1) {
+        state.ceasefires[cfIdx].active = false;
+        attacker.resources.respect = Math.max(0, (attacker.resources.respect || 0) - 15);
+        state.pendingNotifications.push({
+          type: 'warning' as const,
+          title: '⚠️ Ceasefire Broken!',
+          message: `The ${attackerFam} family attacked you, breaking your ceasefire. Their respect dropped 15.`,
+        });
+        if (turnReport) turnReport.aiActions.push({ family: attackerFam, action: 'ceasefire_break', detail: `Broke ceasefire with you — lost 15 respect` });
+      }
+      // Alliance break
+      const aIdx = (state.alliances || []).findIndex(a => a.active && a.alliedFamily === attackerFam);
+      if (aIdx !== -1) {
+        state.alliances[aIdx].active = false;
+        attacker.resources.respect = Math.max(0, (attacker.resources.respect || 0) - 25);
+        state.reputation.familyRelationships[attackerFam] = (state.reputation.familyRelationships[attackerFam] || 0) - 40;
+        state.pendingNotifications.push({
+          type: 'error' as const,
+          title: '💔 Alliance Betrayed!',
+          message: `The ${attackerFam} family broke your alliance by attacking you! Their respect crashed by 25 and your relationship with them collapsed.`,
+        });
+        if (turnReport) turnReport.aiActions.push({ family: attackerFam, action: 'alliance_break', detail: `Betrayed alliance with you — lost 25 respect, relationship -40` });
+      }
+    }
+    // AI ↔ AI alliance (relationship penalty between the two AIs)
+    if (victimFam !== state.playerFamily) {
+      const victim = state.aiOpponents.find(o => o.family === victimFam);
+      if (victim) {
+        victim.relationships[attackerFam] = (victim.relationships[attackerFam] || 0) - 40;
+        attacker.relationships[victimFam] = (attacker.relationships[victimFam] || 0) - 40;
+      }
+    }
+  };
+
   // ============ AI TURN ============
   const processAITurn = (state: EnhancedMafiaGameState, turnReport?: TurnReport) => {
     state.aiOpponents = state.aiOpponents || [];
