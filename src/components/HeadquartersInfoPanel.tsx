@@ -242,7 +242,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -80 }}
       transition={{ type: 'tween', duration: 0.25 }}
-      className="fixed left-4 top-52 bottom-12 z-40 w-96 overflow-hidden"
+      className="fixed left-24 top-52 bottom-12 z-40 w-96 overflow-hidden"
     >
       <Card className="bg-gradient-to-br from-noir-dark to-background border-noir-light shadow-xl h-full flex flex-col">
         <CardHeader className="pb-3 flex-shrink-0">
