@@ -1453,7 +1453,7 @@ export const useEnhancedMafiaGameState = (
           if (u.family !== prev.playerFamily) return u;
           // Mattresses: units are locked — 0 moves
           if ((prev.mattressesState || {}).active) return { ...u, movesRemaining: 0 };
-          const baseMoves = u.type === 'capo' ? 3 : 2;
+          const baseMoves = u.type === 'capo' ? CAPO_MOVES_PER_TURN : 2;
           return { ...u, movesRemaining: baseMoves };
         });
       }
