@@ -1,28 +1,42 @@
 
 
-# Delay Contested Territory Resolution by One Turn
+# Capo Movement Nerf — Range & Moves
 
-Currently, when a soldier claims a hex it goes contested and resolves to fully owned at the end of the same turn. Change resolution to the **end of the NEXT turn**, giving the claiming soldier a full turn where they can either stay (to defend) or move away, with the resolution happening regardless of their final position (as long as no rival contests it).
+Tighten capo mobility to slow down early-game land grabs. Phase 1 capos become short-range scouts; Phase 2+ they unlock the full (reduced) fly range.
 
-## Change
+## Changes
 
-1. **`src/hooks/useEnhancedMafiaGameState.ts`**
-   - Locate where contested hexes are stamped (currently sets `contestedUntilTurn = currentTurn` or similar so it resolves at end-of-turn).
-   - Update the stamp to `contestedUntilTurn = currentTurn + 1` so the hex remains contested through the entire next turn and resolves at the end of turn N+1.
-   - End-of-turn resolution loop already iterates contested hexes — no logic change needed there beyond the new expiry value.
-   - Apply same +1 turn shift to:
-     - Manual soldier claim
-     - Capo auto-claim (per `mem://gameplay/capo-abilities`: "auto-claim now produces contested" — also gets the extended timer)
-   - Keep contest-break rules unchanged: if a rival enters/attacks the hex during the contested window, ownership does NOT finalize (existing logic).
+### 1. Capo Fly Range
+- **Phase 1**: 2 hexes per move (was 5)
+- **Phase 2+**: 4 hexes per move (was 5)
 
-2. **UI / Tooltip**
-   - In `EnhancedMafiaHexGrid.tsx` (or wherever the contested badge tooltip lives), update the label from "Resolves end of turn" → "Resolves end of next turn" so players understand the new timing.
-   - Hex info panel (bottom-left) contested status text updated likewise.
+### 2. Capo Moves Per Turn
+- **All phases**: 2 moves/turn (was 3)
 
-3. **Memory**
-   - Update `mem://gameplay/unit-actions/manual-constraints` and `mem://gameplay/capo-abilities` to note: contested territory now resolves at the end of the **following** turn, freeing the claiming unit to move or hold during the intervening turn.
+This applies to both player and AI capos for symmetry.
+
+## Files Touched
+
+1. **`src/types/game-mechanics.ts`** (or wherever capo constants live)
+   - Add/replace constants: `CAPO_FLY_RANGE_P1 = 2`, `CAPO_FLY_RANGE_P2_PLUS = 4`, `CAPO_MOVES_PER_TURN = 2`.
+
+2. **`src/hooks/useEnhancedMafiaGameState.ts`**
+   - Capo move-budget initialization at turn start: set to 2 instead of 3.
+   - Movement validation / pathing: when computing reachable hexes for a capo, use `currentPhase === 1 ? 2 : 4` as the per-move range.
+   - AI capo movement loop: same phase-gated range and 2-move cap.
+
+3. **`src/components/EnhancedMafiaHexGrid.tsx`**
+   - Highlight computation for selected capo respects the new phase-gated range (2 in P1, 4 in P2+).
+   - Tooltip / hover label on capo shows correct remaining moves out of 2.
+
+4. **UI copy**
+   - Any place that says "Capo: 3 moves" or "fly up to 5" — update to "2 moves" and "fly up to 2 (Phase 1) / 4 (Phase 2+)". Likely in `CapoPromotionPanel.tsx`, `GameGuide.tsx`, hex info panel, and tooltips.
+
+5. **Memory updates**
+   - `mem://gameplay/capo-abilities` — new range/moves with phase split.
+   - `mem://gameplay/unit-movement-rules` — capo line updated.
 
 ## What Doesn't Change
 
-- Heat generation, claim cost, action budget, contested visuals (hatching/badge), rival contest rules, Phase 3+ disabling of manual claim, capo auto-claim behavior aside from the timer.
+- Capo combat immunity, wound mechanic, ZoC bypass, auto-claim behavior (still 1 contested claim per fly), scout range (2 hexes), safehouse establishment, deployment range from HQ, soldier movement.
 
