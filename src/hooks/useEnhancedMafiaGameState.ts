@@ -2153,7 +2153,7 @@ export const useEnhancedMafiaGameState = (
                 autoExtortNotification = {
                   type: 'info' as const,
                   title: '⏳ Territory Contested',
-                  message: `${unit.name || 'Your Capo'} marked this territory. Hold for 1 turn to finalize. Heat +${pendingClaimHeatGain}.`,
+                  message: `${unit.name || 'Your Capo'} marked this territory. Finalizes at end of next turn — move freely or hold. Heat +${pendingClaimHeatGain}.`,
                 };
                 return { ...workingTile, pendingClaim: { family: prev.playerFamily, sinceTurn: prev.turn } };
               }
