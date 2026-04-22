@@ -646,8 +646,15 @@ const checkEncroachment = (state: EnhancedMafiaGameState, q: number, r: number, 
 };
 
 // ============ A1/A3/A4 + B3: PENDING CLAIM HELPERS ============
-// Capo fly range (B3): reduced from 5 → 3 to slow expansion.
-const CAPO_FLY_RANGE = 3;
+// Capo fly range: phase-gated to slow early expansion.
+// Phase 1: 2 hexes/move (short-range scout). Phase 2+: 4 hexes/move.
+const CAPO_FLY_RANGE_P1 = 2;
+const CAPO_FLY_RANGE_P2_PLUS = 4;
+const CAPO_MOVES_PER_TURN = 2;
+const getCapoFlyRange = (gamePhase: number): number =>
+  (gamePhase || 1) >= 2 ? CAPO_FLY_RANGE_P2_PLUS : CAPO_FLY_RANGE_P1;
+// Legacy alias (defaults to most permissive range for non-phase-aware callers like deployment).
+const CAPO_FLY_RANGE = CAPO_FLY_RANGE_P2_PLUS;
 
 // A4: Diminishing claim rewards based on family's currently-finalized hex count.
 // 1–10 → +1/+1, 11–20 → +0.5/+0.5, 21+ → 0/0.
@@ -958,7 +965,7 @@ const createInitialGameState = (
     deployedUnits.push({
       id: `${fam}-capo-0`, type: 'capo', family: fam,
       q: hq.q, r: hq.r, s: hq.s,
-      movesRemaining: 3, maxMoves: 3, level: 1, name: capoNames[fam],
+      movesRemaining: 2, maxMoves: 2, level: 1, name: capoNames[fam],
       personality: randomPersonality,
     });
   });
@@ -1446,7 +1453,7 @@ export const useEnhancedMafiaGameState = (
           if (u.family !== prev.playerFamily) return u;
           // Mattresses: units are locked — 0 moves
           if ((prev.mattressesState || {}).active) return { ...u, movesRemaining: 0 };
-          const baseMoves = u.type === 'capo' ? 3 : 2;
+          const baseMoves = u.type === 'capo' ? CAPO_MOVES_PER_TURN : 2;
           return { ...u, movesRemaining: baseMoves };
         });
       }
@@ -1671,9 +1678,10 @@ export const useEnhancedMafiaGameState = (
         (prev.safePassagePacts || []).some(p => p.active && p.targetFamily === family);
 
       if (unitType === 'capo') {
-        // Capo movement — fly up to CAPO_FLY_RANGE hexes
+        // Capo movement — fly up to phase-gated range per move
         // Capos CAN enter rival hexes with enemy soldiers ONLY if safe passage is active
-        const range = Math.min(CAPO_FLY_RANGE, unit.movesRemaining);
+        const capoRange = getCapoFlyRange(prev.gamePhase);
+        const range = Math.min(capoRange, unit.movesRemaining);
         const candidateHexes = getHexesInRange(unit.q, unit.r, unit.s, range);
         const validHexes = candidateHexes.filter(h => {
           const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
@@ -2188,7 +2196,7 @@ export const useEnhancedMafiaGameState = (
       // After free move or if moves remain, recalculate available hexes
       if (updatedUnit.movesRemaining > 0 || isFreeMove) {
         if (updatedUnit.type === 'capo') {
-          const range = Math.min(CAPO_FLY_RANGE, updatedUnit.movesRemaining);
+          const range = Math.min(getCapoFlyRange(prev.gamePhase), updatedUnit.movesRemaining);
           const candidates = getHexesInRange(updatedUnit.q, updatedUnit.r, updatedUnit.s, range);
           newAvailableMoves = candidates.filter(h => {
             const tile = newHexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
@@ -3200,13 +3208,13 @@ export const useEnhancedMafiaGameState = (
           newState.pendingNotifications.push({
             type: 'success' as const,
             title: '⭐ Soldier Promoted to Capo!',
-            message: `${capoName} (${personalityLabel}) now commands 3 moves per turn and can extort, escort, and negotiate.`,
+            message: `${capoName} (${personalityLabel}) now commands 2 moves per turn and can extort, escort, and negotiate.`,
           });
           return {
             ...u,
             type: 'capo' as const,
-            maxMoves: 3,
-            movesRemaining: 3,
+            maxMoves: 2,
+            movesRemaining: 2,
             name: capoName,
             personality: randomPersonality,
             level: 1,
@@ -3242,11 +3250,12 @@ export const useEnhancedMafiaGameState = (
           }
         }
         
-        const baseMoves = u.type === 'capo' ? (newWounded > 0 ? 2 : 3) : u.maxMoves;
+        const capoBase = newWounded > 0 ? Math.max(1, CAPO_MOVES_PER_TURN - CAPO_WOUND_MOVE_PENALTY) : CAPO_MOVES_PER_TURN;
+        const baseMoves = u.type === 'capo' ? capoBase : u.maxMoves;
         return {
           ...u,
           movesRemaining: baseMoves + safePassageBonus,
-          maxMoves: u.type === 'capo' ? (newWounded > 0 ? 2 : 3) : u.maxMoves,
+          maxMoves: u.type === 'capo' ? capoBase : u.maxMoves,
           escortingSoldierIds: undefined,
           woundedTurnsRemaining: u.type === 'capo' ? newWounded : undefined,
         };
@@ -3958,7 +3967,7 @@ export const useEnhancedMafiaGameState = (
               newState.deployedUnits.push({
                 id: a.unitId, type: 'capo', family: newState.playerFamily,
                 q: hq.q, r: hq.r, s: hq.s,
-                movesRemaining: 3, maxMoves: 3, level: 1,
+                movesRemaining: 2, maxMoves: 2, level: 1,
                 name: stats ? `Capo` : `Capo`,
               });
               turnReport.events.push(`🔓 Capo released from jail and returned to HQ.`);
@@ -5460,7 +5469,7 @@ export const useEnhancedMafiaGameState = (
                         state.soldierStats[eu.id].loyalty = Math.max(0, state.soldierStats[eu.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
                       }
                       eu.woundedTurnsRemaining = CAPO_WOUND_DURATION;
-                      eu.maxMoves = Math.max(1, (eu.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+                      eu.maxMoves = Math.max(1, (eu.maxMoves || 2) - CAPO_WOUND_MOVE_PENALTY);
                       if (eu.family === state.playerFamily) {
                         state.pendingNotifications.push({
                           type: 'warning' as const,
@@ -5779,8 +5788,8 @@ export const useEnhancedMafiaGameState = (
         if (bestCandidate) {
           const { unit: promUnit } = bestCandidate;
           promUnit.type = 'capo' as any;
-          promUnit.maxMoves = 3;
-          promUnit.movesRemaining = 3;
+          promUnit.maxMoves = 2;
+          promUnit.movesRemaining = 2;
           (promUnit as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
           (promUnit as any).name = `${fam.charAt(0).toUpperCase() + fam.slice(1)} Capo`;
           opponent.resources.money -= CAPO_PROMOTION_COST;
@@ -5799,8 +5808,8 @@ export const useEnhancedMafiaGameState = (
             stats.loyalty = Math.max(stats.loyalty, 60);
             state.soldierStats[anyAiSoldier.id] = stats;
             anyAiSoldier.type = 'capo' as any;
-            anyAiSoldier.maxMoves = 3;
-            anyAiSoldier.movesRemaining = 3;
+            anyAiSoldier.maxMoves = 2;
+            anyAiSoldier.movesRemaining = 2;
             (anyAiSoldier as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
             (anyAiSoldier as any).name = `${fam.charAt(0).toUpperCase() + fam.slice(1)} Capo`;
             opponent.resources.money -= CAPO_PROMOTION_COST * 2; // Costs double for forced promotion
@@ -7180,7 +7189,7 @@ export const useEnhancedMafiaGameState = (
             newState.deployedUnits[idx] = {
               ...newState.deployedUnits[idx],
               type: 'capo' as const,
-              maxMoves: 3,
+              maxMoves: 2,
               movesRemaining: newState.deployedUnits[idx].movesRemaining,
               name: capoName,
               personality: randomPersonality,
@@ -8748,7 +8757,7 @@ export const useEnhancedMafiaGameState = (
               state.soldierStats[eu.id].loyalty = Math.max(0, state.soldierStats[eu.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
             }
             eu.woundedTurnsRemaining = CAPO_WOUND_DURATION;
-            eu.maxMoves = Math.max(1, (eu.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+            eu.maxMoves = Math.max(1, (eu.maxMoves || 2) - CAPO_WOUND_MOVE_PENALTY);
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'warning' as const, title: '🩸 Enemy Capo Wounded',
               message: `You wounded an enemy capo from the ${eu.family} family. They survive but are weakened for ${CAPO_WOUND_DURATION} turns. Use Plan Hit or a Hitman to kill capos outright.`,
@@ -9009,7 +9018,7 @@ export const useEnhancedMafiaGameState = (
               state.soldierStats[capo.id].loyalty = Math.max(0, state.soldierStats[capo.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
             }
             capo.woundedTurnsRemaining = CAPO_WOUND_DURATION;
-            capo.maxMoves = Math.max(1, (capo.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+            capo.maxMoves = Math.max(1, (capo.maxMoves || 2) - CAPO_WOUND_MOVE_PENALTY);
             state.pendingNotifications = [...state.pendingNotifications, {
               type: 'warning' as const, title: '🩸 Capo Wounded!',
               message: `Your capo was wounded during the assault on ${tile.district}. Wounded for ${CAPO_WOUND_DURATION} turns.`,
@@ -9041,7 +9050,7 @@ export const useEnhancedMafiaGameState = (
             state.soldierStats[capo.id].loyalty = Math.max(0, state.soldierStats[capo.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
           }
           capo.woundedTurnsRemaining = CAPO_WOUND_DURATION;
-          capo.maxMoves = Math.max(1, (capo.maxMoves || 3) - CAPO_WOUND_MOVE_PENALTY);
+          capo.maxMoves = Math.max(1, (capo.maxMoves || 2) - CAPO_WOUND_MOVE_PENALTY);
           state.pendingNotifications = [...state.pendingNotifications, {
             type: 'warning' as const, title: '🩸 Capo Wounded!',
             message: `Your capo was wounded in the failed attack on ${tile.district}. Wounded for ${CAPO_WOUND_DURATION} turns.`,
