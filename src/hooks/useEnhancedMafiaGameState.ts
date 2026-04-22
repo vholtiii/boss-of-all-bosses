@@ -5734,10 +5734,24 @@ export const useEnhancedMafiaGameState = (
                     checkEncroachment(state, target.q, target.r, target.s, fam);
                   }
                 } else {
+                  // ===== AI HIT PARITY: blind capture of empty rival hex = civilian hit risk =====
+                  const aiCaptureScouted = aiHasScoutIntel(state, fam, target.q, target.r, target.s);
                   // Territory freeze: skip claiming ceasefire family hexes
                   const prevOwnerCeasefire = (state.ceasefires || []).some(c => c.active && (c.family === prevOwner || (prevOwner === state.playerFamily && c.family === fam)));
                   if (prevOwnerCeasefire) {
                     // Can't claim — ceasefire territory freeze
+                  } else if (!aiCaptureScouted && unit.type !== 'capo') {
+                    // Blind capture of empty rival hex by a soldier — same risk as player blind hit on empty rival hex.
+                    // Apply civilian-hit consequences and revert position so the soldier doesn't claim.
+                    applyAICivilianHit(state, fam, unit, tile.district || 'unknown territory', turnReport);
+                    // Diplomacy + bounty (still attacked the rival family)
+                    if (prevOwner && prevOwner !== 'neutral') {
+                      placeBountyOnAI(state, fam, prevOwner as string, turnReport);
+                      applyAIDiplomacyPenalties(state, fam, prevOwner as string, turnReport);
+                      addPairTension(state, fam, prevOwner as string, TENSION_TERRITORY_HIT);
+                    }
+                    // Unit was removed from board by applyAICivilianHit — exit this neighbor loop iteration
+                    break;
                   } else if (aiActionsRemaining > 0) {
                     // Built business protection: requires a Capo to seize
                     const isPlayerBuiltBiz2 = prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted;
@@ -5759,6 +5773,10 @@ export const useEnhancedMafiaGameState = (
                         });
                       }
                       tile.controllingFamily = fam;
+                      // ===== AI HIT PARITY: capturing rival hex incurs heat (scouted tier — capo or scouted soldier) =====
+                      applyAIHeat(state, fam, 1, 'scouted');
+                      // Diplomacy: capturing pact-bound rival's hex still breaks the pact
+                      applyAIDiplomacyPenalties(state, fam, prevOwner as string, turnReport);
                       // Hole #6: AI captures enemy territory → tension
                       addPairTension(state, fam, prevOwner as string, TENSION_TERRITORY_HIT);
                       checkSupplySabotage(state, target.q, target.r, target.s, fam);
