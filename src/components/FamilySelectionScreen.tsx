@@ -34,7 +34,7 @@ interface FamilyInfo {
   };
 }
 
-const families: FamilyInfo[] = [
+export const FAMILIES: FamilyInfo[] = [
   {
     id: 'gambino',
     name: 'Gambino',
@@ -53,7 +53,7 @@ const families: FamilyInfo[] = [
     powerEffect: 'Scout a target hex and all 6 adjacent hexes (7 total revealed).',
     powerCost: '2 Tactical Actions',
     powerCooldown: '3 turns',
-    startingResources: { money: 60000, soldiers: 4, influence: 15, politicalPower: 40, respect: 20 },
+    startingResources: { money: 60000, soldiers: 4, influence: 20, politicalPower: 40, respect: 20 },
   },
   {
     id: 'genovese',
@@ -73,7 +73,7 @@ const families: FamilyInfo[] = [
     powerEffect: 'Hide a hex as neutral for 3 turns. While disguised: unscoutable by enemies, -30% hit and sabotage success against it, zero police heat.',
     powerCost: '1 Tactical Action',
     powerCooldown: '2 turns',
-    startingResources: { money: 45000, soldiers: 4, influence: 10, politicalPower: 25, respect: 25 },
+    startingResources: { money: 45000, soldiers: 4, influence: 15, politicalPower: 25, respect: 25 },
   },
   {
     id: 'lucchese',
@@ -133,7 +133,7 @@ const families: FamilyInfo[] = [
     powerEffect: 'Instantly promote a soldier to capo when one of your capos is killed. Reactive trigger — no turn required.',
     powerCost: '1 Tactical Action',
     powerCooldown: 'Once per game',
-    startingResources: { money: 35000, soldiers: 1, influence: 18, politicalPower: 10, respect: 15 },
+    startingResources: { money: 35000, soldiers: 1, influence: 10, politicalPower: 10, respect: 15 },
   },
 ];
 
@@ -251,7 +251,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
 
   useBgMusic({ src: '/audio/mafia-theme.mp3', soundConfig });
 
-  const activeFamily = families.find(f => f.id === selectedFamily);
+  const activeFamily = FAMILIES.find(f => f.id === selectedFamily);
 
   return (
     <div
@@ -383,7 +383,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
 
       {/* Family cards — horizontal row */}
       <div className="flex flex-wrap justify-center gap-4 max-w-5xl mb-10 relative z-[3]">
-        {families.map((family, i) => {
+        {FAMILIES.map((family, i) => {
           const isSelected = selectedFamily === family.id;
           return (
             <motion.div
