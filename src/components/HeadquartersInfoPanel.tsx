@@ -358,24 +358,29 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
               </div>
               </CollapsibleContent>
             </Collapsible>
-
+          ) : (
             /* Rival HQ — limited info */
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-mafia-gold font-playfair flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Rival Intelligence
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-muted/20 border border-border/30 rounded-lg p-2">
-                  <div className="text-xs text-muted-foreground font-medium">Businesses</div>
-                  <div className="text-sm font-bold text-foreground">{hexBusinesses.length}</div>
+            <Collapsible open={openSections.financial} onOpenChange={() => toggleSection('financial')} className="space-y-2">
+              <CollapsibleTrigger className="w-full flex items-center justify-between text-sm font-semibold text-mafia-gold font-playfair hover:opacity-80 transition-opacity">
+                <span className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Rival Intelligence
+                </span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${openSections.financial ? 'rotate-180' : ''}`} />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-muted/20 border border-border/30 rounded-lg p-2">
+                    <div className="text-xs text-muted-foreground font-medium">Businesses</div>
+                    <div className="text-sm font-bold text-foreground">{hexBusinesses.length}</div>
+                  </div>
+                  <div className="bg-muted/20 border border-border/30 rounded-lg p-2">
+                    <div className="text-xs text-muted-foreground font-medium">Territory</div>
+                    <div className="text-sm font-bold text-foreground">{territoryCount} hexes</div>
+                  </div>
                 </div>
-                <div className="bg-muted/20 border border-border/30 rounded-lg p-2">
-                  <div className="text-xs text-muted-foreground font-medium">Territory</div>
-                  <div className="text-sm font-bold text-foreground">{territoryCount} hexes</div>
-                </div>
-              </div>
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
           )}
 
           {/* Territory Count — Player */}
