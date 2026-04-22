@@ -123,16 +123,12 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     if ((gameState?.alliances || []).some((a: any) => a.active && a.alliedFamily === rivalFamily)) return true;
     // Active supply deal where player buys from this rival — shared logistics
     if ((gameState?.supplyDealPacts || []).some((p: any) => p.active && p.buyerFamily === playerFamily && p.targetFamily === rivalFamily)) return true;
-    // Adjacent vision: within 1 hex of any player soldier, within 2 of any player capo
+    // Flipped soldier (rat) inside this rival's family — we get full sight on their units
+    if ((gameState?.flippedSoldiers || []).some((f: any) => f.family === rivalFamily && f.flippedByFamily === playerFamily)) return true;
+    // Capo vision only: within 2 hexes of any player capo (soldiers do NOT reveal by adjacency)
     for (const u of deployedUnits) {
-      if (u.family !== playerFamily) continue;
-      const range = u.type === 'capo' ? 2 : 1;
-      if (hexDistance({ q: u.q, r: u.r, s: u.s }, tile) <= range) return true;
-    }
-    // Within 1 hex of a player safehouse
-    const playerSafehouses = (gameState?.safehouses || []).filter((sh: any) => sh.family === playerFamily);
-    for (const sh of playerSafehouses) {
-      if (hexDistance({ q: sh.q, r: sh.r, s: sh.s }, tile) <= 1) return true;
+      if (u.family !== playerFamily || u.type !== 'capo') continue;
+      if (hexDistance({ q: u.q, r: u.r, s: u.s }, tile) <= 2) return true;
     }
     return false;
   };
@@ -2384,6 +2380,21 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   <span className="text-[10px] w-4 text-center flex-shrink-0">{item.icon}</span>
                   <span className="text-[10px] text-muted-foreground">{item.label}</span>
                 </div>
+              ))}
+            </div>
+            <div className="border-t border-border pt-1.5 mt-1.5">
+              <div className="text-[10px] font-bold text-foreground/80 uppercase tracking-wider mb-1">Rival Unit Visibility</div>
+              {[
+                'Scout intel (fresh)',
+                'Rat (flipped soldier in their family)',
+                'Captain bribe (target family only)',
+                'Chief / Mayor bribe (all rivals)',
+                'Active alliance or supply deal',
+                'On your claimed territory',
+                'Capo vision (within 2 hexes)',
+                'Rival HQ hex',
+              ].map(label => (
+                <div key={label} className="text-[10px] text-muted-foreground">• {label}</div>
               ))}
             </div>
           </div>
