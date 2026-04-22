@@ -2153,7 +2153,7 @@ export const useEnhancedMafiaGameState = (
                 autoExtortNotification = {
                   type: 'info' as const,
                   title: '⏳ Territory Contested',
-                  message: `${unit.name || 'Your Capo'} marked this territory. Hold for 1 turn to finalize. Heat +${pendingClaimHeatGain}.`,
+                  message: `${unit.name || 'Your Capo'} marked this territory. Finalizes at end of next turn — move freely or hold. Heat +${pendingClaimHeatGain}.`,
                 };
                 return { ...workingTile, pendingClaim: { family: prev.playerFamily, sinceTurn: prev.turn } };
               }
@@ -2725,7 +2725,7 @@ export const useEnhancedMafiaGameState = (
                 autoExtortNotification = {
                   type: 'info' as const,
                   title: '⏳ Territory Contested',
-                  message: `${deployedUnit?.name || 'Your Capo'} marked this territory on deployment. Hold for 1 turn to finalize. Heat +${pendingClaimHeatGain}.`,
+                  message: `${deployedUnit?.name || 'Your Capo'} marked this territory on deployment. Finalizes at end of next turn — move freely or hold. Heat +${pendingClaimHeatGain}.`,
                 };
                 return { ...tile, pendingClaim: { family: family as string, sinceTurn: prev.turn } };
               }
@@ -2884,18 +2884,20 @@ export const useEnhancedMafiaGameState = (
       newState.turn += 1;
 
       // ============ A1: PENDING CLAIM FINALIZATION ============
-      // For every hex with a pendingClaim from the previous turn:
+      // For every hex with a pendingClaim from two turns ago (claim turn N → resolves at end of turn N+1):
       //   • If a friendly unit is on or adjacent → finalize (controllingFamily = family),
       //     grant diminishing-return respect/influence (A4).
       //   • Else → revert to neutral (claim wasted, no refund).
+      // The extra turn lets the claiming unit move freely or hold during the intervening turn.
       const finalizedByFam: Record<string, number> = {};
       const wastedByFam: Record<string, number> = {};
       for (const tile of newState.hexMap) {
         if (!tile.pendingClaim) continue;
         const claimFam = tile.pendingClaim.family;
         const sinceTurn = tile.pendingClaim.sinceTurn;
-        // Only resolve claims initiated on a previous turn (1+ turn presence required).
-        if (newState.turn <= sinceTurn) continue;
+        // Resolve only after the claim has aged through one full intervening turn.
+        // Claim turn N → state.turn here is N+1 at end of turn N (skip), N+2 at end of turn N+1 (resolve).
+        if (newState.turn <= sinceTurn + 1) continue;
         const onHex = newState.deployedUnits.some(u => u.family === claimFam && u.q === tile.q && u.r === tile.r && u.s === tile.s);
         const adjUnit = !onHex && getHexNeighbors(tile.q, tile.r, tile.s).some(n =>
           newState.deployedUnits.some(u => u.family === claimFam && u.q === n.q && u.r === n.r && u.s === n.s)
