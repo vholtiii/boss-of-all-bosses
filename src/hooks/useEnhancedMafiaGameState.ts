@@ -3031,46 +3031,63 @@ export const useEnhancedMafiaGameState = (
       (newState as any).abandonedThisTurn = 0;
 
       // ============ HIDDEN UNITS RETURN / INTERNAL HIT CHECK ============
+      // Now family-aware: AI hidden soldiers (from civilian hits during AI turns) return to their own HQ.
       const returningUnits = newState.hiddenUnits.filter(h => newState.turn >= h.returnsOnTurn);
       if (returningUnits.length > 0) {
-        const hq = newState.headquarters[newState.playerFamily];
         let returnedCount = 0;
         let eliminatedCount = 0;
+        let aiReturnedCount = 0;
+        let aiEliminatedCount = 0;
 
         returningUnits.forEach(h => {
           const stats = newState.soldierStats[h.unitId];
           const loyalty = stats?.loyalty ?? 50;
+          const ownerFam = h.family || newState.playerFamily;
+          const isPlayer = ownerFam === newState.playerFamily;
 
           if (loyalty < INTERNAL_HIT_LOYALTY_THRESHOLD) {
             // ===== INTERNAL FAMILY HIT: soldier eliminated =====
-            eliminatedCount++;
-            if (turnReport) turnReport.resourceDeltas.soldiers--;
-            delete newState.soldierStats[h.unitId];
+            if (isPlayer) {
+              eliminatedCount++;
+              if (turnReport) turnReport.resourceDeltas.soldiers--;
+              delete newState.soldierStats[h.unitId];
 
-            // Heat reduction — family cleaned up its mess
-            newState.policeHeat.level = Math.max(0, newState.policeHeat.level - INTERNAL_HIT_HEAT_REDUCTION);
+              // Heat reduction — family cleaned up its mess
+              newState.policeHeat.level = Math.max(0, newState.policeHeat.level - INTERNAL_HIT_HEAT_REDUCTION);
 
-            // Morale risk: each remaining soldier may lose loyalty
-            Object.keys(newState.soldierStats).forEach(sid => {
-              if (Math.random() < INTERNAL_HIT_MORALE_RISK) {
-                newState.soldierStats[sid] = {
-                  ...newState.soldierStats[sid],
-                  loyalty: Math.max(0, newState.soldierStats[sid].loyalty - INTERNAL_HIT_MORALE_PENALTY),
-                };
+              // Morale risk: each remaining soldier may lose loyalty
+              Object.keys(newState.soldierStats).forEach(sid => {
+                if (Math.random() < INTERNAL_HIT_MORALE_RISK) {
+                  newState.soldierStats[sid] = {
+                    ...newState.soldierStats[sid],
+                    loyalty: Math.max(0, newState.soldierStats[sid].loyalty - INTERNAL_HIT_MORALE_PENALTY),
+                  };
+                }
+              });
+
+              newState.pendingNotifications.push({
+                type: 'error',
+                title: '🔪 Internal Family Hit',
+                message: `A disloyal soldier (loyalty: ${loyalty}/${INTERNAL_HIT_LOYALTY_THRESHOLD}) was eliminated by the family. -${INTERNAL_HIT_HEAT_REDUCTION} heat. Warning: remaining crew morale may suffer.`,
+              });
+            } else {
+              aiEliminatedCount++;
+              delete newState.soldierStats[h.unitId];
+              const opp = newState.aiOpponents.find(o => o.family === ownerFam);
+              if (opp) {
+                opp.resources.soldiers = Math.max(0, opp.resources.soldiers - 1);
+                opp.resources.heat = Math.max(0, (opp.resources.heat || 0) - INTERNAL_HIT_HEAT_REDUCTION);
               }
-            });
-
-            newState.pendingNotifications.push({
-              type: 'error',
-              title: '🔪 Internal Family Hit',
-              message: `A disloyal soldier (loyalty: ${loyalty}/${INTERNAL_HIT_LOYALTY_THRESHOLD}) was eliminated by the family. -${INTERNAL_HIT_HEAT_REDUCTION} heat. Warning: remaining crew morale may suffer.`,
-            });
+              if (turnReport) turnReport.aiActions.push({ family: ownerFam, action: 'internal_hit', detail: `Eliminated a disloyal soldier returning from hiding (loyalty ${loyalty})` });
+            }
           } else {
             // ===== LOYAL SOLDIER: returns to HQ =====
-            returnedCount++;
+            const hq = newState.headquarters[ownerFam];
+            if (!hq) return;
+            if (isPlayer) returnedCount++; else aiReturnedCount++;
             newState.deployedUnits.push({
               id: h.unitId,
-              family: newState.playerFamily,
+              family: ownerFam as any,
               type: 'soldier',
               q: hq.q, r: hq.r, s: hq.s,
               movesRemaining: 0,
@@ -3099,6 +3116,8 @@ export const useEnhancedMafiaGameState = (
         if (turnReport) {
           if (returnedCount > 0) turnReport.events.push(`${returnedCount} soldier(s) returned from hiding.`);
           if (eliminatedCount > 0) turnReport.events.push(`🔪 Internal hit: ${eliminatedCount} disloyal soldier(s) eliminated by the family (loyalty below ${INTERNAL_HIT_LOYALTY_THRESHOLD}). -${INTERNAL_HIT_HEAT_REDUCTION} heat each. Morale risk applied.`);
+          if (aiReturnedCount > 0) turnReport.events.push(`🕵️ ${aiReturnedCount} rival soldier(s) returned from hiding to their HQ.`);
+          if (aiEliminatedCount > 0) turnReport.events.push(`🔪 ${aiEliminatedCount} rival soldier(s) eliminated internally after disloyal return from hiding.`);
         }
 
       }
