@@ -8905,7 +8905,9 @@ export const useEnhancedMafiaGameState = (
         state.plannedHit = null; // Consume the plan either way
       }
       
-      chance = Math.max(0.1, Math.min(0.95, chance));
+      // Difficulty modifier: Easy +10pp, Hard -10pp on hit success
+      chance += state.difficultyModifiers?.hitSuccessBonus ?? 0;
+      chance = Math.max(0.05, Math.min(0.99, chance));
 
       // Heat scales with battle size — modified by hit type
       const totalUnitsInvolved = attackers + defenders;
