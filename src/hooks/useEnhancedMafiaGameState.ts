@@ -4308,7 +4308,7 @@ export const useEnhancedMafiaGameState = (
       // Business gain: was hexes/5. Now hexes/7 (~30% less).
       let rawRespectGain = (hexesWithBusinesses / 7) + incomeRespectGain;
       // Phase 1 dampener: halve passive respect gains in early game (combat spikes & claim rewards bypass).
-      if (newState.currentPhase === 1) {
+      if ((newState.gamePhase || 1) === 1) {
         rawRespectGain *= 0.5;
       }
       const scaledRespectGain = applyDiminishingReturns(newState.reputation.respect, rawRespectGain);
