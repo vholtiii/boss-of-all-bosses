@@ -1,89 +1,54 @@
 
 
-# Slow Territory Acquisition — A1 + A3 + A4 + B3
+# Dock HQ Info Panel to Left Side — With Scroll + Collapsible Sections
 
-Implement four compounding levers that make territory expansion slower, costlier, and more deliberate — without removing any mechanic.
+Move the Headquarters info panel from its floating top-right position to a fixed left-side dock between the map controls and the Legend button. Make it fully scrollable and convert long content blocks into collapsible dropdown sections to economize space.
 
----
+## Placement
 
-## A1 — Claim Requires Presence Time (Contested → Claimed)
+- Fixed to the left edge: `left-4`, `top-52` (clears zoom + Units + Supply Lines toggles), `bottom-12` (clears Legend button), `w-96`, `z-40`.
+- Slide-in animation flipped to enter from the left (`x: -80`).
+- Dragging removed (panel is docked). Click-outside-to-close preserved.
 
-Claim is still an explicit action (1 AP), not automatic on movement.
+## Scroll Behavior
 
-- Player runs **Claim** on a neutral hex. The hex enters a new **Contested** state owned by the player visually but **not counted toward victory, district control, or income**.
-- If the same player still has a unit on or adjacent to that hex at the **start of their next turn**, the hex finalizes to **Claimed** (full ownership, all bonuses apply).
-- If the unit has moved away AND no friendly unit is adjacent, the hex reverts to **Neutral** (claim wasted, AP not refunded).
-- If a rival unit moves onto a Contested hex before it finalizes, it reverts to Neutral immediately (no combat — the claim simply fails).
-- Visual: Contested hexes use the player color at ~40% opacity with a dashed outline and a small ⏳ badge.
+- Outer wrapper: `overflow-hidden` with `h-full` so it fills the docked vertical slot exactly.
+- Inner `<Card>` uses a flex column: fixed header + `flex-1 overflow-y-auto` content region.
+- Custom thin scrollbar styling consistent with the rest of the app.
+- Long content (financial breakdown, full unit roster, business list) scrolls inside the panel — never pushes the layout.
 
-Applies to both manual Claim and capo auto-claim (capo auto-claim now produces Contested, not Claimed).
+## Collapsible Sections (space economy)
 
-## A3 — Claiming Generates Heat
+Each major content block becomes a `<Collapsible>` (using existing `src/components/ui/collapsible.tsx`) with a clickable header showing a chevron + summary chip. Default open/closed states tuned for at-a-glance use:
 
-- Claim action: **+3 heat**.
-- Claim on a hex containing a business: **+6 heat**.
-- Heat applies on claim *initiation* (when Contested begins), not on finalization. Wasted claims still cost heat — the feds noticed you trying.
-- Capo auto-claim follows the same rule.
-
-## A4 — Diminishing Claim Returns
-
-Respect/influence rewards from claiming scale by total hexes the family currently holds (Claimed only, not Contested):
-
-| Family hex count | Respect per claim | Influence per claim |
+| Section | Default | Header summary chip |
 |---|---|---|
-| 1–10 | +1 | +1 |
-| 11–20 | +0.5 (rounded down each 2 claims) | +0.5 |
-| 21+ | 0 | 0 |
+| Financial Overview | **Open** | net profit (e.g. "+$4,200/turn") |
+| Unit Status | **Open** | "5 soldiers · 2 capos" |
+| Boss Overview (businesses + loyalty) | Collapsed | "12 businesses · 8 loyal" |
+| Threats & Intel | Collapsed | unread threat count badge |
+| Strategic Actions (Sitdown / Mattresses / War Summit / Purge) | Collapsed | "4 actions" |
+| Diplomacy Status (pacts, cooldowns) | Collapsed | active pact count |
 
-Income from the hex is unaffected — only the prestige reward decays. Encourages developing held territory rather than blobbing.
+Multiple sections can be expanded simultaneously (matches existing right-sidebar action menu pattern). Open/closed state is local component state (resets when panel closes).
 
-## B3 — Reduce Capo Fly Range
+For the rival HQ variant, the same docked slot is used with a reduced section set (Intel summary open, others collapsed).
 
-- Capo fly range: **5 → 3 hexes** per move.
-- Capo moves per turn unchanged (3).
-- Scout range unchanged (2 hexes).
-- Auto-claim still triggers on hexes the capo lands on (now produces Contested per A1).
+## Files Touched
 
-Keeps capos elite (still fly, still scout 2, still 3 moves) but they can no longer cross half the map in one turn.
+1. **`src/components/HeadquartersInfoPanel.tsx`**
+   - Replace floating/draggable wrapper with docked classes: `fixed left-4 top-52 bottom-12 z-40 w-96 overflow-hidden`.
+   - Strip `drag`, `dragMomentum`, `dragConstraints`, `onDragStart`, `onDragEnd`, `whileDrag`, `cursor: grab`, and the `isDraggingRef` guard in click-outside handler.
+   - Flip enter/exit animation to `x: -80 → 0 → -80`.
+   - Convert inner card to flex column: header (fixed) + scrollable content region (`flex-1 overflow-y-auto pr-1`).
+   - Wrap each major content block in `<Collapsible>` with a header row (title + summary chip + chevron). Use `lucide-react` `ChevronDown` rotating on open.
+   - Local `useState` map for section open states with the defaults above.
 
----
+2. **Memory** — update `mem://ui/hq-panel-interaction` to reflect: docked left between controls and Legend, no longer draggable, internal scroll, collapsible subsections.
 
-## Technical Outline
+## What Doesn't Change
 
-### Files Touched
-
-1. **`src/types/game-mechanics.ts`** — add `'contested'` to hex `controlledBy` semantics via a new field `contestedBy?: FamilyId` and `contestedSince?: number` on the hex type. Keep `controlledBy` strictly for finalized ownership.
-
-2. **`src/hooks/useEnhancedMafiaGameState.ts`**
-   - **Claim handler**: write to `contestedBy` + `contestedSince = currentTurn` instead of `controlledBy`. Apply heat (+3 / +6). Do NOT grant respect/influence yet.
-   - **New finalization pass** at the start of each player's turn: for every hex where `contestedBy === player`, check if a friendly unit is on or adjacent. If yes → finalize (`controlledBy = player`, clear contested fields, grant diminishing respect/influence per A4). If no → revert to neutral.
-   - **Rival intrusion check**: in unit-move handler, if destination hex is Contested by another family, clear contested state (revert to neutral).
-   - **Capo auto-claim**: route through the same Claim path (contested + heat + diminishing rewards).
-   - **Capo fly range constant**: `CAPO_FLY_RANGE: 5 → 3`. Update pathfinding/range-highlight helpers that read this.
-   - **Diminishing rewards helper**: `getClaimRewards(familyHexCount) → { respect, influence }`.
-   - **Victory / district-control / income calculations**: ensure they count only `controlledBy === family`, ignore Contested.
-
-3. **`src/components/EnhancedMafiaHexGrid.tsx`** — render Contested hexes (40% opacity fill, dashed stroke in family color, ⏳ badge). Update legend.
-
-4. **`src/components/MapLegend`** (within hex grid file) — add Contested entry.
-
-5. **`src/components/HeadquartersInfoPanel.tsx`** + any territory counters — display "Held: X (+Y contested)" so players see pending finalizations.
-
-6. **`src/components/AlertsLogPanel.tsx`** indirectly — emit alerts for: "Claim contested → finalized" (success), "Claim reverted (no presence)" (warning), "Claim broken by Genovese intrusion" (warning). Hooked at finalization pass.
-
-7. **Tooltip / action preview** for Claim button — update to show "+3 heat, requires holding for 1 turn" and current diminishing-reward tier.
-
-### Memory Updates
-
-After build, update three memory files:
-- `mem://gameplay/unit-actions/manual-constraints` — claim now contested for 1 turn, costs +3/+6 heat.
-- `mem://gameplay/capo-abilities` — fly range 5→3; auto-claim produces contested.
-- `mem://gameplay/respect-influence-balance` — note diminishing claim rewards tier table.
-
-### What Doesn't Change
-
-- Extort, sabotage, hit, fortify, scout: untouched.
-- Erosion/expansion (Phase 3+): untouched.
-- AP costs, movement rules other than capo range: untouched.
-- AI uses the exact same rules (contested, heat, diminishing rewards, range 3).
+- All existing HQ panel content, props, and parent wiring.
+- Map controls, Legend, and right sidebar.
+- Click-outside dismissal logic (minus the drag guard).
 
