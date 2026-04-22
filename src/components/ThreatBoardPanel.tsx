@@ -11,6 +11,7 @@ import {
   Swords,
   Waves,
   DollarSign,
+  Gavel,
 } from 'lucide-react';
 import { EnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { getTensionPairKey } from '@/types/game-mechanics';
