@@ -251,7 +251,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
 
   useBgMusic({ src: '/audio/mafia-theme.mp3', soundConfig });
 
-  const activeFamily = families.find(f => f.id === selectedFamily);
+  const activeFamily = FAMILIES.find(f => f.id === selectedFamily);
 
   return (
     <div
@@ -383,7 +383,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
 
       {/* Family cards — horizontal row */}
       <div className="flex flex-wrap justify-center gap-4 max-w-5xl mb-10 relative z-[3]">
-        {families.map((family, i) => {
+        {FAMILIES.map((family, i) => {
           const isSelected = selectedFamily === family.id;
           return (
             <motion.div
