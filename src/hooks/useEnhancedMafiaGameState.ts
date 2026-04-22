@@ -863,7 +863,7 @@ const HQ_POSITIONS_BY_SIZE: Record<string, Record<string, {q:number;r:number;s:n
 };
 
 // ============ INITIAL STATE ============
-const createInitialGameState = (
+export const createInitialGameState = (
   family: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo' = 'gambino',
   startingResources?: { money: number; soldiers: number; influence: number; politicalPower: number; respect: number },
   difficulty: Difficulty = 'normal',
