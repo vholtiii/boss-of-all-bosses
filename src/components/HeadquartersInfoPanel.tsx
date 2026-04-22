@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   SITDOWN_COST, SITDOWN_DEFENSE_PER_SOLDIER,
   DECLARE_WAR_COST, MATTRESSES_COST, MATTRESSES_COOLDOWN, MATTRESSES_DURATION, MATTRESSES_DEFENSE_BONUS, MATTRESSES_HQ_BONUS, MATTRESSES_INCOME_PENALTY,
@@ -161,15 +162,25 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   onEliminateSoldier,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
-  const isDraggingRef = useRef(false);
   const [bossExpanded, setBossExpanded] = useState(false);
   const [sitdownOpen, setSitdownOpen] = useState(false);
   const [selectedSitdownIds, setSelectedSitdownIds] = useState<string[]>([]);
   const [declareWarOpen, setDeclareWarOpen] = useState(false);
 
+  // Collapsible section states
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    financial: true,
+    units: true,
+    boss: false,
+    threats: false,
+    strategic: false,
+    diplomacy: false,
+  });
+  const toggleSection = (key: string) =>
+    setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (isDraggingRef.current) return;
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         onClose();
       }
@@ -227,21 +238,14 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   return (
     <motion.div
       ref={panelRef}
-      drag
-      dragMomentum={false}
-      dragConstraints={{ left: -(window.innerWidth - 400), right: 0, top: 0, bottom: window.innerHeight - 200 }}
-      onDragStart={() => { isDraggingRef.current = true; }}
-      onDragEnd={() => { setTimeout(() => { isDraggingRef.current = false; }, 100); }}
-      initial={{ opacity: 0, x: 80 }}
+      initial={{ opacity: 0, x: -80 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 80 }}
+      exit={{ opacity: 0, x: -80 }}
       transition={{ type: 'tween', duration: 0.25 }}
-      className="fixed top-4 right-4 z-40 w-96 max-h-[calc(100vh-2rem)] overflow-y-auto"
-      style={{ cursor: 'grab' }}
-      whileDrag={{ cursor: 'grabbing' }}
+      className="fixed left-4 top-52 bottom-12 z-40 w-96 overflow-hidden"
     >
-      <Card className="bg-gradient-to-br from-noir-dark to-background border-noir-light shadow-xl">
-        <CardHeader className="pb-4">
+      <Card className="bg-gradient-to-br from-noir-dark to-background border-noir-light shadow-xl h-full flex flex-col">
+        <CardHeader className="pb-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-3 text-mafia-gold font-playfair text-base">
               <Building2 className="h-5 w-5" style={{ color: familyColor }} />
@@ -261,14 +265,23 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
           </div>
         </CardHeader>
         
-        <CardContent className="space-y-4 pt-0">
+        <CardContent className="space-y-3 pt-0 pb-4 flex-1 overflow-y-auto pr-2">
           {/* Financial Overview — Player Only */}
           {isPlayerFamily && finances ? (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-mafia-gold font-playfair flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Financial Overview
-              </h3>
+            <Collapsible open={openSections.financial} onOpenChange={() => toggleSection('financial')} className="space-y-2">
+              <CollapsibleTrigger className="w-full flex items-center justify-between text-sm font-semibold text-mafia-gold font-playfair hover:opacity-80 transition-opacity">
+                <span className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Financial Overview
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className={`text-[10px] font-mono ${finances.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {finances.totalProfit >= 0 ? '+' : ''}${finances.totalProfit.toLocaleString()}/t
+                  </span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${openSections.financial ? 'rotate-180' : ''}`} />
+                </span>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-2">
 
               {/* Cash on Hand */}
               {totalMoney !== undefined && (
@@ -343,25 +356,31 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                   <div className="text-xs font-bold text-emerald-400">${finances.cleanMoney.toLocaleString()}</div>
                 </div>
               </div>
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
           ) : (
             /* Rival HQ — limited info */
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-mafia-gold font-playfair flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Rival Intelligence
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-muted/20 border border-border/30 rounded-lg p-2">
-                  <div className="text-xs text-muted-foreground font-medium">Businesses</div>
-                  <div className="text-sm font-bold text-foreground">{hexBusinesses.length}</div>
+            <Collapsible open={openSections.financial} onOpenChange={() => toggleSection('financial')} className="space-y-2">
+              <CollapsibleTrigger className="w-full flex items-center justify-between text-sm font-semibold text-mafia-gold font-playfair hover:opacity-80 transition-opacity">
+                <span className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Rival Intelligence
+                </span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${openSections.financial ? 'rotate-180' : ''}`} />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-muted/20 border border-border/30 rounded-lg p-2">
+                    <div className="text-xs text-muted-foreground font-medium">Businesses</div>
+                    <div className="text-sm font-bold text-foreground">{hexBusinesses.length}</div>
+                  </div>
+                  <div className="bg-muted/20 border border-border/30 rounded-lg p-2">
+                    <div className="text-xs text-muted-foreground font-medium">Territory</div>
+                    <div className="text-sm font-bold text-foreground">{territoryCount} hexes</div>
+                  </div>
                 </div>
-                <div className="bg-muted/20 border border-border/30 rounded-lg p-2">
-                  <div className="text-xs text-muted-foreground font-medium">Territory</div>
-                  <div className="text-sm font-bold text-foreground">{territoryCount} hexes</div>
-                </div>
-              </div>
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
           )}
 
           {/* Territory Count — Player */}
@@ -377,51 +396,65 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
 
           {/* Active Threats — Player Only */}
           {isPlayerFamily && detectedThreats && detectedThreats.length > 0 && (
-            <div className="space-y-1.5">
-              <h3 className="text-sm font-semibold text-destructive font-playfair flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                ⚠️ Active Threats
-              </h3>
-              {detectedThreats.map((threat, i) => {
-                const sourceLabels: Record<string, string> = {
-                  scout: '🕵️ Street Scout',
-                  bribe_captain: '👮 Police Captain',
-                  bribe_chief: '🏛️ Police Chief',
-                  bribe_mayor: '🏛️ Mayor\'s Office',
-                };
-                const targetUnit = deployedUnits.find((u: any) => u.id === threat.targetUnitId);
-                const targetName = targetUnit ? (targetUnit.name || `Capo ${threat.targetUnitId.slice(0, 4)}`) : 'Unknown';
-                const isUrgent = threat.turnsRemaining <= 1;
-                return (
-                  <div
-                    key={i}
-                    className={`rounded-lg p-2 text-[11px] border ${
-                      isUrgent
-                        ? 'bg-red-500/20 border-red-500/40 text-red-300'
-                        : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
-                    }`}
-                  >
-                    <div className="font-bold capitalize">
-                      {threat.family} → {targetName}
+            <Collapsible open={openSections.threats} onOpenChange={() => toggleSection('threats')} className="space-y-1.5">
+              <CollapsibleTrigger className="w-full flex items-center justify-between text-sm font-semibold text-destructive font-playfair hover:opacity-80 transition-opacity">
+                <span className="flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  ⚠️ Active Threats
+                </span>
+                <span className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[9px] h-4 border-destructive/40 text-destructive">{detectedThreats.length}</Badge>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${openSections.threats ? 'rotate-180' : ''}`} />
+                </span>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-1.5">
+                {detectedThreats.map((threat, i) => {
+                  const sourceLabels: Record<string, string> = {
+                    scout: '🕵️ Street Scout',
+                    bribe_captain: '👮 Police Captain',
+                    bribe_chief: '🏛️ Police Chief',
+                    bribe_mayor: '🏛️ Mayor\'s Office',
+                  };
+                  const targetUnit = deployedUnits.find((u: any) => u.id === threat.targetUnitId);
+                  const targetName = targetUnit ? (targetUnit.name || `Capo ${threat.targetUnitId.slice(0, 4)}`) : 'Unknown';
+                  const isUrgent = threat.turnsRemaining <= 1;
+                  return (
+                    <div
+                      key={i}
+                      className={`rounded-lg p-2 text-[11px] border ${
+                        isUrgent
+                          ? 'bg-red-500/20 border-red-500/40 text-red-300'
+                          : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
+                      }`}
+                    >
+                      <div className="font-bold capitalize">
+                        {threat.family} → {targetName}
+                      </div>
+                      <div className="text-[10px] opacity-80">
+                        {threat.turnsRemaining} turn{threat.turnsRemaining !== 1 ? 's' : ''} until execution
+                      </div>
+                      <div className="text-[10px] opacity-60 italic">
+                        Source: {sourceLabels[threat.detectedVia] || 'Unknown'}
+                      </div>
                     </div>
-                    <div className="text-[10px] opacity-80">
-                      {threat.turnsRemaining} turn{threat.turnsRemaining !== 1 ? 's' : ''} until execution
-                    </div>
-                    <div className="text-[10px] opacity-60 italic">
-                      Source: {sourceLabels[threat.detectedVia] || 'Unknown'}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </CollapsibleContent>
+            </Collapsible>
           )}
 
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-mafia-gold font-playfair flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Unit Status
-            </h3>
-            
+          <Collapsible open={openSections.units} onOpenChange={() => toggleSection('units')} className="space-y-2">
+            <CollapsibleTrigger className="w-full flex items-center justify-between text-sm font-semibold text-mafia-gold font-playfair hover:opacity-80 transition-opacity">
+              <span className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Unit Status
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground font-normal">{units.soldiers.length}🔫 · {units.capos.length}⚡</span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${openSections.units ? 'rotate-180' : ''}`} />
+              </span>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2">
                 <div className="flex items-center gap-1 mb-1">
@@ -1074,9 +1107,8 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                 </div>
               );
             })()}
-          </div>
-
-          {/* Business & Territory Summary */}
+            </CollapsibleContent>
+          </Collapsible>
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-2">
               <div className="text-xs font-medium text-gray-400">Businesses</div>
