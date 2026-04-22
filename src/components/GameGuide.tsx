@@ -239,7 +239,7 @@ const sections: GuideSection[] = [
         </div>
         <Stat label="Intel Decay" value="Fresh → Stale over time" color="text-yellow-400" />
         <Tip>Fresh intel gives combat bonuses. Re-scout before major attacks!</Tip>
-        <Tip>Soldiers can't see rival units by proximity. Reveal via scout, rat, Captain bribe (one family), Chief/Mayor bribe (all families), pact, or capo vision.</Tip>
+        <Tip>Soldiers can't see rival units by proximity. Reveal via scout, rat in their family, Captain bribe (target family only), Chief/Mayor bribe (all rivals, map-wide), pact, or capo vision.</Tip>
       </div>
     ),
   },
