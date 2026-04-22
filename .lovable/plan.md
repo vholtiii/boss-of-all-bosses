@@ -1,76 +1,39 @@
 
 
-# Revisit Starting Influence + Add Starting Balance Test
+# Bump Colombo Starting Influence to 12.5
 
-## Part 1 — Rebalance starting Influence
+Colombo's starting influence goes from 10 → **12.5**, slotting it just above Lucchese (12) in the ladder.
 
-Current per-family Influence values feel arbitrary and don't strongly map to family identity. Influence gates diplomacy (sitdowns, pacts, Commission Vote progress) and feeds passive territory expansion in Phase 3+. Families with political/economic dominance should start higher; scrappy/military families lower.
+## Heads-up on the half-point
 
-### Current vs Proposed
+All other starting resources are integers, and the HUD/Phase-1 dampener math has only been exercised against whole numbers. 12.5 will display as "12.5%" in the influence badge (or round depending on the formatter). If you'd rather keep integers, 12 or 13 would be safer — but per your request, 12.5 it is.
 
-| Family   | Current | Proposed | Rationale |
-|----------|---------|----------|-----------|
-| Gambino  | 15      | **20**   | Most politically connected, "controls the money" — should lead in influence |
-| Genovese | 10      | **15**   | Hidden empire with deep front-business reach — moderate influence |
-| Lucchese | 12      | **12**   | Unchanged — quiet, surgical, mid-tier political reach |
-| Bonanno  | 8       | **8**    | Unchanged — old guard, insular, weakest political network (matches identity) |
-| Colombo  | 18      | **10**   | Currently highest, but lore says "scrappy survivors with the least" — 18 contradicts identity. Drop to 10. |
+## New influence ladder
 
-**New ladder**: Gambino 20 > Genovese 15 > Lucchese 12 > Colombo 10 > Bonanno 8.
+| Family   | Influence |
+|----------|-----------|
+| Gambino  | 20        |
+| Genovese | 15        |
+| **Colombo**  | **12.5** |
+| Lucchese | 12        |
+| Bonanno  | 8         |
 
-This makes Influence reflect political/economic clout (Gambino top, Bonanno bottom) and fixes the Colombo inconsistency where the "scrappy underdog" had the highest influence in the game.
-
-## Part 2 — Add starting balance test
-
-Add a Vitest unit test that locks in the per-family starting resources so future edits can't silently regress the carefully-tuned values.
-
-### Test setup (project has none yet)
-
-- Add `vitest`, `@testing-library/jest-dom`, `@testing-library/react`, `jsdom` to `package.json` devDependencies.
-- Create `vitest.config.ts` (jsdom env, `@` alias, setup file).
-- Create `src/test/setup.ts` (jest-dom + matchMedia stub).
-- Add `"vitest/globals"` to `tsconfig.app.json` types.
-
-### The test itself
-
-`src/components/__tests__/FamilySelectionScreen.starting-balance.test.tsx` — imports the `FAMILIES` array and asserts each family's full `startingResources` object matches a frozen expected snapshot:
-
-```ts
-const EXPECTED = {
-  gambino:  { money: 60000, soldiers: 4, influence: 20, politicalPower: 40, respect: 20 },
-  genovese: { money: 45000, soldiers: 4, influence: 15, politicalPower: 25, respect: 25 },
-  lucchese: { money: 70000, soldiers: 3, influence: 12, politicalPower: 20, respect: 10 },
-  bonanno:  { money: 40000, soldiers: 2, influence: 8,  politicalPower: 15, respect: 25 },
-  colombo:  { money: 35000, soldiers: 1, influence: 10, politicalPower: 10, respect: 15 },
-};
-```
-
-Test cases:
-1. All 5 families exist in `FAMILIES`.
-2. Each family's `startingResources` deep-equals the expected object.
-3. Influence ladder ordering check: `gambino > genovese > lucchese > colombo > bonanno`.
-4. Respect floor: no family starts below 10.
-
-`FAMILIES` is currently a module-local const — the test requires it to be exported. Add `export` to its declaration in `FamilySelectionScreen.tsx`.
+Note: this flips Colombo above Lucchese, breaking the previous `lucchese > colombo` ordering. The ladder test in `FamilySelectionScreen.starting-balance.test.tsx` asserts `lucchese > colombo`, so it will be updated to `colombo > lucchese`.
 
 ## Files Touched
 
-- `src/components/FamilySelectionScreen.tsx` — update `influence:` for Gambino (15→20), Genovese (10→15), Colombo (18→10); export `FAMILIES`.
-- `package.json` — add 4 testing devDependencies.
-- `vitest.config.ts` — new file.
-- `src/test/setup.ts` — new file.
-- `tsconfig.app.json` — add `"vitest/globals"` to `types`.
-- `src/components/__tests__/FamilySelectionScreen.starting-balance.test.tsx` — new test file.
-- `mem://gameplay/starting-balance` — record new influence ladder and rationale.
+- `src/components/FamilySelectionScreen.tsx` — Colombo `influence: 10` → `influence: 12.5`.
+- `src/components/__tests__/FamilySelectionScreen.starting-balance.test.tsx` — update Colombo `EXPECTED.colombo.influence` to `12.5`; flip ladder assertion to `gambino > genovese > colombo > lucchese > bonanno`.
+- `mem://gameplay/starting-balance.md` — record Colombo 12.5 and the new ladder ordering.
 
 ## Verification
 
-- Pick Gambino → HUD shows **20** influence (was 15).
-- Pick Colombo → HUD shows **10** influence (was 18).
-- Bonanno/Lucchese influence unchanged.
-- Run tests → starting-balance test passes; any future edit to `startingResources` fails the test until the expected snapshot is updated deliberately.
+- Pick Colombo → HUD shows **12.5** influence at Turn 1.
+- All other families' influence unchanged.
+- Run vitest → starting-balance test passes with updated snapshot and ladder.
+- AI starting influence (8–15 random) unchanged; AI test still passes.
 
 ## What Doesn't Change
 
-- Money, soldiers, politicalPower, respect for any family. Family bonuses, powers, AI starting values, Phase 1 dampener.
+- Money, soldiers, politicalPower, respect for any family. Other families' influence. AI initialization. Phase 1 ×0.5 passive dampener.
 
