@@ -180,6 +180,17 @@ const DIFFICULTY_MODIFIERS: Record<Difficulty, DifficultyModifiers> = {
   hard: { playerMoneyMult: 0.75, aiIncomeMult: 1.5, aiRecruitCapBonus: 2, policeHeatMult: 1.3, hitSuccessBonus: -0.10, eventCostMult: 1.3 },
 };
 
+// ============ HEAT HELPER ============
+// Applies a heat increment scaled by the active difficulty's policeHeatMult.
+// Use for all player-action-driven heat (claim/extort/hit/sabotage/etc.).
+// Passive/loyalty/informant heat is intentionally NOT scaled here.
+export const applyPlayerHeat = (state: EnhancedMafiaGameState, amount: number): void => {
+  state.policeHeat = state.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
+  const mult = state.difficultyModifiers?.policeHeatMult ?? 1;
+  const scaled = Math.max(0, Math.round(amount * mult));
+  state.policeHeat.level = Math.min(100, (state.policeHeat.level || 0) + scaled);
+};
+
 // ============ IMMUTABLE STATE CLONE HELPER ============
 const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGameState => ({
   ...state,
