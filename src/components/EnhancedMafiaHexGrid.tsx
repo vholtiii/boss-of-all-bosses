@@ -1437,8 +1437,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       const hexRevealed = isHexRevealed(tile);
 
                       caposByFamily.forEach((capos, fam) => {
-                        // Fog of War: hide rival units unless hex is revealed
-                        if (fam !== playerFamily && !hexRevealed) return;
+                       // Fog of War: hide rival capos unless visible per intel rules
+                        if (fam !== playerFamily && !isRivalUnitVisible(tile, fam)) return;
                         const capo = capos[0];
                         const isSelected = selectedUnitId === capo.id;
                         const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action');
