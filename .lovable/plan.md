@@ -1,31 +1,38 @@
 
 
-# Phase 1 Respect Dampener — Suggestions A + E
+# Apply Phase 1 Respect Reduction Across All Families
 
-Slow early-game respect by lowering starting respect and halving passive per-turn respect gains while in Phase 1. Combat spikes and claim rewards remain unchanged.
+The previous edit only updated the default in the hook, but `FamilySelectionScreen.tsx` defines per-family `startingResources.respect` values that override it. That's why Colombo still shows 25%.
 
-## Changes
+## Per-family starting respect changes
 
-### A — Phase 1 passive respect ×0.5
-In `src/hooks/useEnhancedMafiaGameState.ts`, in the per-turn growth block where `rawRespectGain` is computed (after district/business contributions, before diminishing-returns tiering), apply a `× 0.5` multiplier when `gameState.currentPhase === 1`. Influence gain unchanged. Decay unchanged.
+Subtract 10 from each family's starting respect to mirror the 25→15 intent across the board:
 
-### E — Starting respect 25 → 15
-In `src/hooks/useEnhancedMafiaGameState.ts`, change the player's initial `respect` in the starting resources block from `25` to `15`. AI starting respect unchanged (keeps competitive pressure).
+| Family   | Current | New |
+|----------|---------|-----|
+| Gambino  | 20*     | 10  |
+| Genovese | 30*     | 20  |
+| Lucchese | 15      | 5 (or keep at 15 — see note) |
+| Bonanno  | 35      | 25  |
+| Colombo  | 25      | 15  |
+
+\* I'll confirm Gambino/Genovese values when editing (lines above 80). The pattern is "−10 across the board" so the relative family identity (Bonanno proud/high, Lucchese humble/low) is preserved.
+
+**Note on Lucchese**: 15 → 5 may feel too low. Recommend floor at 10 for Lucchese so no family starts under 10.
 
 ## Files Touched
 
-- `src/hooks/useEnhancedMafiaGameState.ts` — starting `respect: 15`; Phase 1 passive respect multiplier `0.5`.
-- `src/components/GameGuide.tsx` — Resources section: add a line noting "Phase 1: passive respect gain halved; combat spikes unaffected" and update starting respect reference if shown.
-- `mem://gameplay/respect-influence-balance` — record the Phase 1 ×0.5 passive multiplier and lower starting respect.
+- `src/components/FamilySelectionScreen.tsx` — update `respect:` in all 5 `startingResources` blocks (lines ~56, 76, 96, 116, 136 — exact lines confirmed at edit time).
+- `mem://gameplay/starting-balance` — record the new per-family starting respect values.
 
 ## Verification
 
-- New game: player starts at 15 respect (was 25).
-- Five turns of pure claiming/business income in Phase 1 → respect rises noticeably slower than before.
-- An early Blind Hit still grants the full +20 respect spike (combat bypass intact).
-- Once Phase 2 unlocks, passive respect returns to full rate.
+- Pick Colombo → HUD shows **15%** respect at turn 1 (was 25%).
+- Pick Bonanno → **25%** (was 35%).
+- Pick Lucchese → **10%** (was 15%).
+- All families: Phase 1 passive respect gain still halved (already shipped).
 
 ## What Doesn't Change
 
-- Influence economy, decay rates, diminishing-return tiers, claim/extort rewards, combat respect spikes, AI starting respect, AI passive growth.
+- AI starting respect, family bonuses/powers, money/soldiers/influence/politicalPower starts, Phase 1 passive ×0.5 multiplier, combat respect spikes.
 
