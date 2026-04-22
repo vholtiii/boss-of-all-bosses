@@ -5022,6 +5022,14 @@ export const useEnhancedMafiaGameState = (
       if (!hq) return;
       const aiPhase = calculatePhaseForFamily(state, fam);
 
+      // Reset per-turn move budget for this AI family's units (mirror player reset).
+      // Mattresses only locks the player's units; AI families always reset.
+      state.deployedUnits = state.deployedUnits.map(u => {
+        if (u.family !== fam) return u;
+        const baseMoves = u.type === 'capo' ? CAPO_MOVES_PER_TURN : 2;
+        return { ...u, movesRemaining: baseMoves };
+      });
+
       // ── INCOME (difficulty-scaled) ──
       let aiIncome = 0;
       // Compute AI family's connected supply nodes via BFS
@@ -5240,11 +5248,13 @@ export const useEnhancedMafiaGameState = (
       const aiUnits = state.deployedUnits.filter(u => u.family === fam && u.movesRemaining > 0);
       for (const unit of aiUnits) {
         if (aiTacticalRemaining <= 0) break; // No more tactical actions
-        let movesLeft = Math.min(unit.movesRemaining, unit.type === 'soldier' ? (2 + alertBonus) : 3);
+        const aiCapoRange = getCapoFlyRange(state.gamePhase);
+        const baseMoves = unit.type === 'capo' ? CAPO_MOVES_PER_TURN : 2; // no alertBonus on movement — match player cap
+        let movesLeft = Math.min(unit.movesRemaining, baseMoves);
         while (movesLeft > 0) {
           const neighbors = unit.type === 'soldier'
             ? getHexNeighbors(unit.q, unit.r, unit.s)
-            : getHexesInRange(unit.q, unit.r, unit.s, Math.min(3, movesLeft));
+            : getHexesInRange(unit.q, unit.r, unit.s, Math.min(aiCapoRange, movesLeft));
           const validMoves = neighbors.filter(n => {
             const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
             if (!tile || tile.isHeadquarters) return false;
