@@ -73,7 +73,7 @@ export const FAMILIES: FamilyInfo[] = [
     powerEffect: 'Hide a hex as neutral for 3 turns. While disguised: unscoutable by enemies, -30% hit and sabotage success against it, zero police heat.',
     powerCost: '1 Tactical Action',
     powerCooldown: '2 turns',
-    startingResources: { money: 45000, soldiers: 4, influence: 15, politicalPower: 25, respect: 25 },
+    startingResources: { money: 40000, soldiers: 4, influence: 15, politicalPower: 25, respect: 25 },
   },
   {
     id: 'lucchese',
@@ -93,7 +93,7 @@ export const FAMILIES: FamilyInfo[] = [
     powerEffect: '+50% income from all businesses in the target district. Extract $1,000 tribute from each rival-owned hex in that district.',
     powerCost: '1 Tactical Action',
     powerCooldown: '3 turns',
-    startingResources: { money: 70000, soldiers: 3, influence: 12, politicalPower: 20, respect: 10 },
+    startingResources: { money: 55000, soldiers: 3, influence: 12, politicalPower: 20, respect: 10 },
   },
   {
     id: 'bonanno',
@@ -133,7 +133,7 @@ export const FAMILIES: FamilyInfo[] = [
     powerEffect: 'Instantly promote a soldier to capo when one of your capos is killed. Reactive trigger — no turn required.',
     powerCost: '1 Tactical Action',
     powerCooldown: 'Once per game',
-    startingResources: { money: 35000, soldiers: 1, influence: 12.5, politicalPower: 10, respect: 15 },
+    startingResources: { money: 42000, soldiers: 2, influence: 12.5, politicalPower: 10, respect: 15 },
   },
 ];
 
