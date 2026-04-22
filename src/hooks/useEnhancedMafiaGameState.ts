@@ -3250,11 +3250,12 @@ export const useEnhancedMafiaGameState = (
           }
         }
         
-        const baseMoves = u.type === 'capo' ? (newWounded > 0 ? 2 : 3) : u.maxMoves;
+        const capoBase = newWounded > 0 ? Math.max(1, CAPO_MOVES_PER_TURN - CAPO_WOUND_MOVE_PENALTY) : CAPO_MOVES_PER_TURN;
+        const baseMoves = u.type === 'capo' ? capoBase : u.maxMoves;
         return {
           ...u,
           movesRemaining: baseMoves + safePassageBonus,
-          maxMoves: u.type === 'capo' ? (newWounded > 0 ? 2 : 3) : u.maxMoves,
+          maxMoves: u.type === 'capo' ? capoBase : u.maxMoves,
           escortingSoldierIds: undefined,
           woundedTurnsRemaining: u.type === 'capo' ? newWounded : undefined,
         };
