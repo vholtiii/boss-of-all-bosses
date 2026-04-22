@@ -1107,9 +1107,8 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                 </div>
               );
             })()}
-          </div>
-
-          {/* Business & Territory Summary */}
+            </CollapsibleContent>
+          </Collapsible>
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-2">
               <div className="text-xs font-medium text-gray-400">Businesses</div>
