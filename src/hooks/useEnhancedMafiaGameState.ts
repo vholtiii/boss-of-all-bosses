@@ -646,8 +646,15 @@ const checkEncroachment = (state: EnhancedMafiaGameState, q: number, r: number, 
 };
 
 // ============ A1/A3/A4 + B3: PENDING CLAIM HELPERS ============
-// Capo fly range (B3): reduced from 5 → 3 to slow expansion.
-const CAPO_FLY_RANGE = 3;
+// Capo fly range: phase-gated to slow early expansion.
+// Phase 1: 2 hexes/move (short-range scout). Phase 2+: 4 hexes/move.
+const CAPO_FLY_RANGE_P1 = 2;
+const CAPO_FLY_RANGE_P2_PLUS = 4;
+const CAPO_MOVES_PER_TURN = 2;
+const getCapoFlyRange = (gamePhase: number): number =>
+  (gamePhase || 1) >= 2 ? CAPO_FLY_RANGE_P2_PLUS : CAPO_FLY_RANGE_P1;
+// Legacy alias (defaults to most permissive range for non-phase-aware callers like deployment).
+const CAPO_FLY_RANGE = CAPO_FLY_RANGE_P2_PLUS;
 
 // A4: Diminishing claim rewards based on family's currently-finalized hex count.
 // 1–10 → +1/+1, 11–20 → +0.5/+0.5, 21+ → 0/0.
