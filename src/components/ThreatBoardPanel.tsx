@@ -14,31 +14,21 @@ import {
   Gavel,
 } from 'lucide-react';
 import { EnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
-import { getTensionPairKey } from '@/types/game-mechanics';
-
-interface ThreatRow {
-  id: string;
-  label: string;
-  sub?: string;
-  badge?: { text: string; tone: 'danger' | 'warn' | 'muted' };
-  hex?: { q: number; r: number; s: number };
-  unitType?: 'soldier' | 'capo';
-  severity: 'critical' | 'soft';
-}
-
-interface ThreatSection {
-  id: string;
-  title: string;
-  icon: React.ReactNode;
-  rows: ThreatRow[];
-}
+import { buildThreatSections, ThreatSection as SharedThreatSection } from '@/lib/threat-board';
 
 interface ThreatBoardPanelProps {
   gameState: EnhancedMafiaGameState;
   onSelectUnit?: (unitType: string, hex: { q: number; r: number; s: number }) => void;
 }
 
-const familyName = (f: string) => f.charAt(0).toUpperCase() + f.slice(1);
+const ICONS_BY_SECTION: Record<string, React.ReactNode> = {
+  incoming: <Crosshair className="h-3 w-3 text-destructive" />,
+  hitman: <Skull className="h-3 w-3 text-amber-400" />,
+  diplomacy: <Swords className="h-3 w-3 text-destructive" />,
+  law: <Gavel className="h-3 w-3 text-amber-400" />,
+  erosion: <Waves className="h-3 w-3 text-amber-400" />,
+  bounties: <DollarSign className="h-3 w-3 text-destructive" />,
+};
 
 const ThreatBoardPanel: React.FC<ThreatBoardPanelProps> = ({ gameState, onSelectUnit }) => {
   const [open, setOpen] = useState(false);
