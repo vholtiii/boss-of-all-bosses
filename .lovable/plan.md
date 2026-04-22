@@ -1,47 +1,63 @@
 
 
-# Add Prosecution Risk to Threat Board
+# Two enhancements: Threat HUD popover + richer Hex Info panel
 
-## Problem
+## Part 1 — Threats badge becomes a popover
 
-The Threat Board currently surfaces incoming hits, hitman contracts, wars, erosion, bounties, and marks — but not **Police Heat** or **Prosecution Risk**, the two systems that actually arrest your soldiers. A player can be one turn from a federal indictment with zero indication on the threat panel.
+Wrap the top-bar `🚨 Threats: N` badge in a `Popover` (already in `components/ui/popover.tsx`). Clicking opens a compact, scrollable card anchored under the badge.
 
-## Fix
+### Popover contents (short-form, grouped)
 
-Add a new **"Law Enforcement"** section to `ThreatBoardPanel.tsx`, positioned between "Wars & Ceasefires" and "Territory Watch". Rows surface based on thresholds:
+Same six sections as `ThreatBoardPanel`, condensed to one-line rows with no sub-text:
 
-### Prosecution Risk rows
-- **Risk ≥ 50** with active consecutive-turn counter → critical row: `Federal indictment in {3 - consecutiveTurns}t` · badge `INDICTMENT` (red).
-- **Risk ≥ 50** but counter at 0 → soft row: `Prosecution risk {value}/100` · badge `RISK` (amber).
-- **Risk 30–49** → soft row: `Prosecution risk climbing ({value}/100)` · badge amber.
+- **🎯 Incoming Hits** — `{Family} → {Soldier/Capo} · {Nt}` (red)
+- **💀 Hitman Contracts** — `{Target} · {Nt ETA}` (amber)
+- **⚔️ Wars & Pacts** — `War: {Family} ({Nt})`, `Ceasefire ending: {Family} ({Nt})`, `Tension HOT: {Family}`
+- **⚖️ Law** — `RICO {Nt}`, `Heat {value} (Tier N)`, `Risk {value}`, `Soldier jailed ({Nt})`
+- **🌊 Territory** — `{District} eroding (1t)`, `{Family} expanding into {District} (1t)`
+- **💰 Bounties & Marks** — `Bounty from {Family}`, `{Unit} marked ({Nt})`
 
-### Police Heat rows
-- **Heat ≥ 90** (Tier 4 / RICO fuse) → critical row: `RICO investigation — {ricoTurnsRemaining}t fuse` · badge red `RICO`.
-- **Heat ≥ 70** (Tier 3) → critical row: `Heat critical ({heat}/100) — arrests likely` · badge red.
-- **Heat ≥ 50** (Tier 2 / arrest threshold) → soft row: `Heat high ({heat}/100) — 20% arrest chance/turn` · badge amber.
-- **Heat 30–49** (Tier 1) → soft row: `Heat elevated ({heat}/100)` · badge amber muted.
+Rows with a hex target are clickable → call existing `onSelectUnit(type, hex)` to focus the unit/tile on the map and close the popover.
 
-### Active arrests / indictments (informational)
-- For each jailed/indicted soldier in `soldierStats` (or wherever jail state lives — will grep), add a row: `Soldier jailed ({turnsRemaining}t)` · clickable to jump to unit if still on map. Soft tone.
+If 0 threats → muted emerald "All clear. No active threats."
 
-## Counter updates
+Width ~320px, max-height ~480px with internal scroll. Section headers + flat rows for fast scanning. Extract row-builders into a shared helper `src/lib/threat-board.ts` exporting `buildThreatSections(gameState)` so `ThreatBoardPanel.tsx` and the new popover stay in sync.
 
-- `totalCount` and `hasCritical` automatically include the new section's rows (existing reduce logic).
-- Top-bar Threats badge in `UltimateMafiaGame.tsx` gets the same additions so the HUD count stays in sync. Add: heat ≥ 50 (+1), prosecution risk ≥ 50 (+1), RICO active (+1, critical), each jailed soldier (+1).
+## Part 2 — Hex Info panel: Income contribution only
+
+Extend the bottom-left hover/pinned hex card in `EnhancedMafiaHexGrid.tsx` (lines ~2144–2330) with **only Section A** (income), and only render lines whose underlying state is active. Empty hexes stay clean.
+
+### Income contribution sub-card (player-owned hex with business)
+Render the sub-card only if the hex has a business owned by the player. Inside, each row is conditional:
+
+- `💵 Income: $X/turn (effective)` — always shown when business present (uses existing business income calc).
+- `📦 Supply: ✅ Connected` — shown when supply line from HQ reaches this hex.
+- `📦 Supply: ⚠️ Severed (-10%/turn decay)` — shown only when the hex is actually supply-severed (decay actively applying). Not shown for businesses that don't depend on supply.
+- `🔥 Heat/turn: +X` — shown only when the business is illegal and contributes heat > 0.
+- `🌊 Eroding ({Nt} until flip)` — shown only when `erosionCounter > 0` for this hex.
+- `📈 Passive influence gain: +X` — shown only when this hex is actively contributing to player's passive influence/respect gain (Phase 3+ expansion candidate or qualifying owned hex), per `mem://gameplay/respect-influence-balance` and `mem://gameplay/influence-erosion-expansion`.
+
+No threat overlay, no ZoC section, no district snapshot, no unit detail expansion in this pass.
+
+Styling matches existing sub-cards: `mt-1 p-1.5 rounded border bg-X/30 border-X/30`, small font, consistent with current hex info card.
 
 ## Files Touched
 
-- `src/components/ThreatBoardPanel.tsx` — add Law Enforcement section with the rows above; import `Gavel` or `Scale` icon from lucide-react.
-- `src/pages/UltimateMafiaGame.tsx` — extend the top-bar Threats badge aggregation to include heat/prosecution/jail counts and critical-tone triggers.
+- `src/lib/threat-board.ts` — **new**, exports `buildThreatSections(gameState)` shared by panel + HUD popover.
+- `src/components/ThreatBoardPanel.tsx` — refactor to import the shared builder (no visual change).
+- `src/pages/UltimateMafiaGame.tsx` — wrap the `🚨 Threats` badge in a `Popover` rendering the short-form list; pass `onSelectUnit` to focus the map.
+- `src/components/EnhancedMafiaHexGrid.tsx` — add the conditional Income sub-card to the hex info card.
 
 ## Verification
 
-- New game → Heat 0, Risk 0 → Threat Board still shows "All Clear" (0).
-- Sabotage a few times until Heat hits 50 → Threat Board shows amber Law Enforcement row; HUD badge increments and turns amber.
-- Drive Risk ≥ 50 for 3 turns → row turns red `INDICTMENT 1t`; HUD goes red.
-- Soldier gets jailed → row appears under Law Enforcement showing turns remaining.
+- Click `🚨 Threats: N` in the top bar → popover opens with grouped one-line rows.
+- Click a row with a hex target → map focuses that unit, popover closes.
+- New game (0 threats) → popover shows "All clear" in muted emerald.
+- Hover/pin a player-owned business hex → see Income line; Supply/Heat/Erosion/Passive-gain lines appear only when active.
+- Pin an empty or rival-owned hex → no income sub-card.
+- Pin an eroding owned hex → see `🌊 Eroding (Nt until flip)` line.
 
 ## What Doesn't Change
 
-Heat/prosecution mechanics, arrest probabilities, RICO fuse logic, all existing Threat Board sections, auto-expand on incoming hit, click-to-jump behavior.
+Threat detection logic. Right-sidebar `ThreatBoardPanel` UI. Hex info card position (bottom-left), styling theme, click-for-actions behavior. Map legend. All existing hex info sections (owner, terrain, business, supply node, HQ, fortification, scout intel, negotiation, units).
 
