@@ -580,10 +580,54 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           const totalSoldiers = deployedCount + (gameState.resources?.soldiers || 0);
           const deployRatio = totalSoldiers > 0 ? deployedCount / totalSoldiers : 0;
 
-          if (!hasCooldowns && expiringPacts.length === 0 && totalSoldiers === 0) return null;
+          // Threat counter — mirrors ThreatBoardPanel logic (count + tone)
+          const playerFam = gameState.playerFamily;
+          const units = gameState.deployedUnits || [];
+          let threatCount = 0;
+          let threatHasCritical = false;
+          let threatHasIncoming = false;
+          for (const ph of ((gameState as any).aiPlannedHits || [])) {
+            if (!ph.detectedVia) continue;
+            const target = units.find((u: any) => u.id === ph.targetUnitId);
+            if (!target || target.family !== playerFam) continue;
+            threatCount++; threatHasCritical = true; threatHasIncoming = true;
+          }
+          threatCount += ((gameState as any).hitmanContracts || []).length;
+          for (const war of (gameState.activeWars || [])) {
+            if (war.family1 === playerFam || war.family2 === playerFam) { threatCount++; threatHasCritical = true; }
+          }
+          for (const cf of (gameState.ceasefires || [])) if (cf.active && cf.turnsRemaining <= 2) threatCount++;
+          for (const al of ((gameState as any).alliances || [])) if (al.active && al.turnsRemaining <= 2) threatCount++;
+          for (const sp of ((gameState as any).safePassagePacts || [])) if (sp.active && sp.turnsRemaining <= 2) threatCount++;
+          for (const b of ((gameState as any).aiBounties || [])) {
+            if (b.targetFamily === playerFam) { threatCount++; threatHasCritical = true; }
+          }
+          const stats = (gameState as any).soldierStats || {};
+          for (const u of units) {
+            if (u.family !== playerFam) continue;
+            const s = stats[u.id]; if (!s) continue;
+            if (s.markedForDeath) { threatCount++; threatHasCritical = true; }
+            else if (s.loyalty < 40 && u.type === 'soldier') threatCount++;
+          }
+          const threatTone = threatCount === 0
+            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+            : threatHasCritical
+              ? 'bg-destructive/20 border-destructive/40 text-destructive'
+              : 'bg-amber-500/20 border-amber-500/30 text-amber-400';
+          const threatLabel = threatCount === 0 ? '✓' : threatHasIncoming ? '⚠' : '';
+          const threatBadge = (
+            <span className={cn('px-2 py-0.5 rounded-full text-[10px] border', threatTone, threatHasIncoming && 'animate-pulse')}>
+              🚨 Threats: {threatCount} {threatLabel}
+            </span>
+          );
+
+          if (!hasCooldowns && expiringPacts.length === 0 && totalSoldiers === 0) {
+            return <div className="flex flex-wrap items-center justify-center gap-1">{threatBadge}</div>;
+          }
 
           return (
             <div className="flex flex-wrap items-center justify-center gap-1">
+              {threatBadge}
               {expiringPacts.map((p, i) => (
                 <span key={i} className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 border border-amber-500/30 text-amber-400 animate-pulse">
                   ⚠️ {p.emoji} {p.label} expires!

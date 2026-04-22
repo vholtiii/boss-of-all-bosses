@@ -247,18 +247,27 @@ const ThreatBoardPanel: React.FC<ThreatBoardPanelProps> = ({ gameState, onSelect
     }
   }, [hasIncomingHit, turn, userToggled]);
 
-  // Hidden when zero threats
-  if (totalCount === 0) return null;
+  // Always render — show calm "All Clear" state when zero threats
+  const isCalm = totalCount === 0;
 
-  const headerToneCls = hasCritical
-    ? 'text-destructive'
-    : 'text-amber-400';
-  const badgeToneCls = hasCritical
-    ? 'bg-destructive/20 border-destructive/40 text-destructive'
-    : 'bg-amber-500/20 border-amber-500/40 text-amber-400';
+  const headerToneCls = isCalm
+    ? 'text-emerald-400/80'
+    : hasCritical
+      ? 'text-destructive'
+      : 'text-amber-400';
+  const badgeToneCls = isCalm
+    ? 'bg-muted/30 border-muted text-muted-foreground'
+    : hasCritical
+      ? 'bg-destructive/20 border-destructive/40 text-destructive'
+      : 'bg-amber-500/20 border-amber-500/40 text-amber-400';
+  const borderCls = isCalm
+    ? 'border-border'
+    : hasCritical
+      ? 'border-destructive/40'
+      : 'border-amber-500/30';
 
   return (
-    <div className={cn('rounded-lg border bg-card/80 px-3 py-2', hasCritical ? 'border-destructive/40' : 'border-amber-500/30', hasIncomingHit && !open && 'animate-pulse')}>
+    <div className={cn('rounded-lg border bg-card/80 px-3 py-2', borderCls, hasIncomingHit && !open && 'animate-pulse')}>
       <button
         data-no-sound
         onClick={() => { setUserToggled(true); setOpen(o => !o); }}
