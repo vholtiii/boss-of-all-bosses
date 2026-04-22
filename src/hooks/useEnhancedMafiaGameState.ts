@@ -965,7 +965,7 @@ const createInitialGameState = (
     deployedUnits.push({
       id: `${fam}-capo-0`, type: 'capo', family: fam,
       q: hq.q, r: hq.r, s: hq.s,
-      movesRemaining: 3, maxMoves: 3, level: 1, name: capoNames[fam],
+      movesRemaining: 2, maxMoves: 2, level: 1, name: capoNames[fam],
       personality: randomPersonality,
     });
   });
@@ -3208,13 +3208,13 @@ export const useEnhancedMafiaGameState = (
           newState.pendingNotifications.push({
             type: 'success' as const,
             title: '⭐ Soldier Promoted to Capo!',
-            message: `${capoName} (${personalityLabel}) now commands 3 moves per turn and can extort, escort, and negotiate.`,
+            message: `${capoName} (${personalityLabel}) now commands 2 moves per turn and can extort, escort, and negotiate.`,
           });
           return {
             ...u,
             type: 'capo' as const,
-            maxMoves: 3,
-            movesRemaining: 3,
+            maxMoves: 2,
+            movesRemaining: 2,
             name: capoName,
             personality: randomPersonality,
             level: 1,
@@ -3967,7 +3967,7 @@ export const useEnhancedMafiaGameState = (
               newState.deployedUnits.push({
                 id: a.unitId, type: 'capo', family: newState.playerFamily,
                 q: hq.q, r: hq.r, s: hq.s,
-                movesRemaining: 3, maxMoves: 3, level: 1,
+                movesRemaining: 2, maxMoves: 2, level: 1,
                 name: stats ? `Capo` : `Capo`,
               });
               turnReport.events.push(`🔓 Capo released from jail and returned to HQ.`);
@@ -5788,8 +5788,8 @@ export const useEnhancedMafiaGameState = (
         if (bestCandidate) {
           const { unit: promUnit } = bestCandidate;
           promUnit.type = 'capo' as any;
-          promUnit.maxMoves = 3;
-          promUnit.movesRemaining = 3;
+          promUnit.maxMoves = 2;
+          promUnit.movesRemaining = 2;
           (promUnit as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
           (promUnit as any).name = `${fam.charAt(0).toUpperCase() + fam.slice(1)} Capo`;
           opponent.resources.money -= CAPO_PROMOTION_COST;
@@ -5808,8 +5808,8 @@ export const useEnhancedMafiaGameState = (
             stats.loyalty = Math.max(stats.loyalty, 60);
             state.soldierStats[anyAiSoldier.id] = stats;
             anyAiSoldier.type = 'capo' as any;
-            anyAiSoldier.maxMoves = 3;
-            anyAiSoldier.movesRemaining = 3;
+            anyAiSoldier.maxMoves = 2;
+            anyAiSoldier.movesRemaining = 2;
             (anyAiSoldier as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
             (anyAiSoldier as any).name = `${fam.charAt(0).toUpperCase() + fam.slice(1)} Capo`;
             opponent.resources.money -= CAPO_PROMOTION_COST * 2; // Costs double for forced promotion
@@ -7189,7 +7189,7 @@ export const useEnhancedMafiaGameState = (
             newState.deployedUnits[idx] = {
               ...newState.deployedUnits[idx],
               type: 'capo' as const,
-              maxMoves: 3,
+              maxMoves: 2,
               movesRemaining: newState.deployedUnits[idx].movesRemaining,
               name: capoName,
               personality: randomPersonality,
