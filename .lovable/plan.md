@@ -1,33 +1,28 @@
 
 
-# Fix Rival Unit Visibility Bug
+# Delay Contested Territory Resolution by One Turn
 
-Rival units are currently always rendered. The existing reveal rules (scout intel, adjacency, capo vision, safehouse, corruption tier, pacts, units-on-your-turf, HQ) are correct in design — they just aren't being applied to unit rendering. This is a pure bug fix: add the visibility filter to the render path. No rule changes.
+Currently, when a soldier claims a hex it goes contested and resolves to fully owned at the end of the same turn. Change resolution to the **end of the NEXT turn**, giving the claiming soldier a full turn where they can either stay (to defend) or move away, with the resolution happening regardless of their final position (as long as no rival contests it).
 
-## Fix
+## Change
 
-1. **`src/components/EnhancedMafiaHexGrid.tsx`**
-   - Before rendering each rival unit (soldier or capo), check visibility against the existing game state.
-   - A rival unit renders only if at least one is true:
-     - Hex is within 1 of any player soldier, or within 2 of any player capo (matches existing scout ranges).
-     - Hex is in the player's `scoutedHexes` set with fresh intel (reuse existing freshness check).
-     - Hex is within 1 of a player safehouse.
-     - Player corruption tier is Police Chief (T3) or Mayor (T4) — reveals all.
-     - Rival's family currently has an active Supply Deal or Alliance pact with the player.
-     - Hex is owned/contested by the player.
-     - Hex is a rival HQ.
-   - If none match, skip the unit (do not render its `<SoldierIcon>` / capo icon). The hex itself still renders normally.
+1. **`src/hooks/useEnhancedMafiaGameState.ts`**
+   - Locate where contested hexes are stamped (currently sets `contestedUntilTurn = currentTurn` or similar so it resolves at end-of-turn).
+   - Update the stamp to `contestedUntilTurn = currentTurn + 1` so the hex remains contested through the entire next turn and resolves at the end of turn N+1.
+   - End-of-turn resolution loop already iterates contested hexes — no logic change needed there beyond the new expiry value.
+   - Apply same +1 turn shift to:
+     - Manual soldier claim
+     - Capo auto-claim (per `mem://gameplay/capo-abilities`: "auto-claim now produces contested" — also gets the extended timer)
+   - Keep contest-break rules unchanged: if a rival enters/attacks the hex during the contested window, ownership does NOT finalize (existing logic).
 
-2. **Helper placement** — add a small `isRivalUnitVisible(unit, hex)` function inside the grid component (or extracted to a local util) that reads from props/state already passed in (`units`, `hexes`, `scoutedHexes`, `safehouses`, `corruptionTier`, `activePacts`, `playerFamily`). No changes to `useEnhancedMafiaGameState.ts` required if all those are already exposed; otherwise expose them.
+2. **UI / Tooltip**
+   - In `EnhancedMafiaHexGrid.tsx` (or wherever the contested badge tooltip lives), update the label from "Resolves end of turn" → "Resolves end of next turn" so players understand the new timing.
+   - Hex info panel (bottom-left) contested status text updated likewise.
 
-## Verification
-
-- Start a new game, do not scout: rival units that aren't adjacent to your units / on your turf / at a rival HQ should not appear.
-- Scout a rival hex → its units appear until intel goes stale.
-- Move a soldier next to a rival hex → that rival's units appear.
-- Buy Police Chief corruption → all rival units appear.
+3. **Memory**
+   - Update `mem://gameplay/unit-actions/manual-constraints` and `mem://gameplay/capo-abilities` to note: contested territory now resolves at the end of the **following** turn, freeing the claiming unit to move or hold during the intervening turn.
 
 ## What Doesn't Change
 
-- Reveal rules themselves, AI behavior, combat, scout/corruption/pact mechanics, hex/territory rendering, fog-of-war for Planned Hits.
+- Heat generation, claim cost, action budget, contested visuals (hatching/badge), rival contest rules, Phase 3+ disabling of manual claim, capo auto-claim behavior aside from the timer.
 
