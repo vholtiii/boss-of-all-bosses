@@ -123,16 +123,12 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     if ((gameState?.alliances || []).some((a: any) => a.active && a.alliedFamily === rivalFamily)) return true;
     // Active supply deal where player buys from this rival — shared logistics
     if ((gameState?.supplyDealPacts || []).some((p: any) => p.active && p.buyerFamily === playerFamily && p.targetFamily === rivalFamily)) return true;
-    // Adjacent vision: within 1 hex of any player soldier, within 2 of any player capo
+    // Flipped soldier (rat) inside this rival's family — we get full sight on their units
+    if ((gameState?.flippedSoldiers || []).some((f: any) => f.family === rivalFamily && f.flippedByFamily === playerFamily)) return true;
+    // Capo vision only: within 2 hexes of any player capo (soldiers do NOT reveal by adjacency)
     for (const u of deployedUnits) {
-      if (u.family !== playerFamily) continue;
-      const range = u.type === 'capo' ? 2 : 1;
-      if (hexDistance({ q: u.q, r: u.r, s: u.s }, tile) <= range) return true;
-    }
-    // Within 1 hex of a player safehouse
-    const playerSafehouses = (gameState?.safehouses || []).filter((sh: any) => sh.family === playerFamily);
-    for (const sh of playerSafehouses) {
-      if (hexDistance({ q: sh.q, r: sh.r, s: sh.s }, tile) <= 1) return true;
+      if (u.family !== playerFamily || u.type !== 'capo') continue;
+      if (hexDistance({ q: u.q, r: u.r, s: u.s }, tile) <= 2) return true;
     }
     return false;
   };
