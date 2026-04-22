@@ -73,7 +73,7 @@ const families: FamilyInfo[] = [
     powerEffect: 'Hide a hex as neutral for 3 turns. While disguised: unscoutable by enemies, -30% hit and sabotage success against it, zero police heat.',
     powerCost: '1 Tactical Action',
     powerCooldown: '2 turns',
-    startingResources: { money: 45000, soldiers: 4, influence: 10, politicalPower: 25, respect: 10 },
+    startingResources: { money: 45000, soldiers: 4, influence: 10, politicalPower: 25, respect: 25 },
   },
   {
     id: 'lucchese',
