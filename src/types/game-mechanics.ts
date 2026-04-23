@@ -144,12 +144,12 @@ export const PHASE_CONFIGS: PhaseConfig[] = [
   },
   {
     phase: 2, name: 'Establishing Territory', icon: '🏴', minTurn: 9,
-    requirements: { minHexes: 8, minRespect: 30 },
+    requirements: { minHexes: 15, minRespect: 35 },
     unlocks: ['Scouting', 'Plan Hits', 'Capo Promotion', 'Safehouses', 'Fortification', 'Enemy Extortion', 'Patrol Officer Bribe', 'Boss Sitdown', 'Local Recruitment'],
   },
   {
     phase: 3, name: 'Controlling Territory', icon: '🏛️', minTurn: 18,
-    requirements: { minHexes: 20, minCapos: 2, minBuiltBusinesses: 1 },
+    requirements: { minHexes: 25, minCapos: 1, minBuiltBusinesses: 1 },
     unlocks: ['Boss Diplomacy', 'Alliances', 'Ceasefires', 'Captain+ Bribes', 'Hitman Contracts', 'Go to the Mattresses', 'War Summit', 'Flip Soldier'],
   },
   {
