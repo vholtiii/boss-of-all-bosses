@@ -1,63 +1,57 @@
 
 
-# Two enhancements: Threat HUD popover + richer Hex Info panel
+# Rebalance Phase Thresholds + Decouple AI Phase Progression
 
-## Part 1 — Threats badge becomes a popover
+## Part 1 — Threshold rebalance
 
-Wrap the top-bar `🚨 Threats: N` badge in a `Popover` (already in `components/ui/popover.tsx`). Clicking opens a compact, scrollable card anchored under the badge.
+### `src/types/game-mechanics.ts` — `PHASE_CONFIGS`
 
-### Popover contents (short-form, grouped)
+| Transition | Current | New |
+|---|---|---|
+| **Phase 1 → 2** | `minHexes: 8`, `minRespect: 30` | **`minHexes: 15`, `minRespect: 35`** |
+| **Phase 2 → 3** | `minHexes: 20`, `minCapos: 2`, `minBuiltBusinesses: 1` | **`minHexes: 25`, `minCapos: 1`, `minBuiltBusinesses: 1`** |
+| **Phase 3 → 4** | unchanged (OR gate stays) | unchanged |
 
-Same six sections as `ThreatBoardPanel`, condensed to one-line rows with no sub-text:
+### Label clarity
 
-- **🎯 Incoming Hits** — `{Family} → {Soldier/Capo} · {Nt}` (red)
-- **💀 Hitman Contracts** — `{Target} · {Nt ETA}` (amber)
-- **⚔️ Wars & Pacts** — `War: {Family} ({Nt})`, `Ceasefire ending: {Family} ({Nt})`, `Tension HOT: {Family}`
-- **⚖️ Law** — `RICO {Nt}`, `Heat {value} (Tier N)`, `Risk {value}`, `Soldier jailed ({Nt})`
-- **🌊 Territory** — `{District} eroding (1t)`, `{Family} expanding into {District} (1t)`
-- **💰 Bounties & Marks** — `Bounty from {Family}`, `{Unit} marked ({Nt})`
+In `src/pages/UltimateMafiaGame.tsx` (line 1215) and `src/components/PhaseInfographic.tsx` (line 60), change the requirement label from `"1+ businesses"` / `"1+ business"` → **`"1+ legal business built"`**, with a small muted helper line: `"Build a Restaurant, Store, or Construction via the Build action."`
 
-Rows with a hex target are clickable → call existing `onSelectUnit(type, hex)` to focus the unit/tile on the map and close the popover.
+## Part 2 — Decouple AI phase progression
 
-If 0 threats → muted emerald "All clear. No active threats."
+### Problem
 
-Width ~320px, max-height ~480px with internal scroll. Section headers + flat rows for fast scanning. Extract row-builders into a shared helper `src/lib/threat-board.ts` exporting `buildThreatSections(gameState)` so `ThreatBoardPanel.tsx` and the new popover stay in sync.
+I'll grep `cachedPhase` and the AI phase-update logic to confirm, but per the existing memory (`mem://gameplay/ai-behavior` — "Phase gating … parity with the player") and the symptom the user describes, AI families currently use the same `gamePhase` value as the player or recompute against identical thresholds at the same tick, causing synchronized transitions.
 
-## Part 2 — Hex Info panel: Income contribution only
+### Fix
 
-Extend the bottom-left hover/pinned hex card in `EnhancedMafiaHexGrid.tsx` (lines ~2144–2330) with **only Section A** (income), and only render lines whose underlying state is active. Empty hexes stay clean.
+Each AI opponent should evaluate its own phase independently from its own resources, hexes, capos, and built businesses — using the same `PHASE_CONFIGS` requirements but applied to the AI's state, not the player's.
 
-### Income contribution sub-card (player-owned hex with business)
-Render the sub-card only if the hex has a business owned by the player. Inside, each row is conditional:
+In the per-turn AI update loop (in `src/hooks/useEnhancedMafiaGameState.ts` — exact function will be located during implementation), for each `aiOpponent`:
 
-- `💵 Income: $X/turn (effective)` — always shown when business present (uses existing business income calc).
-- `📦 Supply: ✅ Connected` — shown when supply line from HQ reaches this hex.
-- `📦 Supply: ⚠️ Severed (-10%/turn decay)` — shown only when the hex is actually supply-severed (decay actively applying). Not shown for businesses that don't depend on supply.
-- `🔥 Heat/turn: +X` — shown only when the business is illegal and contributes heat > 0.
-- `🌊 Eroding ({Nt} until flip)` — shown only when `erosionCounter > 0` for this hex.
-- `📈 Passive influence gain: +X` — shown only when this hex is actively contributing to player's passive influence/respect gain (Phase 3+ expansion candidate or qualifying owned hex), per `mem://gameplay/respect-influence-balance` and `mem://gameplay/influence-erosion-expansion`.
+1. Count AI-owned hexes from `hexMap.filter(h => h.controllingFamily === opp.family)`.
+2. Count AI capos from `units.filter(u => u.family === opp.family && u.type === 'capo')`.
+3. Count AI legal-built businesses from `hexMap.filter(h => h.controllingFamily === opp.family && h.business?.builtByPlayer)` — note: the `builtByPlayer` flag is a misnomer; it really means "constructed (vs extorted)" and applies to any builder. If the flag is currently never set for AI builds, extend AI construction logic to set it (will verify during implementation).
+4. Read AI respect from `opp.resources.respect`.
+5. Compare against `PHASE_CONFIGS[currentAIPhase].requirements` + `minTurn` floor.
+6. Write the result to `opp.resources.cachedPhase` (already the field rendered by `PhaseInfographic`'s "Rival Phases" grid).
 
-No threat overlay, no ZoC section, no district snapshot, no unit detail expansion in this pass.
+This keeps the player's `gamePhase` as a separate value driven only by player state. The AI's `cachedPhase` is what gates AI behavior (Plan Hits, Capo Promotion, Hitman, Influence Erosion, etc.) wherever AI logic currently checks phase — those reads switch from `gamePhase` to `opp.resources.cachedPhase`.
 
-Styling matches existing sub-cards: `mt-1 p-1.5 rounded border bg-X/30 border-X/30`, small font, consistent with current hex info card.
+### Verification
+
+- Player rushes to Phase 2 → rival panel still shows rivals at P1 until they hit 15 hexes / 35 respect themselves.
+- Aggressive AI (e.g., Genovese) reaches P2 before a slow player → its `cachedPhase` reads P2 in the rival grid while player stays P1.
+- Player at P3 with rivals lagging at P2 → rivals don't trigger erosion/expansion until they reach P3 individually.
+- Existing tests still pass; no change to `PHASE_CONFIGS` shape, only numbers and consumer wiring.
 
 ## Files Touched
 
-- `src/lib/threat-board.ts` — **new**, exports `buildThreatSections(gameState)` shared by panel + HUD popover.
-- `src/components/ThreatBoardPanel.tsx` — refactor to import the shared builder (no visual change).
-- `src/pages/UltimateMafiaGame.tsx` — wrap the `🚨 Threats` badge in a `Popover` rendering the short-form list; pass `onSelectUnit` to focus the map.
-- `src/components/EnhancedMafiaHexGrid.tsx` — add the conditional Income sub-card to the hex info card.
-
-## Verification
-
-- Click `🚨 Threats: N` in the top bar → popover opens with grouped one-line rows.
-- Click a row with a hex target → map focuses that unit, popover closes.
-- New game (0 threats) → popover shows "All clear" in muted emerald.
-- Hover/pin a player-owned business hex → see Income line; Supply/Heat/Erosion/Passive-gain lines appear only when active.
-- Pin an empty or rival-owned hex → no income sub-card.
-- Pin an eroding owned hex → see `🌊 Eroding (Nt until flip)` line.
+- `src/types/game-mechanics.ts` — update Phase 1→2 and Phase 2→3 requirement numbers.
+- `src/pages/UltimateMafiaGame.tsx` — clarify built-business label.
+- `src/components/PhaseInfographic.tsx` — clarify built-business label + helper line.
+- `src/hooks/useEnhancedMafiaGameState.ts` — per-AI phase evaluation each turn writing to `opp.resources.cachedPhase`; switch AI phase-gated branches to read `cachedPhase` instead of player `gamePhase`.
 
 ## What Doesn't Change
 
-Threat detection logic. Right-sidebar `ThreatBoardPanel` UI. Hex info card position (bottom-left), styling theme, click-for-actions behavior. Map legend. All existing hex info sections (owner, terrain, business, supply node, HQ, fortification, scout intel, negotiation, units).
+`minTurn` floors. Phase 3→4 OR gate. Victory targets. Player phase logic. AI personalities, family powers, combat math. UI layout.
 
