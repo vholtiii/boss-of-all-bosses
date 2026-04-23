@@ -28,7 +28,7 @@ const PhaseInfographic: React.FC<PhaseInfographicProps> = ({
   // Compute player metrics
   const playerHexes = hexMap?.filter((h: any) => h.controllingFamily === playerFamily).length || 0;
   const capoCount = (units || []).filter((u: any) => u.family === playerFamily && u.type === 'capo').length;
-  const businessCount = hexMap?.filter((h: any) => h.controllingFamily === playerFamily && h.business?.builtByPlayer).length || 0;
+  const businessCount = hexMap?.filter((h: any) => h.controllingFamily === playerFamily && h.business && !h.business.isExtorted).length || 0;
   const respect = resources?.respect || 0;
 
   // Next phase requirements
@@ -57,11 +57,12 @@ const PhaseInfographic: React.FC<PhaseInfographicProps> = ({
       met: capoCount >= nextPhase.requirements.minCapos,
     },
     nextPhase.requirements.minBuiltBusinesses != null && {
-      label: `${nextPhase.requirements.minBuiltBusinesses}+ business`,
+      label: `${nextPhase.requirements.minBuiltBusinesses}+ legal business built`,
       icon: <Store className="h-3 w-3" />,
       current: businessCount,
       target: nextPhase.requirements.minBuiltBusinesses,
       met: businessCount >= nextPhase.requirements.minBuiltBusinesses,
+      helper: 'Build a Restaurant, Store, or Construction via the Build action.',
     },
     nextPhase.minTurn > 1 && {
       label: `Turn ${nextPhase.minTurn}+`,
@@ -149,6 +150,9 @@ const PhaseInfographic: React.FC<PhaseInfographicProps> = ({
                 value={r.target > 0 ? Math.min(100, (r.isOr ? r.current : r.current / r.target) * 100) : 0}
                 className="h-1"
               />
+              {r.helper && !r.met && (
+                <p className="text-[9px] text-muted-foreground/70 italic mt-0.5">{r.helper}</p>
+              )}
             </div>
           ))}
         </div>

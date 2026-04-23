@@ -1204,7 +1204,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     const playerHexes = gameState.hexMap?.filter((h: any) => h.controllingFamily === config.family).length || 0;
     const playerRespect = gameState.resources?.respect ?? 0;
     const playerCapos = gameState.units?.[config.family]?.capos?.length ?? 0;
-    const playerBuilt = gameState.hexMap?.filter((h: any) => h.controllingFamily === config.family && h.business).length ?? 0;
+    const playerBuilt = gameState.hexMap?.filter((h: any) => h.controllingFamily === config.family && h.business && !h.business.isExtorted).length ?? 0;
     const playerIncome = gameState.lastTurnIncome ?? 0;
     const reqs = next.requirements;
     const rows: { label: string; current: number; target: number; met: boolean }[] = [];
@@ -1212,7 +1212,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     if (reqs.minHexes) rows.push({ label: `${reqs.minHexes}+ hexes`, current: playerHexes, target: reqs.minHexes, met: playerHexes >= reqs.minHexes });
     if (reqs.minRespect) rows.push({ label: `${reqs.minRespect}+ respect`, current: playerRespect, target: reqs.minRespect, met: playerRespect >= reqs.minRespect });
     if (reqs.minCapos) rows.push({ label: `${reqs.minCapos}+ capos`, current: playerCapos, target: reqs.minCapos, met: playerCapos >= reqs.minCapos });
-    if (reqs.minBuiltBusinesses) rows.push({ label: `${reqs.minBuiltBusinesses}+ businesses`, current: playerBuilt, target: reqs.minBuiltBusinesses, met: playerBuilt >= reqs.minBuiltBusinesses });
+    if (reqs.minBuiltBusinesses) rows.push({ label: `${reqs.minBuiltBusinesses}+ legal business built`, current: playerBuilt, target: reqs.minBuiltBusinesses, met: playerBuilt >= reqs.minBuiltBusinesses });
     if (reqs.minIncomeOrHexesOrRespect) {
       const or = reqs.minIncomeOrHexesOrRespect;
       rows.push({ label: `${or.hexes}+ hexes`, current: playerHexes, target: or.hexes, met: playerHexes >= or.hexes });
