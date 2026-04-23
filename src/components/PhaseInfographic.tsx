@@ -150,6 +150,9 @@ const PhaseInfographic: React.FC<PhaseInfographicProps> = ({
                 value={r.target > 0 ? Math.min(100, (r.isOr ? r.current : r.current / r.target) * 100) : 0}
                 className="h-1"
               />
+              {r.helper && !r.met && (
+                <p className="text-[9px] text-muted-foreground/70 italic mt-0.5">{r.helper}</p>
+              )}
             </div>
           ))}
         </div>
