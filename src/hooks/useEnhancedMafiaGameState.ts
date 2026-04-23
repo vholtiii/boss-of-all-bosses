@@ -1293,10 +1293,8 @@ export const useEnhancedMafiaGameState = (
     const isPlayer = family === state.playerFamily;
     const respect = isPlayer ? state.reputation.respect : (state.aiOpponents.find(o => o.family === family)?.resources.respect || 0);
     const capoCount = state.deployedUnits.filter(u => u.family === family && u.type === 'capo').length;
-    // For AI, count any hex with a business (extorted or not) since AI doesn't build businesses
-    const builtBusinessCount = isPlayer
-      ? state.hexMap.filter(t => t.controllingFamily === family && t.business && !t.business.isExtorted).length
-      : state.hexMap.filter(t => t.controllingFamily === family && t.business).length;
+    // Count only legally constructed (non-extorted) businesses for both player and AI
+    const builtBusinessCount = state.hexMap.filter(t => t.controllingFamily === family && t.business && !t.business.isExtorted).length;
     const income = isPlayer
       ? state.lastTurnIncome
       : (state.aiOpponents.find(o => o.family === family)?.resources.lastTurnIncome || 0);
