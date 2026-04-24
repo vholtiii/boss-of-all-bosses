@@ -140,7 +140,7 @@ All families also start with 1 Capo and 1 Boss. Each HQ + 6 adjacent hexes are p
 | Movement range | 1 hex (adjacent), or unlimited within connected territory (free) |
 | Moves per turn | 2 |
 | Mercenary cost | $1,500 |
-| Local recruit cost | $300 (requires 10+ controlled hexes) |
+| Local recruit cost | $600 (requires 10+ controlled hexes) |
 | Maintenance | **$600/turn (deployed only)** â€” undeployed soldiers in the recruitment pool are free |
 
 ### 4.2 Capos
@@ -345,7 +345,7 @@ Higher-tier bribes (Captain+) can also reveal **informants** in your own ranks â
 | Type | Cost | Requirement |
 |---|---|---|
 | Mercenary | $1,500 | None |
-| Local Recruit | $300 | 10+ controlled hexes |
+| Local Recruit | $600 | 10+ controlled hexes |
 
 ### 13.2 Capo Promotion
 

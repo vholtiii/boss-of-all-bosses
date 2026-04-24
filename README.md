@@ -98,7 +98,7 @@ Deploy → Tactical (Move) → Action → End Turn
 - Capos still fly up to 5 hexes regardless
 
 ### Units & Personnel
-- **Soldiers**: 1-hex movement (or free within connected territory), 2 moves/turn, $1,500 (mercenary) or $300 (local recruit, requires 10+ hexes). **Only deployed soldiers cost $600/turn maintenance — undeployed reserves are free.**
+- **Soldiers**: 1-hex movement (or free within connected territory), 2 moves/turn, $1,500 (mercenary) or $600 (local recruit, requires 10+ hexes). **Only deployed soldiers cost $600/turn maintenance — undeployed reserves are free.**
 - **Capos**: 5-hex flying movement, 3 moves/turn, 100% territory income, negotiation abilities. Auto-claim neutral territory on arrival. **Wound mechanic**: immune to death in regular combat — wounded instead (-10 loyalty, -1 move for 1 turn). Can only be killed via hitman or planned hit. Scout at 2-hex range.
 - **Boss**: Permanent HQ presence. Can call a Sitdown.
 - **Hitmen**: External contract killers ($30,000), 40-90% success based on target location. Kills raise global tension (+5 soldier, +15 capo).
@@ -152,7 +152,7 @@ Four business types: Brothel ($3K), Gambling Den ($4K), Loan Sharking ($5K), Sto
 
 ### Recruitment & Promotion
 - **Mercenary soldiers**: $1,500 (available immediately)
-- **Local recruits**: $300 (requires 10+ controlled hexes)
+- **Local recruits**: $600 (requires 10+ controlled hexes)
 - **Capo promotion**: $10,000, requires victories ≥ 3, loyalty ≥ 60, training ≥ 2, toughness ≥ 3, racketeering ≥ 3
 - Max 3 capos, max 3 hitman contracts ($30,000 each)
 

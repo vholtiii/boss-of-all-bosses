@@ -42,7 +42,7 @@ Two recruitment paths:
 | Type | Cost | Requirement | Notes |
 |---|---|---|---|
 | **Mercenary** | $1,500 | None | Available immediately |
-| **Local Recruit** | $300 | 10+ controlled hexes | Cheaper, marked as "recruited" |
+| **Local Recruit** | $600 | 10+ controlled hexes | Cheaper, marked as "recruited" |
 
 Both deploy at headquarters during the Deploy phase. Respect ≥ 50 provides up to 30% recruitment discount.
 
@@ -186,7 +186,7 @@ Auto-fails after 5 turns total.
 | Unit | Cost | Per-Turn Maintenance |
 |---|---|---|
 | Soldier (Mercenary) | $1,500 | $600/turn **(deployed only)** |
-| Soldier (Local Recruit) | $300 | $600/turn **(deployed only)** |
+| Soldier (Local Recruit) | $600 | $600/turn **(deployed only)** |
 | Soldier (Undeployed) | — | **Free** |
 | Capo (Promotion) | $10,000 | — |
 | Hitman contract | **$30,000** | — (one-time) |
@@ -200,7 +200,7 @@ Auto-fails after 5 turns total.
 
 ### Recruitment
 - Recruit mercenaries early for action coverage ($1,500 each)
-- Once at 10+ hexes, switch to local recruits ($300 each)
+- Once at 10+ hexes, switch to local recruits ($600 each)
 - Respect ≥ 50 gives up to 30% discount
 - Keep a reserve of undeployed soldiers — they're free until you need them
 
