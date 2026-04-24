@@ -71,6 +71,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
   const discountedRecruitCost = Math.round(LOCAL_SOLDIER_COST * (1 - totalSoldierDiscount));
   const discountedCapoCost = Math.round(CAPO_COST * (1 - totalCapoDiscount));
   const respectPct = Math.round(respectDiscount * 100);
+  const totalDiscountPct = Math.round(totalSoldierDiscount * 100);
   const playerTerritoryCount = gameState.hexMap?.filter((t: any) => t.controllingFamily === gameState.playerFamily).length || 0;
   const canRecruit = playerTerritoryCount >= RECRUIT_TERRITORY_REQUIREMENT;
   const isTacticalPhase = phase === 'move';
@@ -687,7 +688,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             <ActionButton
               icon={<Users className="h-4 w-4" />}
               label="Buy Soldier (Mercenary)"
-              sublabel={respectPct > 0 ? `$${discountedMercCost.toLocaleString()} · -3 loyalty · 1 action (${respectPct}% respect)` : `$${SOLDIER_COST.toLocaleString()} · -3 loyalty · 1 action`}
+              sublabel={totalDiscountPct > 0 ? `$${discountedMercCost.toLocaleString()} · -3 loyalty · 1 action (${totalDiscountPct}% discount applied)` : `$${SOLDIER_COST.toLocaleString()} · -3 loyalty · 1 action`}
               disabled={resources.money < discountedMercCost || gameState.tacticalActionsRemaining <= 0}
               disabledReason={gameState.tacticalActionsRemaining <= 0 ? 'No tactical actions' : resources.money < discountedMercCost ? `Need $${discountedMercCost.toLocaleString()}` : undefined}
               phaseLocked={!isTacticalPhase}
@@ -697,7 +698,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               icon={<Users className="h-4 w-4" />}
               label="Recruit Soldier (Loyal)"
               sublabel={canRecruit 
-                ? (respectPct > 0 ? `$${discountedRecruitCost} · +2 loyalty · 1 action (${respectPct}% respect)` : `$${LOCAL_SOLDIER_COST} · +2 loyalty · 1 action`)
+                ? (totalDiscountPct > 0 ? `$${discountedRecruitCost} · +2 loyalty · 1 action (${totalDiscountPct}% discount applied)` : `$${LOCAL_SOLDIER_COST} · +2 loyalty · 1 action`)
                 : `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (${playerTerritoryCount} owned)`}
               disabled={!canRecruit || resources.money < discountedRecruitCost || gameState.tacticalActionsRemaining <= 0}
               disabledReason={gameState.tacticalActionsRemaining <= 0 ? 'No tactical actions' : !canRecruit ? `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (have ${playerTerritoryCount})` : resources.money < discountedRecruitCost ? `Need $${discountedRecruitCost.toLocaleString()}` : undefined}
