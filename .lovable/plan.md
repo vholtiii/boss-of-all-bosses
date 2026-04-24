@@ -1,27 +1,24 @@
 
 
-# Fix: AI Capo fly range using player phase
+# Sync docs to match in-game $600 local recruit cost
 
-## Change
+## Confirmation
 
-In `src/hooks/useEnhancedMafiaGameState.ts`, update `getCapoFlyRange` (and any call-sites) so the phase used to compute a Capo's fly range comes from **that Capo's family**, not the player's `state.gamePhase`.
+In-game price = **$600** (from `LOCAL_SOLDIER_COST = 600` in `src/types/game-mechanics.ts`). That is the source of truth. The stale references are only in markdown docs.
 
-- For the player's Capos → use `state.gamePhase`.
-- For an AI Capo → use `state.aiOpponents.find(o => o.family === capo.family)?.resources.cachedPhase ?? 1`.
+## Fix
 
-Implementation: change `getCapoFlyRange(phase)` callers to pass the resolved phase per unit, or refactor to `getCapoFlyRange(state, capo)` which internally picks the right phase based on `capo.family === state.playerFamily`.
+Update every `$300` local-recruit reference to `$600`:
 
-## Files Touched
-
-- `src/hooks/useEnhancedMafiaGameState.ts` — fix the one leak so AI Capos get their P2+ extended fly range based on their own `cachedPhase`.
+- `README.md` — lines 101, 155
+- `GAME_MECHANICS.md` — lines 143, 348
+- `SOLDIER_RECRUITMENT_GUIDE.md` — lines 45, 189, 203
 
 ## Verification
 
-- Player at P1, rival at P2 → that rival's Capos can fly 4 hexes (not 2).
-- Player at P2, rival at P1 → that rival's Capos still limited to 2.
-- No change to player Capo movement.
+`grep -n '\$300' README.md GAME_MECHANICS.md SOLDIER_RECRUITMENT_GUIDE.md` returns no local-recruit hits.
 
 ## What Doesn't Change
 
-`PHASE_CONFIGS`, fly-range numbers (2 / 4), capo combat, any other phase gate.
+Game code, constants, UI, mechanics. Pure documentation sync.
 
