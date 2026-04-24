@@ -152,7 +152,7 @@ const sections: GuideSection[] = [
           <p className="text-xs font-semibold">Soldiers:</p>
           <Stat label="Movement" value="1 hex/move, max 2 moves/turn" />
           <Stat label="Free Travel" value="Unlimited on connected territory" />
-          <Stat label="Recruitment" value="$3,000 (loyal) or $1,500 (mercenary)" />
+          <Stat label="Recruitment" value="$600 (loyal) or $1,500 (mercenary)" />
           <Stat label="Toughness" value="+0.25/claim, +0.3/extort" />
         </div>
         <div className="space-y-1">
@@ -238,7 +238,7 @@ const sections: GuideSection[] = [
           <Stat label="🔍 Scout" value="Reveal enemy info (1-hex soldier, 2-hex capo)" />
           <Stat label="🏰 Fortify" value="+25% defense bonus, max 4 per family" />
           <Stat label="🏠 Safehouse" value="$2,500, deploy node + 10% defense" />
-          <Stat label="👥 Recruit" value="$3,000 loyal / $1,500 mercenary" />
+          <Stat label="👥 Recruit" value="$600 loyal / $1,500 mercenary" />
         </div>
         <Stat label="Intel Decay" value="Fresh → Stale over time" color="text-yellow-400" />
         <Tip>Fresh intel gives combat bonuses. Re-scout before major attacks!</Tip>
