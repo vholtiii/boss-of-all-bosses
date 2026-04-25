@@ -886,7 +886,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
             )}
 
             {/* Active State Badges */}
-            {isPlayerFamily && (mattressesState?.active || warSummitState?.active) && (
+            {isPlayerFamily && (mattressesState?.active || warSummitState?.active || layLowActiveUntil >= currentTurn || layLowAfterglowUntil >= currentTurn) && (
               <div className="mt-2 space-y-1">
                 {mattressesState?.active && (
                   <Badge variant="outline" className="w-full justify-center text-xs border-amber-500/50 text-amber-400 bg-amber-500/10">
@@ -896,6 +896,16 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                 {warSummitState?.active && (
                   <Badge variant="outline" className="w-full justify-center text-xs border-red-500/50 text-red-400 bg-red-500/10">
                     ⚔️ War Summit ({warSummitState.turnsRemaining} turn{warSummitState.turnsRemaining !== 1 ? 's' : ''})
+                  </Badge>
+                )}
+                {layLowActiveUntil >= currentTurn && (
+                  <Badge variant="outline" className="w-full justify-center text-xs border-purple-500/50 text-purple-300 bg-purple-500/10">
+                    🤫 Laying Low ({layLowActiveUntil - currentTurn + 1} turn{layLowActiveUntil - currentTurn + 1 !== 1 ? 's' : ''})
+                  </Badge>
+                )}
+                {layLowActiveUntil < currentTurn && layLowAfterglowUntil >= currentTurn && (
+                  <Badge variant="outline" className="w-full justify-center text-xs border-purple-400/40 text-purple-300/80 bg-purple-500/5">
+                    🌙 Lay Low Afterglow ({layLowAfterglowUntil - currentTurn + 1} turn{layLowAfterglowUntil - currentTurn + 1 !== 1 ? 's' : ''})
                   </Badge>
                 )}
               </div>
