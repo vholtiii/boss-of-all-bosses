@@ -756,13 +756,36 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 🏛️ Under Federal Oversight — illegal businesses suspended ({(gameState as any).federalIndictmentRecoveryTurn - gameState.turn} turns left)
               </div>
             )}
+            {/* Lay Low / Afterglow Status */}
+            {(() => {
+              const layUntil = (gameState as any).layLowActiveUntil || 0;
+              const afterUntil = (gameState as any).layLowAfterglowUntil || 0;
+              const turn = gameState.turn;
+              if (layUntil >= turn) {
+                const left = layUntil - turn + 1;
+                return (
+                  <div className="rounded-md border border-purple-500/40 bg-purple-500/10 px-3 py-1.5 text-xs text-purple-300 font-medium flex items-center gap-1.5">
+                    🤫 Laying Low — {left} turn{left !== 1 ? 's' : ''} left · arrest immune, no income
+                  </div>
+                );
+              }
+              if (afterUntil >= turn) {
+                const left = afterUntil - turn + 1;
+                return (
+                  <div className="rounded-md border border-purple-400/30 bg-purple-500/5 px-3 py-1.5 text-xs text-purple-300/80 flex items-center gap-1.5">
+                    🌙 Lay Low Afterglow — {left} turn{left !== 1 ? 's' : ''} (−10 informant flip)
+                  </div>
+                );
+              }
+              return null;
+            })()}
             {/* Heat Tier Indicator */}
             {(() => {
               const heat = policeHeat.level;
-              if (heat >= 90) return <div className="text-xs text-destructive font-semibold px-1">🔴 CRITICAL — Businesses shutting down, RICO active</div>;
-              if (heat >= 70) return <div className="text-xs text-orange-400 font-semibold px-1">🟠 HIGH — Capo arrests possible, −25% illegal income</div>;
-              if (heat >= 50) return <div className="text-xs text-yellow-400 font-semibold px-1">🟡 MEDIUM — Soldier arrests possible, −15% illegal income</div>;
-              if (heat >= 30) return <div className="text-xs text-blue-400 font-semibold px-1">🔵 LOW — −15% illegal income</div>;
+              if (heat >= 90) return <div className="text-xs text-destructive font-semibold px-1">🔴 CRITICAL — Businesses shutting down, RICO active (3 turns)</div>;
+              if (heat >= 70) return <div className="text-xs text-orange-400 font-semibold px-1">🟠 HIGH — 25% capo arrest chance, −35% illegal income</div>;
+              if (heat >= 50) return <div className="text-xs text-yellow-400 font-semibold px-1">🟡 MEDIUM — 30% soldier arrest chance, −25% illegal income</div>;
+              if (heat >= 40) return <div className="text-xs text-blue-400 font-semibold px-1">🔵 LOW — −25% illegal income</div>;
               return null;
             })()}
             <ActionButton
