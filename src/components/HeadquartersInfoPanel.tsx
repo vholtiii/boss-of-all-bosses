@@ -1036,7 +1036,32 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
               })()
             )}
 
-            {/* Purge Ranks — inside Boss Actions */}
+            {/* Lay Low — Boss Action (free, punishing) */}
+            {isPlayerFamily && onLayLow && (
+              (() => {
+                const isActionPhase = turnPhase === 'action';
+                const isActive = layLowActiveUntil >= currentTurn;
+                const turnsLeft = isActive ? (layLowActiveUntil - currentTurn + 1) : 0;
+                return (
+                  <div className="mt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs h-8 border-purple-500/40 text-purple-300 hover:bg-purple-500/10"
+                      disabled={!isActionPhase || isActive}
+                      onClick={onLayLow}
+                    >
+                      🤫 {isActive ? `Laying Low — ${turnsLeft} turn${turnsLeft !== 1 ? 's' : ''} left` : 'Lay Low (Free · 3 turns)'}
+                    </Button>
+                    <p className="text-[9px] text-muted-foreground mt-0.5 text-center">
+                      Illegal income $0, no offensive actions, −5 Respect · Arrest immunity, no rats
+                    </p>
+                  </div>
+                )
+              })()
+            )}
+
+
             {isPlayerFamily && onEliminateSoldier && (() => {
               const flaggedSoldiers = (deployedUnits || []).filter((u: any) => {
                 if (u.family !== family || u.type !== 'soldier') return false;
