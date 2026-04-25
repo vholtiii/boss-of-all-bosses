@@ -3293,6 +3293,19 @@ export const useEnhancedMafiaGameState = (
         };
       });
 
+      // --- Lay Low lifecycle: detect expiry and start afterglow ---
+      {
+        const wasActive = ((newState as any).layLowActiveUntil || 0) >= (newState.turn - 1);
+        const stillActive = ((newState as any).layLowActiveUntil || 0) >= newState.turn;
+        if (wasActive && !stillActive) {
+          (newState as any).layLowAfterglowUntil = newState.turn + 1; // 2 turns of afterglow (this + next)
+          newState.pendingNotifications.push({
+            type: 'info' as const, title: '🤫 Lay Low Ended',
+            message: 'Family resumes operations. Informant flip chance reduced for 2 turns.',
+          });
+        }
+      }
+
       // --- Mattresses & War Summit lifecycle ---
       if (newState.mattressesState && newState.mattressesState.active) {
         newState.mattressesState.turnsRemaining -= 1;
