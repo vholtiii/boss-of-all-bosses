@@ -729,7 +729,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             {/* RICO Warning */}
             {(gameState as any).ricoTimer > 0 && (
               <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-1.5 text-xs text-destructive font-bold flex items-center gap-1.5 animate-pulse">
-                🚨 RICO: {(gameState as any).ricoTimer}/5 turns
+                🚨 RICO: {(gameState as any).ricoTimer}/3 turns
               </div>
             )}
             {/* Prosecution Arrest Timer */}
