@@ -1538,10 +1538,13 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
             onDeclareWar={isPlayerHQ ? (targetFamily) => handleAction({ type: 'declare_war', targetFamily }) : undefined}
             onGoToMattresses={isPlayerHQ ? () => handleAction({ type: 'go_to_mattresses' }) : undefined}
             onWarSummit={isPlayerHQ ? () => handleAction({ type: 'war_summit' }) : undefined}
+            onLayLow={isPlayerHQ ? () => handleAction({ type: 'lay_low' }) : undefined}
             mattressesState={(gameState as any).mattressesState}
             warSummitState={(gameState as any).warSummitState}
             mattressesCooldownUntil={(gameState as any).mattressesCooldownUntil || 0}
             warSummitCooldownUntil={(gameState as any).warSummitCooldownUntil || 0}
+            layLowActiveUntil={(gameState as any).layLowActiveUntil || 0}
+            layLowAfterglowUntil={(gameState as any).layLowAfterglowUntil || 0}
             activeWars={(gameState as any).activeWars || []}
             actionsRemaining={gameState.actionsRemaining || 0}
             gamePhase={(gameState as any).gamePhase || 1}
