@@ -4943,6 +4943,12 @@ export const useEnhancedMafiaGameState = (
     if ((state.mattressesState || {}).active) {
       grossIncome = Math.floor(grossIncome * (1 - MATTRESSES_INCOME_PENALTY));
     }
+
+    // Lay Low: zero out illegal income (legal income unaffected)
+    if (isLayingLow(state)) {
+      grossIncome = grossIncome - illegalIncome;
+      illegalIncome = 0;
+    }
     const grossLegalIncome = legalIncome;
     const grossIllegalIncome = illegalIncome;
     
