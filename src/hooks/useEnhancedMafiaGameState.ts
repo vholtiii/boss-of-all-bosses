@@ -6927,7 +6927,22 @@ export const useEnhancedMafiaGameState = (
         }];
         return newState;
       }
-      
+
+      // ---- Lay Low: block all offensive actions while active ----
+      const layLowBlockedActions = new Set([
+        'hit_territory', 'execute_planned_hit', 'extort_territory',
+        'sabotage_hex', 'claim_territory', 'assault_hq', 'flip_soldier',
+        'plan_hit', 'hire_hitman',
+      ]);
+      if (isLayingLow(newState) && layLowBlockedActions.has(action.type)) {
+        newState.pendingNotifications.push({
+          type: 'warning' as const,
+          title: '🤫 Laying Low',
+          message: 'Cannot take offensive action while the family is laying low.',
+        });
+        return newState;
+      }
+
       switch (action.type) {
         case 'hit_territory': {
           // Block during mattresses
