@@ -4283,7 +4283,10 @@ export const useEnhancedMafiaGameState = (
       {
         const recentArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn < 3).length;
         const loyalty = newState.reputation.loyalty;
-        newState.policeHeat.rattingRisk = Math.min(100, Math.round(recentArrests * 15 * ((100 - loyalty) / 100)));
+        let risk = Math.round(recentArrests * 15 * ((100 - loyalty) / 100));
+        if (isLayingLow(newState)) risk = 0;
+        else if (isLayLowAfterglow(newState)) risk = Math.max(0, risk - 10);
+        newState.policeHeat.rattingRisk = Math.min(100, risk);
       }
       
       // --- Update reductionPerTurn from active bribes ---
