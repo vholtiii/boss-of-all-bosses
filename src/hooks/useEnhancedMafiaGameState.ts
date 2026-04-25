@@ -7945,6 +7945,24 @@ export const useEnhancedMafiaGameState = (
           checkAndTriggerWar(newState, newState.playerFamily, warTarget, 'declared' as any);
           return newState;
         }
+        case 'lay_low': {
+          if (newState.turnPhase !== 'action') {
+            newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'Lay Low is only available during the Action phase.' });
+            return newState;
+          }
+          if (isLayingLow(newState)) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Already Active', message: 'The family is already laying low.' });
+            return newState;
+          }
+          // Free, no cooldown — but immediate -5 respect and 3-turn duration
+          (newState as any).layLowActiveUntil = newState.turn + 2; // current + next 2 = 3 turns
+          syncRespect(newState, Math.max(0, newState.resources.respect - 5));
+          newState.pendingNotifications.push({
+            type: 'info' as const, title: '🤫 Laying Low',
+            message: 'Family stands down for 3 turns. Illegal income $0, no offensive actions, but immune to arrests and ratting. -5 Respect.',
+          });
+          return newState;
+        }
         case 'go_to_mattresses': {
           // Phase gate: Phase 3+
           if ((newState.gamePhase || 1) < 3) {
