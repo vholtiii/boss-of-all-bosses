@@ -184,10 +184,17 @@ const DIFFICULTY_MODIFIERS: Record<Difficulty, DifficultyModifiers> = {
 // Applies a heat increment scaled by the active difficulty's policeHeatMult.
 // Use for all player-action-driven heat (claim/extort/hit/sabotage/etc.).
 // Passive/loyalty/informant heat is intentionally NOT scaled here.
+// Global multiplier on player heat gains (action + ambient).
+// Heat decay (reductionPerTurn) is intentionally NOT touched.
+export const HEAT_GAIN_MULT = 1.30;
+export const isLayingLow = (state: EnhancedMafiaGameState): boolean =>
+  ((state as any).layLowActiveUntil || 0) >= state.turn;
+export const isLayLowAfterglow = (state: EnhancedMafiaGameState): boolean =>
+  ((state as any).layLowAfterglowUntil || 0) >= state.turn;
 export const applyPlayerHeat = (state: EnhancedMafiaGameState, amount: number): void => {
   state.policeHeat = state.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
   const mult = state.difficultyModifiers?.policeHeatMult ?? 1;
-  const scaled = Math.max(0, Math.round(amount * mult));
+  const scaled = Math.max(0, Math.round(amount * mult * HEAT_GAIN_MULT));
   state.policeHeat.level = Math.min(100, (state.policeHeat.level || 0) + scaled);
 };
 
