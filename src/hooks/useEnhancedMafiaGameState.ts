@@ -184,10 +184,17 @@ const DIFFICULTY_MODIFIERS: Record<Difficulty, DifficultyModifiers> = {
 // Applies a heat increment scaled by the active difficulty's policeHeatMult.
 // Use for all player-action-driven heat (claim/extort/hit/sabotage/etc.).
 // Passive/loyalty/informant heat is intentionally NOT scaled here.
+// Global multiplier on player heat gains (action + ambient).
+// Heat decay (reductionPerTurn) is intentionally NOT touched.
+export const HEAT_GAIN_MULT = 1.30;
+export const isLayingLow = (state: EnhancedMafiaGameState): boolean =>
+  ((state as any).layLowActiveUntil || 0) >= state.turn;
+export const isLayLowAfterglow = (state: EnhancedMafiaGameState): boolean =>
+  ((state as any).layLowAfterglowUntil || 0) >= state.turn;
 export const applyPlayerHeat = (state: EnhancedMafiaGameState, amount: number): void => {
   state.policeHeat = state.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
   const mult = state.difficultyModifiers?.policeHeatMult ?? 1;
-  const scaled = Math.max(0, Math.round(amount * mult));
+  const scaled = Math.max(0, Math.round(amount * mult * HEAT_GAIN_MULT));
   state.policeHeat.level = Math.min(100, (state.policeHeat.level || 0) + scaled);
 };
 
@@ -496,6 +503,10 @@ export interface EnhancedMafiaGameState {
   mattressesCooldownUntil: number;
   warSummitState: WarSummitState;
   warSummitCooldownUntil: number;
+
+  // Lay Low (family-wide stand-down)
+  layLowActiveUntil?: number;
+  layLowAfterglowUntil?: number;
   
   // Enemy hex entry system
   contestedHexes: Array<{ q: number; r: number; s: number; occupyingFamily: string; occupyingSince: number }>;
@@ -1058,6 +1069,8 @@ export const createInitialGameState = (
      mattressesCooldownUntil: 0,
      warSummitState: { active: false, turnsRemaining: 0 },
      warSummitCooldownUntil: 0,
+     layLowActiveUntil: 0,
+     layLowAfterglowUntil: 0,
      contestedHexes: [],
      pendingEnemyHexAction: null,
     // Family Power system
@@ -1666,6 +1679,7 @@ export const useEnhancedMafiaGameState = (
           if (prev.tacticalActionsRemaining <= 0) return prev;
           if (unitType !== 'capo') return prev;
           if ((unit as any).woundedTurnsRemaining > 0) return prev;
+          if (isLayingLow(prev)) return prev;
           // Show all enemy hexes as targets (excluding HQs)
           const enemyHexes = prev.hexMap
             .filter(t => t.controllingFamily !== prev.playerFamily && t.controllingFamily !== 'neutral' && !t.isHeadquarters)
@@ -3286,6 +3300,19 @@ export const useEnhancedMafiaGameState = (
         };
       });
 
+      // --- Lay Low lifecycle: detect expiry and start afterglow ---
+      {
+        const wasActive = ((newState as any).layLowActiveUntil || 0) >= (newState.turn - 1);
+        const stillActive = ((newState as any).layLowActiveUntil || 0) >= newState.turn;
+        if (wasActive && !stillActive) {
+          (newState as any).layLowAfterglowUntil = newState.turn + 1; // 2 turns of afterglow (this + next)
+          newState.pendingNotifications.push({
+            type: 'info' as const, title: '🤫 Lay Low Ended',
+            message: 'Family resumes operations. Informant flip chance reduced for 2 turns.',
+          });
+        }
+      }
+
       // --- Mattresses & War Summit lifecycle ---
       if (newState.mattressesState && newState.mattressesState.active) {
         newState.mattressesState.turnsRemaining -= 1;
@@ -3928,7 +3955,7 @@ export const useEnhancedMafiaGameState = (
           const isPlayerBuilt = !t.business!.isExtorted;
           heatFromBiz += isPlayerBuilt ? 0.5 : 1; // built = half heat contribution
         });
-        const passiveHeat = Math.floor(heatFromBiz / 3);
+        const passiveHeat = Math.floor((heatFromBiz / 3) * HEAT_GAIN_MULT);
         if (passiveHeat > 0) {
           newState.policeHeat.level = Math.min(100, newState.policeHeat.level + passiveHeat);
         }
@@ -4008,12 +4035,12 @@ export const useEnhancedMafiaGameState = (
         const lawyerActive = (newState.lawyerActiveUntil || 0) >= newState.turn;
 
         // Heat tier crossing alerts (upward only)
-        const tierFor = (h: number) => h >= 90 ? 4 : h >= 70 ? 3 : h >= 50 ? 2 : h >= 30 ? 1 : 0;
+        const tierFor = (h: number) => h >= 90 ? 4 : h >= 70 ? 3 : h >= 50 ? 2 : h >= 40 ? 1 : 0;
         const oldTier = tierFor(prevHeat);
         const newTier = tierFor(heat);
         if (newTier > oldTier && newTier >= 1) {
           const tierLabels = ['', '⚠️ Heat Tier 1 — Income Penalty', '🚔 Heat Tier 2 — Soldier Arrests', '👔 Heat Tier 3 — Capo Arrests', '🚨 Heat Tier 4 — RICO Investigation'];
-          const tierMsgs = ['', 'Heat hit 30+. Illegal businesses earn less.', 'Heat hit 50+. Soldier arrests possible each turn.', 'Heat hit 70+. Capos can be arrested.', 'Heat hit 90+. RICO timer started — game over in 5 turns at this level!'];
+          const tierMsgs = ['', 'Heat hit 40+. Illegal income −25%.', 'Heat hit 50+. 30% chance of soldier arrests each turn.', 'Heat hit 70+. 25% chance of capo arrests each turn.', 'Heat hit 90+. RICO timer started — game over in 3 turns at this level!'];
           newState.pendingNotifications.push({
             type: newTier >= 3 ? 'error' as const : 'warning' as const,
             title: tierLabels[newTier],
@@ -4021,12 +4048,14 @@ export const useEnhancedMafiaGameState = (
           });
         }
 
-        // Tier 1: 30+ → income penalty applied in processEconomy
+        // Tier 1: 40+ → income penalty applied in processEconomy
         // (handled via state flag, not here)
 
-        // Tier 2: 50+ → 20% chance soldier arrest (3 turns, 2 with lawyer)
-        if (heat >= 50) {
-          if (Math.random() < 0.20) {
+        const layingLow = isLayingLow(newState);
+
+        // Tier 2: 50+ → 30% chance soldier arrest (3 turns, 2 with lawyer)
+        if (heat >= 50 && !layingLow) {
+          if (Math.random() < 0.30) {
             const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
             if (playerSoldiers.length > 0) {
               const arrested = playerSoldiers[Math.floor(Math.random() * playerSoldiers.length)];
@@ -4051,9 +4080,9 @@ export const useEnhancedMafiaGameState = (
           }
         }
 
-        // Tier 3: 70+ → 15% chance capo arrest (5 turns, 4 with lawyer)
-        if (heat >= 70) {
-          if (Math.random() < 0.15) {
+        // Tier 3: 70+ → 25% chance capo arrest (5 turns, 4 with lawyer)
+        if (heat >= 70 && !layingLow) {
+          if (Math.random() < 0.25) {
             const playerCapos = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'capo');
             if (playerCapos.length > 0) {
               const arrested = playerCapos[Math.floor(Math.random() * playerCapos.length)];
@@ -4096,21 +4125,21 @@ export const useEnhancedMafiaGameState = (
             });
           }
 
-          // RICO timer
+          // RICO timer (3 turns to indictment)
           newState.ricoTimer = (newState.ricoTimer || 0) + 1;
-          turnReport.events.push(`⚠️ RICO INVESTIGATION: ${newState.ricoTimer}/5 turns at critical heat!`);
-          if (newState.ricoTimer >= 5) {
+          turnReport.events.push(`⚠️ RICO INVESTIGATION: ${newState.ricoTimer}/3 turns at critical heat!`);
+          if (newState.ricoTimer >= 3) {
             newState.gameOver = { type: 'rico', turn: newState.turn };
             turnReport.events.push(`🚨 RICO INDICTMENT! The federal government has brought down your empire!`);
             newState.pendingNotifications.push({
               type: 'error' as const, title: '🚨 GAME OVER — RICO Indictment',
-              message: `5 consecutive turns at critical heat. Your entire organization has been dismantled by the feds.`,
+              message: `3 consecutive turns at critical heat. Your entire organization has been dismantled by the feds.`,
             });
           } else {
             newState.pendingNotifications.push({
               type: 'error' as const,
-              title: `⏱️ RICO Timer ${newState.ricoTimer}/5`,
-              message: `Heat still at 90+. ${5 - newState.ricoTimer} turn${5 - newState.ricoTimer === 1 ? '' : 's'} until federal indictment.`,
+              title: `⏱️ RICO Timer ${newState.ricoTimer}/3`,
+              message: `Heat still at 90+. ${3 - newState.ricoTimer} turn${3 - newState.ricoTimer === 1 ? '' : 's'} until federal indictment.`,
             });
           }
         } else {
@@ -4274,7 +4303,10 @@ export const useEnhancedMafiaGameState = (
       {
         const recentArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn < 3).length;
         const loyalty = newState.reputation.loyalty;
-        newState.policeHeat.rattingRisk = Math.min(100, Math.round(recentArrests * 15 * ((100 - loyalty) / 100)));
+        let risk = Math.round(recentArrests * 15 * ((100 - loyalty) / 100));
+        if (isLayingLow(newState)) risk = 0;
+        else if (isLayLowAfterglow(newState)) risk = Math.max(0, risk - 10);
+        newState.policeHeat.rattingRisk = Math.min(100, risk);
       }
       
       // --- Update reductionPerTurn from active bribes ---
@@ -4934,6 +4966,12 @@ export const useEnhancedMafiaGameState = (
     if ((state.mattressesState || {}).active) {
       grossIncome = Math.floor(grossIncome * (1 - MATTRESSES_INCOME_PENALTY));
     }
+
+    // Lay Low: zero out illegal income (legal income unaffected)
+    if (isLayingLow(state)) {
+      grossIncome = grossIncome - illegalIncome;
+      illegalIncome = 0;
+    }
     const grossLegalIncome = legalIncome;
     const grossIllegalIncome = illegalIncome;
     
@@ -4962,9 +5000,9 @@ export const useEnhancedMafiaGameState = (
       const heat = state.policeHeat.level;
       let heatPenaltyRate = 0;
       if (heat >= 70) {
+        heatPenaltyRate = 0.35;
+      } else if (heat >= 40) {
         heatPenaltyRate = 0.25;
-      } else if (heat >= 30) {
-        heatPenaltyRate = 0.15;
       }
       if (heatPenaltyRate > 0) {
         heatPenaltyAmount = Math.floor((grossIllegalIncome - copFlipPenaltyAmount) * heatPenaltyRate);
@@ -6890,7 +6928,22 @@ export const useEnhancedMafiaGameState = (
         }];
         return newState;
       }
-      
+
+      // ---- Lay Low: block all offensive actions while active ----
+      const layLowBlockedActions = new Set([
+        'hit_territory', 'execute_planned_hit', 'extort_territory',
+        'sabotage_hex', 'claim_territory', 'assault_hq', 'flip_soldier',
+        'plan_hit', 'hire_hitman',
+      ]);
+      if (isLayingLow(newState) && layLowBlockedActions.has(action.type)) {
+        newState.pendingNotifications.push({
+          type: 'warning' as const,
+          title: '🤫 Laying Low',
+          message: 'Cannot take offensive action while the family is laying low.',
+        });
+        return newState;
+      }
+
       switch (action.type) {
         case 'hit_territory': {
           // Block during mattresses
@@ -7890,6 +7943,24 @@ export const useEnhancedMafiaGameState = (
           const pairKey = getTensionPairKey(newState.playerFamily, warTarget);
           newState.familyTensions[pairKey] = WAR_TENSION_THRESHOLD;
           checkAndTriggerWar(newState, newState.playerFamily, warTarget, 'declared' as any);
+          return newState;
+        }
+        case 'lay_low': {
+          if (newState.turnPhase !== 'action') {
+            newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'Lay Low is only available during the Action phase.' });
+            return newState;
+          }
+          if (isLayingLow(newState)) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Already Active', message: 'The family is already laying low.' });
+            return newState;
+          }
+          // Free, no cooldown — but immediate -5 respect and 3-turn duration
+          (newState as any).layLowActiveUntil = newState.turn + 2; // current + next 2 = 3 turns
+          syncRespect(newState, Math.max(0, newState.resources.respect - 5));
+          newState.pendingNotifications.push({
+            type: 'info' as const, title: '🤫 Laying Low',
+            message: 'Family stands down for 3 turns. Illegal income $0, no offensive actions, but immune to arrests and ratting. -5 Respect.',
+          });
           return newState;
         }
         case 'go_to_mattresses': {
