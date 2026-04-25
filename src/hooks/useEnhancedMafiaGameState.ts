@@ -4028,12 +4028,14 @@ export const useEnhancedMafiaGameState = (
           });
         }
 
-        // Tier 1: 30+ → income penalty applied in processEconomy
+        // Tier 1: 40+ → income penalty applied in processEconomy
         // (handled via state flag, not here)
 
-        // Tier 2: 50+ → 20% chance soldier arrest (3 turns, 2 with lawyer)
-        if (heat >= 50) {
-          if (Math.random() < 0.20) {
+        const layingLow = isLayingLow(newState);
+
+        // Tier 2: 50+ → 30% chance soldier arrest (3 turns, 2 with lawyer)
+        if (heat >= 50 && !layingLow) {
+          if (Math.random() < 0.30) {
             const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
             if (playerSoldiers.length > 0) {
               const arrested = playerSoldiers[Math.floor(Math.random() * playerSoldiers.length)];
@@ -4058,9 +4060,9 @@ export const useEnhancedMafiaGameState = (
           }
         }
 
-        // Tier 3: 70+ → 15% chance capo arrest (5 turns, 4 with lawyer)
-        if (heat >= 70) {
-          if (Math.random() < 0.15) {
+        // Tier 3: 70+ → 25% chance capo arrest (5 turns, 4 with lawyer)
+        if (heat >= 70 && !layingLow) {
+          if (Math.random() < 0.25) {
             const playerCapos = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'capo');
             if (playerCapos.length > 0) {
               const arrested = playerCapos[Math.floor(Math.random() * playerCapos.length)];
@@ -4103,21 +4105,21 @@ export const useEnhancedMafiaGameState = (
             });
           }
 
-          // RICO timer
+          // RICO timer (3 turns to indictment)
           newState.ricoTimer = (newState.ricoTimer || 0) + 1;
-          turnReport.events.push(`⚠️ RICO INVESTIGATION: ${newState.ricoTimer}/5 turns at critical heat!`);
-          if (newState.ricoTimer >= 5) {
+          turnReport.events.push(`⚠️ RICO INVESTIGATION: ${newState.ricoTimer}/3 turns at critical heat!`);
+          if (newState.ricoTimer >= 3) {
             newState.gameOver = { type: 'rico', turn: newState.turn };
             turnReport.events.push(`🚨 RICO INDICTMENT! The federal government has brought down your empire!`);
             newState.pendingNotifications.push({
               type: 'error' as const, title: '🚨 GAME OVER — RICO Indictment',
-              message: `5 consecutive turns at critical heat. Your entire organization has been dismantled by the feds.`,
+              message: `3 consecutive turns at critical heat. Your entire organization has been dismantled by the feds.`,
             });
           } else {
             newState.pendingNotifications.push({
               type: 'error' as const,
-              title: `⏱️ RICO Timer ${newState.ricoTimer}/5`,
-              message: `Heat still at 90+. ${5 - newState.ricoTimer} turn${5 - newState.ricoTimer === 1 ? '' : 's'} until federal indictment.`,
+              title: `⏱️ RICO Timer ${newState.ricoTimer}/3`,
+              message: `Heat still at 90+. ${3 - newState.ricoTimer} turn${3 - newState.ricoTimer === 1 ? '' : 's'} until federal indictment.`,
             });
           }
         } else {
