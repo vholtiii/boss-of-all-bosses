@@ -1679,6 +1679,7 @@ export const useEnhancedMafiaGameState = (
           if (prev.tacticalActionsRemaining <= 0) return prev;
           if (unitType !== 'capo') return prev;
           if ((unit as any).woundedTurnsRemaining > 0) return prev;
+          if (isLayingLow(prev)) return prev;
           // Show all enemy hexes as targets (excluding HQs)
           const enemyHexes = prev.hexMap
             .filter(t => t.controllingFamily !== prev.playerFamily && t.controllingFamily !== 'neutral' && !t.isHeadquarters)
