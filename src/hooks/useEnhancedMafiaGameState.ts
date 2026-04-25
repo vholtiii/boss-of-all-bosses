@@ -4971,9 +4971,9 @@ export const useEnhancedMafiaGameState = (
       const heat = state.policeHeat.level;
       let heatPenaltyRate = 0;
       if (heat >= 70) {
+        heatPenaltyRate = 0.35;
+      } else if (heat >= 40) {
         heatPenaltyRate = 0.25;
-      } else if (heat >= 30) {
-        heatPenaltyRate = 0.15;
       }
       if (heatPenaltyRate > 0) {
         heatPenaltyAmount = Math.floor((grossIllegalIncome - copFlipPenaltyAmount) * heatPenaltyRate);
