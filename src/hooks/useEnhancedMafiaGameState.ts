@@ -503,6 +503,10 @@ export interface EnhancedMafiaGameState {
   mattressesCooldownUntil: number;
   warSummitState: WarSummitState;
   warSummitCooldownUntil: number;
+
+  // Lay Low (family-wide stand-down)
+  layLowActiveUntil?: number;
+  layLowAfterglowUntil?: number;
   
   // Enemy hex entry system
   contestedHexes: Array<{ q: number; r: number; s: number; occupyingFamily: string; occupyingSince: number }>;
@@ -1065,6 +1069,8 @@ export const createInitialGameState = (
      mattressesCooldownUntil: 0,
      warSummitState: { active: false, turnsRemaining: 0 },
      warSummitCooldownUntil: 0,
+     layLowActiveUntil: 0,
+     layLowAfterglowUntil: 0,
      contestedHexes: [],
      pendingEnemyHexAction: null,
     // Family Power system
