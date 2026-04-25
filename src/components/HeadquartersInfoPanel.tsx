@@ -93,10 +93,13 @@ interface HeadquartersInfoPanelProps {
   onDeclareWar?: (targetFamily: string) => void;
   onGoToMattresses?: () => void;
   onWarSummit?: () => void;
+  onLayLow?: () => void;
   mattressesState?: MattressesState;
   warSummitState?: WarSummitState;
   mattressesCooldownUntil?: number;
   warSummitCooldownUntil?: number;
+  layLowActiveUntil?: number;
+  layLowAfterglowUntil?: number;
   activeWars?: Array<{ family1: string; family2: string; turnsRemaining: number }>;
   actionsRemaining?: number;
   gamePhase?: number;
@@ -150,10 +153,13 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   onDeclareWar,
   onGoToMattresses,
   onWarSummit,
+  onLayLow,
   mattressesState,
   warSummitState,
   mattressesCooldownUntil = 0,
   warSummitCooldownUntil = 0,
+  layLowActiveUntil = 0,
+  layLowAfterglowUntil = 0,
   activeWars = [],
   actionsRemaining = 0,
   gamePhase = 1,
