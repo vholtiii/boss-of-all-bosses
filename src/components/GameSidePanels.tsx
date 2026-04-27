@@ -1140,7 +1140,30 @@ export const RightSidePanel: React.FC<{
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-bold capitalize text-foreground">{opponent.family}</span>
-                  <Badge variant="outline" className="text-[10px] h-5">{opponent.personality}</Badge>
+                  <div className="flex items-center gap-1">
+                    {(() => {
+                      const layUntil = opponent.layLowActiveUntil || 0;
+                      const matUntil = opponent.mattressesActiveUntil || 0;
+                      const turn = gameState.turn;
+                      const isLayingLow = layUntil >= turn;
+                      const atMattresses = matUntil >= turn;
+                      return (
+                        <>
+                          {isLayingLow && (
+                            <Badge variant="outline" className="text-[10px] h-5 border-purple-500/40 text-purple-300" title="Family is laying low">
+                              🤫 {layUntil - turn + 1}t
+                            </Badge>
+                          )}
+                          {atMattresses && (
+                            <Badge variant="outline" className="text-[10px] h-5 border-amber-500/40 text-amber-300" title="Family is at the mattresses">
+                              🛏️ {matUntil - turn + 1}t
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="text-[10px] h-5">{opponent.personality}</Badge>
+                        </>
+                      );
+                    })()}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-1 text-center">
                   <div>
