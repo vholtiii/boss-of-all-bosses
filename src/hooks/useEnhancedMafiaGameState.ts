@@ -6929,11 +6929,12 @@ export const useEnhancedMafiaGameState = (
         return newState;
       }
 
-      // ---- Lay Low: block all offensive actions while active ----
+      // ---- Lay Low: block all offensive actions AND recruitment while active ----
       const layLowBlockedActions = new Set([
         'hit_territory', 'execute_planned_hit', 'extort_territory',
         'sabotage_hex', 'claim_territory', 'assault_hq', 'flip_soldier',
         'plan_hit', 'hire_hitman',
+        'recruit_soldiers', 'recruit_local_soldier',
       ]);
       if (isLayingLow(newState) && layLowBlockedActions.has(action.type)) {
         newState.pendingNotifications.push({
@@ -7954,12 +7955,19 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Already Active', message: 'The family is already laying low.' });
             return newState;
           }
-          // Free, no cooldown — but immediate -5 respect and 3-turn duration
+          const cd = (newState as any).layLowCooldownUntil || 0;
+          if (cd > newState.turn) {
+            const turnsLeft = cd - newState.turn;
+            newState.pendingNotifications.push({ type: 'warning', title: '⏳ Cooldown', message: `Lay Low available in ${turnsLeft} turn${turnsLeft !== 1 ? 's' : ''}.` });
+            return newState;
+          }
+          // Free but 7-turn cooldown — immediate -5 respect and 3-turn duration
           (newState as any).layLowActiveUntil = newState.turn + 2; // current + next 2 = 3 turns
+          (newState as any).layLowCooldownUntil = newState.turn + 7; // 7-turn cooldown from activation
           syncRespect(newState, Math.max(0, newState.resources.respect - 5));
           newState.pendingNotifications.push({
             type: 'info' as const, title: '🤫 Laying Low',
-            message: 'Family stands down for 3 turns. Illegal income $0, no offensive actions, but immune to arrests and ratting. -5 Respect.',
+            message: 'Family stands down for 3 turns. Illegal income $0, no offensive actions, no recruiting, but immune to arrests and ratting. -5 Respect. 7-turn cooldown.',
           });
           return newState;
         }
