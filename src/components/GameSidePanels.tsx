@@ -878,6 +878,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               money={resources.money}
               currentTurn={gameState.turn}
               gamePhase={(gameState as any).gamePhase || 1}
+              activeBribes={gameState.activeBribes || []}
               onHire={(targetUnitId, targetFamily) => onAction({ type: 'hire_hitman', targetUnitId, targetFamily })}
             />
           )}
