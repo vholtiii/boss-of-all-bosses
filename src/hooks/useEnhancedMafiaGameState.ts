@@ -5203,7 +5203,7 @@ export const useEnhancedMafiaGameState = (
       if (!hq) return;
       const aiPhase = calculatePhaseForFamily(state, fam);
       const oppAny = opponent as any;
-      const personality = opponent.personality || 'aggressive';
+      let personality = opponent.personality || 'aggressive';
 
       // ── AI LAY LOW + MATTRESSES TRIGGERS (heat-baseline + personality-weighted) ──
       // Personality multiplier: defensive/diplomatic lean in, aggressive avoids
@@ -5457,7 +5457,7 @@ export const useEnhancedMafiaGameState = (
       }
 
       // ── PERSONALITY-DRIVEN MOVEMENT & COMBAT ──
-      let personality = opponent.personality || 'aggressive';
+      // (personality already declared above; reassignable for war override)
       const aggression = opponent.strategy.aggressionLevel || 50;
       const cooperation = opponent.strategy.cooperationTendency || 50;
 
