@@ -5971,8 +5971,9 @@ export const useEnhancedMafiaGameState = (
 
       // ── AI ACTION PHASE: CLAIM & EXTORT ──
       // Phase 3+: AI claim/extort disabled — influence system handles territory
-      if (aiPhase >= 3) {
-        // Skip claim/extort — territory handled by processInfluenceSystem
+      // Lay Low / Mattresses also disable claim+extort offense
+      if (aiPhase >= 3 || aiOffenseDisabled) {
+        // Skip claim/extort — territory handled by processInfluenceSystem (or AI is hiding)
       } else {
       // Priority 1: Extort neutral hexes with completed businesses (free money + territory)
       const aiUnitsForActions = state.deployedUnits.filter(u => u.family === fam);
@@ -6359,8 +6360,8 @@ export const useEnhancedMafiaGameState = (
       const planHitChanceMultiplier = personality === 'aggressive' ? 2.0
         : personality === 'unpredictable' ? 1.5
         : 1.0; // opportunistic
-      if (hasCeasefireWithPlayer || hasAllianceWithPlayer) {
-        // Skip plan hit — active pact with player
+      if (hasCeasefireWithPlayer || hasAllianceWithPlayer || aiOffenseDisabled) {
+        // Skip plan hit — active pact with player or AI is laying low / mattresses
       } else if (aiPhase >= 2 && planHitPersonalityAllowed && Math.random() < AI_PLAN_HIT_CHANCE * planHitChanceMultiplier) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
@@ -6503,7 +6504,7 @@ export const useEnhancedMafiaGameState = (
       // ── AI FLIP SOLDIER (weaken enemy HQ defenses) — Capo within 3 hexes of enemy HQ ──
       const aiFlippedCount = (state.flippedSoldiers || []).filter(f => f.flippedByFamily === fam).length;
       const aiFlipCost = FLIP_SOLDIER_BASE_COST + aiFlippedCount * FLIP_SOLDIER_COST_ESCALATION;
-      if (aiPhase >= 3 && opponent.resources.money >= aiFlipCost && Math.random() < (personality === 'aggressive' ? 0.25 : personality === 'opportunistic' ? 0.20 : personality === 'unpredictable' ? 0.18 : 0.12)) {
+      if (!aiOffenseDisabled && aiPhase >= 3 && opponent.resources.money >= aiFlipCost && Math.random() < (personality === 'aggressive' ? 0.25 : personality === 'opportunistic' ? 0.20 : personality === 'unpredictable' ? 0.18 : 0.12)) {
         const otherFamilies = [state.playerFamily, ...state.aiOpponents.filter(o => o.family !== fam).map(o => o.family)];
         let flipped = false;
         for (const victimFamily of otherFamilies) {
@@ -6560,7 +6561,7 @@ export const useEnhancedMafiaGameState = (
         : personality === 'unpredictable' ? 0.12
         : personality === 'opportunistic' ? ((state.flippedSoldiers || []).length >= 2 ? 0.08 : 0)
         : 0.10;
-      if (aiPhase >= 4 && hqAssaultAllowed && Math.random() < hqAssaultChance) {
+      if (!aiOffenseDisabled && aiPhase >= 4 && hqAssaultAllowed && Math.random() < hqAssaultChance) {
         // Find enemy HQs adjacent to AI soldiers with high toughness
         const aiSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
         for (const soldier of aiSoldiers) {
