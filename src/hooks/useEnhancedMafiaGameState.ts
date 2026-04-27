@@ -198,6 +198,14 @@ export const applyPlayerHeat = (state: EnhancedMafiaGameState, amount: number): 
   state.policeHeat.level = Math.min(100, (state.policeHeat.level || 0) + scaled);
 };
 
+// ============ AI LAY LOW / MATTRESSES HELPERS ============
+// Per-AI panic-button state — mirrors the player's Lay Low + Mattresses systems.
+// Stored loosely on opponent.resources via cast to allow incremental adoption.
+export const isAILayingLow = (opp: any, turn: number): boolean =>
+  ((opp?.layLowActiveUntil) || 0) >= turn;
+export const isAIAtMattresses = (opp: any, turn: number): boolean =>
+  ((opp?.mattressesActiveUntil) || 0) >= turn;
+
 // ============ IMMUTABLE STATE CLONE HELPER ============
 const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGameState => ({
   ...state,
