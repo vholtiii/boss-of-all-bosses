@@ -6490,17 +6490,26 @@ export const useEnhancedMafiaGameState = (
             if (!nTile || !nTile.isHeadquarters || nTile.isHeadquarters === fam) continue;
             const victimFamily = nTile.isHeadquarters;
             if ((state.eliminatedFamilies || []).includes(victimFamily)) continue;
-            // Attempt assault
-            let chance = HQ_ASSAULT_BASE_CHANCE - HQ_DEFENSE_BONUS;
+            // Compute total defense penalty against assault, then cap at 60%
+            let defensePenalty = HQ_DEFENSE_BONUS; // base HQ
+            // Fortified HQ tile bonus
+            if (isHexFortified(state.fortifiedHexes || [], nTile.q, nTile.r, nTile.s, victimFamily)) {
+              defensePenalty += FORTIFY_DEFENSE_BONUS / 100;
+            }
+            // Mattresses HQ defense bonus (player or AI)
+            const victimMattresses = victimFamily === state.playerFamily
+              ? (state.mattressesState || {}).active
+              : !!(state.aiOpponents.find(o => o.family === victimFamily) as any)?.mattressesActiveUntil && ((state.aiOpponents.find(o => o.family === victimFamily) as any).mattressesActiveUntil >= state.turn);
+            if (victimMattresses) defensePenalty += MATTRESSES_HQ_BONUS / 100;
+            // CAP defense at +60%
+            defensePenalty = Math.min(0.60, defensePenalty);
+
+            let chance = HQ_ASSAULT_BASE_CHANCE - defensePenalty;
             const adjFriendly = state.deployedUnits.filter(u => u.family === fam && u.id !== soldier.id && neighbors.some(nb => nb.q === u.q && nb.r === u.r && nb.s === u.s));
             chance += adjFriendly.length * 0.05;
             // Flipped soldier bonus
             const flippedCount = (state.flippedSoldiers || []).filter(f => f.family === victimFamily).length;
             chance += flippedCount * 0.10;
-            // Mattresses HQ defense bonus if victim is player
-            if (victimFamily === state.playerFamily && (state.mattressesState || {}).active) {
-              chance -= MATTRESSES_HQ_BONUS / 100;
-            }
             chance = Math.min(HQ_ASSAULT_MAX_CHANCE, Math.max(0.05, chance));
             if (Math.random() < chance) {
               state.eliminatedFamilies = [...(state.eliminatedFamilies || []), victimFamily];
@@ -8612,7 +8621,18 @@ export const useEnhancedMafiaGameState = (
       return state;
     }
 
-    let chance = HQ_ASSAULT_BASE_CHANCE - HQ_DEFENSE_BONUS;
+    // Compute total defense penalty against assault, then cap at 60%
+    let defensePenalty = HQ_DEFENSE_BONUS;
+    if (isHexFortified(state.fortifiedHexes || [], targetQ, targetR, targetS, targetFamily)) {
+      defensePenalty += FORTIFY_DEFENSE_BONUS / 100;
+    }
+    const targetOpp = state.aiOpponents.find(o => o.family === targetFamily) as any;
+    if (targetOpp && targetOpp.mattressesActiveUntil && targetOpp.mattressesActiveUntil >= state.turn) {
+      defensePenalty += MATTRESSES_HQ_BONUS / 100;
+    }
+    defensePenalty = Math.min(0.60, defensePenalty);
+
+    let chance = HQ_ASSAULT_BASE_CHANCE - defensePenalty;
     const hqNeighbors = getHexNeighbors(targetQ, targetR, targetS);
     const friendlyAdjacent = state.deployedUnits.filter(u =>
       u.family === state.playerFamily && u.id !== attacker.id &&
