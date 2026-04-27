@@ -5202,11 +5202,85 @@ export const useEnhancedMafiaGameState = (
       const hq = state.headquarters[fam];
       if (!hq) return;
       const aiPhase = calculatePhaseForFamily(state, fam);
+      const oppAny = opponent as any;
+      const personality = opponent.personality || 'aggressive';
+
+      // ── AI LAY LOW + MATTRESSES TRIGGERS (heat-baseline + personality-weighted) ──
+      // Personality multiplier: defensive/diplomatic lean in, aggressive avoids
+      const personalityMult = personality === 'defensive' ? 1.5
+        : personality === 'diplomatic' ? 1.3
+        : personality === 'opportunistic' ? 1.0
+        : personality === 'aggressive' ? 0.4
+        : /* unpredictable */ 0.8 + (Math.random() * 0.8 - 0.4);
+
+      const aiHeat = opponent.resources.heat || 0;
+      // Track soldier losses crudely via a counter we maintain elsewhere; if missing, skip loss-trigger
+      const recentSoldierLosses = (oppAny.recentSoldierLosses) || 0;
+      const recentCapoLosses = (oppAny.recentCapoLosses) || 0;
+      const hqAssaultedRecently = (oppAny.lastAssaultedOnTurn || -99) >= state.turn - 1;
+
+      // Decay loss counters each turn
+      oppAny.recentSoldierLosses = Math.max(0, recentSoldierLosses - 1);
+      oppAny.recentCapoLosses = Math.max(0, recentCapoLosses - 1);
+
+      // Lay Low trigger: heat ≥60 OR ≥2 recent soldier losses, off cooldown, not already active
+      const layLowOnCD = (oppAny.layLowCooldownUntil || 0) > state.turn;
+      if (!isAILayingLow(opponent, state.turn) && !layLowOnCD) {
+        const heatTrigger = aiHeat >= 60;
+        const lossTrigger = recentSoldierLosses >= 2;
+        if (heatTrigger || lossTrigger) {
+          const baseChance = 0.5;
+          const fireChance = Math.min(0.95, Math.max(0.05, baseChance * personalityMult));
+          if (Math.random() < fireChance) {
+            oppAny.layLowActiveUntil = state.turn + 2; // 3 turns
+            oppAny.layLowCooldownUntil = state.turn + 7;
+            opponent.resources.respect = Math.max(0, opponent.resources.respect - 5);
+            state.pendingNotifications.push({
+              type: 'info' as const,
+              title: '🤫 Family Goes to Ground',
+              message: `The ${fam} family is laying low for 3 turns.`,
+            });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'lay_low', detail: `Stood down for 3 turns` });
+          }
+        }
+      }
+
+      // Mattresses trigger (Phase 3+): HQ assaulted in last turn OR capo lost recently OR at-war and adjacent
+      const mattressesOnCD = (oppAny.mattressesCooldownUntil || 0) > state.turn;
+      if (aiPhase >= 3 && !isAIAtMattresses(opponent, state.turn) && !mattressesOnCD) {
+        const wars = (state.activeWars || []).filter(w => w.family1 === fam || w.family2 === fam);
+        const atWar = wars.length > 0;
+        const aiHasUnitNearEnemy = atWar && state.deployedUnits.some(u => {
+          if (u.family !== fam) return false;
+          const ns = getHexNeighbors(u.q, u.r, u.s);
+          return ns.some(n => {
+            const t = state.hexMap.find(tt => tt.q === n.q && tt.r === n.r && tt.s === n.s);
+            return t && t.controllingFamily && t.controllingFamily !== fam && t.controllingFamily !== 'neutral';
+          });
+        });
+        if (hqAssaultedRecently || recentCapoLosses >= 1 || (atWar && aiHasUnitNearEnemy)) {
+          const baseChance = 0.5;
+          const fireChance = Math.min(0.95, Math.max(0.05, baseChance * personalityMult));
+          if (Math.random() < fireChance) {
+            oppAny.mattressesActiveUntil = state.turn + 2; // 3 turns
+            oppAny.mattressesCooldownUntil = state.turn + 8;
+            state.pendingNotifications.push({
+              type: 'info' as const,
+              title: '🛏️ Hit the Mattresses',
+              message: `The ${fam} family is hunkered down for 3 turns.`,
+            });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'go_to_mattresses', detail: `Hunkered down for 3 turns` });
+          }
+        }
+      }
+
+      const aiOffenseDisabled = isAILayingLow(opponent, state.turn) || isAIAtMattresses(opponent, state.turn);
 
       // Reset per-turn move budget for this AI family's units (mirror player reset).
-      // Mattresses only locks the player's units; AI families always reset.
+      // Mattresses locks AI units' movement (parity with player).
       state.deployedUnits = state.deployedUnits.map(u => {
         if (u.family !== fam) return u;
+        if (isAIAtMattresses(opponent, state.turn)) return { ...u, movesRemaining: 0 };
         const baseMoves = u.type === 'capo' ? CAPO_MOVES_PER_TURN : 2;
         return { ...u, movesRemaining: baseMoves };
       });
