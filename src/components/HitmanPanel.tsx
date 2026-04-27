@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Crosshair, Clock, DollarSign, Users } from 'lucide-react';
-import { HitmanContract, HITMAN_CONTRACT_COST, MAX_HITMEN } from '@/types/game-mechanics';
+import { Crosshair, Clock, DollarSign, Users, Eye } from 'lucide-react';
+import { HitmanContract, HITMAN_CONTRACT_COST, MAX_HITMEN, BribeContract } from '@/types/game-mechanics';
 import { DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
 
 interface HitmanPanelProps {
@@ -13,16 +13,32 @@ interface HitmanPanelProps {
   money: number;
   currentTurn: number;
   gamePhase: number;
+  activeBribes?: BribeContract[];
   onHire: (targetUnitId: string, targetFamily: string) => void;
 }
 
 const HitmanPanel: React.FC<HitmanPanelProps> = ({
-  hitmanContracts, deployedUnits, playerFamily, money, currentTurn, gamePhase, onHire
+  hitmanContracts, deployedUnits, playerFamily, money, currentTurn, gamePhase, activeBribes = [], onHire
 }) => {
   const [selecting, setSelecting] = useState(false);
+  const [tab, setTab] = useState<'known' | 'blind'>('known');
 
   const phaseLocked = gamePhase < 3;
   const canHire = !phaseLocked && hitmanContracts.length < MAX_HITMEN && money >= HITMAN_CONTRACT_COST;
+
+  // Captain-bribed (or higher) families: enables blind hits
+  const captainBribedFamilies = new Set<string>();
+  activeBribes.forEach(b => {
+    if (!b.active) return;
+    if ((b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'mayor') && b.targetFamily) {
+      captainBribedFamilies.add(b.targetFamily);
+    }
+    // Chief/Mayor without target = map-wide
+    if ((b.tier === 'police_chief' || b.tier === 'mayor') && !b.targetFamily) {
+      ['gambino','genovese','lucchese','bonanno','colombo'].forEach(f => { if (f !== playerFamily) captainBribedFamilies.add(f); });
+    }
+  });
+  const hasAnyCaptain = captainBribedFamilies.size > 0;
 
   // Build target list: enemy soldiers and capos, grouped by family
   const enemyUnits = deployedUnits.filter(u => u.family !== playerFamily);
@@ -32,7 +48,6 @@ const HitmanPanel: React.FC<HitmanPanelProps> = ({
     familyGroups[u.family].push(u);
   });
 
-  // Count units per family per type for labeling
   const getUnitLabel = (unit: DeployedUnit, index: number) => {
     if (unit.type === 'capo') {
       return `Capo${unit.name ? ` — ${unit.name}` : ''}`;
@@ -113,44 +128,111 @@ const HitmanPanel: React.FC<HitmanPanelProps> = ({
           </Button>
         ) : (
           <div className="space-y-2">
-            <p className="text-xs font-medium text-foreground">Pick a target:</p>
-            {Object.entries(familyGroups).map(([family, units]) => {
-              const soldiers = units.filter(u => u.type === 'soldier');
-              const capos = units.filter(u => u.type === 'capo');
-              const allUnits = [...capos, ...soldiers];
+            {/* Tabs: known vs blind */}
+            {hasAnyCaptain && (
+              <div className="flex gap-1 mb-2">
+                <button
+                  className={`flex-1 px-2 py-1 text-[10px] rounded border ${tab === 'known' ? 'bg-accent border-accent' : 'border-border bg-background'}`}
+                  onClick={() => setTab('known')}
+                >
+                  Known Targets
+                </button>
+                <button
+                  className={`flex-1 px-2 py-1 text-[10px] rounded border flex items-center justify-center gap-1 ${tab === 'blind' ? 'bg-accent border-accent' : 'border-border bg-background'}`}
+                  onClick={() => setTab('blind')}
+                >
+                  <Eye className="h-3 w-3" /> Blind (Captain)
+                </button>
+              </div>
+            )}
 
-              return (
-                <div key={family} className="rounded-lg border border-border bg-card p-2">
-                  <p className="text-xs font-bold text-foreground capitalize mb-1 flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    {family}
-                  </p>
-                  <div className="space-y-1">
-                    {allUnits.map((unit, idx) => {
-                      const alreadyTargeted = hitmanContracts.some(c => c.targetUnitId === unit.id);
-                      return (
+            {tab === 'known' ? (
+              <>
+                <p className="text-xs font-medium text-foreground">Pick a known target:</p>
+                {Object.entries(familyGroups).map(([family, units]) => {
+                  const soldiers = units.filter(u => u.type === 'soldier');
+                  const capos = units.filter(u => u.type === 'capo');
+                  const allUnits = [...capos, ...soldiers];
+                  return (
+                    <div key={family} className="rounded-lg border border-border bg-card p-2">
+                      <p className="text-xs font-bold text-foreground capitalize mb-1 flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {family}
+                      </p>
+                      <div className="space-y-1">
+                        {allUnits.map((unit, idx) => {
+                          const alreadyTargeted = hitmanContracts.some(c => c.targetUnitId === unit.id);
+                          return (
+                            <button
+                              key={unit.id}
+                              className="w-full flex items-center justify-between rounded border border-border/50 bg-background px-2 py-1 text-[10px] hover:bg-accent/30 transition-colors disabled:opacity-40"
+                              disabled={alreadyTargeted}
+                              onClick={() => {
+                                onHire(unit.id, family);
+                                setSelecting(false);
+                              }}
+                            >
+                              <span className="text-foreground">
+                                {getUnitLabel(unit, unit.type === 'capo' ? idx : idx - capos.length)}
+                              </span>
+                              {alreadyTargeted && (
+                                <Badge variant="outline" className="text-[8px]">Targeted</Badge>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            ) : (
+              <>
+                <p className="text-xs font-medium text-foreground">Captain's intel — pick family + unit type:</p>
+                <p className="text-[9px] text-muted-foreground mb-1">Backend resolves to a random matching enemy unit, scouted or not.</p>
+                {Array.from(captainBribedFamilies).map(family => {
+                  const units = familyGroups[family] || [];
+                  const soldierCount = units.filter(u => u.type === 'soldier').length;
+                  const capoCount = units.filter(u => u.type === 'capo').length;
+                  return (
+                    <div key={family} className="rounded-lg border border-purple-500/30 bg-purple-500/5 p-2">
+                      <p className="text-xs font-bold text-foreground capitalize mb-1 flex items-center gap-1">
+                        <Eye className="h-3 w-3 text-purple-400" />
+                        {family}
+                      </p>
+                      <div className="space-y-1">
                         <button
-                          key={unit.id}
                           className="w-full flex items-center justify-between rounded border border-border/50 bg-background px-2 py-1 text-[10px] hover:bg-accent/30 transition-colors disabled:opacity-40"
-                          disabled={alreadyTargeted}
+                          disabled={capoCount === 0}
                           onClick={() => {
-                            onHire(unit.id, family);
-                            setSelecting(false);
+                            const target = units.find(u => u.type === 'capo' && !hitmanContracts.some(c => c.targetUnitId === u.id));
+                            if (target) { onHire(target.id, family); setSelecting(false); }
                           }}
                         >
-                          <span className="text-foreground">
-                            {getUnitLabel(unit, unit.type === 'capo' ? idx : idx - capos.length)}
-                          </span>
-                          {alreadyTargeted && (
-                            <Badge variant="outline" className="text-[8px]">Targeted</Badge>
-                          )}
+                          <span className="text-foreground">A Capo</span>
+                          <Badge variant="outline" className="text-[8px]">{capoCount} known</Badge>
                         </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+                        <button
+                          className="w-full flex items-center justify-between rounded border border-border/50 bg-background px-2 py-1 text-[10px] hover:bg-accent/30 transition-colors disabled:opacity-40"
+                          disabled={soldierCount === 0}
+                          onClick={() => {
+                            const target = units.find(u => u.type === 'soldier' && !hitmanContracts.some(c => c.targetUnitId === u.id));
+                            if (target) { onHire(target.id, family); setSelecting(false); }
+                          }}
+                        >
+                          <span className="text-foreground">A Soldier</span>
+                          <Badge variant="outline" className="text-[8px]">{soldierCount} known</Badge>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {captainBribedFamilies.size === 0 && (
+                  <p className="text-[10px] text-muted-foreground italic">Bribe a Police Captain (or higher) to unlock blind hits.</p>
+                )}
+              </>
+            )}
+
             <Button
               size="sm"
               variant="outline"

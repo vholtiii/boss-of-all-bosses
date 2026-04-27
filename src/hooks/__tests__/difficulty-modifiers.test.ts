@@ -47,10 +47,13 @@ describe("Difficulty modifiers — wiring", () => {
       applyPlayerHeat(normal, 10);
       applyPlayerHeat(hard, 10);
 
-      // Math.round used inside the helper: 10×0.7=7, 10×1.0=10, 10×1.3=13
-      expect(easy.policeHeat.level).toBe(7);
-      expect(normal.policeHeat.level).toBe(10);
-      expect(hard.policeHeat.level).toBe(13);
+      // applyPlayerHeat applies policeHeatMult × HEAT_GAIN_MULT (1.30):
+      //   easy:   round(10 × 0.7 × 1.30) = 9
+      //   normal: round(10 × 1.0 × 1.30) = 13
+      //   hard:   round(10 × 1.3 × 1.30) = 17
+      expect(easy.policeHeat.level).toBe(9);
+      expect(normal.policeHeat.level).toBe(13);
+      expect(hard.policeHeat.level).toBe(17);
     });
 
     it("clamps heat at 100 regardless of difficulty", () => {

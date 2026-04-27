@@ -1545,6 +1545,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
             warSummitCooldownUntil={(gameState as any).warSummitCooldownUntil || 0}
             layLowActiveUntil={(gameState as any).layLowActiveUntil || 0}
             layLowAfterglowUntil={(gameState as any).layLowAfterglowUntil || 0}
+            layLowCooldownUntil={(gameState as any).layLowCooldownUntil || 0}
             activeWars={(gameState as any).activeWars || []}
             actionsRemaining={gameState.actionsRemaining || 0}
             gamePhase={(gameState as any).gamePhase || 1}

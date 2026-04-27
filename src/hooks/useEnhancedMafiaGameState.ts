@@ -198,6 +198,14 @@ export const applyPlayerHeat = (state: EnhancedMafiaGameState, amount: number): 
   state.policeHeat.level = Math.min(100, (state.policeHeat.level || 0) + scaled);
 };
 
+// ============ AI LAY LOW / MATTRESSES HELPERS ============
+// Per-AI panic-button state — mirrors the player's Lay Low + Mattresses systems.
+// Stored loosely on opponent.resources via cast to allow incremental adoption.
+export const isAILayingLow = (opp: any, turn: number): boolean =>
+  ((opp?.layLowActiveUntil) || 0) >= turn;
+export const isAIAtMattresses = (opp: any, turn: number): boolean =>
+  ((opp?.mattressesActiveUntil) || 0) >= turn;
+
 // ============ IMMUTABLE STATE CLONE HELPER ============
 const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGameState => ({
   ...state,
@@ -507,6 +515,7 @@ export interface EnhancedMafiaGameState {
   // Lay Low (family-wide stand-down)
   layLowActiveUntil?: number;
   layLowAfterglowUntil?: number;
+  layLowCooldownUntil?: number;
   
   // Enemy hex entry system
   contestedHexes: Array<{ q: number; r: number; s: number; occupyingFamily: string; occupyingSince: number }>;
@@ -1071,6 +1080,7 @@ export const createInitialGameState = (
      warSummitCooldownUntil: 0,
      layLowActiveUntil: 0,
      layLowAfterglowUntil: 0,
+     layLowCooldownUntil: 0,
      contestedHexes: [],
      pendingEnemyHexAction: null,
     // Family Power system
@@ -4972,6 +4982,15 @@ export const useEnhancedMafiaGameState = (
       grossIncome = grossIncome - illegalIncome;
       illegalIncome = 0;
     }
+
+    // Difficulty: scale ongoing income by playerMoneyMult (Easy 1.5x, Normal 1.0x, Hard 0.75x)
+    const playerMoneyMult = state.difficultyModifiers?.playerMoneyMult ?? 1;
+    if (playerMoneyMult !== 1) {
+      legalIncome = Math.floor(legalIncome * playerMoneyMult);
+      illegalIncome = Math.floor(illegalIncome * playerMoneyMult);
+      grossIncome = Math.floor(grossIncome * playerMoneyMult);
+    }
+
     const grossLegalIncome = legalIncome;
     const grossIllegalIncome = illegalIncome;
     
@@ -5183,11 +5202,85 @@ export const useEnhancedMafiaGameState = (
       const hq = state.headquarters[fam];
       if (!hq) return;
       const aiPhase = calculatePhaseForFamily(state, fam);
+      const oppAny = opponent as any;
+      let personality = opponent.personality || 'aggressive';
+
+      // ── AI LAY LOW + MATTRESSES TRIGGERS (heat-baseline + personality-weighted) ──
+      // Personality multiplier: defensive/diplomatic lean in, aggressive avoids
+      const personalityMult = personality === 'defensive' ? 1.5
+        : personality === 'diplomatic' ? 1.3
+        : personality === 'opportunistic' ? 1.0
+        : personality === 'aggressive' ? 0.4
+        : /* unpredictable */ 0.8 + (Math.random() * 0.8 - 0.4);
+
+      const aiHeat = opponent.resources.heat || 0;
+      // Track soldier losses crudely via a counter we maintain elsewhere; if missing, skip loss-trigger
+      const recentSoldierLosses = (oppAny.recentSoldierLosses) || 0;
+      const recentCapoLosses = (oppAny.recentCapoLosses) || 0;
+      const hqAssaultedRecently = (oppAny.lastAssaultedOnTurn || -99) >= state.turn - 1;
+
+      // Decay loss counters each turn
+      oppAny.recentSoldierLosses = Math.max(0, recentSoldierLosses - 1);
+      oppAny.recentCapoLosses = Math.max(0, recentCapoLosses - 1);
+
+      // Lay Low trigger: heat ≥60 OR ≥2 recent soldier losses, off cooldown, not already active
+      const layLowOnCD = (oppAny.layLowCooldownUntil || 0) > state.turn;
+      if (!isAILayingLow(opponent, state.turn) && !layLowOnCD) {
+        const heatTrigger = aiHeat >= 60;
+        const lossTrigger = recentSoldierLosses >= 2;
+        if (heatTrigger || lossTrigger) {
+          const baseChance = 0.5;
+          const fireChance = Math.min(0.95, Math.max(0.05, baseChance * personalityMult));
+          if (Math.random() < fireChance) {
+            oppAny.layLowActiveUntil = state.turn + 2; // 3 turns
+            oppAny.layLowCooldownUntil = state.turn + 7;
+            opponent.resources.respect = Math.max(0, opponent.resources.respect - 5);
+            state.pendingNotifications.push({
+              type: 'info' as const,
+              title: '🤫 Family Goes to Ground',
+              message: `The ${fam} family is laying low for 3 turns.`,
+            });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'lay_low', detail: `Stood down for 3 turns` });
+          }
+        }
+      }
+
+      // Mattresses trigger (Phase 3+): HQ assaulted in last turn OR capo lost recently OR at-war and adjacent
+      const mattressesOnCD = (oppAny.mattressesCooldownUntil || 0) > state.turn;
+      if (aiPhase >= 3 && !isAIAtMattresses(opponent, state.turn) && !mattressesOnCD) {
+        const wars = (state.activeWars || []).filter(w => w.family1 === fam || w.family2 === fam);
+        const atWar = wars.length > 0;
+        const aiHasUnitNearEnemy = atWar && state.deployedUnits.some(u => {
+          if (u.family !== fam) return false;
+          const ns = getHexNeighbors(u.q, u.r, u.s);
+          return ns.some(n => {
+            const t = state.hexMap.find(tt => tt.q === n.q && tt.r === n.r && tt.s === n.s);
+            return t && t.controllingFamily && t.controllingFamily !== fam && t.controllingFamily !== 'neutral';
+          });
+        });
+        if (hqAssaultedRecently || recentCapoLosses >= 1 || (atWar && aiHasUnitNearEnemy)) {
+          const baseChance = 0.5;
+          const fireChance = Math.min(0.95, Math.max(0.05, baseChance * personalityMult));
+          if (Math.random() < fireChance) {
+            oppAny.mattressesActiveUntil = state.turn + 2; // 3 turns
+            oppAny.mattressesCooldownUntil = state.turn + 8;
+            state.pendingNotifications.push({
+              type: 'info' as const,
+              title: '🛏️ Hit the Mattresses',
+              message: `The ${fam} family is hunkered down for 3 turns.`,
+            });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'go_to_mattresses', detail: `Hunkered down for 3 turns` });
+          }
+        }
+      }
+
+      const aiOffenseDisabled = isAILayingLow(opponent, state.turn) || isAIAtMattresses(opponent, state.turn);
 
       // Reset per-turn move budget for this AI family's units (mirror player reset).
-      // Mattresses only locks the player's units; AI families always reset.
+      // Mattresses locks AI units' movement (parity with player).
       state.deployedUnits = state.deployedUnits.map(u => {
         if (u.family !== fam) return u;
+        if (isAIAtMattresses(opponent, state.turn)) return { ...u, movesRemaining: 0 };
         const baseMoves = u.type === 'capo' ? CAPO_MOVES_PER_TURN : 2;
         return { ...u, movesRemaining: baseMoves };
       });
@@ -5364,7 +5457,7 @@ export const useEnhancedMafiaGameState = (
       }
 
       // ── PERSONALITY-DRIVEN MOVEMENT & COMBAT ──
-      let personality = opponent.personality || 'aggressive';
+      // (personality already declared above; reassignable for war override)
       const aggression = opponent.strategy.aggressionLevel || 50;
       const cooperation = opponent.strategy.cooperationTendency || 50;
 
@@ -5878,8 +5971,9 @@ export const useEnhancedMafiaGameState = (
 
       // ── AI ACTION PHASE: CLAIM & EXTORT ──
       // Phase 3+: AI claim/extort disabled — influence system handles territory
-      if (aiPhase >= 3) {
-        // Skip claim/extort — territory handled by processInfluenceSystem
+      // Lay Low / Mattresses also disable claim+extort offense
+      if (aiPhase >= 3 || aiOffenseDisabled) {
+        // Skip claim/extort — territory handled by processInfluenceSystem (or AI is hiding)
       } else {
       // Priority 1: Extort neutral hexes with completed businesses (free money + territory)
       const aiUnitsForActions = state.deployedUnits.filter(u => u.family === fam);
@@ -6266,8 +6360,8 @@ export const useEnhancedMafiaGameState = (
       const planHitChanceMultiplier = personality === 'aggressive' ? 2.0
         : personality === 'unpredictable' ? 1.5
         : 1.0; // opportunistic
-      if (hasCeasefireWithPlayer || hasAllianceWithPlayer) {
-        // Skip plan hit — active pact with player
+      if (hasCeasefireWithPlayer || hasAllianceWithPlayer || aiOffenseDisabled) {
+        // Skip plan hit — active pact with player or AI is laying low / mattresses
       } else if (aiPhase >= 2 && planHitPersonalityAllowed && Math.random() < AI_PLAN_HIT_CHANCE * planHitChanceMultiplier) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
@@ -6410,7 +6504,7 @@ export const useEnhancedMafiaGameState = (
       // ── AI FLIP SOLDIER (weaken enemy HQ defenses) — Capo within 3 hexes of enemy HQ ──
       const aiFlippedCount = (state.flippedSoldiers || []).filter(f => f.flippedByFamily === fam).length;
       const aiFlipCost = FLIP_SOLDIER_BASE_COST + aiFlippedCount * FLIP_SOLDIER_COST_ESCALATION;
-      if (aiPhase >= 3 && opponent.resources.money >= aiFlipCost && Math.random() < (personality === 'aggressive' ? 0.25 : personality === 'opportunistic' ? 0.20 : personality === 'unpredictable' ? 0.18 : 0.12)) {
+      if (!aiOffenseDisabled && aiPhase >= 3 && opponent.resources.money >= aiFlipCost && Math.random() < (personality === 'aggressive' ? 0.25 : personality === 'opportunistic' ? 0.20 : personality === 'unpredictable' ? 0.18 : 0.12)) {
         const otherFamilies = [state.playerFamily, ...state.aiOpponents.filter(o => o.family !== fam).map(o => o.family)];
         let flipped = false;
         for (const victimFamily of otherFamilies) {
@@ -6467,7 +6561,7 @@ export const useEnhancedMafiaGameState = (
         : personality === 'unpredictable' ? 0.12
         : personality === 'opportunistic' ? ((state.flippedSoldiers || []).length >= 2 ? 0.08 : 0)
         : 0.10;
-      if (aiPhase >= 4 && hqAssaultAllowed && Math.random() < hqAssaultChance) {
+      if (!aiOffenseDisabled && aiPhase >= 4 && hqAssaultAllowed && Math.random() < hqAssaultChance) {
         // Find enemy HQs adjacent to AI soldiers with high toughness
         const aiSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
         for (const soldier of aiSoldiers) {
@@ -6479,17 +6573,26 @@ export const useEnhancedMafiaGameState = (
             if (!nTile || !nTile.isHeadquarters || nTile.isHeadquarters === fam) continue;
             const victimFamily = nTile.isHeadquarters;
             if ((state.eliminatedFamilies || []).includes(victimFamily)) continue;
-            // Attempt assault
-            let chance = HQ_ASSAULT_BASE_CHANCE - HQ_DEFENSE_BONUS;
+            // Compute total defense penalty against assault, then cap at 60%
+            let defensePenalty = HQ_DEFENSE_BONUS; // base HQ
+            // Fortified HQ tile bonus
+            if (isHexFortified(state.fortifiedHexes || [], nTile.q, nTile.r, nTile.s, victimFamily)) {
+              defensePenalty += FORTIFY_DEFENSE_BONUS / 100;
+            }
+            // Mattresses HQ defense bonus (player or AI)
+            const victimMattresses = victimFamily === state.playerFamily
+              ? (state.mattressesState || {}).active
+              : !!(state.aiOpponents.find(o => o.family === victimFamily) as any)?.mattressesActiveUntil && ((state.aiOpponents.find(o => o.family === victimFamily) as any).mattressesActiveUntil >= state.turn);
+            if (victimMattresses) defensePenalty += MATTRESSES_HQ_BONUS / 100;
+            // CAP defense at +60%
+            defensePenalty = Math.min(0.60, defensePenalty);
+
+            let chance = HQ_ASSAULT_BASE_CHANCE - defensePenalty;
             const adjFriendly = state.deployedUnits.filter(u => u.family === fam && u.id !== soldier.id && neighbors.some(nb => nb.q === u.q && nb.r === u.r && nb.s === u.s));
             chance += adjFriendly.length * 0.05;
             // Flipped soldier bonus
             const flippedCount = (state.flippedSoldiers || []).filter(f => f.family === victimFamily).length;
             chance += flippedCount * 0.10;
-            // Mattresses HQ defense bonus if victim is player
-            if (victimFamily === state.playerFamily && (state.mattressesState || {}).active) {
-              chance -= MATTRESSES_HQ_BONUS / 100;
-            }
             chance = Math.min(HQ_ASSAULT_MAX_CHANCE, Math.max(0.05, chance));
             if (Math.random() < chance) {
               state.eliminatedFamilies = [...(state.eliminatedFamilies || []), victimFamily];
@@ -6929,11 +7032,12 @@ export const useEnhancedMafiaGameState = (
         return newState;
       }
 
-      // ---- Lay Low: block all offensive actions while active ----
+      // ---- Lay Low: block all offensive actions AND recruitment while active ----
       const layLowBlockedActions = new Set([
         'hit_territory', 'execute_planned_hit', 'extort_territory',
         'sabotage_hex', 'claim_territory', 'assault_hq', 'flip_soldier',
         'plan_hit', 'hire_hitman',
+        'recruit_soldiers', 'recruit_local_soldier',
       ]);
       if (isLayingLow(newState) && layLowBlockedActions.has(action.type)) {
         newState.pendingNotifications.push({
@@ -7954,12 +8058,19 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Already Active', message: 'The family is already laying low.' });
             return newState;
           }
-          // Free, no cooldown — but immediate -5 respect and 3-turn duration
+          const cd = (newState as any).layLowCooldownUntil || 0;
+          if (cd > newState.turn) {
+            const turnsLeft = cd - newState.turn;
+            newState.pendingNotifications.push({ type: 'warning', title: '⏳ Cooldown', message: `Lay Low available in ${turnsLeft} turn${turnsLeft !== 1 ? 's' : ''}.` });
+            return newState;
+          }
+          // Free but 7-turn cooldown — immediate -5 respect and 3-turn duration
           (newState as any).layLowActiveUntil = newState.turn + 2; // current + next 2 = 3 turns
+          (newState as any).layLowCooldownUntil = newState.turn + 7; // 7-turn cooldown from activation
           syncRespect(newState, Math.max(0, newState.resources.respect - 5));
           newState.pendingNotifications.push({
             type: 'info' as const, title: '🤫 Laying Low',
-            message: 'Family stands down for 3 turns. Illegal income $0, no offensive actions, but immune to arrests and ratting. -5 Respect.',
+            message: 'Family stands down for 3 turns. Illegal income $0, no offensive actions, no recruiting, but immune to arrests and ratting. -5 Respect. 7-turn cooldown.',
           });
           return newState;
         }
@@ -8593,7 +8704,18 @@ export const useEnhancedMafiaGameState = (
       return state;
     }
 
-    let chance = HQ_ASSAULT_BASE_CHANCE - HQ_DEFENSE_BONUS;
+    // Compute total defense penalty against assault, then cap at 60%
+    let defensePenalty = HQ_DEFENSE_BONUS;
+    if (isHexFortified(state.fortifiedHexes || [], targetQ, targetR, targetS, targetFamily)) {
+      defensePenalty += FORTIFY_DEFENSE_BONUS / 100;
+    }
+    const targetOpp = state.aiOpponents.find(o => o.family === targetFamily) as any;
+    if (targetOpp && targetOpp.mattressesActiveUntil && targetOpp.mattressesActiveUntil >= state.turn) {
+      defensePenalty += MATTRESSES_HQ_BONUS / 100;
+    }
+    defensePenalty = Math.min(0.60, defensePenalty);
+
+    let chance = HQ_ASSAULT_BASE_CHANCE - defensePenalty;
     const hqNeighbors = getHexNeighbors(targetQ, targetR, targetS);
     const friendlyAdjacent = state.deployedUnits.filter(u =>
       u.family === state.playerFamily && u.id !== attacker.id &&

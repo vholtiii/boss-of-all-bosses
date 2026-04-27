@@ -100,6 +100,7 @@ interface HeadquartersInfoPanelProps {
   warSummitCooldownUntil?: number;
   layLowActiveUntil?: number;
   layLowAfterglowUntil?: number;
+  layLowCooldownUntil?: number;
   activeWars?: Array<{ family1: string; family2: string; turnsRemaining: number }>;
   actionsRemaining?: number;
   gamePhase?: number;
@@ -160,6 +161,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
   warSummitCooldownUntil = 0,
   layLowActiveUntil = 0,
   layLowAfterglowUntil = 0,
+  layLowCooldownUntil = 0,
   activeWars = [],
   actionsRemaining = 0,
   gamePhase = 1,
@@ -1042,19 +1044,27 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                 const isActionPhase = turnPhase === 'action';
                 const isActive = layLowActiveUntil >= currentTurn;
                 const turnsLeft = isActive ? (layLowActiveUntil - currentTurn + 1) : 0;
+                const onCooldown = !isActive && layLowCooldownUntil > currentTurn;
+                const cdLeft = onCooldown ? (layLowCooldownUntil - currentTurn) : 0;
+                const label = isActive
+                  ? `Laying Low — ${turnsLeft} turn${turnsLeft !== 1 ? 's' : ''} left`
+                  : onCooldown
+                    ? `Cooldown — ${cdLeft} turn${cdLeft !== 1 ? 's' : ''}`
+                    : 'Lay Low (Free · 3 turns)';
                 return (
                   <div className="mt-1">
                     <Button
                       variant="outline"
                       size="sm"
                       className="w-full text-xs h-8 border-purple-500/40 text-purple-300 hover:bg-purple-500/10"
-                      disabled={!isActionPhase || isActive}
+                      disabled={!isActionPhase || isActive || onCooldown}
                       onClick={onLayLow}
+                      title={onCooldown ? `Available in ${cdLeft} turn${cdLeft !== 1 ? 's' : ''}` : undefined}
                     >
-                      🤫 {isActive ? `Laying Low — ${turnsLeft} turn${turnsLeft !== 1 ? 's' : ''} left` : 'Lay Low (Free · 3 turns)'}
+                      🤫 {label}
                     </Button>
                     <p className="text-[9px] text-muted-foreground mt-0.5 text-center">
-                      Illegal income $0, no offensive actions, −5 Respect · Arrest immunity, no rats
+                      Illegal income $0, no offense, no recruiting, −5 Respect · Arrest immunity, no rats · 7-turn cooldown
                     </p>
                   </div>
                 )

@@ -1,71 +1,116 @@
+# Balance Rebalance Plan
 
-# Heat overhaul + Lay Low (family-wide stand-down)
+Addresses the four findings from the audit plus AI-side parity. All edits live in `src/hooks/useEnhancedMafiaGameState.ts`, `src/components/HeadquartersInfoPanel.tsx`, `src/components/HitmanPanel.tsx`, and `src/components/GameSidePanels.tsx`.
 
-## A. Heat — raise penalties + stronger passive gain (decay unchanged at 2/turn)
+---
 
-### A1. Tier thresholds (Tier 1 raised to 40+ per your note)
-In `src/hooks/useEnhancedMafiaGameState.ts` around line 4011:
-- **Tier 1: 40+** (was 30) — Income penalty
-- Tier 2: 50+ (unchanged) — Soldier arrests
-- Tier 3: 70+ (unchanged) — Capo arrests
-- Tier 4: 90+ (unchanged) — RICO
+## 1. Lay Low — close the loophole
 
-Update tier label messages on line 4016 to reflect "40+" for Tier 1.
+**Problem:** Free, no cooldown, allows recruit/scout/fortify → infinite heat-wash loop.
 
-### A2. Bigger penalties
-- **Tier 1 income**: Illegal income penalty deepened from -15% → **-25%**.
-- **Tier 2 arrests**: Soldier arrest chance per turn raised from current → **30%**.
-- **Tier 3 arrests**: Capo arrest chance raised from current → **25%**.
-- **Tier 4 RICO**: Game-over timer shortened from **5 turns → 3 turns**. Update timer text/notifications (lines 4101, 4106, 4112) and `ricoTimer` checks accordingly.
+### Changes
+- **Cooldown:** 7 turns. Add `layLowCooldownUntil` to game state. Disabled with tooltip "Available in N turns" until expired.
+- **Cost:** Stays free (per prior decision) but the cooldown gates spam.
+- **Expanded block list** (extend `layLowBlockedActions` set, line ~6933):
+  - Already blocked: `hit_territory`, `execute_planned_hit`, `extort_territory`, `sabotage_hex`, `claim_territory`, `assault_hq`, `flip_soldier`, `plan_hit`, `hire_hitman`.
+  - **Add:** `recruit_soldier`, `recruit_loyal_soldier` (any recruit action types in the switch). You're hiding, not hiring.
+- **Still allowed:** scout, fortify, safehouse, escort, legal construction, diplomacy, abandon, defense/law actions, donations.
+- **HQ panel UI:** Button shows three states — "Lay Low (3 turns) — Free", "Active — N turns left" (disabled), "Cooldown — N turns" (disabled with tooltip).
+- **Heat double-mult fix:** `applyPlayerHeat` already applies `HEAT_GAIN_MULT`. Audit ambient heat at line 3958 — currently does `Math.floor((heatFromBiz / 3) * HEAT_GAIN_MULT)` and then likely passes through `applyPlayerHeat` again. Confirm and remove the inner multiplication so passive heat isn't 1.69× (1.30²).
 
-### A3. Stronger passive heat (decay stays at 2/turn)
-- Multiply heat from `claim`, `extort`, `hit`, `sabotage` actions and ambient/passive heat (line 3933 area) by **1.30**.
-- Leave `policeHeat.reductionPerTurn = 2` untouched everywhere.
+---
 
-### A4. Notifications
-Update tier-entry toast copy in `tierMsgs` to match new thresholds and stronger penalties (e.g., "Heat hit 40+. Illegal income -25%.").
+## 2. Hitman vs Plan Hit — give Hitman a real role
 
-## B. Lay Low — family-wide stand-down (free but punishing)
+**Problem:** Plan Hit dominates — free tactical action, grants loot/respect, low risk.
 
-### B1. State
-Add to game state:
-- `layLowActiveUntil?: number` — turn through which Lay Low is active.
-- `layLowAfterglowUntil?: number` — turn through which the post-Lay-Low informant flip reduction applies.
+### Changes (per your direction)
+- **Cost stays at $30,000.**
+- **New capability — can target unscouted units**, but only if the player has at least a **bribed Police Captain** (Tier 2 corruption) on the target's family/district. Without Captain intel, behavior is unchanged (must be a known/scouted target).
+  - Implementation: in the `hire_hitman` case (line ~7547), allow target selection to include unscouted enemy units when `corruption.bribedOfficials` includes a Captain whose jurisdiction covers the target's hex/district.
+  - UI in `HitmanPanel.tsx`: when Captain is bribed, show a new "Blind Contracts (via Captain intel)" tab listing rival families' hidden unit counts; player picks family + unit type; backend resolves to a random matching enemy unit.
+- **Clear role split surfaced in tooltips:**
+  - Plan Hit → "Cheap, loud, requires capo near target. +Respect, +Loot, generates heat."
+  - Hitman → "$30k, anonymous (no tension, low heat), can reach unscouted targets if you have Captain intel."
 
-Helper: `isLayingLow(state) = (state.layLowActiveUntil ?? 0) >= state.turn`.
+---
 
-### B2. Activation (Boss action, free, no cooldown)
-New button in `src/components/HeadquartersInfoPanel.tsx` "Lay Low (3 turns)" with confirmation dialog explaining penalties.
+## 3. Difficulty — apply modifiers to ongoing economy
 
-On activate:
-- Set `layLowActiveUntil = turn + 2` (covers current + next 2 turns = 3).
-- Immediate **-5 respect**.
-- Push notification + turn report event.
+**Problem:** `playerMoneyMult` only touches starting cash; mid/late-game difficulty is identical across settings.
 
-### B3. Penalties while active
-- **Illegal income = $0** for all owned + extorted illegal businesses (legal income unaffected). Gate in `business-income-calculation` path.
-- **Block offensive actions**: `claim`, `extort`, `hit` (all tiers), `sabotage`, `assaultHQ`, `sendWord`/`sitDown` initiation. Each guarded with a clear toast: "Cannot act while laying low."
-- Defense, scouting, recruitment, deployment, fortify, safehouse, abandon, legal construction → **still allowed**.
+### Changes
+- **Apply `playerMoneyMult` to ongoing income**, not just initial bankroll. Multiply legal + illegal income calculations in `business-income-calculation` path by `state.difficultyModifiers.playerMoneyMult`.
+  - Easy: 1.5× ongoing income.
+  - Normal: 1.0×.
+  - Hard: 0.75× ongoing income.
+- **`aiIncomeMult`** is already declared but verify it actually scales AI per-turn income. If not, wire it into the AI economy tick.
+- **`eventCostMult`** — apply to random event monetary penalties/costs so Easy = cheaper events, Hard = pricier.
+- Update tests in `src/hooks/__tests__/difficulty-modifiers.test.ts` to cover ongoing-income scaling (currently only asserts starting cash).
 
-### B4. Benefits while active
-- **Arrest immunity**: Skip Tier 2 soldier arrests and Tier 3 capo arrests. Skip prosecution-driven arrests (`legal-and-prosecution` flow) for the duration.
-- **Ratting risk = 0**: Force `policeHeat.rattingRisk = 0` while active (line 4277 area).
-- **Afterglow**: On expiry, set `layLowAfterglowUntil = turn + 2`. While afterglow active, informant/rat flip chance reduced by **10**.
+---
 
-Note: Heat decay stays at the normal 2/turn — no faster decay during Lay Low (per "decay unchanged" decision in A).
+## 4. Defense stacking — soft cap
 
-### B5. UI
-- **Status HUD badge** (`src/components/GameSidePanels.tsx` / status HUD): Show "🤫 Laying Low (Nx)" with turns remaining when active; show "Afterglow (Nx)" when in afterglow window.
-- **HQ panel**: Lay Low button shows "Active — N turns left" when running, disabled until expired.
-- **Action menus**: Blocked offensive buttons get a 🤫 lock icon + tooltip "Disabled while laying low."
+**Problem:** Fortified HQ + Mattresses + purged moles + Captain bribe makes HQ assault near-impossible for AI.
+
+### Changes
+- Introduce a **defense cap of +60% total** on a single hex. Sum of all multipliers (fortify +25%, mattresses HQ +X%, district control bonus, safehouse +10%, capo presence) is clamped at 1.60× before combat resolution.
+- Note: this affects the player's HQ AND any AI HQ — symmetric.
+- Implement at the combat resolution site around line 8901 (`mattressesState defense bonus` block).
+
+---
+
+## 5. AI parity — Lay Low + Mattresses for AI families
+
+**Problem:** Player has two strategic panic buttons the AI can't use.
+
+### State additions per AI opponent (in `AIOpponent.resources` or a new `aiState` map keyed by family):
+- `layLowActiveUntil`, `layLowCooldownUntil`
+- `mattressesActiveUntil`, `mattressesCooldownUntil`
+
+### Trigger logic (heat-baseline + personality-weighted)
+Run during AI turn, before action selection:
+
+**Lay Low triggers when:**
+- AI heat proxy ≥ 60, OR
+- AI has lost ≥2 soldiers in last 2 turns to arrests/hits.
+
+Personality multipliers on the trigger probability:
+- Defensive: ×1.5
+- Diplomatic: ×1.3
+- Opportunistic: ×1.0
+- Aggressive: ×0.4
+- Unpredictable: ×0.8 + ±0.4 random jitter
+
+**Mattresses triggers when:**
+- AI HQ defense breached recently (assaulted in last turn), OR
+- AI lost a capo in the last 2 turns, OR
+- AI is at war (tension ≥80) with the player AND adjacent to player units.
+
+Same personality multipliers apply.
+
+### AI behavior while active
+- **Lay Low:** AI skips offensive actions in its action loop (gate the `claim/extort/hit/sabotage/plan_hit/flip` branches behind `!isAILayingLow(fam)`). Heat decay still 2/turn; arrest immunity for that family's soldiers.
+- **Mattresses:** AI units get the defense bonus on their hexes, no movement, no offense. Same income penalty as the player gets.
+
+### UI surfacing
+- Rival cards in `GameSidePanels.tsx` show a 🤫 / 🛏️ badge when an AI family is in either state, with turns remaining. Helps the player recognize "they're hiding — now's the time to consolidate" vs "they're hunkered — don't bother attacking."
+- Turn report includes "🤫 Bonanno went to ground (3 turns)" / "🛏️ Lucchese hit the mattresses (4 turns)" entries.
+
+---
 
 ## Files Touched
-- `src/hooks/useEnhancedMafiaGameState.ts` — tier thresholds, penalties, RICO timer, heat-gain multiplier, Lay Low state/gates/effects, action blockers, arrest/ratting skips, afterglow.
-- `src/components/HeadquartersInfoPanel.tsx` — Lay Low button + confirm dialog + active state UI.
-- `src/components/GameSidePanels.tsx` — Lay Low/Afterglow status badges; locked-action tooltips.
+- `src/hooks/useEnhancedMafiaGameState.ts` — Lay Low cooldown + recruit block, heat double-mult fix, Hitman blind contracts via Captain, difficulty income scaling, defense cap, AI Lay Low + Mattresses state/triggers/gates.
+- `src/components/HeadquartersInfoPanel.tsx` — three-state Lay Low button with cooldown display.
+- `src/components/HitmanPanel.tsx` — "Blind Contracts" tab unlocked by Captain bribe.
+- `src/components/GameSidePanels.tsx` — Rival family Lay Low / Mattresses badges.
+- `src/hooks/__tests__/difficulty-modifiers.test.ts` — extend to cover ongoing income scaling.
+- Memory: update `mem://gameplay/police-heat-system` (cooldown + recruit block), `mem://gameplay/hitman-contracts` (Captain-gated blind contracts), `mem://gameplay/difficulty-levels` (ongoing income), `mem://gameplay/ai-behavior` (Lay Low/Mattresses parity).
 
 ## What Doesn't Change
-- Heat decay rate (stays 2/turn).
-- Tier 2/3/4 thresholds (50/70/90).
-- Bribery/corruption tiers, scout, fortify, safehouse, supply lines.
-- AI heat behavior parity is preserved (AI still uses its own `resources.heat` proxy; Lay Low is player-only for this pass).
+- Heat decay rate (2/turn).
+- Heat tier thresholds (40/50/70/90) and penalties just set in the previous pass.
+- Lay Low duration (3 turns) and afterglow (2 turns, -10 informant flip).
+- Plan Hit mechanics, capo abilities, fortification cap (4/family).
+- Mattresses cost/duration (player side) — only parity additions for AI.
