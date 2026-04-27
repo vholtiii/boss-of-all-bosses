@@ -4974,6 +4974,15 @@ export const useEnhancedMafiaGameState = (
       grossIncome = grossIncome - illegalIncome;
       illegalIncome = 0;
     }
+
+    // Difficulty: scale ongoing income by playerMoneyMult (Easy 1.5x, Normal 1.0x, Hard 0.75x)
+    const playerMoneyMult = state.difficultyModifiers?.playerMoneyMult ?? 1;
+    if (playerMoneyMult !== 1) {
+      legalIncome = Math.floor(legalIncome * playerMoneyMult);
+      illegalIncome = Math.floor(illegalIncome * playerMoneyMult);
+      grossIncome = Math.floor(grossIncome * playerMoneyMult);
+    }
+
     const grossLegalIncome = legalIncome;
     const grossIllegalIncome = illegalIncome;
     
