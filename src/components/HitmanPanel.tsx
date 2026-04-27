@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Crosshair, Clock, DollarSign, Users, Eye } from 'lucide-react';
-import { HitmanContract, HITMAN_CONTRACT_COST, MAX_HITMEN, ActiveBribe } from '@/types/game-mechanics';
+import { HitmanContract, HITMAN_CONTRACT_COST, MAX_HITMEN, BribeContract } from '@/types/game-mechanics';
 import { DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
 
 interface HitmanPanelProps {
@@ -13,7 +13,7 @@ interface HitmanPanelProps {
   money: number;
   currentTurn: number;
   gamePhase: number;
-  activeBribes?: ActiveBribe[];
+  activeBribes?: BribeContract[];
   onHire: (targetUnitId: string, targetFamily: string) => void;
 }
 
