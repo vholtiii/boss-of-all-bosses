@@ -1,116 +1,72 @@
-# Balance Rebalance Plan
+## Goal
 
-Addresses the four findings from the audit plus AI-side parity. All edits live in `src/hooks/useEnhancedMafiaGameState.ts`, `src/components/HeadquartersInfoPanel.tsx`, `src/components/HitmanPanel.tsx`, and `src/components/GameSidePanels.tsx`.
+Make the Hitman panel's "Blind (Captain)" tab self-explanatory: show *which* families are eligible under each bribe tier, *why* they're eligible (Captain target-scoped vs Chief/Mayor map-wide), and—when the tab is empty—exactly which bribe requirement is missing.
 
----
+All edits are in `src/components/HitmanPanel.tsx`. No logic changes; UI/labeling only.
 
-## 1. Lay Low — close the loophole
+## Changes
 
-**Problem:** Free, no cooldown, allows recruit/scout/fortify → infinite heat-wash loop.
+### 1. Track *source* of eligibility, not just family list
 
-### Changes
-- **Cooldown:** 7 turns. Add `layLowCooldownUntil` to game state. Disabled with tooltip "Available in N turns" until expired.
-- **Cost:** Stays free (per prior decision) but the cooldown gates spam.
-- **Expanded block list** (extend `layLowBlockedActions` set, line ~6933):
-  - Already blocked: `hit_territory`, `execute_planned_hit`, `extort_territory`, `sabotage_hex`, `claim_territory`, `assault_hq`, `flip_soldier`, `plan_hit`, `hire_hitman`.
-  - **Add:** `recruit_soldier`, `recruit_loyal_soldier` (any recruit action types in the switch). You're hiding, not hiring.
-- **Still allowed:** scout, fortify, safehouse, escort, legal construction, diplomacy, abandon, defense/law actions, donations.
-- **HQ panel UI:** Button shows three states — "Lay Low (3 turns) — Free", "Active — N turns left" (disabled), "Cooldown — N turns" (disabled with tooltip).
-- **Heat double-mult fix:** `applyPlayerHeat` already applies `HEAT_GAIN_MULT`. Audit ambient heat at line 3958 — currently does `Math.floor((heatFromBiz / 3) * HEAT_GAIN_MULT)` and then likely passes through `applyPlayerHeat` again. Confirm and remove the inner multiplication so passive heat isn't 1.69× (1.30²).
+Replace the flat `captainBribedFamilies: Set<string>` with a map that records why each family is unlocked:
 
----
+```ts
+type BlindSource = { tier: 'police_captain' | 'police_chief' | 'mayor'; scope: 'targeted' | 'map-wide' };
+const blindEligibility = new Map<string, BlindSource>(); // family → highest-tier source
+```
 
-## 2. Hitman vs Plan Hit — give Hitman a real role
+When walking `activeBribes`, prefer the strongest source (Mayor > Chief > Captain) so the badge reflects the best active intel.
 
-**Problem:** Plan Hit dominates — free tactical action, grants loot/respect, low risk.
+### 2. Tab header — always visible, with status
 
-### Changes (per your direction)
-- **Cost stays at $30,000.**
-- **New capability — can target unscouted units**, but only if the player has at least a **bribed Police Captain** (Tier 2 corruption) on the target's family/district. Without Captain intel, behavior is unchanged (must be a known/scouted target).
-  - Implementation: in the `hire_hitman` case (line ~7547), allow target selection to include unscouted enemy units when `corruption.bribedOfficials` includes a Captain whose jurisdiction covers the target's hex/district.
-  - UI in `HitmanPanel.tsx`: when Captain is bribed, show a new "Blind Contracts (via Captain intel)" tab listing rival families' hidden unit counts; player picks family + unit type; backend resolves to a random matching enemy unit.
-- **Clear role split surfaced in tooltips:**
-  - Plan Hit → "Cheap, loud, requires capo near target. +Respect, +Loot, generates heat."
-  - Hitman → "$30k, anonymous (no tension, low heat), can reach unscouted targets if you have Captain intel."
+Show the "Blind (Captain)" tab unconditionally (not gated behind `hasAnyCaptain`) so players can discover the feature. When no eligibility exists, the tab is selectable but renders an explanatory empty state instead of being hidden.
 
----
+Update tab label to: **"Blind Hits"** with a small lock icon when no bribes qualify.
 
-## 3. Difficulty — apply modifiers to ongoing economy
+### 3. Per-family eligibility badge
 
-**Problem:** `playerMoneyMult` only touches starting cash; mid/late-game difficulty is identical across settings.
+Inside the Blind tab, on each eligible family card, replace the generic purple header with a labeled chip indicating the intel source:
 
-### Changes
-- **Apply `playerMoneyMult` to ongoing income**, not just initial bankroll. Multiply legal + illegal income calculations in `business-income-calculation` path by `state.difficultyModifiers.playerMoneyMult`.
-  - Easy: 1.5× ongoing income.
-  - Normal: 1.0×.
-  - Hard: 0.75× ongoing income.
-- **`aiIncomeMult`** is already declared but verify it actually scales AI per-turn income. If not, wire it into the AI economy tick.
-- **`eventCostMult`** — apply to random event monetary penalties/costs so Easy = cheaper events, Hard = pricier.
-- Update tests in `src/hooks/__tests__/difficulty-modifiers.test.ts` to cover ongoing-income scaling (currently only asserts starting cash).
+- Captain → amber chip: **"via Police Captain (target intel)"**
+- Chief → blue chip: **"via Police Chief (map-wide intel)"**
+- Mayor → gold chip: **"via Mayor (full map intel)"**
 
----
+Also add a one-line note under the family name: "Hidden units in this family can be targeted." The existing soldier/capo count buttons stay.
 
-## 4. Defense stacking — soft cap
+### 4. Ineligible families — show, don't hide
 
-**Problem:** Fortified HQ + Mattresses + purged moles + Captain bribe makes HQ assault near-impossible for AI.
+List *all* rival families in the Blind tab, not just eligible ones. Ineligible families render greyed-out with a clear missing-requirement line:
 
-### Changes
-- Introduce a **defense cap of +60% total** on a single hex. Sum of all multipliers (fortify +25%, mattresses HQ +X%, district control bonus, safehouse +10%, capo presence) is clamped at 1.60× before combat resolution.
-- Note: this affects the player's HQ AND any AI HQ — symmetric.
-- Implement at the combat resolution site around line 8901 (`mattressesState defense bonus` block).
+- No bribe at all → **"Locked — bribe a Police Captain on this family, or a Police Chief / Mayor for map-wide intel."**
+- Patrol Officer only on this family → **"Locked — Patrol Officer doesn't provide intel. Upgrade to Police Captain or higher."**
 
----
+The buttons (A Capo / A Soldier) are disabled for these rows.
 
-## 5. AI parity — Lay Low + Mattresses for AI families
+### 5. Empty-state panel (when no rival has any qualifying bribe)
 
-**Problem:** Player has two strategic panic buttons the AI can't use.
+Replace the current single-line italic text with a structured callout at the top of the Blind tab:
 
-### State additions per AI opponent (in `AIOpponent.resources` or a new `aiState` map keyed by family):
-- `layLowActiveUntil`, `layLowCooldownUntil`
-- `mattressesActiveUntil`, `mattressesCooldownUntil`
+```
+🔒 Blind Contracts unavailable
+Requires one of:
+  • Police Captain bribe on a specific rival family ($2,000 — target-scoped)
+  • Police Chief bribe ($8,000 — map-wide, all rivals)
+  • Mayor bribe ($25,000 — map-wide, all rivals)
+Open the Corruption panel to bribe an official.
+```
 
-### Trigger logic (heat-baseline + personality-weighted)
-Run during AI turn, before action selection:
+Costs are pulled from `BRIBE_TIER_DATA` (already imported via `BribeContract` types) so they stay in sync.
 
-**Lay Low triggers when:**
-- AI heat proxy ≥ 60, OR
-- AI has lost ≥2 soldiers in last 2 turns to arrests/hits.
+### 6. Tooltip on the Blind tab trigger
 
-Personality multipliers on the trigger probability:
-- Defensive: ×1.5
-- Diplomatic: ×1.3
-- Opportunistic: ×1.0
-- Aggressive: ×0.4
-- Unpredictable: ×0.8 + ±0.4 random jitter
-
-**Mattresses triggers when:**
-- AI HQ defense breached recently (assaulted in last turn), OR
-- AI lost a capo in the last 2 turns, OR
-- AI is at war (tension ≥80) with the player AND adjacent to player units.
-
-Same personality multipliers apply.
-
-### AI behavior while active
-- **Lay Low:** AI skips offensive actions in its action loop (gate the `claim/extort/hit/sabotage/plan_hit/flip` branches behind `!isAILayingLow(fam)`). Heat decay still 2/turn; arrest immunity for that family's soldiers.
-- **Mattresses:** AI units get the defense bonus on their hexes, no movement, no offense. Same income penalty as the player gets.
-
-### UI surfacing
-- Rival cards in `GameSidePanels.tsx` show a 🤫 / 🛏️ badge when an AI family is in either state, with turns remaining. Helps the player recognize "they're hiding — now's the time to consolidate" vs "they're hunkered — don't bother attacking."
-- Turn report includes "🤫 Bonanno went to ground (3 turns)" / "🛏️ Lucchese hit the mattresses (4 turns)" entries.
-
----
+Add a tooltip (using existing `@/components/ui/tooltip`) explaining: "Hire a hitman against an unscouted target. Requires Police Captain (target-scoped) or Chief/Mayor (map-wide) bribe."
 
 ## Files Touched
-- `src/hooks/useEnhancedMafiaGameState.ts` — Lay Low cooldown + recruit block, heat double-mult fix, Hitman blind contracts via Captain, difficulty income scaling, defense cap, AI Lay Low + Mattresses state/triggers/gates.
-- `src/components/HeadquartersInfoPanel.tsx` — three-state Lay Low button with cooldown display.
-- `src/components/HitmanPanel.tsx` — "Blind Contracts" tab unlocked by Captain bribe.
-- `src/components/GameSidePanels.tsx` — Rival family Lay Low / Mattresses badges.
-- `src/hooks/__tests__/difficulty-modifiers.test.ts` — extend to cover ongoing income scaling.
-- Memory: update `mem://gameplay/police-heat-system` (cooldown + recruit block), `mem://gameplay/hitman-contracts` (Captain-gated blind contracts), `mem://gameplay/difficulty-levels` (ongoing income), `mem://gameplay/ai-behavior` (Lay Low/Mattresses parity).
+
+- `src/components/HitmanPanel.tsx` — eligibility map, always-visible Blind tab, per-family source chips, ineligible rows with missing-requirement copy, structured empty state, tooltip.
 
 ## What Doesn't Change
-- Heat decay rate (2/turn).
-- Heat tier thresholds (40/50/70/90) and penalties just set in the previous pass.
-- Lay Low duration (3 turns) and afterglow (2 turns, -10 informant flip).
-- Plan Hit mechanics, capo abilities, fortification cap (4/family).
-- Mattresses cost/duration (player side) — only parity additions for AI.
+
+- Hitman cost ($30k), MAX_HITMEN, Phase 3 gate, contract resolution backend.
+- Known Targets tab behavior.
+- Bribe tier definitions or corruption panel.
