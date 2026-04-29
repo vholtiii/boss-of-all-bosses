@@ -984,6 +984,7 @@ export const createInitialGameState = (
         loyalty: 50, training: 0,
         hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
         turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
+        extortedHexTurns: 0,
       };
     }
     const capoNames: Record<string, string> = {
@@ -2716,6 +2717,7 @@ export const useEnhancedMafiaGameState = (
             loyalty: 50, training: 0,
             hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
             turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
+            extortedHexTurns: 0,
           };
           newResources.soldiers -= 1;
         } else {
@@ -3129,6 +3131,7 @@ export const useEnhancedMafiaGameState = (
                 loyalty: 50, training: 0, hits: 0, extortions: 0,
                 victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
                 turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
+                extortedHexTurns: 0,
               };
             }
           }
@@ -3235,6 +3238,7 @@ export const useEnhancedMafiaGameState = (
             loyalty: LOYALTY_RECRUIT_START, training: 0, hits: 0, extortions: 0,
             victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
             turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
+            extortedHexTurns: 0,
           };
           newState.resources.soldiers += 1;
           newState.pendingNotifications.push({
@@ -5427,6 +5431,7 @@ export const useEnhancedMafiaGameState = (
               loyalty: 40 + Math.floor(Math.random() * 30), training: 0,
               hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
               turnsIdle: 0, isMercenary: true, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
+              extortedHexTurns: 0,
             };
             // Only capos auto-claim neutral territory on deploy (matches player rules)
             const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
@@ -6106,7 +6111,7 @@ export const useEnhancedMafiaGameState = (
           const anyAiSoldier = state.deployedUnits.find(u => u.family === fam && u.type === 'soldier');
           if (anyAiSoldier) {
             // Boost stats to meet threshold, then promote
-            const stats = state.soldierStats[anyAiSoldier.id] || { loyalty: 50, training: 1, hits: 0, extortions: 2, victories: 3, toughness: 2, racketeering: 3, turnsDeployed: 10, toughnessProgress: 0, turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false };
+            const stats = state.soldierStats[anyAiSoldier.id] || { loyalty: 50, training: 1, hits: 0, extortions: 2, victories: 3, toughness: 2, racketeering: 3, turnsDeployed: 10, toughnessProgress: 0, turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false, extortedHexTurns: 0 };
             stats.victories = Math.max(stats.victories, 3);
             stats.racketeering = Math.max(stats.racketeering, 3);
             stats.loyalty = Math.max(stats.loyalty, 60);
@@ -7292,6 +7297,7 @@ export const useEnhancedMafiaGameState = (
                 loyalty: LOYALTY_MERC_START, training: 0,
                 hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
                 turnsIdle: 0, isMercenary: true, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
+                extortedHexTurns: 0,
               };
             }
             newState.pendingNotifications = [...newState.pendingNotifications, {
