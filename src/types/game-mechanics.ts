@@ -46,6 +46,10 @@ export interface SoldierStats {
   confirmedRat: boolean;     // true when discovered via bribe/scout
   markedForDeath?: boolean;  // true when marked for elimination via Purge Ranks
   markedTurnsRemaining?: number; // turns left before mark expires
+  // Passive racketeering progression: consecutive turns occupying a same-family extorted business hex.
+  // Resets to 0 if the soldier moves off, the hex is lost, or the business is destroyed.
+  // At 5, racketeering +1 (cap 5), loyalty +1, counter resets.
+  extortedHexTurns?: number;
 }
 
 // ============ PURGE RANKS (ELIMINATE RAT) SYSTEM ============

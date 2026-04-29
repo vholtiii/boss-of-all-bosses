@@ -206,6 +206,43 @@ export const isAILayingLow = (opp: any, turn: number): boolean =>
 export const isAIAtMattresses = (opp: any, turn: number): boolean =>
   ((opp?.mattressesActiveUntil) || 0) >= turn;
 
+// ============ PASSIVE RACKETEERING (sustained extorted-hex occupancy) ============
+// A soldier on a same-family extorted-business hex earns +1 to extortedHexTurns each turn.
+// At PASSIVE_RACKET_TURNS_REQUIRED, racketeering +1 (cap 5), loyalty +1 (cap 80), counter resets.
+// Resets to 0 on any turn the soldier isn't eligible (moved, hex lost, business destroyed).
+// Mutates state in place. Returns number of soldiers (player-only) that ticked this turn.
+export const PASSIVE_RACKET_TURNS_REQUIRED = 5;
+export const tickPassiveRacketeering = (state: EnhancedMafiaGameState): number => {
+  let playerTicks = 0;
+  state.deployedUnits.forEach((unit: any) => {
+    if (unit.type !== 'soldier') return;
+    const stats = state.soldierStats[unit.id];
+    if (!stats) return;
+    const tile = state.hexMap.find((t: any) => t.q === unit.q && t.r === unit.r && t.s === unit.s);
+    const eligible = !!(
+      tile &&
+      tile.controllingFamily === unit.family &&
+      tile.business &&
+      tile.business.isExtorted === true
+    );
+    if (!eligible) {
+      if ((stats.extortedHexTurns || 0) > 0) stats.extortedHexTurns = 0;
+      return;
+    }
+    stats.extortedHexTurns = (stats.extortedHexTurns || 0) + 1;
+    if (stats.extortedHexTurns >= PASSIVE_RACKET_TURNS_REQUIRED) {
+      const before = stats.racketeering || 0;
+      stats.racketeering = Math.min(5, before + 1);
+      stats.loyalty = Math.min(80, (stats.loyalty || 0) + 1);
+      stats.extortedHexTurns = 0;
+      if (unit.family === state.playerFamily && stats.racketeering > before) {
+        playerTicks += 1;
+      }
+    }
+  });
+  return playerTicks;
+};
+
 // ============ IMMUTABLE STATE CLONE HELPER ============
 const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGameState => ({
   ...state,
@@ -984,6 +1021,7 @@ export const createInitialGameState = (
         loyalty: 50, training: 0,
         hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
         turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
+        extortedHexTurns: 0,
       };
     }
     const capoNames: Record<string, string> = {
@@ -2716,6 +2754,7 @@ export const useEnhancedMafiaGameState = (
             loyalty: 50, training: 0,
             hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
             turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
+            extortedHexTurns: 0,
           };
           newResources.soldiers -= 1;
         } else {
@@ -3129,6 +3168,7 @@ export const useEnhancedMafiaGameState = (
                 loyalty: 50, training: 0, hits: 0, extortions: 0,
                 victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
                 turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
+                extortedHexTurns: 0,
               };
             }
           }
@@ -3235,6 +3275,7 @@ export const useEnhancedMafiaGameState = (
             loyalty: LOYALTY_RECRUIT_START, training: 0, hits: 0, extortions: 0,
             victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
             turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
+            extortedHexTurns: 0,
           };
           newState.resources.soldiers += 1;
           newState.pendingNotifications.push({
@@ -4958,7 +4999,25 @@ export const useEnhancedMafiaGameState = (
     });
     income += shareProfitsIncome;
     illegalIncome += shareProfitsIncome; // Treat shared profits as illegal income
-    
+
+    // ── Passive Racketeering Progression ──
+    // See tickPassiveRacketeering helper at top of file.
+    const playerPassiveTicks = tickPassiveRacketeering(state);
+    if (playerPassiveTicks > 0) {
+      state.pendingNotifications = [
+        ...state.pendingNotifications,
+        {
+          type: 'success' as const,
+          title: '👔 Earned His Bones',
+          message:
+            playerPassiveTicks === 1
+              ? 'A soldier earned a Racketeering point running a quiet shakedown (5 turns on an extorted hex).'
+              : `${playerPassiveTicks} soldiers earned Racketeering points running quiet shakedowns.`,
+        },
+      ];
+    }
+
+
     // Soldier maintenance — $600/soldier per turn (deployed only, undeployed are free)
     const playerSoldiers = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier');
     const soldierMaintenance = playerSoldiers.length * SOLDIER_MAINTENANCE;
@@ -5427,6 +5486,7 @@ export const useEnhancedMafiaGameState = (
               loyalty: 40 + Math.floor(Math.random() * 30), training: 0,
               hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
               turnsIdle: 0, isMercenary: true, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
+              extortedHexTurns: 0,
             };
             // Only capos auto-claim neutral territory on deploy (matches player rules)
             const tile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
@@ -6106,7 +6166,7 @@ export const useEnhancedMafiaGameState = (
           const anyAiSoldier = state.deployedUnits.find(u => u.family === fam && u.type === 'soldier');
           if (anyAiSoldier) {
             // Boost stats to meet threshold, then promote
-            const stats = state.soldierStats[anyAiSoldier.id] || { loyalty: 50, training: 1, hits: 0, extortions: 2, victories: 3, toughness: 2, racketeering: 3, turnsDeployed: 10, toughnessProgress: 0, turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false };
+            const stats = state.soldierStats[anyAiSoldier.id] || { loyalty: 50, training: 1, hits: 0, extortions: 2, victories: 3, toughness: 2, racketeering: 3, turnsDeployed: 10, toughnessProgress: 0, turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false, extortedHexTurns: 0 };
             stats.victories = Math.max(stats.victories, 3);
             stats.racketeering = Math.max(stats.racketeering, 3);
             stats.loyalty = Math.max(stats.loyalty, 60);
@@ -7292,6 +7352,7 @@ export const useEnhancedMafiaGameState = (
                 loyalty: LOYALTY_MERC_START, training: 0,
                 hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
                 turnsIdle: 0, isMercenary: true, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
+                extortedHexTurns: 0,
               };
             }
             newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -7338,6 +7399,7 @@ export const useEnhancedMafiaGameState = (
                 loyalty: LOYALTY_RECRUIT_START, training: 0,
                 hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
                 turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
+                extortedHexTurns: 0,
               };
             }
             newState.pendingNotifications = [...newState.pendingNotifications, {
