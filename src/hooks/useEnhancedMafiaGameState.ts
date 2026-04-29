@@ -7344,6 +7344,7 @@ export const useEnhancedMafiaGameState = (
                 loyalty: LOYALTY_RECRUIT_START, training: 0,
                 hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
                 turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
+                extortedHexTurns: 0,
               };
             }
             newState.pendingNotifications = [...newState.pendingNotifications, {
