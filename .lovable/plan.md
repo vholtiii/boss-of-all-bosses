@@ -1,72 +1,90 @@
-## Goal
+# Confirmation + Passive Racketeering via Hex Occupancy
 
-Make the Hitman panel's "Blind (Captain)" tab self-explanatory: show *which* families are eligible under each bribe tier, *why* they're eligible (Captain target-scoped vs Chief/Mayor map-wide), and—when the tab is empty—exactly which bribe requirement is missing.
+## Confirmation: How Occupancy Affects Extorted Hex Income Today
 
-All edits are in `src/components/HitmanPanel.tsx`. No logic changes; UI/labeling only.
+Verified in `useEnhancedMafiaGameState.ts` (L4871–4882) inside `processEconomy`. For an **extorted** business (not player-built), per-turn income is:
 
-## Changes
+| Occupant on the hex | Income from the business |
+|---|---|
+| **Capo** present | **100%** of `business.income` |
+| **Soldier** present (no capo) | **30%** of `business.income` |
+| **No unit** present | **10%** passive |
 
-### 1. Track *source* of eligibility, not just family list
+Player-built businesses are exempt — they always pay 100% regardless of occupancy. After this base, the result is multiplied by family bonuses, district control bonuses (e.g. Manhattan +25%), Lucchese boost, supply decay, and war penalties.
 
-Replace the flat `captainBribedFamilies: Set<string>` with a map that records why each family is unlocked:
+So yes — **a unit's presence on an extorted hex materially increases its income, and capos out-earn soldiers (100% vs 30%, ~3.3× multiplier).** This is also documented in `mem://gameplay/business-operations` and `mem://gameplay/business-income-calculation`.
 
-```ts
-type BlindSource = { tier: 'police_captain' | 'police_chief' | 'mayor'; scope: 'targeted' | 'map-wide' };
-const blindEligibility = new Map<string, BlindSource>(); // family → highest-tier source
-```
+---
 
-When walking `activeBribes`, prefer the strongest source (Mayor > Chief > Captain) so the badge reflects the best active intel.
+## Proposal: Passive Racketeering Growth from Sustained Occupancy
 
-### 2. Tab header — always visible, with status
+A soldier who quietly **sits on an extorted business hex for 5 consecutive turns** earns +1 racketeering — no extortion action, no heat. This gives a slow, low-risk path toward Capo promotion (which currently demands `racketeering ≥ 3`, typically requiring 3+ noisy extortion actions).
 
-Show the "Blind (Captain)" tab unconditionally (not gated behind `hasAnyCaptain`) so players can discover the feature. When no eligibility exists, the tab is selectable but renders an explanatory empty state instead of being hidden.
+### Mechanics
 
-Update tab label to: **"Blind Hits"** with a small lock icon when no bribes qualify.
+| Property | Value |
+|---|---|
+| **Trigger** | Soldier (not capo) is on a hex this family controls, that hex has a business, and the business is **extorted** (not player-built). |
+| **Counter** | New per-soldier stat `extortedHexTurns` increments +1 each turn the condition holds. |
+| **Reward** | When `extortedHexTurns` reaches **5**, racketeering +1 (capped at 5), counter resets to 0. Soldier loyalty +1 (steady earner reward). |
+| **Reset to 0** | Soldier moves off the hex, the hex is lost/abandoned/flipped, the business is destroyed, or the soldier dies/is jailed. |
+| **No reset** | Family changes phase, scout passes through, or another soldier joins the hex. |
+| **Stacking with active extortion** | Performing a manual `extort` action on the same hex in the meantime is fine — it adds racketeering as it does today. The passive counter just keeps ticking; they're additive paths. |
+| **Phases** | Active in **all phases**. Especially valuable in Phase 3+ where manual extort is locked, giving sit-tight soldiers a real progression path. |
+| **AI parity** | Same rule applies to AI soldiers. Their existing promotion logic already reads `racketeering`, so this just feeds the pipeline organically. |
 
-### 3. Per-family eligibility badge
+### Why this fits the design
 
-Inside the Blind tab, on each eligible family card, replace the generic purple header with a labeled chip indicating the intel source:
+- **Lower heat ceiling** — currently the only racketeering-growth path (the `extort` action) generates heat. This gives a heat-free alternative, matching how a real "made man" earns his bones quietly running a steady racket.
+- **Rewards the existing 30% income choice** — the player already pays an opportunity cost by parking a soldier on a hex (the hex becomes harder to defend elsewhere). Adding racketeering progression rewards that commitment.
+- **Slow but reliable** — 5 turns per +1 means reaching `racketeering ≥ 3` (promotion threshold) takes ~15 turns of dedicated occupancy. Active extortion still gets there in 3 turns. The two paths trade speed for heat.
+- **No new UI required to function**, but small surfacing (below) makes it discoverable.
 
-- Captain → amber chip: **"via Police Captain (target intel)"**
-- Chief → blue chip: **"via Police Chief (map-wide intel)"**
-- Mayor → gold chip: **"via Mayor (full map intel)"**
+### UX Surfacing
 
-Also add a one-line note under the family name: "Hidden units in this family can be targeted." The existing soldier/capo count buttons stay.
+- **Hex Info Panel** (bottom-left, when hovering an occupied extorted hex): show a small line "👔 Earning his bones — 2/5 turns to +1 Racketeering" if a soldier of yours is on it.
+- **HQ Boss Overview soldier list**: when a soldier has an active counter > 0, append a 👔 badge with tooltip showing progress.
+- **Turn Summary**: when a soldier ticks +1 racketeering this way, log it under "Promotions in Progress" — e.g. "Tony Salerno earned a racketeering point running Joe's Pizza shakedown."
 
-### 4. Ineligible families — show, don't hide
+---
 
-List *all* rival families in the Blind tab, not just eligible ones. Ineligible families render greyed-out with a clear missing-requirement line:
+## Technical Implementation
 
-- No bribe at all → **"Locked — bribe a Police Captain on this family, or a Police Chief / Mayor for map-wide intel."**
-- Patrol Officer only on this family → **"Locked — Patrol Officer doesn't provide intel. Upgrade to Police Captain or higher."**
+### State (`src/hooks/useEnhancedMafiaGameState.ts`)
 
-The buttons (A Capo / A Soldier) are disabled for these rows.
+1. **New stat field** `extortedHexTurns: number` on the soldier-stats object. Add to all 6 stat-init sites (L985, 2717, 3129–3130, 3235–3236, 5428, 7293, 7339) and into the AI fallback at L6109.
+2. **Tick logic** in `processEconomy` right after the per-tile loop completes (around L4946), iterate `state.deployedUnits` for soldiers only:
+   - For each soldier of any family, check if their `(q,r,s)` matches an extorted-business hex controlled by their family.
+   - If yes: increment that soldier's `extortedHexTurns`. If it reaches 5, set `racketeering = min(5, racketeering + 1)`, loyalty `+1`, reset counter to 0, push a notification.
+   - If no: reset counter to 0.
+3. **Cleanup** — soldier death/jail handlers already drop the stats record, so no extra work.
 
-### 5. Empty-state panel (when no rival has any qualifying bribe)
+### UI
 
-Replace the current single-line italic text with a structured callout at the top of the Blind tab:
+- **`src/components/HeadquartersInfoPanel.tsx`** — Boss Overview soldier rows: render 👔 + `extortedHexTurns/5` when > 0.
+- **Hex Info panel** (in `EnhancedMafiaHexGrid.tsx` or wherever the bottom-left tile detail lives — confirm at implementation time): add the per-soldier progress line.
+- **`src/components/TurnSummaryModal.tsx`** — new "Promotions in Progress" section listing tick events.
 
-```
-🔒 Blind Contracts unavailable
-Requires one of:
-  • Police Captain bribe on a specific rival family ($2,000 — target-scoped)
-  • Police Chief bribe ($8,000 — map-wide, all rivals)
-  • Mayor bribe ($25,000 — map-wide, all rivals)
-Open the Corruption panel to bribe an official.
-```
+### Save compatibility
 
-Costs are pulled from `BRIBE_TIER_DATA` (already imported via `BribeContract` types) so they stay in sync.
+Bump save version. Migrate older saves by initializing `extortedHexTurns: 0` on every existing soldier-stats record.
 
-### 6. Tooltip on the Blind tab trigger
+### Tests
 
-Add a tooltip (using existing `@/components/ui/tooltip`) explaining: "Hire a hitman against an unscouted target. Requires Police Captain (target-scoped) or Chief/Mayor (map-wide) bribe."
+`src/hooks/__tests__/passive-racketeering.test.ts` covering:
+- 5 consecutive turns → racketeering +1 and counter reset
+- Moving off resets the counter
+- Hex flipped/abandoned resets the counter
+- Capo on the hex does NOT accumulate (capos are already promoted)
+- Player-built hex does NOT count (only extorted)
+- AI soldiers accumulate and promote via the same pipeline
+- Cap at racketeering = 5 still ticks loyalty but can't push past 5
 
-## Files Touched
+### Memory updates
 
-- `src/components/HitmanPanel.tsx` — eligibility map, always-visible Blind tab, per-family source chips, ineligible rows with missing-requirement copy, structured empty state, tooltip.
+- Update `mem://gameplay/unit-attributes-and-promotion` to describe the passive path.
+- Update `mem://gameplay/business-operations` to note occupancy now also progresses racketeering.
 
-## What Doesn't Change
+---
 
-- Hitman cost ($30k), MAX_HITMEN, Phase 3 gate, contract resolution backend.
-- Known Targets tab behavior.
-- Bribe tier definitions or corruption panel.
+If approved, I'll implement this in default mode with full AI parity and the test suite above.
