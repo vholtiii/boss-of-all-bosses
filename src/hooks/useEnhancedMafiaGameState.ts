@@ -4962,7 +4962,61 @@ export const useEnhancedMafiaGameState = (
     });
     income += shareProfitsIncome;
     illegalIncome += shareProfitsIncome; // Treat shared profits as illegal income
-    
+
+    // ── Passive Racketeering Progression ──
+    // A soldier (any family) sitting on a same-family extorted business hex earns
+    // +1 to extortedHexTurns each turn. At 5, racketeering +1 (cap 5) and loyalty +1.
+    // Resets to 0 if the soldier is not on such a hex this turn.
+    {
+      const PASSIVE_RACKET_TURNS = 5;
+      const passiveTicks: Array<{ family: string; soldierName: string; newRacketeering: number }> = [];
+      state.deployedUnits.forEach((unit: any) => {
+        if (unit.type !== 'soldier') return;
+        const stats = state.soldierStats[unit.id];
+        if (!stats) return;
+        const tile = state.hexMap.find((t: any) => t.q === unit.q && t.r === unit.r && t.s === unit.s);
+        const eligible = !!(
+          tile &&
+          tile.controllingFamily === unit.family &&
+          tile.business &&
+          tile.business.isExtorted === true
+        );
+        if (!eligible) {
+          if ((stats.extortedHexTurns || 0) > 0) stats.extortedHexTurns = 0;
+          return;
+        }
+        stats.extortedHexTurns = (stats.extortedHexTurns || 0) + 1;
+        if (stats.extortedHexTurns >= PASSIVE_RACKET_TURNS) {
+          const before = stats.racketeering || 0;
+          stats.racketeering = Math.min(5, before + 1);
+          // Loyalty cap: 80 for soldiers (mirrors existing convention)
+          stats.loyalty = Math.min(80, (stats.loyalty || 0) + 1);
+          stats.extortedHexTurns = 0;
+          if (unit.family === state.playerFamily && stats.racketeering > before) {
+            passiveTicks.push({
+              family: unit.family,
+              soldierName: unit.id,
+              newRacketeering: stats.racketeering,
+            });
+          }
+        }
+      });
+      if (passiveTicks.length > 0) {
+        state.pendingNotifications = [
+          ...state.pendingNotifications,
+          {
+            type: 'success' as const,
+            title: '👔 Earned His Bones',
+            message:
+              passiveTicks.length === 1
+                ? `A soldier earned a Racketeering point (${passiveTicks[0].newRacketeering}/5) running a quiet shakedown.`
+                : `${passiveTicks.length} soldiers earned Racketeering points running quiet shakedowns.`,
+          },
+        ];
+      }
+    }
+
+
     // Soldier maintenance — $600/soldier per turn (deployed only, undeployed are free)
     const playerSoldiers = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier');
     const soldierMaintenance = playerSoldiers.length * SOLDIER_MAINTENANCE;
