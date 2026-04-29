@@ -567,6 +567,14 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                                               ☠️ {ss.markedTurnsRemaining}t
                                             </span>
                                           )}
+                                          {ss.extortedHexTurns > 0 && (ss.racketeering || 0) < 5 && (
+                                            <span
+                                              className="text-[9px] px-1 rounded mt-0.5 bg-amber-500/20 text-amber-400"
+                                              title={`Earning his bones — ${ss.extortedHexTurns}/5 turns to next Racketeering point`}
+                                            >
+                                              👔 {ss.extortedHexTurns}/5
+                                            </span>
+                                          )}
                                         </>
                                       );
                                     })()}
