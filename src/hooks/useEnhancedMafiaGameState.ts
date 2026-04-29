@@ -206,6 +206,43 @@ export const isAILayingLow = (opp: any, turn: number): boolean =>
 export const isAIAtMattresses = (opp: any, turn: number): boolean =>
   ((opp?.mattressesActiveUntil) || 0) >= turn;
 
+// ============ PASSIVE RACKETEERING (sustained extorted-hex occupancy) ============
+// A soldier on a same-family extorted-business hex earns +1 to extortedHexTurns each turn.
+// At PASSIVE_RACKET_TURNS_REQUIRED, racketeering +1 (cap 5), loyalty +1 (cap 80), counter resets.
+// Resets to 0 on any turn the soldier isn't eligible (moved, hex lost, business destroyed).
+// Mutates state in place. Returns number of soldiers (player-only) that ticked this turn.
+export const PASSIVE_RACKET_TURNS_REQUIRED = 5;
+export const tickPassiveRacketeering = (state: EnhancedMafiaGameState): number => {
+  let playerTicks = 0;
+  state.deployedUnits.forEach((unit: any) => {
+    if (unit.type !== 'soldier') return;
+    const stats = state.soldierStats[unit.id];
+    if (!stats) return;
+    const tile = state.hexMap.find((t: any) => t.q === unit.q && t.r === unit.r && t.s === unit.s);
+    const eligible = !!(
+      tile &&
+      tile.controllingFamily === unit.family &&
+      tile.business &&
+      tile.business.isExtorted === true
+    );
+    if (!eligible) {
+      if ((stats.extortedHexTurns || 0) > 0) stats.extortedHexTurns = 0;
+      return;
+    }
+    stats.extortedHexTurns = (stats.extortedHexTurns || 0) + 1;
+    if (stats.extortedHexTurns >= PASSIVE_RACKET_TURNS_REQUIRED) {
+      const before = stats.racketeering || 0;
+      stats.racketeering = Math.min(5, before + 1);
+      stats.loyalty = Math.min(80, (stats.loyalty || 0) + 1);
+      stats.extortedHexTurns = 0;
+      if (unit.family === state.playerFamily && stats.racketeering > before) {
+        playerTicks += 1;
+      }
+    }
+  });
+  return playerTicks;
+};
+
 // ============ IMMUTABLE STATE CLONE HELPER ============
 const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGameState => ({
   ...state,
