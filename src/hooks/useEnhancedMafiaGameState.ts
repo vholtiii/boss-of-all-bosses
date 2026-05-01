@@ -8050,7 +8050,42 @@ export const useEnhancedMafiaGameState = (
           if (!sitdown) return newState;
           // Remove the incoming sitdown entry
           newState.incomingSitdowns = newState.incomingSitdowns.filter(s => s.id !== action.sitdownId);
-          // Route to boss_negotiate with the success bonus
+
+          // D1: territory-scope incoming → route through territory negotiation
+          if (sitdown.scope === 'territory' && sitdown.targetQ !== undefined) {
+            // Use the player's nearest capo as the negotiator (or any capo) so processNegotiation passes its capo check
+            const playerCapos = newState.deployedUnits.filter(
+              u => u.family === newState.playerFamily && u.type === 'capo'
+            );
+            const negotiatorCapo = playerCapos.length > 0 ? playerCapos[0] : null;
+            if (!negotiatorCapo) {
+              // No capo available — refund the offer is moot (player paid nothing yet); just notify
+              newState.pendingNotifications.push({
+                type: 'warning' as const,
+                title: '🚫 No Capo Available',
+                message: 'You have no Capo to attend the sitdown. The offer lapses.',
+              });
+              return newState;
+            }
+            const result = processNegotiation(newState, {
+              ...action,
+              type: 'negotiate',
+              isBossNegotiation: false,
+              negotiationType: sitdown.proposedDeal,
+              targetQ: sitdown.targetQ,
+              targetR: sitdown.targetR,
+              targetS: sitdown.targetS,
+              capoId: negotiatorCapo.id,
+              targetFamily: sitdown.fromFamily,
+              successBonus: sitdown.successBonus,
+              proposedAmountOverride: sitdown.proposedAmount,
+              extraData: action.extraData,
+            });
+            result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+            return result;
+          }
+
+          // Family-scope incoming → boss negotiation (legacy path)
           const result = processNegotiation(newState, {
             ...action,
             type: 'boss_negotiate',
