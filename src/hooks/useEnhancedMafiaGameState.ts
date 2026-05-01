@@ -6246,6 +6246,95 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
+      // ── D1: AI CAPO TERRITORY SITDOWNS (Phase 2+) ──
+      // Each living AI capo has a low chance to propose a territory deal on a juicy player hex.
+      if (!atWarWithPlayer && aiPhase >= 2) {
+        const aiCapos = state.deployedUnits.filter(u =>
+          u.family === fam && u.type === 'capo' && !(u as any).jailed && !(u as any).wounded
+        );
+        const territorySitdownsFromFam = (state.incomingSitdowns || []).filter(
+          s => s.fromFamily === fam && s.scope === 'territory'
+        );
+        const totalSitdownsFromFam = (state.incomingSitdowns || []).filter(s => s.fromFamily === fam).length;
+        const playerHexes = state.hexMap.filter(t => t.controllingFamily === state.playerFamily);
+
+        for (const capo of aiCapos) {
+          if (territorySitdownsFromFam.length >= 1) break;
+          if (totalSitdownsFromFam >= 2) break;
+          if ((state.incomingSitdowns || []).some(s => s.fromCapoId === capo.id)) continue;
+
+          const capoPersonality: CapoPersonality = (capo as any).personality || 'enforcer';
+          const personalityMult: Record<string, number> = {
+            diplomatic: 2, defensive: 1, opportunistic: 1.5, aggressive: 0.5, unpredictable: 1,
+          };
+          const baseProb = 0.05 * (personalityMult[personality] || 1);
+          if (Math.random() >= baseProb) continue;
+
+          let bestTile: any = null;
+          let bestScore = 0;
+          for (const t of playerHexes) {
+            const dist = hexDistance(capo, { q: t.q, r: t.r, s: t.s });
+            if (dist > 6) continue;
+            const playerUnitsHere = state.deployedUnits.filter(
+              u => u.family === state.playerFamily && u.q === t.q && u.r === t.r && u.s === t.s
+            ).length;
+            const garrisonBonus = playerUnitsHere === 0 ? 50 : playerUnitsHere === 1 ? 20 : 0;
+            const fortifiedPenalty = (state.fortifiedHexes || []).some(
+              f => f.q === t.q && f.r === t.r && f.s === t.s && f.family === state.playerFamily
+            ) ? 40 : 0;
+            const income = t.business?.income || 0;
+            const score = income + garrisonBonus - fortifiedPenalty;
+            if (score > bestScore) { bestScore = score; bestTile = t; }
+          }
+          if (!bestTile || bestScore <= 0) continue;
+
+          let deal: 'bribe_territory' | 'share_profits';
+          if (capoPersonality === 'enforcer') deal = 'bribe_territory';
+          else if (capoPersonality === 'diplomat' || capoPersonality === 'schemer') {
+            deal = Math.random() < 0.5 ? 'share_profits' : 'bribe_territory';
+          } else deal = 'share_profits';
+
+          const playerUnitsOnHex = state.deployedUnits.filter(
+            u => u.family === state.playerFamily && u.q === bestTile.q && u.r === bestTile.r && u.s === bestTile.s
+          ).length;
+          const hexIncome = bestTile.business?.income || 0;
+          const baseCost = deal === 'bribe_territory' ? 8000 : 3000;
+          const proposedAmount = deal === 'bribe_territory'
+            ? baseCost + playerUnitsOnHex * 2000 + hexIncome
+            : baseCost;
+
+          const famLabel2 = fam.charAt(0).toUpperCase() + fam.slice(1);
+          const dealLabel2 = deal === 'bribe_territory' ? 'Bribe for Territory' : 'Share Profits';
+          state.incomingSitdowns = state.incomingSitdowns || [];
+          const newSitdown = {
+            id: `sitdown-${fam}-${capo.id}-${state.turn}-${Math.random().toString(36).slice(2)}`,
+            fromFamily: fam,
+            proposedDeal: deal,
+            turnRequested: state.turn,
+            expiresOnTurn: state.turn + 2,
+            successBonus: 15,
+            scope: 'territory' as const,
+            targetQ: bestTile.q,
+            targetR: bestTile.r,
+            targetS: bestTile.s,
+            fromCapoId: capo.id,
+            fromCapoName: capo.name,
+            fromCapoPersonality: capoPersonality,
+            proposedAmount,
+          };
+          state.incomingSitdowns.push(newSitdown);
+          state.pendingNotifications.push({
+            type: 'info' as const,
+            title: `📩 ${capo.name} (${famLabel2}) Wants to Talk`,
+            message: `Proposes a ${dealLabel2} on your hex at (${bestTile.q}, ${bestTile.r}) for $${proposedAmount.toLocaleString()}. 2 turns to respond.`,
+          });
+          state.combatLog = state.combatLog || [];
+          state.combatLog.push(`📩 ${famLabel2} capo ${capo.name} proposed ${dealLabel2} on (${bestTile.q}, ${bestTile.r}) — $${proposedAmount.toLocaleString()}`);
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: `${capo.name} requested territory sitdown (${dealLabel2})` });
+          territorySitdownsFromFam.push(newSitdown);
+        }
+      }
+
       // ── AI-to-AI DIPLOMACY: Auto-resolve ceasefires between AI families ──
       if (!atWarWithPlayer) {
         const otherAIs = state.aiOpponents.filter(o => o.family !== fam && !(state.eliminatedFamilies || []).includes(o.family));
