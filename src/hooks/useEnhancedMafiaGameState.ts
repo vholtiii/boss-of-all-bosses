@@ -2944,8 +2944,31 @@ export const useEnhancedMafiaGameState = (
         newState.combatLog.push(`🤝 Sitdown ready: ${ready.capoName} → ${famLabel} territory at (${ready.targetQ}, ${ready.targetR})`);
       }
 
-      // ============ INCOMING SITDOWNS EXPIRATION ============
+      // ============ INCOMING SITDOWNS EXPIRATION + AUTO-INVALIDATION ============
       newState.incomingSitdowns = newState.incomingSitdowns || [];
+      // D1 auto-invalidation: drop territory-scope incoming whose target hex flipped away from the player,
+      // or whose originating AI capo is dead/jailed. Silent (situation dissolved) — no tension hit.
+      const stillValid: typeof newState.incomingSitdowns = [];
+      for (const s of newState.incomingSitdowns) {
+        if (s.scope === 'territory') {
+          const tile = newState.hexMap.find(t => t.q === s.targetQ && t.r === s.targetR && t.s === s.targetS);
+          const hexLost = !tile || tile.controllingFamily !== newState.playerFamily;
+          const capoGone = s.fromCapoId
+            ? !newState.deployedUnits.some(u => u.id === s.fromCapoId && !(u as any).jailed)
+            : false;
+          if (hexLost || capoGone) {
+            const famLabel = s.fromFamily.charAt(0).toUpperCase() + s.fromFamily.slice(1);
+            newState.pendingNotifications.push({
+              type: 'info' as const,
+              title: '📭 Sitdown Withdrawn',
+              message: `The ${famLabel} family withdrew their offer (${hexLost ? 'hex changed hands' : 'their capo is unavailable'}).`,
+            });
+            continue;
+          }
+        }
+        stillValid.push(s);
+      }
+      newState.incomingSitdowns = stillValid;
       const expiredIncoming = newState.incomingSitdowns.filter(s => s.expiresOnTurn <= newState.turn + 1);
       for (const expired of expiredIncoming) {
         addPairTension(newState, newState.playerFamily, expired.fromFamily, 5);
