@@ -51,8 +51,10 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   const personalityInfo = PERSONALITY_LABELS[personality];
   const personalityBonuses = PERSONALITY_BONUSES[personality];
 
-  // Filter negotiation types by scope
-  const filteredTypes = NEGOTIATION_TYPES.filter(n => n.scope === scope);
+  // Filter negotiation types by scope (and lock to a single type when forced)
+  const filteredTypes = lockedDealType
+    ? NEGOTIATION_TYPES.filter(n => n.type === lockedDealType)
+    : NEGOTIATION_TYPES.filter(n => n.scope === scope);
 
   const treacheryDebuff = (treacheryTurnsRemaining || 0) > 0 ? 20 : 0;
 
