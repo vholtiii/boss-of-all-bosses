@@ -1568,14 +1568,14 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
           const tile = gameState.hexMap.find((t: any) => t.q === negotiationState.targetQ && t.r === negotiationState.targetR && t.s === negotiationState.targetS);
           if (!tile) return null;
           const capo = gameState.deployedUnits.find((u: any) => u.id === negotiationState.capoId);
-          // For pending negotiations, capo may be anywhere or even dead — use pending data as fallback
-          const pendingEntry = (negotiationState as any).pendingNegotiationId 
-            ? ((gameState as any).pendingNegotiations || []).find((p: any) => p.id === (negotiationState as any).pendingNegotiationId) 
+          const pendingEntry = (negotiationState as any).pendingNegotiationId
+            ? ((gameState as any).pendingNegotiations || []).find((p: any) => p.id === (negotiationState as any).pendingNegotiationId)
             : null;
           const capoName = capo?.name || pendingEntry?.capoName || 'Capo';
           const capoPersonality = capo?.personality || pendingEntry?.capoPersonality || 'diplomat';
-          const enemyFamily = tile.controllingFamily;
+          const enemyFamily = (negotiationState as any).targetFamilyOverride || tile.controllingFamily;
           const enemyUnitsOnHex = gameState.deployedUnits.filter((u: any) => u.family === enemyFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+          const incomingSitdownId = (negotiationState as any).incomingSitdownId;
           return (
             <NegotiationDialog
               open={negotiationState.open}
@@ -1583,16 +1583,25 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               scope="territory"
               negotiationUsedThisTurn={((gameState as any).capoNegotiationCooldown || 0) > 0}
               onNegotiate={(type, extraData) => {
-                performAction({
-                  type: 'negotiate',
-                  negotiationType: type,
-                  targetQ: negotiationState.targetQ,
-                  targetR: negotiationState.targetR,
-                  targetS: negotiationState.targetS,
-                  capoId: negotiationState.capoId,
-                  pendingNegotiationId: (negotiationState as any).pendingNegotiationId,
-                  extraData,
-                });
+                if (incomingSitdownId) {
+                  performAction({
+                    type: 'accept_incoming_sitdown',
+                    sitdownId: incomingSitdownId,
+                    negotiationType: type,
+                    extraData,
+                  });
+                } else {
+                  performAction({
+                    type: 'negotiate',
+                    negotiationType: type,
+                    targetQ: negotiationState.targetQ,
+                    targetR: negotiationState.targetR,
+                    targetS: negotiationState.targetS,
+                    capoId: negotiationState.capoId,
+                    pendingNegotiationId: (negotiationState as any).pendingNegotiationId,
+                    extraData,
+                  });
+                }
                 setNegotiationState(null);
               }}
               capoName={capoName}
@@ -1603,6 +1612,10 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               enemyStrength={enemyUnitsOnHex.length}
               hexIncome={tile.business?.income || 0}
               treacheryTurnsRemaining={(gameState as any).treacheryDebuff?.turnsRemaining || 0}
+              lockedDealType={(negotiationState as any).lockedDealType}
+              proposedAmount={(negotiationState as any).proposedAmount}
+              proposerLabel={(negotiationState as any).proposerLabel}
+              successBonus={(negotiationState as any).successBonus || 0}
             />
           );
         } else {
