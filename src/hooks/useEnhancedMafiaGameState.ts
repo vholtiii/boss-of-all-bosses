@@ -9838,7 +9838,10 @@ export const useEnhancedMafiaGameState = (
       enemyFamily = tile.controllingFamily;
     }
 
-    const cost = config.baseCost + (negotiationType === 'bribe_territory' && tile ? (state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS).length * 2000 + (tile.business?.income || 0)) : 0);
+    // D1: when accepting an AI territory sitdown, snap cost to the offered amount so the player isn't surprised
+    const cost = (typeof action.proposedAmountOverride === 'number')
+      ? action.proposedAmountOverride
+      : config.baseCost + (negotiationType === 'bribe_territory' && tile ? (state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS).length * 2000 + (tile.business?.income || 0)) : 0);
     if (state.resources.money < cost) return state;
 
     state.resources.money -= cost;
