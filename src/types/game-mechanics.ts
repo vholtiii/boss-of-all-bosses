@@ -849,10 +849,19 @@ export const getAllFamilyPairKeys = (): string[] => {
 export interface IncomingSitdown {
   id: string;
   fromFamily: string;
-  proposedDeal: 'ceasefire' | 'alliance' | 'safe_passage' | 'supply_deal';
+  proposedDeal: 'ceasefire' | 'alliance' | 'safe_passage' | 'supply_deal' | 'bribe_territory' | 'share_profits';
   turnRequested: number;
   expiresOnTurn: number; // 2-turn window to respond
   successBonus: number;  // +15% since THEY asked
+  // Territory-scope fields (D1) — present only when scope === 'territory'
+  scope?: 'family' | 'territory';
+  targetQ?: number;
+  targetR?: number;
+  targetS?: number;
+  fromCapoId?: string;
+  fromCapoName?: string;
+  fromCapoPersonality?: CapoPersonality;
+  proposedAmount?: number;
 }
 
 // ============ INFLUENCE EROSION & PASSIVE EXPANSION (Phase 3+) ============
