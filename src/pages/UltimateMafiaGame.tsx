@@ -147,6 +147,12 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     capoId: string;
     scope: 'territory';
     pendingNegotiationId?: string;
+    incomingSitdownId?: string;
+    lockedDealType?: any;
+    proposedAmount?: number;
+    proposerLabel?: string;
+    successBonus?: number;
+    targetFamilyOverride?: string;
   } | {
     open: boolean;
     scope: 'family';
