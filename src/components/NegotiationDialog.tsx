@@ -28,13 +28,17 @@ interface NegotiationDialogProps {
   availableEnemyFamilies?: string[];
   onSelectTargetFamily?: (family: string) => void;
   successBonus?: number;
+  // D1: Territory-scope incoming sitdown lock
+  lockedDealType?: NegotiationType;       // forces this single negotiation type, hides picker
+  proposedAmount?: number;                 // overrides computed cost
+  proposerLabel?: string;                  // e.g. "Vito Corleone (Genovese)" — replaces capo header
 }
 
 const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   open, onClose, onNegotiate, scope, capoName, capoPersonality,
   enemyFamily, playerReputation, playerInfluence = 0, playerFear, playerMoney, enemyStrength, hexIncome,
   negotiationUsedThisTurn, treacheryTurnsRemaining, availableEnemyFamilies, onSelectTargetFamily,
-  successBonus = 0,
+  successBonus = 0, lockedDealType, proposedAmount, proposerLabel,
 }) => {
   const [selectedType, setSelectedType] = useState<NegotiationType | null>(null);
   const [rolling, setRolling] = useState(false);
