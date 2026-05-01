@@ -80,13 +80,14 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   }, [personalityBonuses, playerReputation, playerInfluence, playerFear, enemyStrength, scope, successBonus, treacheryDebuff]);
 
   const getCost = useCallback((type: NegotiationType) => {
+    if (typeof proposedAmount === 'number') return proposedAmount;
     const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
     let cost = config.baseCost;
     if (type === 'bribe_territory') {
       cost += enemyStrength * 2000 + hexIncome;
     }
     return cost;
-  }, [enemyStrength, hexIncome]);
+  }, [enemyStrength, hexIncome, proposedAmount]);
 
   const handleRoll = useCallback((type: NegotiationType) => {
     const chance = getSuccessChance(type);
