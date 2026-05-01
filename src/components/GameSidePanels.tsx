@@ -1042,7 +1042,11 @@ export const RightSidePanel: React.FC<{
   onHighlightFamily?: (family: string | null) => void;
   highlightedFamily?: string | null;
   onSelectUnit?: (unitType: string, hex: { q: number; r: number; s: number }) => void;
-}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily, onSelectUnit }) => {
+  onOpenOutgoingSitdown?: (p: PendingNegotiation) => void;
+  onAcceptIncomingSitdown?: (s: IncomingSitdown) => void;
+  onDeclineIncomingSitdown?: (s: IncomingSitdown) => void;
+  onFocusHex?: (q: number, r: number, s: number) => void;
+}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily, onSelectUnit, onOpenOutgoingSitdown, onAcceptIncomingSitdown, onDeclineIncomingSitdown, onFocusHex }) => {
   const [openSection, setOpenSection] = useState<string>('');
   const { playSound } = useSoundSystem();
   const toggle = (id: string) => {
@@ -1057,6 +1061,16 @@ export const RightSidePanel: React.FC<{
         {/* ── Threat Board (consolidated alerts) ── */}
         <ThreatBoardPanel gameState={gameState} onSelectUnit={onSelectUnit} />
 
+        {/* ── Sitdowns Minicard (E3) ── */}
+        {(onOpenOutgoingSitdown && onAcceptIncomingSitdown && onDeclineIncomingSitdown) && (
+          <SitdownsPanel
+            gameState={gameState}
+            onOpenOutgoing={onOpenOutgoingSitdown}
+            onAcceptIncoming={onAcceptIncomingSitdown}
+            onDeclineIncoming={onDeclineIncomingSitdown}
+            onFocusHex={onFocusHex}
+          />
+        )}
         {/* ── Territory Control ── */}
         <div className="pb-3 border-b border-border">
           <h3 className="text-sm font-bold text-primary font-playfair mb-3 uppercase tracking-wider">Territory Control</h3>
