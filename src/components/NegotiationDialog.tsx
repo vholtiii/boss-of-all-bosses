@@ -141,6 +141,9 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
             {scope === 'family' ? '🏛️ Boss Diplomacy' : '🤝 Negotiate'} — {targetName} Territory
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
+            {proposerLabel && (
+              <span className="block text-mafia-gold font-semibold mb-1">📩 {proposerLabel} requested this sitdown</span>
+            )}
             {scope === 'territory' && capoName && (
               <>
                 <span className="font-semibold text-foreground">{capoName}</span>{' '}
@@ -149,7 +152,7 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
                 </Badge>
               </>
             )}
-            {scope === 'family' && (
+            {scope === 'family' && !proposerLabel && (
               <span className="text-foreground">The Boss sends word from Headquarters</span>
             )}
           </DialogDescription>
