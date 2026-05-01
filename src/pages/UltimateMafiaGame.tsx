@@ -498,12 +498,68 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     );
   }
 
+  // Sitdowns minicard handlers (shared between mobile/tab and desktop sidebar mounts)
+  const handleOpenOutgoingSitdown = useCallback((p: any) => {
+    setNegotiationState({
+      open: true,
+      targetQ: p.targetQ,
+      targetR: p.targetR,
+      targetS: p.targetS,
+      capoId: p.capoId,
+      scope: 'territory',
+      pendingNegotiationId: p.id,
+    });
+  }, []);
+  const handleAcceptIncomingSitdown = useCallback((s: any) => {
+    if (s.scope === 'territory' && s.targetQ !== undefined) {
+      const fam = String(s.fromFamily || '');
+      const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
+      setNegotiationState({
+        open: true,
+        scope: 'territory',
+        targetQ: s.targetQ,
+        targetR: s.targetR,
+        targetS: s.targetS,
+        capoId: '',
+        incomingSitdownId: s.id,
+        lockedDealType: s.proposedDeal,
+        proposedAmount: s.proposedAmount,
+        successBonus: s.successBonus,
+        targetFamilyOverride: s.fromFamily,
+        proposerLabel: s.fromCapoName ? `${s.fromCapoName} (${famLabel})` : famLabel,
+      });
+    } else {
+      setNegotiationState({
+        open: true,
+        scope: 'family',
+        targetFamily: s.fromFamily,
+        incomingSitdownId: s.id,
+        successBonus: s.successBonus,
+      });
+    }
+  }, []);
+  const handleDeclineIncomingSitdown = useCallback((s: any) => {
+    performAction({ type: 'decline_incoming_sitdown', sitdownId: s.id });
+  }, [performAction]);
+
   const leftSidebar = (
     <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} onSelectUnit={selectUnit} />
   );
 
   const rightSidebar = (
-    <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} onHighlightFamily={setHighlightedFamily} highlightedFamily={highlightedFamily} onSelectUnit={selectUnit} />
+    <RightSidePanel
+      gameState={gameState}
+      onEventChoice={handleEventChoice}
+      onAction={handleAction}
+      onHighlightSupplyNode={setBossHighlightHex}
+      highlightedSupplyHex={bossHighlightHex}
+      onHighlightFamily={setHighlightedFamily}
+      highlightedFamily={highlightedFamily}
+      onSelectUnit={selectUnit}
+      onOpenOutgoingSitdown={handleOpenOutgoingSitdown}
+      onAcceptIncomingSitdown={handleAcceptIncomingSitdown}
+      onDeclineIncomingSitdown={handleDeclineIncomingSitdown}
+    />
   );
 
   const topBar = (
