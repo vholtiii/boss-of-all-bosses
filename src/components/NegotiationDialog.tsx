@@ -28,13 +28,17 @@ interface NegotiationDialogProps {
   availableEnemyFamilies?: string[];
   onSelectTargetFamily?: (family: string) => void;
   successBonus?: number;
+  // D1: Territory-scope incoming sitdown lock
+  lockedDealType?: NegotiationType;       // forces this single negotiation type, hides picker
+  proposedAmount?: number;                 // overrides computed cost
+  proposerLabel?: string;                  // e.g. "Vito Corleone (Genovese)" — replaces capo header
 }
 
 const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   open, onClose, onNegotiate, scope, capoName, capoPersonality,
   enemyFamily, playerReputation, playerInfluence = 0, playerFear, playerMoney, enemyStrength, hexIncome,
   negotiationUsedThisTurn, treacheryTurnsRemaining, availableEnemyFamilies, onSelectTargetFamily,
-  successBonus = 0,
+  successBonus = 0, lockedDealType, proposedAmount, proposerLabel,
 }) => {
   const [selectedType, setSelectedType] = useState<NegotiationType | null>(null);
   const [rolling, setRolling] = useState(false);
@@ -47,8 +51,10 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   const personalityInfo = PERSONALITY_LABELS[personality];
   const personalityBonuses = PERSONALITY_BONUSES[personality];
 
-  // Filter negotiation types by scope
-  const filteredTypes = NEGOTIATION_TYPES.filter(n => n.scope === scope);
+  // Filter negotiation types by scope (and lock to a single type when forced)
+  const filteredTypes = lockedDealType
+    ? NEGOTIATION_TYPES.filter(n => n.type === lockedDealType)
+    : NEGOTIATION_TYPES.filter(n => n.scope === scope);
 
   const treacheryDebuff = (treacheryTurnsRemaining || 0) > 0 ? 20 : 0;
 
@@ -74,13 +80,14 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   }, [personalityBonuses, playerReputation, playerInfluence, playerFear, enemyStrength, scope, successBonus, treacheryDebuff]);
 
   const getCost = useCallback((type: NegotiationType) => {
+    if (typeof proposedAmount === 'number') return proposedAmount;
     const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
     let cost = config.baseCost;
     if (type === 'bribe_territory') {
       cost += enemyStrength * 2000 + hexIncome;
     }
     return cost;
-  }, [enemyStrength, hexIncome]);
+  }, [enemyStrength, hexIncome, proposedAmount]);
 
   const handleRoll = useCallback((type: NegotiationType) => {
     const chance = getSuccessChance(type);
@@ -134,6 +141,9 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
             {scope === 'family' ? '🏛️ Boss Diplomacy' : '🤝 Negotiate'} — {targetName} Territory
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
+            {proposerLabel && (
+              <span className="block text-mafia-gold font-semibold mb-1">📩 {proposerLabel} requested this sitdown</span>
+            )}
             {scope === 'territory' && capoName && (
               <>
                 <span className="font-semibold text-foreground">{capoName}</span>{' '}
@@ -142,7 +152,7 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
                 </Badge>
               </>
             )}
-            {scope === 'family' && (
+            {scope === 'family' && !proposerLabel && (
               <span className="text-foreground">The Boss sends word from Headquarters</span>
             )}
           </DialogDescription>

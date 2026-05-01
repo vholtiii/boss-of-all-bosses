@@ -39,7 +39,8 @@ import CorruptionPanel from '@/components/CorruptionPanel';
 import VictoryTracker from '@/components/VictoryTracker';
 import PhaseInfographic from '@/components/PhaseInfographic';
 import ThreatBoardPanel from '@/components/ThreatBoardPanel';
-import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType, SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, Safehouse, getTensionPairKey, WAR_TENSION_THRESHOLD, FAMILY_POWERS } from '@/types/game-mechanics';
+import SitdownsPanel from '@/components/SitdownsPanel';
+import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType, SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, Safehouse, getTensionPairKey, WAR_TENSION_THRESHOLD, FAMILY_POWERS, PendingNegotiation, IncomingSitdown } from '@/types/game-mechanics';
 import { Anchor, Wrench, Truck, Wine, Fish, Package, Link2 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 
@@ -1041,7 +1042,11 @@ export const RightSidePanel: React.FC<{
   onHighlightFamily?: (family: string | null) => void;
   highlightedFamily?: string | null;
   onSelectUnit?: (unitType: string, hex: { q: number; r: number; s: number }) => void;
-}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily, onSelectUnit }) => {
+  onOpenOutgoingSitdown?: (p: PendingNegotiation) => void;
+  onAcceptIncomingSitdown?: (s: IncomingSitdown) => void;
+  onDeclineIncomingSitdown?: (s: IncomingSitdown) => void;
+  onFocusHex?: (q: number, r: number, s: number) => void;
+}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily, onSelectUnit, onOpenOutgoingSitdown, onAcceptIncomingSitdown, onDeclineIncomingSitdown, onFocusHex }) => {
   const [openSection, setOpenSection] = useState<string>('');
   const { playSound } = useSoundSystem();
   const toggle = (id: string) => {
@@ -1056,6 +1061,16 @@ export const RightSidePanel: React.FC<{
         {/* ── Threat Board (consolidated alerts) ── */}
         <ThreatBoardPanel gameState={gameState} onSelectUnit={onSelectUnit} />
 
+        {/* ── Sitdowns Minicard (E3) ── */}
+        {(onOpenOutgoingSitdown && onAcceptIncomingSitdown && onDeclineIncomingSitdown) && (
+          <SitdownsPanel
+            gameState={gameState}
+            onOpenOutgoing={onOpenOutgoingSitdown}
+            onAcceptIncoming={onAcceptIncomingSitdown}
+            onDeclineIncoming={onDeclineIncomingSitdown}
+            onFocusHex={onFocusHex}
+          />
+        )}
         {/* ── Territory Control ── */}
         <div className="pb-3 border-b border-border">
           <h3 className="text-sm font-bold text-primary font-playfair mb-3 uppercase tracking-wider">Territory Control</h3>

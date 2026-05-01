@@ -2944,8 +2944,31 @@ export const useEnhancedMafiaGameState = (
         newState.combatLog.push(`🤝 Sitdown ready: ${ready.capoName} → ${famLabel} territory at (${ready.targetQ}, ${ready.targetR})`);
       }
 
-      // ============ INCOMING SITDOWNS EXPIRATION ============
+      // ============ INCOMING SITDOWNS EXPIRATION + AUTO-INVALIDATION ============
       newState.incomingSitdowns = newState.incomingSitdowns || [];
+      // D1 auto-invalidation: drop territory-scope incoming whose target hex flipped away from the player,
+      // or whose originating AI capo is dead/jailed. Silent (situation dissolved) — no tension hit.
+      const stillValid: typeof newState.incomingSitdowns = [];
+      for (const s of newState.incomingSitdowns) {
+        if (s.scope === 'territory') {
+          const tile = newState.hexMap.find(t => t.q === s.targetQ && t.r === s.targetR && t.s === s.targetS);
+          const hexLost = !tile || tile.controllingFamily !== newState.playerFamily;
+          const capoGone = s.fromCapoId
+            ? !newState.deployedUnits.some(u => u.id === s.fromCapoId && !(u as any).jailed)
+            : false;
+          if (hexLost || capoGone) {
+            const famLabel = s.fromFamily.charAt(0).toUpperCase() + s.fromFamily.slice(1);
+            newState.pendingNotifications.push({
+              type: 'info' as const,
+              title: '📭 Sitdown Withdrawn',
+              message: `The ${famLabel} family withdrew their offer (${hexLost ? 'hex changed hands' : 'their capo is unavailable'}).`,
+            });
+            continue;
+          }
+        }
+        stillValid.push(s);
+      }
+      newState.incomingSitdowns = stillValid;
       const expiredIncoming = newState.incomingSitdowns.filter(s => s.expiresOnTurn <= newState.turn + 1);
       for (const expired of expiredIncoming) {
         addPairTension(newState, newState.playerFamily, expired.fromFamily, 5);
@@ -6246,6 +6269,95 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
+      // ── D1: AI CAPO TERRITORY SITDOWNS (Phase 2+) ──
+      // Each living AI capo has a low chance to propose a territory deal on a juicy player hex.
+      if (!atWarWithPlayer && aiPhase >= 2) {
+        const aiCapos = state.deployedUnits.filter(u =>
+          u.family === fam && u.type === 'capo' && !(u as any).jailed && !(u as any).wounded
+        );
+        const territorySitdownsFromFam = (state.incomingSitdowns || []).filter(
+          s => s.fromFamily === fam && s.scope === 'territory'
+        );
+        const totalSitdownsFromFam = (state.incomingSitdowns || []).filter(s => s.fromFamily === fam).length;
+        const playerHexes = state.hexMap.filter(t => t.controllingFamily === state.playerFamily);
+
+        for (const capo of aiCapos) {
+          if (territorySitdownsFromFam.length >= 1) break;
+          if (totalSitdownsFromFam >= 2) break;
+          if ((state.incomingSitdowns || []).some(s => s.fromCapoId === capo.id)) continue;
+
+          const capoPersonality: CapoPersonality = (capo as any).personality || 'enforcer';
+          const personalityMult: Record<string, number> = {
+            diplomatic: 2, defensive: 1, opportunistic: 1.5, aggressive: 0.5, unpredictable: 1,
+          };
+          const baseProb = 0.05 * (personalityMult[personality] || 1);
+          if (Math.random() >= baseProb) continue;
+
+          let bestTile: any = null;
+          let bestScore = 0;
+          for (const t of playerHexes) {
+            const dist = hexDistance(capo, { q: t.q, r: t.r, s: t.s });
+            if (dist > 6) continue;
+            const playerUnitsHere = state.deployedUnits.filter(
+              u => u.family === state.playerFamily && u.q === t.q && u.r === t.r && u.s === t.s
+            ).length;
+            const garrisonBonus = playerUnitsHere === 0 ? 50 : playerUnitsHere === 1 ? 20 : 0;
+            const fortifiedPenalty = (state.fortifiedHexes || []).some(
+              f => f.q === t.q && f.r === t.r && f.s === t.s && f.family === state.playerFamily
+            ) ? 40 : 0;
+            const income = t.business?.income || 0;
+            const score = income + garrisonBonus - fortifiedPenalty;
+            if (score > bestScore) { bestScore = score; bestTile = t; }
+          }
+          if (!bestTile || bestScore <= 0) continue;
+
+          let deal: 'bribe_territory' | 'share_profits';
+          if (capoPersonality === 'enforcer') deal = 'bribe_territory';
+          else if (capoPersonality === 'diplomat' || capoPersonality === 'schemer') {
+            deal = Math.random() < 0.5 ? 'share_profits' : 'bribe_territory';
+          } else deal = 'share_profits';
+
+          const playerUnitsOnHex = state.deployedUnits.filter(
+            u => u.family === state.playerFamily && u.q === bestTile.q && u.r === bestTile.r && u.s === bestTile.s
+          ).length;
+          const hexIncome = bestTile.business?.income || 0;
+          const baseCost = deal === 'bribe_territory' ? 8000 : 3000;
+          const proposedAmount = deal === 'bribe_territory'
+            ? baseCost + playerUnitsOnHex * 2000 + hexIncome
+            : baseCost;
+
+          const famLabel2 = fam.charAt(0).toUpperCase() + fam.slice(1);
+          const dealLabel2 = deal === 'bribe_territory' ? 'Bribe for Territory' : 'Share Profits';
+          state.incomingSitdowns = state.incomingSitdowns || [];
+          const newSitdown = {
+            id: `sitdown-${fam}-${capo.id}-${state.turn}-${Math.random().toString(36).slice(2)}`,
+            fromFamily: fam,
+            proposedDeal: deal,
+            turnRequested: state.turn,
+            expiresOnTurn: state.turn + 2,
+            successBonus: 15,
+            scope: 'territory' as const,
+            targetQ: bestTile.q,
+            targetR: bestTile.r,
+            targetS: bestTile.s,
+            fromCapoId: capo.id,
+            fromCapoName: capo.name,
+            fromCapoPersonality: capoPersonality,
+            proposedAmount,
+          };
+          state.incomingSitdowns.push(newSitdown);
+          state.pendingNotifications.push({
+            type: 'info' as const,
+            title: `📩 ${capo.name} (${famLabel2}) Wants to Talk`,
+            message: `Proposes a ${dealLabel2} on your hex at (${bestTile.q}, ${bestTile.r}) for $${proposedAmount.toLocaleString()}. 2 turns to respond.`,
+          });
+          state.combatLog = state.combatLog || [];
+          state.combatLog.push(`📩 ${famLabel2} capo ${capo.name} proposed ${dealLabel2} on (${bestTile.q}, ${bestTile.r}) — $${proposedAmount.toLocaleString()}`);
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: `${capo.name} requested territory sitdown (${dealLabel2})` });
+          territorySitdownsFromFam.push(newSitdown);
+        }
+      }
+
       // ── AI-to-AI DIPLOMACY: Auto-resolve ceasefires between AI families ──
       if (!atWarWithPlayer) {
         const otherAIs = state.aiOpponents.filter(o => o.family !== fam && !(state.eliminatedFamilies || []).includes(o.family));
@@ -7961,7 +8073,42 @@ export const useEnhancedMafiaGameState = (
           if (!sitdown) return newState;
           // Remove the incoming sitdown entry
           newState.incomingSitdowns = newState.incomingSitdowns.filter(s => s.id !== action.sitdownId);
-          // Route to boss_negotiate with the success bonus
+
+          // D1: territory-scope incoming → route through territory negotiation
+          if (sitdown.scope === 'territory' && sitdown.targetQ !== undefined) {
+            // Use the player's nearest capo as the negotiator (or any capo) so processNegotiation passes its capo check
+            const playerCapos = newState.deployedUnits.filter(
+              u => u.family === newState.playerFamily && u.type === 'capo'
+            );
+            const negotiatorCapo = playerCapos.length > 0 ? playerCapos[0] : null;
+            if (!negotiatorCapo) {
+              // No capo available — refund the offer is moot (player paid nothing yet); just notify
+              newState.pendingNotifications.push({
+                type: 'warning' as const,
+                title: '🚫 No Capo Available',
+                message: 'You have no Capo to attend the sitdown. The offer lapses.',
+              });
+              return newState;
+            }
+            const result = processNegotiation(newState, {
+              ...action,
+              type: 'negotiate',
+              isBossNegotiation: false,
+              negotiationType: sitdown.proposedDeal,
+              targetQ: sitdown.targetQ,
+              targetR: sitdown.targetR,
+              targetS: sitdown.targetS,
+              capoId: negotiatorCapo.id,
+              targetFamily: sitdown.fromFamily,
+              successBonus: sitdown.successBonus,
+              proposedAmountOverride: sitdown.proposedAmount,
+              extraData: action.extraData,
+            });
+            result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+            return result;
+          }
+
+          // Family-scope incoming → boss negotiation (legacy path)
           const result = processNegotiation(newState, {
             ...action,
             type: 'boss_negotiate',
@@ -9714,7 +9861,10 @@ export const useEnhancedMafiaGameState = (
       enemyFamily = tile.controllingFamily;
     }
 
-    const cost = config.baseCost + (negotiationType === 'bribe_territory' && tile ? (state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS).length * 2000 + (tile.business?.income || 0)) : 0);
+    // D1: when accepting an AI territory sitdown, snap cost to the offered amount so the player isn't surprised
+    const cost = (typeof action.proposedAmountOverride === 'number')
+      ? action.proposedAmountOverride
+      : config.baseCost + (negotiationType === 'bribe_territory' && tile ? (state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS).length * 2000 + (tile.business?.income || 0)) : 0);
     if (state.resources.money < cost) return state;
 
     state.resources.money -= cost;

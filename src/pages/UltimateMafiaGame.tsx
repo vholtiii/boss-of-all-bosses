@@ -147,6 +147,12 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     capoId: string;
     scope: 'territory';
     pendingNegotiationId?: string;
+    incomingSitdownId?: string;
+    lockedDealType?: any;
+    proposedAmount?: number;
+    proposerLabel?: string;
+    successBonus?: number;
+    targetFamilyOverride?: string;
   } | {
     open: boolean;
     scope: 'family';
@@ -260,6 +266,50 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     playSound('success');
   };
 
+  // Sitdowns minicard handlers (shared between mobile/tab and desktop sidebar mounts)
+  const handleOpenOutgoingSitdown = useCallback((p: any) => {
+    setNegotiationState({
+      open: true,
+      targetQ: p.targetQ,
+      targetR: p.targetR,
+      targetS: p.targetS,
+      capoId: p.capoId,
+      scope: 'territory',
+      pendingNegotiationId: p.id,
+    });
+  }, []);
+  const handleAcceptIncomingSitdown = useCallback((s: any) => {
+    if (s.scope === 'territory' && s.targetQ !== undefined) {
+      const fam = String(s.fromFamily || '');
+      const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
+      setNegotiationState({
+        open: true,
+        scope: 'territory',
+        targetQ: s.targetQ,
+        targetR: s.targetR,
+        targetS: s.targetS,
+        capoId: '',
+        incomingSitdownId: s.id,
+        lockedDealType: s.proposedDeal,
+        proposedAmount: s.proposedAmount,
+        successBonus: s.successBonus,
+        targetFamilyOverride: s.fromFamily,
+        proposerLabel: s.fromCapoName ? `${s.fromCapoName} (${famLabel})` : famLabel,
+      });
+    } else {
+      setNegotiationState({
+        open: true,
+        scope: 'family',
+        targetFamily: s.fromFamily,
+        incomingSitdownId: s.id,
+        successBonus: s.successBonus,
+      });
+    }
+  }, []);
+  const handleDeclineIncomingSitdown = useCallback((s: any) => {
+    performAction({ type: 'decline_incoming_sitdown', sitdownId: s.id });
+  }, [performAction]);
+
   const mobileTabs = [
     {
       id: 'map',
@@ -316,7 +366,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       id: 'intel',
       label: 'Intel',
       icon: <Eye className="h-4 w-4" />,
-      content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} onHighlightFamily={setHighlightedFamily} highlightedFamily={highlightedFamily} onSelectUnit={selectUnit} />
+      content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} onHighlightFamily={setHighlightedFamily} highlightedFamily={highlightedFamily} onSelectUnit={selectUnit} onOpenOutgoingSitdown={handleOpenOutgoingSitdown} onAcceptIncomingSitdown={handleAcceptIncomingSitdown} onDeclineIncomingSitdown={handleDeclineIncomingSitdown} />
     },
   ];
 
@@ -497,7 +547,19 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   );
 
   const rightSidebar = (
-    <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} onHighlightFamily={setHighlightedFamily} highlightedFamily={highlightedFamily} onSelectUnit={selectUnit} />
+    <RightSidePanel
+      gameState={gameState}
+      onEventChoice={handleEventChoice}
+      onAction={handleAction}
+      onHighlightSupplyNode={setBossHighlightHex}
+      highlightedSupplyHex={bossHighlightHex}
+      onHighlightFamily={setHighlightedFamily}
+      highlightedFamily={highlightedFamily}
+      onSelectUnit={selectUnit}
+      onOpenOutgoingSitdown={handleOpenOutgoingSitdown}
+      onAcceptIncomingSitdown={handleAcceptIncomingSitdown}
+      onDeclineIncomingSitdown={handleDeclineIncomingSitdown}
+    />
   );
 
   const topBar = (
@@ -1562,14 +1624,14 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
           const tile = gameState.hexMap.find((t: any) => t.q === negotiationState.targetQ && t.r === negotiationState.targetR && t.s === negotiationState.targetS);
           if (!tile) return null;
           const capo = gameState.deployedUnits.find((u: any) => u.id === negotiationState.capoId);
-          // For pending negotiations, capo may be anywhere or even dead — use pending data as fallback
-          const pendingEntry = (negotiationState as any).pendingNegotiationId 
-            ? ((gameState as any).pendingNegotiations || []).find((p: any) => p.id === (negotiationState as any).pendingNegotiationId) 
+          const pendingEntry = (negotiationState as any).pendingNegotiationId
+            ? ((gameState as any).pendingNegotiations || []).find((p: any) => p.id === (negotiationState as any).pendingNegotiationId)
             : null;
           const capoName = capo?.name || pendingEntry?.capoName || 'Capo';
           const capoPersonality = capo?.personality || pendingEntry?.capoPersonality || 'diplomat';
-          const enemyFamily = tile.controllingFamily;
+          const enemyFamily = (negotiationState as any).targetFamilyOverride || tile.controllingFamily;
           const enemyUnitsOnHex = gameState.deployedUnits.filter((u: any) => u.family === enemyFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+          const incomingSitdownId = (negotiationState as any).incomingSitdownId;
           return (
             <NegotiationDialog
               open={negotiationState.open}
@@ -1577,16 +1639,25 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               scope="territory"
               negotiationUsedThisTurn={((gameState as any).capoNegotiationCooldown || 0) > 0}
               onNegotiate={(type, extraData) => {
-                performAction({
-                  type: 'negotiate',
-                  negotiationType: type,
-                  targetQ: negotiationState.targetQ,
-                  targetR: negotiationState.targetR,
-                  targetS: negotiationState.targetS,
-                  capoId: negotiationState.capoId,
-                  pendingNegotiationId: (negotiationState as any).pendingNegotiationId,
-                  extraData,
-                });
+                if (incomingSitdownId) {
+                  performAction({
+                    type: 'accept_incoming_sitdown',
+                    sitdownId: incomingSitdownId,
+                    negotiationType: type,
+                    extraData,
+                  });
+                } else {
+                  performAction({
+                    type: 'negotiate',
+                    negotiationType: type,
+                    targetQ: negotiationState.targetQ,
+                    targetR: negotiationState.targetR,
+                    targetS: negotiationState.targetS,
+                    capoId: negotiationState.capoId,
+                    pendingNegotiationId: (negotiationState as any).pendingNegotiationId,
+                    extraData,
+                  });
+                }
                 setNegotiationState(null);
               }}
               capoName={capoName}
@@ -1597,6 +1668,10 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               enemyStrength={enemyUnitsOnHex.length}
               hexIncome={tile.business?.income || 0}
               treacheryTurnsRemaining={(gameState as any).treacheryDebuff?.turnsRemaining || 0}
+              lockedDealType={(negotiationState as any).lockedDealType}
+              proposedAmount={(negotiationState as any).proposedAmount}
+              proposerLabel={(negotiationState as any).proposerLabel}
+              successBonus={(negotiationState as any).successBonus || 0}
             />
           );
         } else {
