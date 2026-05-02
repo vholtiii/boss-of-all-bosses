@@ -2041,6 +2041,11 @@ export const useEnhancedMafiaGameState = (
         if (existing) {
           return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '📩 Already Pending', message: 'Word has already been sent to this territory.' }] };
         }
+        // Hard cap: 1 outstanding Send Word per capo
+        const capoBusy = (prev.pendingNegotiations || []).some(p => p.capoId === unit.id);
+        if (capoBusy) {
+          return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '📩 Capo Already Engaged', message: `${unit.name || 'This capo'} is already in a sitdown. Wait for it to resolve.` }] };
+        }
         const newPending: PendingNegotiation = {
           id: `pn-${Date.now()}-${Math.random().toString(36).slice(2)}`,
           capoId: unit.id,
