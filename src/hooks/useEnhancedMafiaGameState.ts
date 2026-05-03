@@ -7791,6 +7791,7 @@ export const useEnhancedMafiaGameState = (
           successChance = Math.max(5, Math.min(95, successChance));
           
           newState.resources.money -= config.cost;
+          newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
           
           if (Math.random() * 100 < successChance) {
             const contract: BribeContract = {
@@ -7854,6 +7855,7 @@ export const useEnhancedMafiaGameState = (
           else if (isFortified) duration = HITMAN_FORTIFIED_TURNS;
           
           newState.resources.money -= HITMAN_CONTRACT_COST;
+          newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
           newState.hitmanContracts = [...(newState.hitmanContracts || []), {
             id: `hitman-${Date.now()}-${Math.random().toString(36).substr(2,4)}`,
             targetUnitId,
