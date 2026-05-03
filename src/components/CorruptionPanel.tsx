@@ -13,6 +13,8 @@ interface CorruptionPanelProps {
   reputation: number;
   heat: number;
   gamePhase: number;
+  actionsRemaining?: number;
+  phaseIsAction?: boolean;
   onBribe: (tier: BribeTier, targetFamily?: string) => void;
 }
 
@@ -24,7 +26,7 @@ const tierIcons: Record<BribeTier, React.ReactNode> = {
 };
 
 const CorruptionPanel: React.FC<CorruptionPanelProps> = ({
-  money, activeBribes, rivalFamilies, reputation, heat, gamePhase, onBribe
+  money, activeBribes, rivalFamilies, reputation, heat, gamePhase, actionsRemaining = 1, phaseIsAction = true, onBribe
 }) => {
   const [selectedTarget, setSelectedTarget] = useState<string>(rivalFamilies[0] || '');
 
