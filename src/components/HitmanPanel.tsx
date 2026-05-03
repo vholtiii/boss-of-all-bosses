@@ -15,6 +15,8 @@ interface HitmanPanelProps {
   currentTurn: number;
   gamePhase: number;
   activeBribes?: BribeContract[];
+  actionsRemaining?: number;
+  phaseIsAction?: boolean;
   onHire: (targetUnitId: string, targetFamily: string) => void;
 }
 
@@ -47,13 +49,14 @@ const TIER_META: Record<BlindTier, { label: string; chip: string; icon: React.Re
 const ALL_FAMILIES = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
 
 const HitmanPanel: React.FC<HitmanPanelProps> = ({
-  hitmanContracts, deployedUnits, playerFamily, money, currentTurn, gamePhase, activeBribes = [], onHire
+  hitmanContracts, deployedUnits, playerFamily, money, currentTurn, gamePhase, activeBribes = [], actionsRemaining = 1, phaseIsAction = true, onHire
 }) => {
   const [selecting, setSelecting] = useState(false);
   const [tab, setTab] = useState<'known' | 'blind'>('known');
 
   const phaseLocked = gamePhase < 3;
-  const canHire = !phaseLocked && hitmanContracts.length < MAX_HITMEN && money >= HITMAN_CONTRACT_COST;
+  const noActions = !phaseIsAction || actionsRemaining <= 0;
+  const canHire = !phaseLocked && hitmanContracts.length < MAX_HITMEN && money >= HITMAN_CONTRACT_COST && !noActions;
 
   // Build blind eligibility: family → highest-tier intel source
   const blindEligibility = new Map<string, BlindSource>();
@@ -158,7 +161,7 @@ const HitmanPanel: React.FC<HitmanPanelProps> = ({
           </h4>
         </div>
         <p className="text-[10px] text-muted-foreground mb-2">
-          ${HITMAN_CONTRACT_COST.toLocaleString()} · No heat · No bonuses · 3-5 turn ETA · 50% refund on failure
+          ${HITMAN_CONTRACT_COST.toLocaleString()} · 1 action · No heat · No bonuses · 3-5 turn ETA · 50% refund on failure
         </p>
 
         {phaseLocked ? (
@@ -174,7 +177,7 @@ const HitmanPanel: React.FC<HitmanPanelProps> = ({
             onClick={() => setSelecting(true)}
           >
             <Crosshair className="h-3 w-3 mr-1" />
-            {hitmanContracts.length >= MAX_HITMEN ? 'Max Contracts' : money < HITMAN_CONTRACT_COST ? 'Not Enough Money' : 'Select Target'}
+            {hitmanContracts.length >= MAX_HITMEN ? 'Max Contracts' : noActions ? (phaseIsAction ? 'No actions left' : 'Action step only') : money < HITMAN_CONTRACT_COST ? 'Not Enough Money' : 'Select Target'}
           </Button>
         ) : (
           <div className="space-y-2">
