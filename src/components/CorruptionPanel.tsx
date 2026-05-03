@@ -124,7 +124,7 @@ const CorruptionPanel: React.FC<CorruptionPanelProps> = ({
                     'font-medium',
                     modSuccess >= 60 ? 'text-green-400' : modSuccess >= 30 ? 'text-yellow-400' : 'text-destructive'
                   )}>{modSuccess}%</span>
-                  {' · '}{config.duration} turns
+                  {' · '}{config.duration} turns · 1 action
                 </div>
                 {tierPhaseLocked ? (
                   <span className="text-[10px] text-muted-foreground italic">🔒 Phase {config.tier === 'patrol_officer' ? '2' : '3'}</span>
@@ -133,10 +133,11 @@ const CorruptionPanel: React.FC<CorruptionPanelProps> = ({
                     size="sm"
                     variant="outline"
                     className="h-7 text-xs"
-                    disabled={!canAfford || alreadyActive}
+                    disabled={!canAfford || alreadyActive || !phaseIsAction || actionsRemaining <= 0}
+                    title={!phaseIsAction ? 'Available in Action step' : actionsRemaining <= 0 ? 'No actions left' : undefined}
                     onClick={() => onBribe(config.tier, needsTarget ? selectedTarget : undefined)}
                   >
-                    {alreadyActive ? 'Active' : 'Bribe'}
+                    {alreadyActive ? 'Active' : !phaseIsAction ? 'Action step' : actionsRemaining <= 0 ? 'No actions' : 'Bribe'}
                   </Button>
                 )}
               </div>
