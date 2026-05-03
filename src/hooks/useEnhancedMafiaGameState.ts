@@ -7443,7 +7443,7 @@ export const useEnhancedMafiaGameState = (
         }
         case 'recruit_soldiers': {
           // Buy Mercenary — expensive, combat-ready, hurts loyalty
-          if (newState.tacticalActionsRemaining <= 0) return newState;
+          if (newState.actionsRemaining <= 0) return newState;
           const respectDiscount = (newState.reputation.respect / 100) * 0.3;
           const cost = Math.floor(SOLDIER_COST * (1 - discount) * (1 - respectDiscount));
           // District control bonus: Bronx -$750 recruit discount
@@ -7452,7 +7452,7 @@ export const useEnhancedMafiaGameState = (
           if (newState.resources.money >= finalCost) {
             newState.resources.money -= finalCost;
             newState.resources.soldiers += 1;
-            newState.tacticalActionsRemaining -= 1;
+            newState.actionsRemaining -= 1;
             // Mercenary loyalty penalty
             newState.reputation.loyalty = Math.max(0, newState.reputation.loyalty - 10);
             // Deploy mercenary at HQ
@@ -7482,7 +7482,7 @@ export const useEnhancedMafiaGameState = (
         }
         case 'recruit_local_soldier': {
           // Recruit Loyal — cheap, territory-gated, boosts loyalty, lower combat stats
-          if (newState.tacticalActionsRemaining <= 0) return newState;
+          if (newState.actionsRemaining <= 0) return newState;
           const playerTerritoryCount = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).length;
           if (playerTerritoryCount < RECRUIT_TERRITORY_REQUIREMENT) {
             newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -7499,7 +7499,7 @@ export const useEnhancedMafiaGameState = (
           if (newState.resources.money >= finalCost2) {
             newState.resources.money -= finalCost2;
             newState.resources.soldiers += 1;
-            newState.tacticalActionsRemaining -= 1;
+            newState.actionsRemaining -= 1;
             // Loyal recruit boosts loyalty
             newState.reputation.loyalty = Math.min(100, newState.reputation.loyalty + 2);
             // Deploy at HQ with recruited flag and lower training
