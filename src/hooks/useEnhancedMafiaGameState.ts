@@ -7200,7 +7200,7 @@ export const useEnhancedMafiaGameState = (
       const discount = bonuses.recruitmentDiscount / 100;
       
       // Actions that consume the action budget
-      const actionPhaseActions = ['hit_territory', 'extort_territory', 'sabotage_hex', 'claim_territory', 'negotiate'];
+      const actionPhaseActions = ['hit_territory', 'extort_territory', 'sabotage_hex', 'claim_territory', 'negotiate', 'recruit_soldiers', 'recruit_local_soldier', 'launder_money', 'launder', 'bribe_corruption', 'hire_hitman'];
       if (actionPhaseActions.includes(action.type) && newState.actionsRemaining <= 0) {
         newState.pendingNotifications = [...newState.pendingNotifications, {
           type: 'warning' as const, title: '⚠️ No Actions Remaining',
