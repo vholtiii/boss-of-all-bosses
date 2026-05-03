@@ -9026,7 +9026,23 @@ export const useEnhancedMafiaGameState = (
 
     if (Math.random() < chance) {
       state.flippedSoldiers = [...(state.flippedSoldiers || []), { unitId: target.id, family: targetFamily, flippedByFamily: state.playerFamily, hqQ: targetQ, hqR: targetR, hqS: targetS }];
-      state.pendingNotifications = [...state.pendingNotifications, { type: 'success', title: '🐀 Soldier Flipped!', message: `A ${targetFamily} soldier has been turned! HQ defense -10%.` }];
+      // Informant intel: scout the flipped soldier's current hex for SCOUT_DURATION turns.
+      const flippedHexEnemies = state.deployedUnits.filter(u => u.q === target.q && u.r === target.r && u.s === target.s && u.family !== state.playerFamily).length;
+      const flippedTile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
+      state.scoutedHexes = state.scoutedHexes.filter(s => !(s.q === target.q && s.r === target.r && s.s === target.s));
+      state.scoutedHexes.push({
+        q: target.q, r: target.r, s: target.s,
+        scoutedTurn: state.turn, turnsRemaining: SCOUT_DURATION,
+        freshUntilTurn: state.turn + 1,
+        enemySoldierCount: flippedHexEnemies,
+        enemyFamily: targetFamily,
+        businessType: flippedTile?.business?.type,
+        businessIncome: flippedTile?.business?.income,
+        isFortified: (state.fortifiedHexes || []).some(f => f.q === target.q && f.r === target.r && f.s === target.s && f.family === targetFamily) || undefined,
+        hasSafehouse: (state.safehouses || []).some(s => s.q === target.q && s.r === target.r && s.s === target.s) || undefined,
+      });
+      state.pendingNotifications = [...state.pendingNotifications, { type: 'success', title: '🐀 Soldier Flipped!', message: `A ${targetFamily} soldier has been turned! HQ defense -10%. Informant feeds you intel from their position.` }];
+    } else {
     } else {
       state.resources.influence = Math.max(0, (state.resources.influence || 0) - FLIP_SOLDIER_FAIL_INFLUENCE_LOSS);
       targetStats.loyalty = Math.min(100, targetStats.loyalty + 10);
