@@ -7059,17 +7059,8 @@ export const useEnhancedMafiaGameState = (
         consequences: [], turn: state.turn, expires: state.turn + 1,
       });
 
-      // 3. Informant Tip
-      eligibleEvents.push({
-        id: `event-${Date.now()}-informant`, type: 'random' as const,
-        title: 'Informant Tip',
-        description: 'A street contact offers to reveal enemy positions.',
-        choices: [
-          { id: 'pay', text: `Pay ($${Math.floor(5000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(5000 * costMult), description: 'Intel cost' },{ type: 'reputation' as const, value: 3, description: 'Better intel' }] },
-          { id: 'ignore', text: 'Ignore the tip', consequences: [] },
-        ],
-        consequences: [], turn: state.turn, expires: state.turn + 1,
-      });
+      // 3. (removed) Informant Tip — intel must come from Scout / Bribe / Flip / Safehouse capture only.
+
 
       // 4. Weapons Shipment (money > 10k)
       if (money > 10000) {
