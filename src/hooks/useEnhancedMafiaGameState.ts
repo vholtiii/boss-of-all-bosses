@@ -9043,7 +9043,6 @@ export const useEnhancedMafiaGameState = (
       });
       state.pendingNotifications = [...state.pendingNotifications, { type: 'success', title: '🐀 Soldier Flipped!', message: `A ${targetFamily} soldier has been turned! HQ defense -10%. Informant feeds you intel from their position.` }];
     } else {
-    } else {
       state.resources.influence = Math.max(0, (state.resources.influence || 0) - FLIP_SOLDIER_FAIL_INFLUENCE_LOSS);
       targetStats.loyalty = Math.min(100, targetStats.loyalty + 10);
       state.pendingNotifications = [...state.pendingNotifications, { type: 'error', title: '🚨 Flip Failed!', message: `Attempt discovered! -${FLIP_SOLDIER_FAIL_INFLUENCE_LOSS} Influence. Target loyalty +10.` }];
