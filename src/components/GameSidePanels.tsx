@@ -598,7 +598,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
 
         {/* ── RECRUITMENT (tactical phase only) ── */}
         <CollapsibleSection
-          title="Recruitment & Tactical"
+          title="Tactical"
           icon={<Users className="h-4 w-4" />}
           isOpen={openSections.has('recruitment')}
           onToggle={() => toggle('recruitment')}
