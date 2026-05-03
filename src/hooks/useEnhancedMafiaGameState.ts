@@ -8430,7 +8430,8 @@ export const useEnhancedMafiaGameState = (
           // Legacy business actions removed — hex-based system handles these
           break;
 
-        case 'launder': {
+        case 'launder':
+        case 'launder_money': {
           // Laundering: convert dirty money to clean via legal hex businesses
           const legalHexBusinesses = Object.values(newState.hexMap).filter(
             (t: any) => t.controllingFamily === newState.playerFamily && t.business?.isLegal
@@ -8442,6 +8443,7 @@ export const useEnhancedMafiaGameState = (
           if (amountToLaunder > 0) {
             newState.finances.dirtyMoney -= amountToLaunder;
             newState.finances.cleanMoney += amountToLaunder;
+            newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
             // Do NOT add to resources.money — income already added by processEconomy
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'success' as const, title: '🧺 Money Laundered',
