@@ -7059,17 +7059,8 @@ export const useEnhancedMafiaGameState = (
         consequences: [], turn: state.turn, expires: state.turn + 1,
       });
 
-      // 3. Informant Tip
-      eligibleEvents.push({
-        id: `event-${Date.now()}-informant`, type: 'random' as const,
-        title: 'Informant Tip',
-        description: 'A street contact offers to reveal enemy positions.',
-        choices: [
-          { id: 'pay', text: `Pay ($${Math.floor(5000 * costMult).toLocaleString()})`, consequences: [{ type: 'money' as const, value: -Math.floor(5000 * costMult), description: 'Intel cost' },{ type: 'reputation' as const, value: 3, description: 'Better intel' }] },
-          { id: 'ignore', text: 'Ignore the tip', consequences: [] },
-        ],
-        consequences: [], turn: state.turn, expires: state.turn + 1,
-      });
+      // 3. (removed) Informant Tip — intel must come from Scout / Bribe / Flip / Safehouse capture only.
+
 
       // 4. Weapons Shipment (money > 10k)
       if (money > 10000) {
@@ -7200,7 +7191,7 @@ export const useEnhancedMafiaGameState = (
       const discount = bonuses.recruitmentDiscount / 100;
       
       // Actions that consume the action budget
-      const actionPhaseActions = ['hit_territory', 'extort_territory', 'sabotage_hex', 'claim_territory', 'negotiate'];
+      const actionPhaseActions = ['hit_territory', 'extort_territory', 'sabotage_hex', 'claim_territory', 'negotiate', 'recruit_soldiers', 'recruit_local_soldier', 'launder_money', 'launder', 'bribe_corruption', 'hire_hitman'];
       if (actionPhaseActions.includes(action.type) && newState.actionsRemaining <= 0) {
         newState.pendingNotifications = [...newState.pendingNotifications, {
           type: 'warning' as const, title: '⚠️ No Actions Remaining',
@@ -7443,7 +7434,7 @@ export const useEnhancedMafiaGameState = (
         }
         case 'recruit_soldiers': {
           // Buy Mercenary — expensive, combat-ready, hurts loyalty
-          if (newState.tacticalActionsRemaining <= 0) return newState;
+          if (newState.actionsRemaining <= 0) return newState;
           const respectDiscount = (newState.reputation.respect / 100) * 0.3;
           const cost = Math.floor(SOLDIER_COST * (1 - discount) * (1 - respectDiscount));
           // District control bonus: Bronx -$750 recruit discount
@@ -7452,7 +7443,7 @@ export const useEnhancedMafiaGameState = (
           if (newState.resources.money >= finalCost) {
             newState.resources.money -= finalCost;
             newState.resources.soldiers += 1;
-            newState.tacticalActionsRemaining -= 1;
+            newState.actionsRemaining -= 1;
             // Mercenary loyalty penalty
             newState.reputation.loyalty = Math.max(0, newState.reputation.loyalty - 10);
             // Deploy mercenary at HQ
@@ -7482,7 +7473,7 @@ export const useEnhancedMafiaGameState = (
         }
         case 'recruit_local_soldier': {
           // Recruit Loyal — cheap, territory-gated, boosts loyalty, lower combat stats
-          if (newState.tacticalActionsRemaining <= 0) return newState;
+          if (newState.actionsRemaining <= 0) return newState;
           const playerTerritoryCount = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).length;
           if (playerTerritoryCount < RECRUIT_TERRITORY_REQUIREMENT) {
             newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -7499,7 +7490,7 @@ export const useEnhancedMafiaGameState = (
           if (newState.resources.money >= finalCost2) {
             newState.resources.money -= finalCost2;
             newState.resources.soldiers += 1;
-            newState.tacticalActionsRemaining -= 1;
+            newState.actionsRemaining -= 1;
             // Loyal recruit boosts loyalty
             newState.reputation.loyalty = Math.min(100, newState.reputation.loyalty + 2);
             // Deploy at HQ with recruited flag and lower training
@@ -7791,6 +7782,7 @@ export const useEnhancedMafiaGameState = (
           successChance = Math.max(5, Math.min(95, successChance));
           
           newState.resources.money -= config.cost;
+          newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
           
           if (Math.random() * 100 < successChance) {
             const contract: BribeContract = {
@@ -7854,6 +7846,7 @@ export const useEnhancedMafiaGameState = (
           else if (isFortified) duration = HITMAN_FORTIFIED_TURNS;
           
           newState.resources.money -= HITMAN_CONTRACT_COST;
+          newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
           newState.hitmanContracts = [...(newState.hitmanContracts || []), {
             id: `hitman-${Date.now()}-${Math.random().toString(36).substr(2,4)}`,
             targetUnitId,
@@ -8430,7 +8423,8 @@ export const useEnhancedMafiaGameState = (
           // Legacy business actions removed — hex-based system handles these
           break;
 
-        case 'launder': {
+        case 'launder':
+        case 'launder_money': {
           // Laundering: convert dirty money to clean via legal hex businesses
           const legalHexBusinesses = Object.values(newState.hexMap).filter(
             (t: any) => t.controllingFamily === newState.playerFamily && t.business?.isLegal
@@ -8442,6 +8436,7 @@ export const useEnhancedMafiaGameState = (
           if (amountToLaunder > 0) {
             newState.finances.dirtyMoney -= amountToLaunder;
             newState.finances.cleanMoney += amountToLaunder;
+            newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
             // Do NOT add to resources.money — income already added by processEconomy
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'success' as const, title: '🧺 Money Laundered',
@@ -9031,7 +9026,22 @@ export const useEnhancedMafiaGameState = (
 
     if (Math.random() < chance) {
       state.flippedSoldiers = [...(state.flippedSoldiers || []), { unitId: target.id, family: targetFamily, flippedByFamily: state.playerFamily, hqQ: targetQ, hqR: targetR, hqS: targetS }];
-      state.pendingNotifications = [...state.pendingNotifications, { type: 'success', title: '🐀 Soldier Flipped!', message: `A ${targetFamily} soldier has been turned! HQ defense -10%.` }];
+      // Informant intel: scout the flipped soldier's current hex for SCOUT_DURATION turns.
+      const flippedHexEnemies = state.deployedUnits.filter(u => u.q === target.q && u.r === target.r && u.s === target.s && u.family !== state.playerFamily).length;
+      const flippedTile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
+      state.scoutedHexes = state.scoutedHexes.filter(s => !(s.q === target.q && s.r === target.r && s.s === target.s));
+      state.scoutedHexes.push({
+        q: target.q, r: target.r, s: target.s,
+        scoutedTurn: state.turn, turnsRemaining: SCOUT_DURATION,
+        freshUntilTurn: state.turn + 1,
+        enemySoldierCount: flippedHexEnemies,
+        enemyFamily: targetFamily,
+        businessType: flippedTile?.business?.type,
+        businessIncome: flippedTile?.business?.income,
+        isFortified: (state.fortifiedHexes || []).some(f => f.q === target.q && f.r === target.r && f.s === target.s && f.family === targetFamily) || undefined,
+        hasSafehouse: (state.safehouses || []).some(s => s.q === target.q && s.r === target.r && s.s === target.s) || undefined,
+      });
+      state.pendingNotifications = [...state.pendingNotifications, { type: 'success', title: '🐀 Soldier Flipped!', message: `A ${targetFamily} soldier has been turned! HQ defense -10%. Informant feeds you intel from their position.` }];
     } else {
       state.resources.influence = Math.max(0, (state.resources.influence || 0) - FLIP_SOLDIER_FAIL_INFLUENCE_LOSS);
       targetStats.loyalty = Math.min(100, targetStats.loyalty + 10);

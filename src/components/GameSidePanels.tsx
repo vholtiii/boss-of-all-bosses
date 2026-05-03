@@ -566,18 +566,39 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             <ActionButton
               icon={<DollarSign className="h-4 w-4" />}
               label="Launder Money"
-              sublabel={`20% fee`}
-              disabled={gameState.finances.dirtyMoney < 1000 || legalStatus.jailTime > 0}
-              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : gameState.finances.dirtyMoney < 1000 ? 'No dirty money' : undefined}
+              sublabel={`20% fee · 1 action`}
+              disabled={gameState.finances.dirtyMoney < 1000 || legalStatus.jailTime > 0 || gameState.actionsRemaining <= 0}
+              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : gameState.actionsRemaining <= 0 ? 'No actions left' : gameState.finances.dirtyMoney < 1000 ? 'No dirty money' : undefined}
               phaseLocked={actionsLocked}
               onClick={() => onAction({ type: 'launder_money', amount: 10000 })}
+            />
+            <Separator className="my-1" />
+            <ActionButton
+              icon={<Users className="h-4 w-4" />}
+              label="Buy Soldier (Mercenary)"
+              sublabel={totalDiscountPct > 0 ? `$${discountedMercCost.toLocaleString()} · -3 loyalty · 1 action (${totalDiscountPct}% discount applied)` : `$${SOLDIER_COST.toLocaleString()} · -3 loyalty · 1 action`}
+              disabled={resources.money < discountedMercCost || gameState.actionsRemaining <= 0}
+              disabledReason={gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < discountedMercCost ? `Need $${discountedMercCost.toLocaleString()}` : undefined}
+              phaseLocked={actionsLocked}
+              onClick={() => onAction({ type: 'recruit_soldiers', cost: SOLDIER_COST })}
+            />
+            <ActionButton
+              icon={<Users className="h-4 w-4" />}
+              label="Recruit Soldier (Loyal)"
+              sublabel={canRecruit
+                ? (totalDiscountPct > 0 ? `$${discountedRecruitCost} · +2 loyalty · 1 action (${totalDiscountPct}% discount applied)` : `$${LOCAL_SOLDIER_COST} · +2 loyalty · 1 action`)
+                : `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (${playerTerritoryCount} owned)`}
+              disabled={!canRecruit || resources.money < discountedRecruitCost || gameState.actionsRemaining <= 0}
+              disabledReason={gameState.actionsRemaining <= 0 ? 'No actions left' : !canRecruit ? `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (have ${playerTerritoryCount})` : resources.money < discountedRecruitCost ? `Need $${discountedRecruitCost.toLocaleString()}` : undefined}
+              phaseLocked={actionsLocked}
+              onClick={() => onAction({ type: 'recruit_local_soldier' })}
             />
           </div>
         </CollapsibleSection>
 
         {/* ── RECRUITMENT (tactical phase only) ── */}
         <CollapsibleSection
-          title="Recruitment & Tactical"
+          title="Tactical"
           icon={<Users className="h-4 w-4" />}
           isOpen={openSections.has('recruitment')}
           onToggle={() => toggle('recruitment')}
@@ -685,27 +706,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 </div>
               );
             })()}
-            <Separator className="my-1" />
-            <ActionButton
-              icon={<Users className="h-4 w-4" />}
-              label="Buy Soldier (Mercenary)"
-              sublabel={totalDiscountPct > 0 ? `$${discountedMercCost.toLocaleString()} · -3 loyalty · 1 action (${totalDiscountPct}% discount applied)` : `$${SOLDIER_COST.toLocaleString()} · -3 loyalty · 1 action`}
-              disabled={resources.money < discountedMercCost || gameState.tacticalActionsRemaining <= 0}
-              disabledReason={gameState.tacticalActionsRemaining <= 0 ? 'No tactical actions' : resources.money < discountedMercCost ? `Need $${discountedMercCost.toLocaleString()}` : undefined}
-              phaseLocked={!isTacticalPhase}
-              onClick={() => onAction({ type: 'recruit_soldiers', cost: SOLDIER_COST })}
-            />
-            <ActionButton
-              icon={<Users className="h-4 w-4" />}
-              label="Recruit Soldier (Loyal)"
-              sublabel={canRecruit 
-                ? (totalDiscountPct > 0 ? `$${discountedRecruitCost} · +2 loyalty · 1 action (${totalDiscountPct}% discount applied)` : `$${LOCAL_SOLDIER_COST} · +2 loyalty · 1 action`)
-                : `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (${playerTerritoryCount} owned)`}
-              disabled={!canRecruit || resources.money < discountedRecruitCost || gameState.tacticalActionsRemaining <= 0}
-              disabledReason={gameState.tacticalActionsRemaining <= 0 ? 'No tactical actions' : !canRecruit ? `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (have ${playerTerritoryCount})` : resources.money < discountedRecruitCost ? `Need $${discountedRecruitCost.toLocaleString()}` : undefined}
-              phaseLocked={!isTacticalPhase}
-              onClick={() => onAction({ type: 'recruit_local_soldier' })}
-            />
+            {/* Recruitment moved to Economy section (now consumes action tokens, not tactical) */}
           </div>
         </CollapsibleSection>
 
@@ -856,6 +857,8 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               reputation={gameState.reputation.reputation}
               heat={gameState.policeHeat.level}
               gamePhase={(gameState as any).gamePhase || 1}
+              actionsRemaining={gameState.actionsRemaining}
+              phaseIsAction={phase === 'action'}
               onBribe={(tier, targetFamily) => onAction({ type: 'bribe_corruption', tier, targetFamily })}
             />
           )}
@@ -880,6 +883,8 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               currentTurn={gameState.turn}
               gamePhase={(gameState as any).gamePhase || 1}
               activeBribes={gameState.activeBribes || []}
+              actionsRemaining={gameState.actionsRemaining}
+              phaseIsAction={phase === 'action'}
               onHire={(targetUnitId, targetFamily) => onAction({ type: 'hire_hitman', targetUnitId, targetFamily })}
             />
           )}
