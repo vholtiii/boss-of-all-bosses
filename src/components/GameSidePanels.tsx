@@ -685,27 +685,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 </div>
               );
             })()}
-            <Separator className="my-1" />
-            <ActionButton
-              icon={<Users className="h-4 w-4" />}
-              label="Buy Soldier (Mercenary)"
-              sublabel={totalDiscountPct > 0 ? `$${discountedMercCost.toLocaleString()} · -3 loyalty · 1 action (${totalDiscountPct}% discount applied)` : `$${SOLDIER_COST.toLocaleString()} · -3 loyalty · 1 action`}
-              disabled={resources.money < discountedMercCost || gameState.tacticalActionsRemaining <= 0}
-              disabledReason={gameState.tacticalActionsRemaining <= 0 ? 'No tactical actions' : resources.money < discountedMercCost ? `Need $${discountedMercCost.toLocaleString()}` : undefined}
-              phaseLocked={!isTacticalPhase}
-              onClick={() => onAction({ type: 'recruit_soldiers', cost: SOLDIER_COST })}
-            />
-            <ActionButton
-              icon={<Users className="h-4 w-4" />}
-              label="Recruit Soldier (Loyal)"
-              sublabel={canRecruit 
-                ? (totalDiscountPct > 0 ? `$${discountedRecruitCost} · +2 loyalty · 1 action (${totalDiscountPct}% discount applied)` : `$${LOCAL_SOLDIER_COST} · +2 loyalty · 1 action`)
-                : `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (${playerTerritoryCount} owned)`}
-              disabled={!canRecruit || resources.money < discountedRecruitCost || gameState.tacticalActionsRemaining <= 0}
-              disabledReason={gameState.tacticalActionsRemaining <= 0 ? 'No tactical actions' : !canRecruit ? `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (have ${playerTerritoryCount})` : resources.money < discountedRecruitCost ? `Need $${discountedRecruitCost.toLocaleString()}` : undefined}
-              phaseLocked={!isTacticalPhase}
-              onClick={() => onAction({ type: 'recruit_local_soldier' })}
-            />
+            {/* Recruitment moved to Economy section (now consumes action tokens, not tactical) */}
           </div>
         </CollapsibleSection>
 
