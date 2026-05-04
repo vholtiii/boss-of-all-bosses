@@ -1333,6 +1333,11 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                   <p className="text-xs font-semibold text-white">
                     Next: {phaseProgressRows.next.icon} Phase {phaseProgressRows.next.phase} — {phaseProgressRows.next.name}
                   </p>
+                  {phaseProgressRows.earnedWaiting && (
+                    <p className="text-[11px] text-green-400 font-semibold">
+                      ✓ Ready to advance — unlocks Turn {phaseProgressRows.turnFloor} (in {phaseProgressRows.turnFloor - phaseProgressRows.turn} turn{phaseProgressRows.turnFloor - phaseProgressRows.turn === 1 ? '' : 's'})
+                    </p>
+                  )}
                   {phaseProgressRows.hasOrCondition && (
                     <p className="text-[10px] text-amber-400/80 italic">Any one path below unlocks this phase:</p>
                   )}
@@ -1347,6 +1352,16 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                       </div>
                     ))}
                   </div>
+                  {phaseProgressRows.turnFloor > 1 && (
+                    <p className={cn(
+                      "text-[10px] italic",
+                      phaseProgressRows.turnFloorMet ? "text-white/40" : "text-white/60"
+                    )}>
+                      ⏳ {phaseProgressRows.turnFloorMet
+                        ? "Turn floor cleared — focus on requirements above"
+                        : `Earliest: Turn ${phaseProgressRows.turnFloor} (currently ${phaseProgressRows.turn})`}
+                    </p>
+                  )}
                   <p className="text-[10px] text-white/50 pt-1 border-t border-white/10">
                     Unlocks: {phaseProgressRows.next.unlocks.join(', ')}
                   </p>
