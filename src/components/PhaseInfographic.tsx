@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { PHASE_CONFIGS } from '@/types/game-mechanics';
-import { Crown, MapPin, Users, Store, Clock } from 'lucide-react';
+import { Crown, MapPin, Users, Store, Clock, Map as MapIcon } from 'lucide-react';
 
 interface PhaseInfographicProps {
   gamePhase: number;
@@ -15,6 +15,8 @@ interface PhaseInfographicProps {
   playerFamily: string;
   familyBonuses?: any;
 }
+
+const DISTRICT_CONTROL_THRESHOLD = 0.6;
 
 const PhaseInfographic: React.FC<PhaseInfographicProps> = ({
   gamePhase,
@@ -31,10 +33,32 @@ const PhaseInfographic: React.FC<PhaseInfographicProps> = ({
   const businessCount = hexMap?.filter((h: any) => h.controllingFamily === playerFamily && h.business && !h.business.isExtorted).length || 0;
   const respect = resources?.respect || 0;
 
-  // Next phase requirements
-  const nextPhase = gamePhase < 4 ? PHASE_CONFIGS[gamePhase] : null; // gamePhase is 1-indexed, array is 0-indexed so [gamePhase] = next
+  // District control: count districts where player owns >= 60% of hexes; also find best district progress
+  const districtAgg = React.useMemo(() => {
+    const counts: Record<string, { fam: number; total: number }> = {};
+    (hexMap || []).forEach((h: any) => {
+      const d = h?.district;
+      if (!d) return;
+      if (!counts[d]) counts[d] = { fam: 0, total: 0 };
+      counts[d].total++;
+      if (h.controllingFamily === playerFamily) counts[d].fam++;
+    });
+    let controlled = 0;
+    let best: { name: string; pct: number } | null = null;
+    Object.entries(counts).forEach(([name, c]) => {
+      if (c.total === 0) return;
+      const pct = c.fam / c.total;
+      if (pct >= DISTRICT_CONTROL_THRESHOLD) controlled++;
+      if (!best || pct > best.pct) best = { name, pct };
+    });
+    return { controlled, best };
+  }, [hexMap, playerFamily]);
 
-  const requirementRows = nextPhase ? [
+  // Next phase
+  const nextPhase = gamePhase < 4 ? PHASE_CONFIGS[gamePhase] : null;
+
+  // Performance requirement rows (excludes minTurn — that's rendered separately)
+  const perfRows = nextPhase ? [
     nextPhase.requirements.minHexes != null && {
       label: `${nextPhase.requirements.minHexes}+ hexes`,
       icon: <MapPin className="h-3 w-3" />,
@@ -64,12 +88,15 @@ const PhaseInfographic: React.FC<PhaseInfographicProps> = ({
       met: businessCount >= nextPhase.requirements.minBuiltBusinesses,
       helper: 'Build a Restaurant, Store, or Construction via the Build action.',
     },
-    nextPhase.minTurn > 1 && {
-      label: `Turn ${nextPhase.minTurn}+`,
-      icon: <Clock className="h-3 w-3" />,
-      current: turn,
-      target: nextPhase.minTurn,
-      met: turn >= nextPhase.minTurn,
+    nextPhase.requirements.minControlledDistricts != null && {
+      label: `Control ${nextPhase.requirements.minControlledDistricts}+ district (60% of hexes)`,
+      icon: <MapIcon className="h-3 w-3" />,
+      current: districtAgg.controlled,
+      target: nextPhase.requirements.minControlledDistricts,
+      met: districtAgg.controlled >= nextPhase.requirements.minControlledDistricts,
+      helper: districtAgg.best && districtAgg.controlled < (nextPhase.requirements.minControlledDistricts || 1)
+        ? `Closest: ${districtAgg.best.name} at ${Math.round(districtAgg.best.pct * 100)}% (need 60%).`
+        : undefined,
     },
     nextPhase.requirements.minIncomeOrHexesOrRespect && {
       label: `${nextPhase.requirements.minIncomeOrHexesOrRespect.hexes}+ hexes OR $${(nextPhase.requirements.minIncomeOrHexesOrRespect.income / 1000).toFixed(0)}k income OR ${nextPhase.requirements.minIncomeOrHexesOrRespect.respect}+ respect`,
@@ -85,6 +112,11 @@ const PhaseInfographic: React.FC<PhaseInfographicProps> = ({
     },
   ].filter(Boolean) as any[] : [];
 
+  const allPerfMet = perfRows.length > 0 && perfRows.every(r => r.met);
+  const turnFloor = nextPhase?.minTurn ?? 1;
+  const turnFloorMet = turn >= turnFloor;
+  const earnedWaiting = !!nextPhase && allPerfMet && !turnFloorMet;
+
   return (
     <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
       <h4 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
@@ -97,6 +129,7 @@ const PhaseInfographic: React.FC<PhaseInfographicProps> = ({
           const isCompleted = gamePhase > pc.phase;
           const isCurrent = gamePhase === pc.phase;
           const isLocked = gamePhase < pc.phase;
+          const isNextEarned = earnedWaiting && nextPhase?.phase === pc.phase;
           return (
             <React.Fragment key={pc.phase}>
               {i > 0 && (
@@ -110,13 +143,14 @@ const PhaseInfographic: React.FC<PhaseInfographicProps> = ({
                   "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all",
                   isCompleted && "bg-green-500/20 border-green-500 text-green-400",
                   isCurrent && "bg-primary/20 border-primary text-primary shadow-[0_0_8px_hsl(var(--primary)/0.4)] animate-pulse",
-                  isLocked && "bg-muted/30 border-muted-foreground/30 text-muted-foreground/50",
+                  isNextEarned && "bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_8px_hsl(142_76%_36%/0.5)] animate-pulse",
+                  isLocked && !isNextEarned && "bg-muted/30 border-muted-foreground/30 text-muted-foreground/50",
                 )}>
                   <span className="text-[10px]">{pc.icon}</span>
                 </div>
                 <span className={cn(
                   "text-[8px] text-center leading-tight max-w-[60px]",
-                  isCurrent ? "text-primary font-semibold" : isCompleted ? "text-green-400/80" : "text-muted-foreground/50"
+                  isCurrent ? "text-primary font-semibold" : isCompleted ? "text-green-400/80" : isNextEarned ? "text-green-400 font-semibold" : "text-muted-foreground/50"
                 )}>
                   {pc.name.split(' ').slice(0, 2).join(' ')}
                 </span>
@@ -126,13 +160,22 @@ const PhaseInfographic: React.FC<PhaseInfographicProps> = ({
         })}
       </div>
 
-      {/* Requirements for next phase */}
-      {nextPhase && requirementRows.length > 0 && (
+      {/* Earned-waiting banner */}
+      {earnedWaiting && (
+        <div className="rounded-md border border-green-500/40 bg-green-500/10 px-2 py-1.5">
+          <p className="text-[10px] text-green-400 font-semibold">
+            ✓ Ready to advance — unlocks Turn {turnFloor} (in {turnFloor - turn} turn{turnFloor - turn === 1 ? '' : 's'})
+          </p>
+        </div>
+      )}
+
+      {/* Performance requirements */}
+      {nextPhase && perfRows.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-[10px] text-muted-foreground font-medium">
             Next: <span className="text-foreground">{nextPhase.icon} {nextPhase.name}</span>
           </p>
-          {requirementRows.map((r, i) => (
+          {perfRows.map((r, i) => (
             <div key={i}>
               <div className="flex items-center justify-between mb-0.5">
                 <span className={cn(
@@ -156,6 +199,19 @@ const PhaseInfographic: React.FC<PhaseInfographicProps> = ({
             </div>
           ))}
         </div>
+      )}
+
+      {/* Turn floor — visually distinct, separate from perf bars */}
+      {nextPhase && turnFloor > 1 && (
+        <p className={cn(
+          "text-[9px] flex items-center gap-1 italic",
+          turnFloorMet ? "text-muted-foreground/60" : "text-muted-foreground"
+        )}>
+          <Clock className="h-3 w-3" />
+          {turnFloorMet
+            ? `Turn floor cleared — focus on requirements above`
+            : `Earliest: Turn ${turnFloor} (currently ${turn})`}
+        </p>
       )}
 
       {gamePhase >= 4 && (

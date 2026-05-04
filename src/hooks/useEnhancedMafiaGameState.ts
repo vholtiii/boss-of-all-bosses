@@ -1360,6 +1360,18 @@ export const useEnhancedMafiaGameState = (
       ? state.lastTurnIncome
       : (state.aiOpponents.find(o => o.family === family)?.resources.lastTurnIncome || 0);
 
+    // Count districts where this family controls >= 60% of the district's hexes
+    const DISTRICT_CTRL = 0.6;
+    const districtCounts: Record<string, { fam: number; total: number }> = {};
+    state.hexMap.forEach(t => {
+      const d = (t as any).district;
+      if (!d) return;
+      if (!districtCounts[d]) districtCounts[d] = { fam: 0, total: 0 };
+      districtCounts[d].total++;
+      if (t.controllingFamily === family) districtCounts[d].fam++;
+    });
+    const controlledDistricts = Object.values(districtCounts).filter(d => d.total > 0 && d.fam / d.total >= DISTRICT_CTRL).length;
+
     // Check from highest phase down
     for (let p = 3; p >= 0; p--) {
       const cfg = PHASE_CONFIGS[p];
@@ -1369,6 +1381,7 @@ export const useEnhancedMafiaGameState = (
       if (reqs.minRespect && respect < reqs.minRespect) continue;
       if (reqs.minCapos && capoCount < reqs.minCapos) continue;
       if (reqs.minBuiltBusinesses && builtBusinessCount < reqs.minBuiltBusinesses) continue;
+      if (reqs.minControlledDistricts && controlledDistricts < reqs.minControlledDistricts) continue;
       if (reqs.minIncomeOrHexesOrRespect) {
         const or = reqs.minIncomeOrHexesOrRespect;
         if (hexCount < or.hexes && income < or.income && respect < or.respect) continue;
@@ -1376,6 +1389,42 @@ export const useEnhancedMafiaGameState = (
       return cfg.phase;
     }
     return 1;
+  };
+
+  // Returns true if the family meets every PERFORMANCE requirement for the next phase
+  // (ignoring the minTurn floor). Used to detect "earned, waiting on turn" state.
+  const meetsNextPhasePerfReqs = (state: EnhancedMafiaGameState, family: string): boolean => {
+    const isPlayer = family === state.playerFamily;
+    const currentPhase = isPlayer ? (state.gamePhase || 1) : (state.aiOpponents.find(o => o.family === family)?.resources.cachedPhase || 1);
+    if (currentPhase >= 4) return false;
+    const cfg = PHASE_CONFIGS[currentPhase]; // next phase config
+    if (!cfg) return false;
+    const reqs = cfg.requirements;
+    const hexCount = state.hexMap.filter(t => t.controllingFamily === family).length;
+    const respect = isPlayer ? state.reputation.respect : (state.aiOpponents.find(o => o.family === family)?.resources.respect || 0);
+    const capoCount = state.deployedUnits.filter(u => u.family === family && u.type === 'capo').length;
+    const builtBusinessCount = state.hexMap.filter(t => t.controllingFamily === family && t.business && !t.business.isExtorted).length;
+    const income = isPlayer ? state.lastTurnIncome : (state.aiOpponents.find(o => o.family === family)?.resources.lastTurnIncome || 0);
+    const DISTRICT_CTRL = 0.6;
+    const districtCounts: Record<string, { fam: number; total: number }> = {};
+    state.hexMap.forEach(t => {
+      const d = (t as any).district;
+      if (!d) return;
+      if (!districtCounts[d]) districtCounts[d] = { fam: 0, total: 0 };
+      districtCounts[d].total++;
+      if (t.controllingFamily === family) districtCounts[d].fam++;
+    });
+    const controlledDistricts = Object.values(districtCounts).filter(d => d.total > 0 && d.fam / d.total >= DISTRICT_CTRL).length;
+    if (reqs.minHexes && hexCount < reqs.minHexes) return false;
+    if (reqs.minRespect && respect < reqs.minRespect) return false;
+    if (reqs.minCapos && capoCount < reqs.minCapos) return false;
+    if (reqs.minBuiltBusinesses && builtBusinessCount < reqs.minBuiltBusinesses) return false;
+    if (reqs.minControlledDistricts && controlledDistricts < reqs.minControlledDistricts) return false;
+    if (reqs.minIncomeOrHexesOrRespect) {
+      const or = reqs.minIncomeOrHexesOrRespect;
+      if (hexCount < or.hexes && income < or.income && respect < or.respect) return false;
+    }
+    return true;
   };
 
   const updateGamePhase = (state: EnhancedMafiaGameState) => {
@@ -1390,6 +1439,21 @@ export const useEnhancedMafiaGameState = (
         title: `${cfg.icon} Phase ${newPhase}: ${cfg.name}`,
         message: `New abilities unlocked: ${cfg.unlocks.join(', ')}`,
       }];
+    } else if ((state.gamePhase || 1) < 4) {
+      // Detect "earned, waiting on turn floor" — fire one-time info notification
+      const nextCfg = PHASE_CONFIGS[state.gamePhase || 1];
+      if (nextCfg && state.turn < nextCfg.minTurn && meetsNextPhasePerfReqs(state, state.playerFamily)) {
+        const flagKey = `phaseEarnedNotified_${nextCfg.phase}`;
+        if (!(state as any)[flagKey]) {
+          (state as any)[flagKey] = true;
+          const turnsLeft = nextCfg.minTurn - state.turn;
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'info' as const,
+            title: `${nextCfg.icon} Phase ${nextCfg.phase} Earned`,
+            message: `You've met all requirements for ${nextCfg.name}. It will unlock on Turn ${nextCfg.minTurn} (${turnsLeft} turn${turnsLeft === 1 ? '' : 's'}).`,
+          }];
+        }
+      }
     }
   };
 

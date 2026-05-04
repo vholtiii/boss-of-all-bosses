@@ -1268,20 +1268,30 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     const playerCapos = gameState.units?.[config.family]?.capos?.length ?? 0;
     const playerBuilt = gameState.hexMap?.filter((h: any) => h.controllingFamily === config.family && h.business && !h.business.isExtorted).length ?? 0;
     const playerIncome = gameState.lastTurnIncome ?? 0;
+    const districtCounts: Record<string, { fam: number; total: number }> = {};
+    (gameState.hexMap || []).forEach((h: any) => {
+      const d = h?.district; if (!d) return;
+      if (!districtCounts[d]) districtCounts[d] = { fam: 0, total: 0 };
+      districtCounts[d].total++;
+      if (h.controllingFamily === config.family) districtCounts[d].fam++;
+    });
+    const playerControlledDistricts = Object.values(districtCounts).filter(d => d.total > 0 && d.fam / d.total >= 0.6).length;
     const reqs = next.requirements;
     const rows: { label: string; current: number; target: number; met: boolean }[] = [];
-    rows.push({ label: `Turn ${next.minTurn}+`, current: gameState.turn, target: next.minTurn, met: gameState.turn >= next.minTurn });
     if (reqs.minHexes) rows.push({ label: `${reqs.minHexes}+ hexes`, current: playerHexes, target: reqs.minHexes, met: playerHexes >= reqs.minHexes });
     if (reqs.minRespect) rows.push({ label: `${reqs.minRespect}+ respect`, current: playerRespect, target: reqs.minRespect, met: playerRespect >= reqs.minRespect });
     if (reqs.minCapos) rows.push({ label: `${reqs.minCapos}+ capos`, current: playerCapos, target: reqs.minCapos, met: playerCapos >= reqs.minCapos });
     if (reqs.minBuiltBusinesses) rows.push({ label: `${reqs.minBuiltBusinesses}+ legal business built`, current: playerBuilt, target: reqs.minBuiltBusinesses, met: playerBuilt >= reqs.minBuiltBusinesses });
+    if (reqs.minControlledDistricts) rows.push({ label: `Control ${reqs.minControlledDistricts}+ district (60%)`, current: playerControlledDistricts, target: reqs.minControlledDistricts, met: playerControlledDistricts >= reqs.minControlledDistricts });
     if (reqs.minIncomeOrHexesOrRespect) {
       const or = reqs.minIncomeOrHexesOrRespect;
       rows.push({ label: `${or.hexes}+ hexes`, current: playerHexes, target: or.hexes, met: playerHexes >= or.hexes });
       rows.push({ label: `$${(or.income/1000).toFixed(0)}k+ income`, current: playerIncome, target: or.income, met: playerIncome >= or.income });
       rows.push({ label: `${or.respect}+ respect`, current: playerRespect, target: or.respect, met: playerRespect >= or.respect });
     }
-    return { next, rows, hasOrCondition: !!reqs.minIncomeOrHexesOrRespect };
+    const turnFloorMet = gameState.turn >= next.minTurn;
+    const allPerfMet = rows.length > 0 && rows.every(r => r.met);
+    return { next, rows, hasOrCondition: !!reqs.minIncomeOrHexesOrRespect, turnFloor: next.minTurn, turn: gameState.turn, turnFloorMet, earnedWaiting: allPerfMet && !turnFloorMet };
   }, [gp, gameState.turn, gameState.hexMap, gameState.resources?.respect, gameState.units, gameState.lastTurnIncome, config.family]);
 
   const deselectUnit = () => {
@@ -1323,6 +1333,11 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                   <p className="text-xs font-semibold text-white">
                     Next: {phaseProgressRows.next.icon} Phase {phaseProgressRows.next.phase} — {phaseProgressRows.next.name}
                   </p>
+                  {phaseProgressRows.earnedWaiting && (
+                    <p className="text-[11px] text-green-400 font-semibold">
+                      ✓ Ready to advance — unlocks Turn {phaseProgressRows.turnFloor} (in {phaseProgressRows.turnFloor - phaseProgressRows.turn} turn{phaseProgressRows.turnFloor - phaseProgressRows.turn === 1 ? '' : 's'})
+                    </p>
+                  )}
                   {phaseProgressRows.hasOrCondition && (
                     <p className="text-[10px] text-amber-400/80 italic">Any one path below unlocks this phase:</p>
                   )}
@@ -1337,6 +1352,16 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                       </div>
                     ))}
                   </div>
+                  {phaseProgressRows.turnFloor > 1 && (
+                    <p className={cn(
+                      "text-[10px] italic",
+                      phaseProgressRows.turnFloorMet ? "text-white/40" : "text-white/60"
+                    )}>
+                      ⏳ {phaseProgressRows.turnFloorMet
+                        ? "Turn floor cleared — focus on requirements above"
+                        : `Earliest: Turn ${phaseProgressRows.turnFloor} (currently ${phaseProgressRows.turn})`}
+                    </p>
+                  )}
                   <p className="text-[10px] text-white/50 pt-1 border-t border-white/10">
                     Unlocks: {phaseProgressRows.next.unlocks.join(', ')}
                   </p>
