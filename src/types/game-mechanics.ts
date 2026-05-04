@@ -135,6 +135,7 @@ export interface PhaseConfig {
     minRespect?: number;
     minCapos?: number;
     minBuiltBusinesses?: number;
+    minControlledDistricts?: number; // family owns >= 60% hexes in N districts
     minIncomeOrHexesOrRespect?: { hexes: number; income: number; respect: number }; // OR condition
   };
   unlocks: string[];
@@ -147,18 +148,18 @@ export const PHASE_CONFIGS: PhaseConfig[] = [
     unlocks: ['Move', 'Claim', 'Extort (Neutral)', 'Recruit (Mercenary)', 'Blind Hits'],
   },
   {
-    phase: 2, name: 'Establishing Territory', icon: '🏴', minTurn: 9,
-    requirements: { minHexes: 15, minRespect: 35 },
+    phase: 2, name: 'Establishing Territory', icon: '🏴', minTurn: 4,
+    requirements: { minHexes: 18, minRespect: 40 },
     unlocks: ['Scouting', 'Plan Hits', 'Capo Promotion', 'Safehouses', 'Fortification', 'Enemy Extortion', 'Patrol Officer Bribe', 'Boss Sitdown', 'Local Recruitment'],
   },
   {
-    phase: 3, name: 'Controlling Territory', icon: '🏛️', minTurn: 18,
-    requirements: { minHexes: 25, minCapos: 1, minBuiltBusinesses: 1 },
+    phase: 3, name: 'Controlling Territory', icon: '🏛️', minTurn: 10,
+    requirements: { minHexes: 30, minCapos: 2, minBuiltBusinesses: 2, minRespect: 45, minControlledDistricts: 1 },
     unlocks: ['Boss Diplomacy', 'Alliances', 'Ceasefires', 'Captain+ Bribes', 'Hitman Contracts', 'Go to the Mattresses', 'War Summit', 'Flip Soldier'],
   },
   {
-    phase: 4, name: 'Boss of All Bosses', icon: '👑', minTurn: 30,
-    requirements: { minIncomeOrHexesOrRespect: { hexes: 35, income: 40000, respect: 80 } },
+    phase: 4, name: 'Boss of All Bosses', icon: '👑', minTurn: 18,
+    requirements: { minCapos: 3, minIncomeOrHexesOrRespect: { hexes: 45, income: 50000, respect: 85 } },
     unlocks: ['Commission Vote', 'HQ Assault'],
   },
 ];
