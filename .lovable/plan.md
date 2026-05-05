@@ -1,98 +1,61 @@
-## Scope
+## Tighten AI-only phase pacing
 
-Address review items **#1, #5, #7** plus an intel-sources audit.
+AI currently shares `calculatePhaseForFamily` with the player, so it inherits the new performance gates. But AI bookkeeping (starting respect, padded income on harder difficulties, deterministic capo deployment) lets it satisfy perf reqs the moment its turn floor opens — leading to "AI jumps to P3 on turn 10" while the player is still organizing. We also want a small safety net so a single fluke turn (one-time income spike, brief district control) doesn't promote the AI.
 
-- **#1** Recruitment is in the wrong step (currently uses tactical budget but is administrative).
-- **#5** Launder Money silently uses no budget.
-- **#7** Defense & Law (PR / donation / lawyer) charge action tokens but Bribe Corruption / Hitman don't — same conceptual cluster, inconsistent cost.
-- **Intel restriction**: intel may only come from (a) Scout, (b) Bribe (Corruption tiers + Dellacroce family power), (c) Flip Soldier, (d) capturing an enemy Safehouse. No other paths.
+### Changes
 
----
+**1. Difficulty-scaled AI turn floor (`src/hooks/useEnhancedMafiaGameState.ts`)**
 
-## Changes
+Add an AI-only offset on top of `PHASE_CONFIGS[p].minTurn` inside `calculatePhaseForFamily` when `family !== state.playerFamily`:
 
-### 1. Move Recruitment from Tactical → Action
+- Easy: `+4` turns
+- Normal: `+2` turns
+- Hard: `+0` (parity with player)
 
-**`src/hooks/useEnhancedMafiaGameState.ts`** — `recruit_soldiers` and `recruit_local_soldier` cases (~L7444, L7483) and the duplicate paths in the `dispatch`-style switch (~L1444 area if present):
-- Replace every `tacticalActionsRemaining` check + decrement with `actionsRemaining`.
-- Add both action types to `actionPhaseActions` gate list (L7203) so the standard "no actions left" warning fires consistently.
+Implementation: read `state.difficulty` (or `state.difficultyModifiers`), compute `aiTurnOffset`, and use `state.turn < cfg.minTurn + aiTurnOffset` for the AI branch only. Player path unchanged.
 
-**`src/components/GameSidePanels.tsx`**:
-- Move the two recruit `ActionButton`s out of the "Recruitment & Tactical" `CollapsibleSection` and into the existing economy section alongside Build / Launder.
-- Rename the source section to just **"Tactical"**.
-- Update sublabels: keep "1 action" wording (now truthful — it's an action token).
-- Change `phaseLocked={!isTacticalPhase}` → `phaseLocked={actionsLocked}` on the recruit buttons; update `disabledReason` to "No actions left".
+**2. Sustained-performance gate for AI**
 
-### 2. Charge an action token for Launder Money (#5)
+Track a per-opponent counter `resources.phaseReqStreak` (turns in a row meeting all perf reqs for the next phase). In `processAITurn` (around the existing `aiPhase` computation, L5355), before promoting:
 
-**`useEnhancedMafiaGameState.ts`** — `launder` / `launder_money` case:
-- Add `'launder_money'` to `actionPhaseActions`.
-- Decrement `actionsRemaining -= 1` on success.
+- Compute `meetsPerf = meetsNextPhasePerfReqs(state, fam)` (extract the perf-only check; reuse the helper added for the player).
+- If `meetsPerf`, increment streak; else reset to 0.
+- Require `streak >= 2` (Normal/Easy) or `>= 1` (Hard) **in addition to** turn floor + perf gate before allowing `aiPhase` to be returned higher than `cachedPhase`.
 
-**`GameSidePanels.tsx`** — Launder Money button sublabel: `"20% fee · 1 action"`.
+This prevents one-turn promotions caused by transient income spikes or temporary district flips.
 
-### 3. Charge action tokens for Bribe Corruption + Hire Hitman (#7)
+**3. Soft "rubber-band" cap: AI phase ≤ player phase + 1**
 
-**`useEnhancedMafiaGameState.ts`**:
-- Add `'bribe_corruption'` and `'hire_hitman'` to `actionPhaseActions`.
-- In `case 'bribe_corruption'`: after the success/fail branch resolves (money already debited), `newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);`
-- In `case 'hire_hitman'`: same — decrement after the contract is pushed.
+In `processAITurn` at the phase-transition block (L6862-6873), clamp:
 
-**UI sublabels** (so the cost is visible):
-- `CorruptionPanel.tsx` — append `· 1 action` to each tier row's metadata line, and disable the Bribe button when `actionsRemaining <= 0`. Pass `actionsRemaining` + `phaseIsAction` as new props from `GameSidePanels`.
-- `HitmanPanel.tsx` — same treatment for the Hire button.
+```
+const cap = (state.gamePhase || 1) + 1;
+const effective = Math.min(aiPhase, cap);
+```
 
-### 4. Restrict intel sources (the new ask)
+Only promote `cachedPhase` up to `effective`. Once the player advances, the AI catches up next turn (no perf re-check needed because they already qualified). Hard difficulty skips this cap so elite AI can still pull ahead by 2 phases.
 
-Audit shows the only legitimate intel writers to `scoutedHexes` should be:
+**4. Generalize `meetsNextPhasePerfReqs`**
 
-| Source | Code path | Status |
-|---|---|---|
-| Manual Scout | scout action (~L1819-1834, L2429+) | KEEP |
-| Dellacroce family power (a bribe-equivalent network) | family_power gambino branch (L1847-1883) | KEEP |
-| Bribe Corruption (Captain/Chief/Mayor reveal map intel) | already implicit via `activeBribes`; no scoutedHexes write — KEEP as-is |
-| Flip Soldier (informant gives positions) | currently writes nothing — **ADD**: on successful flip, push a 2-turn scout entry on the flipped soldier's hex + 1-ring of HQ |
-| Capture enemy Safehouse | L9395-9415 — full-family intel for 1 turn | KEEP |
-| **Random Event "Informant Tip" (Pay)** | L7062-7072 | **REMOVE** — violates the restriction |
-| Other | none found | — |
+The existing helper hardcodes `state.gamePhase` for player. Refactor to take `(state, family, currentPhase)` so AI can pass `opponent.resources.cachedPhase`. Player call site updated to pass `state.gamePhase`.
 
-**Concrete edits:**
+**5. Memory update**
 
-- **`useEnhancedMafiaGameState.ts`** L7062-7072: delete the "Informant Tip" eligible event entirely (and any `case` handling its `pay`/`ignore` choices if it has dedicated logic — currently it only applies generic consequences, so just removing the event push suffices).
+Update `mem://gameplay/ai-behavior` with: difficulty-scaled AI turn floor offsets (E+4/N+2/H+0), 2-turn sustained perf streak required, and player+1 phase cap (Normal/Easy only).
 
-- **`useEnhancedMafiaGameState.ts`** `processFlipSoldier` (L8976-9041): on the success branch (after pushing to `flippedSoldiers`), push a `ScoutedHex` for the flipped soldier's current hex with `turnsRemaining: 3, freshUntilTurn: state.turn + 1`, mirroring the safehouse-capture write pattern at L9398. Use the soldier's q/r/s. This represents the new informant feeding positions.
+### Files
 
-- **Audit verification** (no code change, just confirm in implementation): grep `scoutedHexes.push` and `scoutedHexes = [...` in the codebase and confirm every site is one of the four allowed sources. Already verified above.
+- `src/hooks/useEnhancedMafiaGameState.ts` — `calculatePhaseForFamily`, `meetsNextPhasePerfReqs`, AI promotion block in `processAITurn`
+- `mem://gameplay/ai-behavior` — pacing rules
 
-### 5. Memory updates
+### Result
 
-- `mem://gameplay/turn-structure` — add: "Recruitment, Launder, Bribe Corruption, and Hitman contracts now consume action tokens (Action step), not tactical actions."
-- `mem://gameplay/recruitment-costs` — change "1 tactical action" → "1 action token (Action step)".
-- `mem://gameplay/tactical-mechanics` — remove recruitment from the tactical-action list.
-- `mem://gameplay/corruption-system` — note "1 action token per bribe attempt".
-- `mem://gameplay/hitman-contracts` — note "1 action token to place a contract".
-- New: `mem://gameplay/intel-sources` — canonical list: Scout, Bribe (incl. Dellacroce power), Flip Soldier, Safehouse capture. No other intel paths permitted.
-- `mem://gameplay/random-events` — remove "Informant Tip".
+| Difficulty | AI turn floor | Streak req | Phase cap vs player |
+|------------|---------------|------------|---------------------|
+| Easy       | cfg + 4       | 2 turns    | player + 1          |
+| Normal     | cfg + 2       | 2 turns    | player + 1          |
+| Hard       | cfg + 0       | 1 turn     | none (cfg + 2 cap)  |
 
----
+Skilled players advancing fast still face accelerating AI; slow players get breathing room without trivializing Hard.
 
-## Out of scope
-
-- No change to Boss Strategy / War / Mattresses / Commission Vote (still anytime, free of budgets).
-- No change to action-budget *size* (`BASE_ACTIONS_PER_TURN`). Tighter feel from the new costs is intentional; tuning is a separate pass if needed.
-- No UX restructure of Plan Hit (was review item #2 — separate ticket).
-- AI doesn't gain free intel from the removed "Informant Tip" event (was player-only anyway).
-
----
-
-## Files touched
-
-- `src/hooks/useEnhancedMafiaGameState.ts` (gate list + 4 case-budget edits, 1 event removal, flip-success scout entry)
-- `src/components/GameSidePanels.tsx` (move recruit buttons, rename section, update sublabels, pass new props)
-- `src/components/CorruptionPanel.tsx` (add `· 1 action` + disable when out of actions)
-- `src/components/HitmanPanel.tsx` (same)
-- 6 memory files (update / create)
-
-## Open question
-
-OK to proceed exactly as above, or want to keep "Informant Tip" alive as flavor and just have the "Pay" choice grant money/rep without intel?
+Approve to implement, or adjust offsets/cap.
