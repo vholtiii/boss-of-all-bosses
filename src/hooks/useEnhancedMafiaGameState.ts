@@ -1372,10 +1372,15 @@ export const useEnhancedMafiaGameState = (
     });
     const controlledDistricts = Object.values(districtCounts).filter(d => d.total > 0 && d.fam / d.total >= DISTRICT_CTRL).length;
 
+    // AI-only turn-floor offset: gives the player breathing room on Easy/Normal.
+    // Easy +4, Normal +2, Hard +0 (parity).
+    const aiTurnOffset = isPlayer ? 0
+      : (state.difficulty === 'easy' ? 4 : state.difficulty === 'hard' ? 0 : 2);
+
     // Check from highest phase down
     for (let p = 3; p >= 0; p--) {
       const cfg = PHASE_CONFIGS[p];
-      if (state.turn < cfg.minTurn) continue;
+      if (state.turn < cfg.minTurn + aiTurnOffset) continue;
       const reqs = cfg.requirements;
       if (reqs.minHexes && hexCount < reqs.minHexes) continue;
       if (reqs.minRespect && respect < reqs.minRespect) continue;
