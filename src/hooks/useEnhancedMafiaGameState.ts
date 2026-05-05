@@ -1372,10 +1372,15 @@ export const useEnhancedMafiaGameState = (
     });
     const controlledDistricts = Object.values(districtCounts).filter(d => d.total > 0 && d.fam / d.total >= DISTRICT_CTRL).length;
 
+    // AI-only turn-floor offset: gives the player breathing room on Easy/Normal.
+    // Easy +4, Normal +2, Hard +0 (parity).
+    const aiTurnOffset = isPlayer ? 0
+      : (state.difficulty === 'easy' ? 4 : state.difficulty === 'hard' ? 0 : 2);
+
     // Check from highest phase down
     for (let p = 3; p >= 0; p--) {
       const cfg = PHASE_CONFIGS[p];
-      if (state.turn < cfg.minTurn) continue;
+      if (state.turn < cfg.minTurn + aiTurnOffset) continue;
       const reqs = cfg.requirements;
       if (reqs.minHexes && hexCount < reqs.minHexes) continue;
       if (reqs.minRespect && respect < reqs.minRespect) continue;
@@ -1393,9 +1398,9 @@ export const useEnhancedMafiaGameState = (
 
   // Returns true if the family meets every PERFORMANCE requirement for the next phase
   // (ignoring the minTurn floor). Used to detect "earned, waiting on turn" state.
-  const meetsNextPhasePerfReqs = (state: EnhancedMafiaGameState, family: string): boolean => {
+  const meetsNextPhasePerfReqs = (state: EnhancedMafiaGameState, family: string, currentPhaseOverride?: number): boolean => {
     const isPlayer = family === state.playerFamily;
-    const currentPhase = isPlayer ? (state.gamePhase || 1) : (state.aiOpponents.find(o => o.family === family)?.resources.cachedPhase || 1);
+    const currentPhase = currentPhaseOverride ?? (isPlayer ? (state.gamePhase || 1) : (state.aiOpponents.find(o => o.family === family)?.resources.cachedPhase || 1));
     if (currentPhase >= 4) return false;
     const cfg = PHASE_CONFIGS[currentPhase]; // next phase config
     if (!cfg) return false;
@@ -6861,15 +6866,25 @@ export const useEnhancedMafiaGameState = (
 
       // ── TRACK AI PHASE TRANSITIONS ──
       const cachedPhase = (opponent.resources.cachedPhase || 1) as GamePhase;
-      if (aiPhase > cachedPhase) {
-        opponent.resources.cachedPhase = aiPhase;
-        const phaseCfg = PHASE_CONFIGS[aiPhase - 1];
+      // Sustained-performance streak: prevents one-turn fluke promotions
+      const meetsPerf = meetsNextPhasePerfReqs(state, fam, cachedPhase);
+      const prevStreak = (opponent.resources as any).phaseReqStreak || 0;
+      const newStreak = meetsPerf ? prevStreak + 1 : 0;
+      (opponent.resources as any).phaseReqStreak = newStreak;
+      const streakRequired = state.difficulty === 'hard' ? 1 : 2;
+      // Soft rubber-band cap: AI can't exceed player phase + 1 (Easy/Normal only)
+      const rubberBandCap = state.difficulty === 'hard' ? 4 : ((state.gamePhase || 1) + 1);
+      const effectiveAiPhase = Math.min(aiPhase, rubberBandCap) as GamePhase;
+      if (effectiveAiPhase > cachedPhase && newStreak >= streakRequired) {
+        opponent.resources.cachedPhase = effectiveAiPhase;
+        const phaseCfg = PHASE_CONFIGS[effectiveAiPhase - 1];
         state.pendingNotifications.push({
           type: 'warning' as const,
           title: `${phaseCfg.icon} ${fam.charAt(0).toUpperCase() + fam.slice(1)} Advancing!`,
-          message: `The ${fam} family has entered Phase ${aiPhase}: ${phaseCfg.name}.`,
+          message: `The ${fam} family has entered Phase ${effectiveAiPhase}: ${phaseCfg.name}.`,
         });
-        if (turnReport) turnReport.aiActions.push({ family: fam, action: 'phase_up', detail: `Entered Phase ${aiPhase}: ${phaseCfg.name}` });
+        if (turnReport) turnReport.aiActions.push({ family: fam, action: 'phase_up', detail: `Entered Phase ${effectiveAiPhase}: ${phaseCfg.name}` });
+        (opponent.resources as any).phaseReqStreak = 0;
       }
 
       // ── AI COMMISSION VOTE (Phase 4 only) ──
