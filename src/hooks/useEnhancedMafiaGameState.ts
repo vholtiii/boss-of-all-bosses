@@ -1398,9 +1398,9 @@ export const useEnhancedMafiaGameState = (
 
   // Returns true if the family meets every PERFORMANCE requirement for the next phase
   // (ignoring the minTurn floor). Used to detect "earned, waiting on turn" state.
-  const meetsNextPhasePerfReqs = (state: EnhancedMafiaGameState, family: string): boolean => {
+  const meetsNextPhasePerfReqs = (state: EnhancedMafiaGameState, family: string, currentPhaseOverride?: number): boolean => {
     const isPlayer = family === state.playerFamily;
-    const currentPhase = isPlayer ? (state.gamePhase || 1) : (state.aiOpponents.find(o => o.family === family)?.resources.cachedPhase || 1);
+    const currentPhase = currentPhaseOverride ?? (isPlayer ? (state.gamePhase || 1) : (state.aiOpponents.find(o => o.family === family)?.resources.cachedPhase || 1));
     if (currentPhase >= 4) return false;
     const cfg = PHASE_CONFIGS[currentPhase]; // next phase config
     if (!cfg) return false;
