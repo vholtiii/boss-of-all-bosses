@@ -6866,15 +6866,25 @@ export const useEnhancedMafiaGameState = (
 
       // ── TRACK AI PHASE TRANSITIONS ──
       const cachedPhase = (opponent.resources.cachedPhase || 1) as GamePhase;
-      if (aiPhase > cachedPhase) {
-        opponent.resources.cachedPhase = aiPhase;
-        const phaseCfg = PHASE_CONFIGS[aiPhase - 1];
+      // Sustained-performance streak: prevents one-turn fluke promotions
+      const meetsPerf = meetsNextPhasePerfReqs(state, fam, cachedPhase);
+      const prevStreak = (opponent.resources as any).phaseReqStreak || 0;
+      const newStreak = meetsPerf ? prevStreak + 1 : 0;
+      (opponent.resources as any).phaseReqStreak = newStreak;
+      const streakRequired = state.difficulty === 'hard' ? 1 : 2;
+      // Soft rubber-band cap: AI can't exceed player phase + 1 (Easy/Normal only)
+      const rubberBandCap = state.difficulty === 'hard' ? 4 : ((state.gamePhase || 1) + 1);
+      const effectiveAiPhase = Math.min(aiPhase, rubberBandCap) as GamePhase;
+      if (effectiveAiPhase > cachedPhase && newStreak >= streakRequired) {
+        opponent.resources.cachedPhase = effectiveAiPhase;
+        const phaseCfg = PHASE_CONFIGS[effectiveAiPhase - 1];
         state.pendingNotifications.push({
           type: 'warning' as const,
           title: `${phaseCfg.icon} ${fam.charAt(0).toUpperCase() + fam.slice(1)} Advancing!`,
-          message: `The ${fam} family has entered Phase ${aiPhase}: ${phaseCfg.name}.`,
+          message: `The ${fam} family has entered Phase ${effectiveAiPhase}: ${phaseCfg.name}.`,
         });
-        if (turnReport) turnReport.aiActions.push({ family: fam, action: 'phase_up', detail: `Entered Phase ${aiPhase}: ${phaseCfg.name}` });
+        if (turnReport) turnReport.aiActions.push({ family: fam, action: 'phase_up', detail: `Entered Phase ${effectiveAiPhase}: ${phaseCfg.name}` });
+        (opponent.resources as any).phaseReqStreak = 0;
       }
 
       // ── AI COMMISSION VOTE (Phase 4 only) ──
