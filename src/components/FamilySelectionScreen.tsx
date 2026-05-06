@@ -248,11 +248,43 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
   const [mapSize, setMapSize] = useState<MapSize>('medium');
   const [seedInput, setSeedInput] = useState('');
-  const { soundConfig, updateSoundConfig } = useSoundSystem();
+  const { soundConfig, updateSoundConfig, playSound } = useSoundSystem();
+  const detailRef = useRef<HTMLDivElement>(null);
 
   useBgMusic({ src: '/audio/mafia-theme.mp3', soundConfig });
 
   const activeFamily = FAMILIES.find(f => f.id === selectedFamily);
+
+  const selectFamily = useCallback((id: FamilyId) => {
+    setSelectedFamily(prev => {
+      if (prev !== id) playSound('click');
+      return id;
+    });
+  }, [playSound]);
+
+  // Auto-scroll detail panel into view when a family is picked
+  useEffect(() => {
+    if (selectedFamily && detailRef.current) {
+      detailRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [selectedFamily]);
+
+  // Arrow key navigation across family row
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const idx = selectedFamily ? FAMILIES.findIndex(f => f.id === selectedFamily) : -1;
+      const next = e.key === 'ArrowRight'
+        ? (idx + 1 + FAMILIES.length) % FAMILIES.length
+        : (idx - 1 + FAMILIES.length) % FAMILIES.length;
+      const safe = idx === -1 ? 0 : next;
+      selectFamily(FAMILIES[safe].id);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedFamily, selectFamily]);
 
   return (
     <div
