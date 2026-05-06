@@ -394,32 +394,176 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         <p className="text-sm text-muted-foreground mt-4 font-source max-w-md mx-auto">
           Choose your family and difficulty. Each has unique strengths, weaknesses, and strategies for domination.
         </p>
-        {/* Difficulty Selector */}
-        <div className="flex items-center justify-center gap-2 mt-5">
+        {/* Difficulty Selector — dossier cards */}
+        <div
+          role="radiogroup"
+          aria-label="Game difficulty"
+          className="flex flex-wrap items-stretch justify-center gap-3 mt-6 max-w-4xl mx-auto"
+          onKeyDown={(e) => {
+            const order = ['easy', 'normal', 'hard'] as const;
+            const idx = order.indexOf(difficulty);
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+              e.preventDefault();
+              const next = order[(idx + 1) % order.length];
+              setDifficulty(next); playSound('click');
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              const prev = order[(idx - 1 + order.length) % order.length];
+              setDifficulty(prev); playSound('click');
+            }
+          }}
+        >
           {(['easy', 'normal', 'hard'] as const).map(d => {
-            const labels = { easy: 'Made Man', normal: 'Wiseguy', hard: 'The Don' };
-            const dotColors = { easy: 'bg-emerald-500', normal: 'bg-amber-400', hard: 'bg-rose-500' };
-            const descs = { easy: '+50% money, weaker AI', normal: 'Balanced experience', hard: '-25% money, stronger AI' };
+            type Tone = 'buff' | 'neutral' | 'debuff';
+            const meta: {
+              icon: string; name: string; chip: string; tagline: string; quote: string;
+              color: string; glow: string; tint: string;
+              stats: { icon: string; label: string; value: string; tone: Tone }[];
+            } = ({
+              easy: {
+                icon: '🎩', name: 'Made Man', chip: 'EASY',
+                tagline: 'Learn the ropes',
+                quote: '"Welcome to the family, kid."',
+                color: 'rgb(16,185,129)', glow: 'rgba(16,185,129,0.55)', tint: 'rgba(16,185,129,0.10)',
+                stats: [
+                  { icon: '💰', label: 'Income',      value: '+50%',      tone: 'buff' },
+                  { icon: '⚔️', label: 'AI Rivals',   value: 'Hesitant',  tone: 'buff' },
+                  { icon: '🚓', label: 'Police Heat', value: 'Lenient',   tone: 'buff' },
+                  { icon: '🤝', label: 'Diplomacy',   value: 'Forgiving', tone: 'buff' },
+                ],
+              },
+              normal: {
+                icon: '🥃', name: 'Wiseguy', chip: 'STANDARD',
+                tagline: 'A fair fight',
+                quote: '"No favors. No mercy."',
+                color: 'rgb(251,191,36)', glow: 'rgba(251,191,36,0.55)', tint: 'rgba(251,191,36,0.10)',
+                stats: [
+                  { icon: '💰', label: 'Income',      value: 'Base',     tone: 'neutral' },
+                  { icon: '⚔️', label: 'AI Rivals',   value: 'Tactical', tone: 'neutral' },
+                  { icon: '🚓', label: 'Police Heat', value: 'Standard', tone: 'neutral' },
+                  { icon: '🤝', label: 'Diplomacy',   value: 'Cautious', tone: 'neutral' },
+                ],
+              },
+              hard: {
+                icon: '🔫', name: 'The Don', chip: 'HARD',
+                tagline: 'Earn your respect',
+                quote: '"Only the strong survive."',
+                color: 'rgb(244,63,94)', glow: 'rgba(244,63,94,0.55)', tint: 'rgba(244,63,94,0.10)',
+                stats: [
+                  { icon: '💰', label: 'Income',      value: '−25%',        tone: 'debuff' },
+                  { icon: '⚔️', label: 'AI Rivals',   value: 'Ruthless',    tone: 'debuff' },
+                  { icon: '🚓', label: 'Police Heat', value: 'Aggressive',  tone: 'debuff' },
+                  { icon: '🤝', label: 'Diplomacy',   value: 'Treacherous', tone: 'debuff' },
+                ],
+              },
+            } as const)[d];
             const isActive = difficulty === d;
+            const toneClass: Record<Tone, string> = {
+              buff: 'text-emerald-400',
+              neutral: 'text-muted-foreground',
+              debuff: 'text-rose-400',
+            };
             return (
-              <Tooltip key={d}>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => { setDifficulty(d); playSound('click'); }}
-                    className={cn(
-                      'px-4 h-10 rounded-lg border-2 text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-2',
-                      'bg-card/80 backdrop-blur-sm font-playfair normal-case text-sm',
-                      isActive
-                        ? 'border-primary text-primary shadow-md scale-105'
-                        : 'border-border/50 text-muted-foreground hover:border-muted-foreground/50'
-                    )}
-                  >
-                    <span className={cn('inline-block w-2 h-2 rounded-full', dotColors[d])} />
-                    {labels[d]}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{descs[d]}</TooltipContent>
-              </Tooltip>
+              <motion.button
+                key={d}
+                role="radio"
+                aria-checked={isActive}
+                aria-label={`Difficulty: ${meta.name} — ${meta.tagline}`}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => {
+                  setDifficulty(d);
+                  playSound(d === 'hard' ? 'success' : 'click');
+                }}
+                whileHover={{ y: -3 }}
+                whileTap={{ scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+                className={cn(
+                  'flex-1 min-w-[220px] max-w-[280px] text-left p-4 rounded-lg border-2 transition-all duration-200',
+                  'backdrop-blur-sm relative overflow-hidden outline-none',
+                  'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                  isActive ? 'border-primary' : 'border-border/40 opacity-80 hover:opacity-100 hover:border-muted-foreground/50',
+                )}
+                style={{
+                  background: isActive
+                    ? `linear-gradient(135deg, ${meta.tint} 0%, transparent 70%), hsl(var(--card) / 0.85)`
+                    : 'hsl(var(--card) / 0.8)',
+                  boxShadow: isActive ? `0 0 24px ${meta.glow}, inset 0 1px 0 rgba(255,255,255,0.05)` : undefined,
+                }}
+              >
+                {/* Texture overlay when active */}
+                {isActive && (
+                  <div
+                    className="absolute inset-0 opacity-[0.04] pointer-events-none"
+                    style={{ backgroundImage: NOISE_BG }}
+                  />
+                )}
+
+                {/* Header */}
+                <div className="flex items-center justify-between gap-2 mb-1 relative">
+                  <div className="flex items-center gap-2">
+                    <motion.span
+                      className="text-2xl leading-none select-none"
+                      animate={isActive ? {
+                        filter: [
+                          `drop-shadow(0 0 2px ${meta.color})`,
+                          `drop-shadow(0 0 8px ${meta.color})`,
+                          `drop-shadow(0 0 2px ${meta.color})`,
+                        ],
+                      } : {}}
+                      transition={isActive ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' } : {}}
+                    >
+                      {meta.icon}
+                    </motion.span>
+                    <span className="font-playfair text-lg font-bold leading-tight text-foreground">
+                      {meta.name}
+                    </span>
+                  </div>
+                  {isActive ? (
+                    <span
+                      className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                      style={{ background: meta.color, color: '#0a0a0a' }}
+                    >
+                      ✓ Selected
+                    </span>
+                  ) : (
+                    <span
+                      className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border"
+                      style={{ borderColor: meta.color, color: meta.color }}
+                    >
+                      {meta.chip}
+                    </span>
+                  )}
+                </div>
+
+                {/* Tagline */}
+                <div className="text-xs text-foreground/80 font-medium mb-1.5">
+                  {meta.tagline}
+                </div>
+
+                {/* Quote */}
+                <div
+                  className="text-[11px] italic text-muted-foreground border-l-2 pl-2 mb-2 leading-snug"
+                  style={{ borderColor: meta.color }}
+                >
+                  {meta.quote}
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-border/30 my-2" />
+
+                {/* Stat rows */}
+                <div className="space-y-0.5">
+                  {meta.stats.map(s => (
+                    <div key={s.label} className="flex items-center justify-between text-[11px] py-0.5">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <span className="text-xs leading-none">{s.icon}</span>
+                        {s.label}
+                      </span>
+                      <span className={cn('font-bold', toneClass[s.tone])}>{s.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.button>
             );
           })}
         </div>
