@@ -462,21 +462,33 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
       </div>
 
       {/* Family cards — horizontal row */}
-      <div className="flex flex-wrap justify-center gap-4 max-w-5xl mb-10 relative z-[3]" style={{ perspective: 1200 }}>
+      <div className="flex flex-wrap justify-center gap-5 max-w-6xl mx-auto mb-10 relative z-[3]" style={{ perspective: 1200 }}>
         {FAMILIES.map((family, i) => {
           const isSelected = selectedFamily === family.id;
           const isDimmed = !!selectedFamily && !isSelected;
+          const isRecommended = family.difficulty === 'Easy';
           return (
             <motion.div
               key={family.id}
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: isDimmed ? 0.55 : 1 }}
               transition={{ delay: 0.15 + i * 0.08, duration: 0.4 }}
-              whileHover={{ scale: 1.07, y: -6, rotateY: 6, rotateX: -3 }}
-              onClick={() => setSelectedFamily(family.id)}
+              whileHover={{ scale: 1.03, y: -4, rotateY: 3, rotateX: -1.5 }}
+              onClick={() => selectFamily(family.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  selectFamily(family.id);
+                }
+              }}
+              tabIndex={0}
+              role="button"
+              aria-pressed={isSelected}
+              aria-label={`Select ${family.name} family`}
               className={cn(
-                'w-[155px] cursor-pointer p-4 transition-all duration-200 relative group',
-                'bg-card/90 backdrop-blur-sm',
+                'w-[180px] cursor-pointer p-5 transition-all duration-200 relative group',
+                'bg-card/90 backdrop-blur-sm outline-none',
+                'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
               )}
               style={{
                 clipPath: CARD_CLIP,
@@ -510,6 +522,16 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 />
               )}
 
+              {/* Recommended tag for new players */}
+              {isRecommended && !isSelected && (
+                <div
+                  className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider flex items-center gap-1 bg-emerald-500/90 text-emerald-950 shadow-md whitespace-nowrap"
+                >
+                  <Star className="h-2.5 w-2.5 fill-current" />
+                  New player pick
+                </div>
+              )}
+
               <motion.div
                 className="flex justify-center mb-2"
                 whileHover={{ filter: `drop-shadow(0 0 6px ${family.color})` }}
@@ -519,7 +541,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 } : {}}
                 transition={isSelected ? { duration: 1.5, repeat: Infinity, ease: 'easeInOut' } : {}}
               >
-                <FamilyCrest familyId={family.id} color={family.color} size={36} />
+                <FamilyCrest familyId={family.id} color={family.color} size={40} />
               </motion.div>
 
               <div className="text-lg font-bold font-playfair mb-0.5 text-center" style={{ color: family.color }}>
@@ -545,12 +567,12 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 ))}
               </div>
 
-              {/* Motto reveal on hover */}
+              {/* Motto reveal — overlay INSIDE the card so it doesn't get clipped */}
               <div
-                className="absolute inset-x-2 -bottom-0.5 translate-y-full px-2 py-1.5 rounded-b bg-noir-dark/95 backdrop-blur-sm opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none"
-                style={{ borderTop: `1px solid ${family.color}80` }}
+                className="absolute inset-0 px-3 flex items-center justify-center bg-noir-dark/92 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+                style={{ clipPath: CARD_CLIP, border: `1px solid ${family.color}60` }}
               >
-                <p className="text-[9px] italic font-playfair text-center leading-tight" style={{ color: family.color }}>
+                <p className="text-xs italic font-playfair text-center leading-snug" style={{ color: family.color }}>
                   {family.motto}
                 </p>
               </div>
@@ -560,7 +582,8 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
       </div>
 
       {/* Detail panel — only shows for selected family */}
-      <div className="max-w-2xl w-full min-h-[220px] relative z-[3]">
+      <div ref={detailRef} className="max-w-2xl w-full min-h-[220px] relative z-[3]">
+        <AnimatePresence mode="wait">
         {activeFamily ? (
           <motion.div
             key={activeFamily.id}
