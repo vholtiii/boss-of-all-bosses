@@ -579,6 +579,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                   {family.motto}
                 </p>
               </div>
+              </div>
             </motion.div>
           );
         })}
