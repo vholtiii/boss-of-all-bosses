@@ -1883,9 +1883,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           });
                           setActionMenu(null);
                         }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-accent/90 hover:bg-accent text-accent-foreground text-xs font-bold transition-colors"
+                        className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-accent/90 hover:bg-accent text-accent-foreground text-xs font-bold transition-colors", isRec('negotiate') && recCls)}
                       >
-                        🤝 Negotiate
+                        🤝 Negotiate<CostChip k="negotiate" />
                       </button>
                     ) : reasons.negotiate ? (
                       <DisabledAction icon="🤝" label="Negotiate" reason={reasons.negotiate} />
