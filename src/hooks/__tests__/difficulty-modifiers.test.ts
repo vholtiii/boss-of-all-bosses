@@ -76,7 +76,7 @@ describe("Difficulty modifiers — wiring", () => {
   });
 
   describe("eventCostMult & aiIncomeMult & aiRecruitCapBonus exposure", () => {
-    it("all 6 modifiers are present on initial state for every difficulty", () => {
+    it("all 9 modifiers are present on initial state for every difficulty", () => {
       for (const diff of ["easy", "normal", "hard"] as const) {
         const s = createInitialGameState("gambino", undefined, diff, 1, "medium");
         const m = s.difficultyModifiers;
@@ -86,7 +86,31 @@ describe("Difficulty modifiers — wiring", () => {
         expect(typeof m.policeHeatMult).toBe("number");
         expect(typeof m.hitSuccessBonus).toBe("number");
         expect(typeof m.eventCostMult).toBe("number");
+        expect(typeof m.aiAggressionBonus).toBe("number");
+        expect(typeof m.diplomacyTensionMult).toBe("number");
+        expect(typeof m.tensionDecayMult).toBe("number");
       }
+    });
+  });
+
+  describe("aiAggressionBonus / diplomacyTensionMult / tensionDecayMult values", () => {
+    it("Easy: AI -15 aggression, 0.7× player tension gains, 1.5× tension decay", () => {
+      const s = createInitialGameState("gambino", undefined, "easy", 1, "medium");
+      expect(s.difficultyModifiers.aiAggressionBonus).toBe(-15);
+      expect(s.difficultyModifiers.diplomacyTensionMult).toBeCloseTo(0.7, 5);
+      expect(s.difficultyModifiers.tensionDecayMult).toBeCloseTo(1.5, 5);
+    });
+    it("Normal: all neutral (0 / 1 / 1)", () => {
+      const s = createInitialGameState("gambino", undefined, "normal", 1, "medium");
+      expect(s.difficultyModifiers.aiAggressionBonus).toBe(0);
+      expect(s.difficultyModifiers.diplomacyTensionMult).toBe(1);
+      expect(s.difficultyModifiers.tensionDecayMult).toBe(1);
+    });
+    it("Hard: AI +15 aggression, 1.4× player tension gains, 0.6× tension decay", () => {
+      const s = createInitialGameState("gambino", undefined, "hard", 1, "medium");
+      expect(s.difficultyModifiers.aiAggressionBonus).toBe(15);
+      expect(s.difficultyModifiers.diplomacyTensionMult).toBeCloseTo(1.4, 5);
+      expect(s.difficultyModifiers.tensionDecayMult).toBeCloseTo(0.6, 5);
     });
   });
 });
