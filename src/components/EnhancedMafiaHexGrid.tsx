@@ -1823,9 +1823,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           });
                           setActionMenu(null);
                         }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-orange-600/90 hover:bg-orange-600 text-white text-xs font-bold transition-colors"
+                        className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-orange-600/90 hover:bg-orange-600 text-white text-xs font-bold transition-colors", isRec('sabotage') && recCls)}
                       >
-                        💣 Sabotage
+                        💣 Sabotage<CostChip k="sabotage" />
                       </button>
                     ) : reasons.sabotage ? (
                       <DisabledAction icon="💣" label="Sabotage" reason={reasons.sabotage} />
