@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import mafiaSitdownBg from '@/assets/mafia-sitdown-bg.png';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { DollarSign, Shield, Swords, Users, Eye, Volume2, VolumeX, Crown } from 'lucide-react';
+import { DollarSign, Shield, Swords, Users, Eye, Volume2, VolumeX, Crown, Star } from 'lucide-react';
 import { useBgMusic } from '@/hooks/useBgMusic';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import AtmosphericParticles from '@/components/AtmosphericParticles';
@@ -247,13 +248,46 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
   const [mapSize, setMapSize] = useState<MapSize>('medium');
   const [seedInput, setSeedInput] = useState('');
-  const { soundConfig, updateSoundConfig } = useSoundSystem();
+  const { soundConfig, updateSoundConfig, playSound } = useSoundSystem();
+  const detailRef = useRef<HTMLDivElement>(null);
 
   useBgMusic({ src: '/audio/mafia-theme.mp3', soundConfig });
 
   const activeFamily = FAMILIES.find(f => f.id === selectedFamily);
 
+  const selectFamily = useCallback((id: FamilyId) => {
+    setSelectedFamily(prev => {
+      if (prev !== id) playSound('click');
+      return id;
+    });
+  }, [playSound]);
+
+  // Auto-scroll detail panel into view when a family is picked
+  useEffect(() => {
+    if (selectedFamily && detailRef.current) {
+      detailRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [selectedFamily]);
+
+  // Arrow key navigation across family row
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const idx = selectedFamily ? FAMILIES.findIndex(f => f.id === selectedFamily) : -1;
+      const next = e.key === 'ArrowRight'
+        ? (idx + 1 + FAMILIES.length) % FAMILIES.length
+        : (idx - 1 + FAMILIES.length) % FAMILIES.length;
+      const safe = idx === -1 ? 0 : next;
+      selectFamily(FAMILIES[safe].id);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedFamily, selectFamily]);
+
   return (
+    <TooltipProvider delayDuration={150}>
     <div
       className="min-h-screen bg-background flex flex-col items-center justify-center p-6 overflow-hidden relative"
     >
@@ -270,15 +304,36 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         transition={{ duration: 40, repeat: Infinity, ease: 'easeInOut' }}
       />
       {/* Dark overlay + vignette for dramatic atmosphere */}
-      <div className="absolute inset-0 bg-black/60 z-0" />
+      <div className="absolute inset-0 bg-black/55 z-0" />
       <div
         className="absolute inset-0 z-0"
         style={{
-          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.7) 70%, rgba(0,0,0,0.95) 100%)',
+          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.6) 70%, rgba(0,0,0,0.85) 100%)',
         }}
       />
       {/* Atmospheric particles */}
       <AtmosphericParticles />
+
+      {/* Art-deco corner ornaments — framed playbill feel */}
+      {([
+        { pos: 'top-3 left-3', rotate: 0 },
+        { pos: 'top-3 right-3', rotate: 90 },
+        { pos: 'bottom-3 right-3', rotate: 180 },
+        { pos: 'bottom-3 left-3', rotate: 270 },
+      ] as const).map(({ pos, rotate }) => (
+        <svg
+          key={pos}
+          className={cn('absolute pointer-events-none z-[2] opacity-30', pos)}
+          width="56" height="56" viewBox="0 0 56 56" fill="none"
+          style={{ transform: `rotate(${rotate}deg)` }}
+        >
+          <path d="M2 20 V2 H20" stroke="hsl(var(--primary))" strokeWidth="1.2" />
+          <path d="M6 14 V6 H14" stroke="hsl(var(--primary))" strokeWidth="0.8" opacity="0.7" />
+          <circle cx="2" cy="2" r="1.5" fill="hsl(var(--primary))" />
+        </svg>
+      ))}
+
+      {/* Music mute toggle */}
 
       {/* Music mute toggle */}
       <button
@@ -343,26 +398,28 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         <div className="flex items-center justify-center gap-2 mt-5">
           {(['easy', 'normal', 'hard'] as const).map(d => {
             const labels = { easy: 'Made Man', normal: 'Wiseguy', hard: 'The Don' };
-            const sublabels = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
-            const dots = { easy: '🟢', normal: '🟡', hard: '🔴' };
+            const dotColors = { easy: 'bg-emerald-500', normal: 'bg-amber-400', hard: 'bg-rose-500' };
             const descs = { easy: '+50% money, weaker AI', normal: 'Balanced experience', hard: '-25% money, stronger AI' };
             const isActive = difficulty === d;
             return (
-              <button
-                key={d}
-                onClick={() => setDifficulty(d)}
-                className={cn(
-                  'px-4 py-2 rounded-lg border-2 text-xs font-bold uppercase tracking-wider transition-all duration-200 flex flex-col items-center gap-0.5',
-                  'bg-card/80 backdrop-blur-sm',
-                  isActive
-                    ? 'border-primary text-primary shadow-md scale-105'
-                    : 'border-border/50 text-muted-foreground hover:border-muted-foreground/50'
-                )}
-                title={descs[d]}
-              >
-                <span className="font-playfair text-sm normal-case tracking-wide">{dots[d]} {labels[d]}</span>
-                <span className="text-[8px] opacity-70">{sublabels[d]} · {descs[d]}</span>
-              </button>
+              <Tooltip key={d}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => { setDifficulty(d); playSound('click'); }}
+                    className={cn(
+                      'px-4 h-10 rounded-lg border-2 text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-2',
+                      'bg-card/80 backdrop-blur-sm font-playfair normal-case text-sm',
+                      isActive
+                        ? 'border-primary text-primary shadow-md scale-105'
+                        : 'border-border/50 text-muted-foreground hover:border-muted-foreground/50'
+                    )}
+                  >
+                    <span className={cn('inline-block w-2 h-2 rounded-full', dotColors[d])} />
+                    {labels[d]}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{descs[d]}</TooltipContent>
+              </Tooltip>
             );
           })}
         </div>
@@ -405,21 +462,33 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
       </div>
 
       {/* Family cards — horizontal row */}
-      <div className="flex flex-wrap justify-center gap-4 max-w-5xl mb-10 relative z-[3]" style={{ perspective: 1200 }}>
+      <div className="flex flex-wrap justify-center gap-5 max-w-6xl mx-auto mb-10 relative z-[3]" style={{ perspective: 1200 }}>
         {FAMILIES.map((family, i) => {
           const isSelected = selectedFamily === family.id;
           const isDimmed = !!selectedFamily && !isSelected;
+          const isRecommended = family.difficulty === 'Easy';
           return (
             <motion.div
               key={family.id}
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: isDimmed ? 0.55 : 1 }}
               transition={{ delay: 0.15 + i * 0.08, duration: 0.4 }}
-              whileHover={{ scale: 1.07, y: -6, rotateY: 6, rotateX: -3 }}
-              onClick={() => setSelectedFamily(family.id)}
+              whileHover={{ scale: 1.03, y: -4, rotateY: 3, rotateX: -1.5 }}
+              onClick={() => selectFamily(family.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  selectFamily(family.id);
+                }
+              }}
+              tabIndex={0}
+              role="button"
+              aria-pressed={isSelected}
+              aria-label={`Select ${family.name} family`}
               className={cn(
-                'w-[155px] cursor-pointer p-4 transition-all duration-200 relative group',
-                'bg-card/90 backdrop-blur-sm',
+                'w-[180px] cursor-pointer p-5 transition-all duration-200 relative group',
+                'bg-card/90 backdrop-blur-sm outline-none',
+                'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
               )}
               style={{
                 clipPath: CARD_CLIP,
@@ -453,6 +522,16 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 />
               )}
 
+              {/* Recommended tag for new players */}
+              {isRecommended && !isSelected && (
+                <div
+                  className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider flex items-center gap-1 bg-emerald-500/90 text-emerald-950 shadow-md whitespace-nowrap"
+                >
+                  <Star className="h-2.5 w-2.5 fill-current" />
+                  New player pick
+                </div>
+              )}
+
               <motion.div
                 className="flex justify-center mb-2"
                 whileHover={{ filter: `drop-shadow(0 0 6px ${family.color})` }}
@@ -462,7 +541,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 } : {}}
                 transition={isSelected ? { duration: 1.5, repeat: Infinity, ease: 'easeInOut' } : {}}
               >
-                <FamilyCrest familyId={family.id} color={family.color} size={36} />
+                <FamilyCrest familyId={family.id} color={family.color} size={40} />
               </motion.div>
 
               <div className="text-lg font-bold font-playfair mb-0.5 text-center" style={{ color: family.color }}>
@@ -488,12 +567,12 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 ))}
               </div>
 
-              {/* Motto reveal on hover */}
+              {/* Motto reveal — overlay INSIDE the card so it doesn't get clipped */}
               <div
-                className="absolute inset-x-2 -bottom-0.5 translate-y-full px-2 py-1.5 rounded-b bg-noir-dark/95 backdrop-blur-sm opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none"
-                style={{ borderTop: `1px solid ${family.color}80` }}
+                className="absolute inset-0 px-3 flex items-center justify-center bg-noir-dark/92 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+                style={{ clipPath: CARD_CLIP, border: `1px solid ${family.color}60` }}
               >
-                <p className="text-[9px] italic font-playfair text-center leading-tight" style={{ color: family.color }}>
+                <p className="text-xs italic font-playfair text-center leading-snug" style={{ color: family.color }}>
                   {family.motto}
                 </p>
               </div>
@@ -503,7 +582,8 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
       </div>
 
       {/* Detail panel — only shows for selected family */}
-      <div className="max-w-2xl w-full min-h-[220px] relative z-[3]">
+      <div ref={detailRef} className="max-w-2xl w-full min-h-[220px] relative z-[3]">
+        <AnimatePresence mode="wait">
         {activeFamily ? (
           <motion.div
             key={activeFamily.id}
@@ -625,7 +705,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
             </div>
 
             <Button
-              onClick={() => onSelectFamily(activeFamily.id, activeFamily.startingResources, difficulty, seedInput ? parseInt(seedInput) : undefined, mapSize)}
+              onClick={() => { playSound('success'); onSelectFamily(activeFamily.id, activeFamily.startingResources, difficulty, seedInput ? parseInt(seedInput) : undefined, mapSize); }}
               className="w-full font-playfair font-bold text-base py-5 transition-all duration-200"
               style={{
                 backgroundColor: activeFamily.color,
@@ -638,18 +718,22 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
           </motion.div>
         ) : (
           <motion.div
+            key="empty"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
+            exit={{ opacity: 0 }}
+            transition={{ delay: 0.3 }}
             className="text-center py-12"
           >
             <p className="text-muted-foreground text-sm">
-              Select a family above to see their strengths and begin your rise to power.
+              Select a family above to see their strengths. Use ← → to browse, Enter to confirm.
             </p>
           </motion.div>
         )}
+        </AnimatePresence>
       </div>
     </div>
+    </TooltipProvider>
   );
 };
 
