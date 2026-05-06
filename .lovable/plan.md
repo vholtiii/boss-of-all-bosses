@@ -1,51 +1,37 @@
-## Goal
+## Issue
 
-Polish the Family Selection screen for clarity and engagement. Implementing items **#2, #3, #4, #6, #7** from the prior suggestion set. Skipping #1 (setup-bar consolidation) and #5 (BEGIN button hero treatment) per user request.
+The "NEW PLAYER PICK" badge on the Lucchese family card is being clipped at the top — the top of the green pill (and its star icon's top half) gets cut off. Same root cause subtly affects the selected-card top accent bar.
 
-File: `src/components/FamilySelectionScreen.tsx` (single file — no new assets, no data changes).
+**Why:** the badge is a child of the card's `motion.div`, which has `clipPath: polygon(0% 0%, 95% 0%, 100% 100%, 5% 100%)` (the angled "playbill" card shape). `clip-path` clips ALL descendants regardless of negative margins / `-top-2` positioning. So anything placed outside the polygon (above the top edge or past the slanted sides) is invisible.
 
----
+## Fix
 
-## #2 — Difficulty chips: lighter, clearer
+Restructure each family card so the clipped artwork lives in an inner element, while overlays that need to escape the clip (recommended badge, top accent bar, spotlight glow) sit on an outer un-clipped wrapper.
 
-- Each chip shows only the flavor name (**Made Man / Wiseguy / The Don**) on one line, with a small color dot (green/yellow/red) inline instead of emoji.
-- Mechanical effect text (`+50% money, weaker AI`) moves into a Radix `Tooltip` on hover.
-- Drop the cramped two-line layout — chips become single-line pill buttons of consistent height.
+In `src/components/FamilySelectionScreen.tsx` (around lines 471-579):
 
-## #3 — Family cards: bigger, calmer, keyboard-friendly
+1. Wrap each card in an outer `motion.div` (no clip-path) that holds:
+   - the hover/scale/3D transforms, click & keyboard handlers, focus ring, `aria-*`
+   - the spotlight cone (`-inset-6` glow), already escapes via `-z-10` but currently still inside the clip
+   - the top accent bar (`-top-0.5`) for selected state
+   - the **"New player pick"** badge (`-top-2`, centered)
 
-- Card width 155 → 180 px; bump internal padding so trait bars breathe.
-- Soften hover transform: `scale 1.07 → 1.03`, `rotateY 6° → 3°`, `rotateX -3° → -1.5°`. Less jitter; neighbors stop overlapping.
-- Make each card focusable: `tabIndex={0}`, `role="button"`, `aria-pressed={isSelected}`. Selecting via Space/Enter when focused.
-- Add **Arrow Left / Right** keyboard navigation across the row (cycles selection). Wire a `keydown` listener at screen level that updates `selectedFamily`.
-- Move the motto reveal **inside** the card as a soft overlay (absolute inset-0, dark backdrop, fade in on hover) so it stops getting clipped by the `clip-path`.
-- Add a small "★ Recommended for new players" tag on the Lucchese card (the only Easy-flavored family).
+2. Inner `<div>` carries the clipped visuals only:
+   - `clipPath: CARD_CLIP`
+   - background, border, box-shadow, noise, padding
+   - crest, name, difficulty, soldier count, trait bars
+   - motto reveal overlay (still needs `clipPath` to match the card silhouette)
 
-## #4 — Detail panel: smoother transitions + auto-scroll into view
+3. Move the focus-visible ring to the outer wrapper so the focus outline isn't clipped either.
 
-- When a family is selected, smoothly `scrollIntoView({ behavior: 'smooth', block: 'nearest' })` on the detail panel ref so the BEGIN button is always visible without manual scrolling.
-- Cap detail panel max-height (with internal `overflow-y-auto`) on short viewports so the BEGIN button stays anchored.
-- Improve cross-family transition: the crest cross-fades and the colored accent line animates its width via Framer Motion when switching between families (currently the whole panel just re-mounts).
+4. Tiny tweak: give the badge `z-20` so it sits above the inner card border.
 
-## #6 — Audio sting
-
-- Wire `useSoundSystem.playSound` into the family-card click handler — short `'click'` cue on selection.
-- Different cue (`'success'`) when the BEGIN button is pressed.
-
-## #7 — Micro-polish
-
-- Wrap setup controls + cards inside a single `max-w-6xl mx-auto` container so spacing scales evenly on ultra-wide viewports (the current 2897 px preview makes elements feel marooned).
-- Reduce vignette outer alpha `0.95 → 0.85` so the background art reads through more.
-- Add four small SVG art-deco corner ornaments (top-left/right, bottom-left/right of the viewport) for a "framed playbill" feel — pure decoration, `pointer-events-none`, low opacity.
-- Particles untouched (already feels right at 50).
-
----
-
-## Out of scope
-
-- Setup-bar consolidation (#1) and BEGIN button hero treatment (#5) — skipped per request.
-- Any gameplay/data/balance changes; family stats, starting resources, and difficulty mechanics unchanged.
+No changes to copy, colors, sizes, or interaction behavior — purely a DOM restructure to stop clipping overlays. Verify visually that:
+- Lucchese badge renders fully above the card with star icon intact
+- Selected accent bar shows full glow
+- Hover spotlight cone reaches all the way out
+- Motto overlay still respects the angled card shape on hover
 
 ## Files
 
-- `src/components/FamilySelectionScreen.tsx` — all changes here.
+- `src/components/FamilySelectionScreen.tsx` — single-file change
