@@ -5625,7 +5625,9 @@ export const useEnhancedMafiaGameState = (
 
       // ── PERSONALITY-DRIVEN MOVEMENT & COMBAT ──
       // (personality already declared above; reassignable for war override)
-      const aggression = opponent.strategy.aggressionLevel || 50;
+      // Difficulty: shift AI aggression baseline (Easy -15, Hard +15)
+      const aggressionBonus = state.difficultyModifiers?.aiAggressionBonus ?? 0;
+      const aggression = Math.max(0, Math.min(100, (opponent.strategy.aggressionLevel || 50) + aggressionBonus));
       const cooperation = opponent.strategy.cooperationTendency || 50;
 
       // War aggression override: if at war, behave as aggressive and prioritize war target
