@@ -1842,9 +1842,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           });
                           setActionMenu(null);
                         }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/90 hover:bg-primary text-primary-foreground text-xs font-bold transition-colors"
+                        className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/90 hover:bg-primary text-primary-foreground text-xs font-bold transition-colors", isRec('extort') && recCls)}
                       >
-                        💰 Extort
+                        💰 Extort<CostChip k="extort" />
                       </button>
                     ) : reasons.extort ? (
                       <DisabledAction icon="💰" label="Extort" reason={reasons.extort} />
