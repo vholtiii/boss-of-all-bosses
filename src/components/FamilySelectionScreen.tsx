@@ -256,12 +256,19 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   return (
     <div
       className="min-h-screen bg-background flex flex-col items-center justify-center p-6 overflow-hidden relative"
-      style={{
-        backgroundImage: `url(${mafiaSitdownBg})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}
     >
+      {/* Ken-Burns background layer */}
+      <motion.div
+        className="absolute inset-0 z-0"
+        style={{
+          backgroundImage: `url(${mafiaSitdownBg})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+        initial={{ scale: 1.05, x: 0, y: 0 }}
+        animate={{ scale: [1.05, 1.15, 1.08, 1.05], x: [0, -20, 10, 0], y: [0, -10, 5, 0] }}
+        transition={{ duration: 40, repeat: Infinity, ease: 'easeInOut' }}
+      />
       {/* Dark overlay + vignette for dramatic atmosphere */}
       <div className="absolute inset-0 bg-black/60 z-0" />
       <div
@@ -312,17 +319,32 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-3 font-source">
           New York City, 1955
         </p>
-        <h1 className="text-5xl md:text-6xl font-bold text-primary font-playfair tracking-wider">
+        <h1 className="text-5xl md:text-6xl font-bold text-primary font-playfair tracking-wider drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
           THE FIVE FAMILIES
         </h1>
-        <div className="w-24 h-px bg-primary/30 mx-auto mt-4" />
+        <motion.div
+          className="h-px bg-primary/60 mx-auto mt-4 origin-center"
+          initial={{ width: 0 }}
+          animate={{ width: 96 }}
+          transition={{ delay: 0.5, duration: 0.9, ease: 'easeOut' }}
+        />
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.0, duration: 0.8 }}
+          className="text-xs italic text-primary/80 mt-3 font-playfair tracking-wide"
+        >
+          Five families. One throne. The Commission watches.
+        </motion.p>
         <p className="text-sm text-muted-foreground mt-4 font-source max-w-md mx-auto">
           Choose your family and difficulty. Each has unique strengths, weaknesses, and strategies for domination.
         </p>
         {/* Difficulty Selector */}
         <div className="flex items-center justify-center gap-2 mt-5">
           {(['easy', 'normal', 'hard'] as const).map(d => {
-            const labels = { easy: '🟢 Easy', normal: '🟡 Normal', hard: '🔴 Hard' };
+            const labels = { easy: 'Made Man', normal: 'Wiseguy', hard: 'The Don' };
+            const sublabels = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
+            const dots = { easy: '🟢', normal: '🟡', hard: '🔴' };
             const descs = { easy: '+50% money, weaker AI', normal: 'Balanced experience', hard: '-25% money, stronger AI' };
             const isActive = difficulty === d;
             return (
@@ -330,7 +352,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 key={d}
                 onClick={() => setDifficulty(d)}
                 className={cn(
-                  'px-4 py-2 rounded-lg border-2 text-xs font-bold uppercase tracking-wider transition-all duration-200',
+                  'px-4 py-2 rounded-lg border-2 text-xs font-bold uppercase tracking-wider transition-all duration-200 flex flex-col items-center gap-0.5',
                   'bg-card/80 backdrop-blur-sm',
                   isActive
                     ? 'border-primary text-primary shadow-md scale-105'
@@ -338,7 +360,8 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 )}
                 title={descs[d]}
               >
-                {labels[d]}
+                <span className="font-playfair text-sm normal-case tracking-wide">{dots[d]} {labels[d]}</span>
+                <span className="text-[8px] opacity-70">{sublabels[d]} · {descs[d]}</span>
               </button>
             );
           })}
@@ -382,19 +405,20 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
       </div>
 
       {/* Family cards — horizontal row */}
-      <div className="flex flex-wrap justify-center gap-4 max-w-5xl mb-10 relative z-[3]">
+      <div className="flex flex-wrap justify-center gap-4 max-w-5xl mb-10 relative z-[3]" style={{ perspective: 1200 }}>
         {FAMILIES.map((family, i) => {
           const isSelected = selectedFamily === family.id;
+          const isDimmed = !!selectedFamily && !isSelected;
           return (
             <motion.div
               key={family.id}
               initial={{ y: 30, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
+              animate={{ y: 0, opacity: isDimmed ? 0.55 : 1 }}
               transition={{ delay: 0.15 + i * 0.08, duration: 0.4 }}
-              whileHover={{ scale: 1.05, y: -4 }}
+              whileHover={{ scale: 1.07, y: -6, rotateY: 6, rotateX: -3 }}
               onClick={() => setSelectedFamily(family.id)}
               className={cn(
-                'w-[155px] cursor-pointer p-4 transition-all duration-200 relative',
+                'w-[155px] cursor-pointer p-4 transition-all duration-200 relative group',
                 'bg-card/90 backdrop-blur-sm',
               )}
               style={{
@@ -402,10 +426,21 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 backgroundImage: NOISE_BG,
                 border: `2px solid ${isSelected ? family.color : 'hsl(var(--border))'}`,
                 boxShadow: isSelected
-                  ? `0 0 25px ${family.color}40, 0 0 50px ${family.color}15, inset 0 1px 0 ${family.color}20`
+                  ? `0 0 25px ${family.color}55, 0 0 60px ${family.color}25, inset 0 1px 0 ${family.color}30`
                   : '0 4px 12px hsl(20 15% 5% / 0.4)',
+                transformStyle: 'preserve-3d',
               }}
             >
+              {/* Spotlight cone behind selected card */}
+              {isSelected && (
+                <div
+                  className="absolute -inset-6 -z-10 pointer-events-none"
+                  style={{
+                    background: `radial-gradient(ellipse at 50% 50%, ${family.color}30 0%, transparent 70%)`,
+                  }}
+                />
+              )}
+
               {/* Spray-paint style accent bar */}
               {isSelected && (
                 <motion.div
@@ -418,12 +453,9 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 />
               )}
 
-              {/* Crest */}
               <motion.div
                 className="flex justify-center mb-2"
-                whileHover={{
-                  filter: `drop-shadow(0 0 6px ${family.color})`,
-                }}
+                whileHover={{ filter: `drop-shadow(0 0 6px ${family.color})` }}
                 animate={isSelected ? {
                   scale: [1, 1.1, 1],
                   filter: [`drop-shadow(0 0 4px ${family.color}60)`, `drop-shadow(0 0 10px ${family.color})`, `drop-shadow(0 0 4px ${family.color}60)`],
@@ -442,7 +474,6 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 <span>{family.startingResources.soldiers} soldiers</span>
               </div>
 
-              {/* Stat bars */}
               <div className="space-y-2">
                 {family.traits.map(trait => (
                   <div key={trait.label} className="space-y-0.5">
@@ -455,6 +486,16 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                     <StatBar value={trait.value} color={family.color} />
                   </div>
                 ))}
+              </div>
+
+              {/* Motto reveal on hover */}
+              <div
+                className="absolute inset-x-2 -bottom-0.5 translate-y-full px-2 py-1.5 rounded-b bg-noir-dark/95 backdrop-blur-sm opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none"
+                style={{ borderTop: `1px solid ${family.color}80` }}
+              >
+                <p className="text-[9px] italic font-playfair text-center leading-tight" style={{ color: family.color }}>
+                  {family.motto}
+                </p>
               </div>
             </motion.div>
           );

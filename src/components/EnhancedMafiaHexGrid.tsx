@@ -1607,8 +1607,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         points={pts.map(p => `${p.x},${p.y}`).join(' ')}
                         fill="none"
                         stroke={storedColor}
-                        strokeWidth="3"
-                        strokeOpacity="0.2"
+                        strokeWidth="5"
+                        strokeOpacity="0.25"
                         strokeLinejoin="round"
                         strokeLinecap="round"
                         filter={`url(#supply-glow-${playerFamily})`}
@@ -1618,9 +1618,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         points={pts.map(p => `${p.x},${p.y}`).join(' ')}
                         fill="none"
                         stroke={storedColor}
-                        strokeWidth="2"
-                        strokeOpacity="0.8"
-                        strokeDasharray="6 3"
+                        strokeWidth="3"
+                        strokeOpacity="0.95"
+                        strokeDasharray="7 3"
                         strokeLinejoin="round"
                         strokeLinecap="round"
                         markerMid={`url(#${markerId})`}
@@ -1707,24 +1707,85 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               const noActions = gameState?.actionsRemaining === 0;
               const reasons = actionMenu.reasons || {};
 
+              // Cost chips per action
+              const flipCount = (gameState?.flippedSoldiers || []).filter((f: any) => f.flippedByFamily === playerFamily).length;
+              const flipCost = FLIP_SOLDIER_BASE_COST + flipCount * FLIP_SOLDIER_COST_ESCALATION;
+              const COSTS: Record<string, string> = {
+                hit: '1 action',
+                sabotage: '1 action · $1k',
+                extort: '1 action',
+                claim: '1 action',
+                negotiate: '1 action',
+                safehouse: '1 action · $5k',
+                assault_hq: '2 actions',
+                flip_soldier: `1 action · $${flipCost.toLocaleString()}`,
+              };
+
+              // Recommended-action heuristics
+              const recommended = new Set<string>();
+              const t = actionMenu.tile;
+              const tileKey = `${t.q},${t.r},${t.s}`;
+              const isScouted = (gameState?.scoutedHexes || []).some((sh: any) => sh.q === t.q && sh.r === t.r && sh.s === t.s);
+              const hasPlannedHit = gameState?.plannedHit && gameState.plannedHit.q === t.q && gameState.plannedHit.r === t.r;
+              if (actionMenu.canHit && (isScouted || hasPlannedHit)) recommended.add('hit');
+              if (actionMenu.canExtort && t.business && !t.business.isExtorted === false) recommended.add('extort');
+              else if (actionMenu.canExtort) recommended.add('extort');
+              if (actionMenu.canClaim && (!t.controllingFamily || t.controllingFamily === 'neutral')) recommended.add('claim');
+              if (actionMenu.canNegotiate && actionMenu.pendingNegotiationId) recommended.add('negotiate');
+              if (actionMenu.canSafehouse && t.controllingFamily === playerFamily && !((gameState?.safehouses || []).some((sh: any) => sh.q === t.q && sh.r === t.r))) {
+                // only suggest safehouse if no other recs and player has few
+                if (recommended.size === 0) recommended.add('safehouse');
+              }
+              // Cap to top 2 to avoid noise
+              const recArr = Array.from(recommended).slice(0, 2);
+              const isRec = (k: string) => recArr.includes(k);
+
+              const recCls = "border-l-2 border-l-primary/80 shadow-[0_0_8px_hsl(var(--primary)/0.35)]";
+
               const DisabledAction = ({ icon, label, reason }: { icon: string; label: string; reason: string }) => (
-                <div className="flex flex-col px-2.5 py-1 rounded-md opacity-40 cursor-not-allowed">
-                  <span className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">{icon} {label}</span>
-                  <span className="text-[8px] text-destructive/80 ml-5">{reason}</span>
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md opacity-50 cursor-not-allowed bg-muted/20">
+                  <span className="text-[10px]">🔒</span>
+                  <span className="text-[10px] font-semibold text-muted-foreground flex-1 truncate">{icon} {label}</span>
+                  <span className="text-[8px] text-destructive/90 italic truncate max-w-[80px]">{reason}</span>
                 </div>
               );
+
+              const CostChip = ({ k }: { k: string }) => (
+                <span className="ml-auto text-[8px] font-medium opacity-75 bg-background/30 px-1 rounded">
+                  {COSTS[k]}
+                </span>
+              );
+
+              // Action pips for header
+              const ar = gameState?.actionsRemaining ?? 0;
+              const am = gameState?.maxActions ?? 0;
 
               return (
                 <foreignObject
                   x={x - menuWidth / 2}
                   y={y - baseHexRadius - menuHeight - 8}
                   width={menuWidth}
-                  height={menuHeight + 20}
+                  height={menuHeight + 30}
                   className="overflow-visible"
                 >
-                  <div className="text-[9px] font-bold text-center mb-0.5 text-muted-foreground">
-                    ⚔️ {gameState?.actionsRemaining ?? '?'}/{gameState?.maxActions ?? '?'} Actions
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <span className="text-[9px] font-bold text-muted-foreground">⚔️</span>
+                    {Array.from({ length: am }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          "w-1.5 h-1.5 rounded-full transition-colors",
+                          i < ar ? "bg-primary shadow-[0_0_4px_hsl(var(--primary))]" : "bg-muted-foreground/25"
+                        )}
+                      />
+                    ))}
+                    <span className="text-[9px] font-bold text-muted-foreground ml-0.5">{ar}/{am}</span>
                   </div>
+                  {recArr.length > 0 && (
+                    <div className="text-[8px] font-bold uppercase tracking-wider text-primary/80 text-center mb-0.5">
+                      ★ Recommended
+                    </div>
+                  )}
                   <div className={cn("flex flex-col gap-0.5 bg-background/95 backdrop-blur-sm border border-primary/40 rounded-lg p-1.5 shadow-xl", noActions && !disabledCount && "opacity-50 pointer-events-none")}>
                     {actionMenu.canHit ? (
                       <button
@@ -1739,12 +1800,13 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           });
                           setActionMenu(null);
                         }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-destructive/90 hover:bg-destructive text-destructive-foreground text-xs font-bold transition-colors"
+                        className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-destructive/90 hover:bg-destructive text-destructive-foreground text-xs font-bold transition-colors", isRec('hit') && recCls)}
                       >
-                        ⚔️ Hit Territory
+                        ⚔️ Hit
                         {gameState?.plannedHit && gameState.plannedHit.q === actionMenu.tile.q && gameState.plannedHit.r === actionMenu.tile.r && gameState.plannedHit.s === actionMenu.tile.s && (
                           <span className="ml-1 text-[9px] bg-background/30 px-1 rounded">+20% 🎯</span>
                         )}
+                        <CostChip k="hit" />
                       </button>
                     ) : reasons.hit ? (
                       <DisabledAction icon="⚔️" label="Hit Territory" reason={reasons.hit} />
@@ -1761,9 +1823,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           });
                           setActionMenu(null);
                         }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-orange-600/90 hover:bg-orange-600 text-white text-xs font-bold transition-colors"
+                        className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-orange-600/90 hover:bg-orange-600 text-white text-xs font-bold transition-colors", isRec('sabotage') && recCls)}
                       >
-                        💣 Sabotage
+                        💣 Sabotage<CostChip k="sabotage" />
                       </button>
                     ) : reasons.sabotage ? (
                       <DisabledAction icon="💣" label="Sabotage" reason={reasons.sabotage} />
@@ -1780,9 +1842,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           });
                           setActionMenu(null);
                         }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/90 hover:bg-primary text-primary-foreground text-xs font-bold transition-colors"
+                        className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/90 hover:bg-primary text-primary-foreground text-xs font-bold transition-colors", isRec('extort') && recCls)}
                       >
-                        💰 Extort
+                        💰 Extort<CostChip k="extort" />
                       </button>
                     ) : reasons.extort ? (
                       <DisabledAction icon="💰" label="Extort" reason={reasons.extort} />
@@ -1800,9 +1862,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           });
                           setActionMenu(null);
                         }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-secondary/90 hover:bg-secondary text-secondary-foreground text-xs font-bold transition-colors"
+                        className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-secondary/90 hover:bg-secondary text-secondary-foreground text-xs font-bold transition-colors", isRec('claim') && recCls)}
                       >
-                        🏴 Claim Territory
+                        🏴 Claim<CostChip k="claim" />
                       </button>
                     ) : reasons.claim ? (
                       <DisabledAction icon="🏴" label="Claim Territory" reason={reasons.claim} />
@@ -1821,9 +1883,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           });
                           setActionMenu(null);
                         }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-accent/90 hover:bg-accent text-accent-foreground text-xs font-bold transition-colors"
+                        className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-accent/90 hover:bg-accent text-accent-foreground text-xs font-bold transition-colors", isRec('negotiate') && recCls)}
                       >
-                        🤝 Negotiate
+                        🤝 Negotiate<CostChip k="negotiate" />
                       </button>
                     ) : reasons.negotiate ? (
                       <DisabledAction icon="🤝" label="Negotiate" reason={reasons.negotiate} />
@@ -1840,9 +1902,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           });
                           setActionMenu(null);
                         }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-600/90 hover:bg-amber-600 text-white text-xs font-bold transition-colors"
+                        className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-600/90 hover:bg-amber-600 text-white text-xs font-bold transition-colors", isRec('safehouse') && recCls)}
                       >
-                        🏠 Safehouse
+                        🏠 Safehouse<CostChip k="safehouse" />
                       </button>
                     ) : reasons.safehouse ? (
                       <DisabledAction icon="🏠" label="Safehouse" reason={reasons.safehouse} />
@@ -1862,7 +1924,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         }}
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-destructive hover:bg-destructive/80 text-destructive-foreground text-xs font-bold transition-colors"
                       >
-                        💀 Assault HQ
+                        💀 Assault HQ<CostChip k="assault_hq" />
                       </button>
                     ) : reasons.assault_hq ? (
                       <DisabledAction icon="💀" label="Assault HQ" reason={reasons.assault_hq} />
@@ -2158,7 +2220,27 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               const districtHexes = (gameState?.hexMap || []).filter(t => t.district === displayHex.district);
               const playerDistrictHexes = districtHexes.filter(t => t.controllingFamily === playerFamily);
               const districtPct = districtHexes.length > 0 ? Math.round((playerDistrictHexes.length / districtHexes.length) * 100) : 0;
-              return <h3 className="font-semibold text-mafia-gold mb-2">{displayHex.district} ({districtPct}% controlled)</h3>;
+              const scoutInfo = scoutedHexes.find((s: ScoutedHex) => s.q === displayHex.q && s.r === displayHex.r && s.s === displayHex.s);
+              const currentTurn = gameState?.turn || 0;
+              const isStale = scoutInfo && currentTurn > scoutInfo.freshUntilTurn;
+              const isFresh = scoutInfo && currentTurn <= scoutInfo.freshUntilTurn;
+              const staleAge = scoutInfo ? currentTurn - scoutInfo.scoutedTurn : 0;
+              return (
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <h3 className="font-semibold text-mafia-gold flex-1 truncate">{displayHex.district} ({districtPct}%)</h3>
+                  {scoutInfo && (
+                    <span
+                      className={cn(
+                        "text-[9px] px-1.5 py-0.5 rounded border flex items-center gap-1 shrink-0",
+                        isFresh ? "border-emerald-500/50 text-emerald-300 bg-emerald-900/30" : "border-amber-500/50 text-amber-300 bg-amber-900/30"
+                      )}
+                      title={isFresh ? 'Fresh intel — combat bonuses active' : `Stale intel — ${staleAge} turn${staleAge !== 1 ? 's' : ''} old`}
+                    >
+                      🕓 {isFresh ? 'Fresh' : `${staleAge}t old`}
+                    </span>
+                  )}
+                </div>
+              );
             })()}
             <div className="space-y-1 text-sm">
               <p><span className="text-muted-foreground">Owner:</span> {(displayHex.controllingFamily || 'neutral').toUpperCase()}</p>
