@@ -172,12 +172,16 @@ export interface DifficultyModifiers {
   policeHeatMult: number;
   hitSuccessBonus: number;
   eventCostMult: number;
+  // NEW — wires the dossier's "AI Rivals" + "Diplomacy" levers
+  aiAggressionBonus: number;     // added to every AI's aggressionLevel (clamped 0-100)
+  diplomacyTensionMult: number;  // multiplies tension *gains* on player-involved pairs
+  tensionDecayMult: number;      // multiplies passive per-turn tension decay
 }
 
 const DIFFICULTY_MODIFIERS: Record<Difficulty, DifficultyModifiers> = {
-  easy: { playerMoneyMult: 1.5, aiIncomeMult: 0.6, aiRecruitCapBonus: 0, policeHeatMult: 0.7, hitSuccessBonus: 0.10, eventCostMult: 0.7 },
-  normal: { playerMoneyMult: 1.0, aiIncomeMult: 1.0, aiRecruitCapBonus: 0, policeHeatMult: 1.0, hitSuccessBonus: 0, eventCostMult: 1.0 },
-  hard: { playerMoneyMult: 0.75, aiIncomeMult: 1.5, aiRecruitCapBonus: 2, policeHeatMult: 1.3, hitSuccessBonus: -0.10, eventCostMult: 1.3 },
+  easy:   { playerMoneyMult: 1.5,  aiIncomeMult: 0.6, aiRecruitCapBonus: 0, policeHeatMult: 0.7, hitSuccessBonus:  0.10, eventCostMult: 0.7, aiAggressionBonus: -15, diplomacyTensionMult: 0.7, tensionDecayMult: 1.5 },
+  normal: { playerMoneyMult: 1.0,  aiIncomeMult: 1.0, aiRecruitCapBonus: 0, policeHeatMult: 1.0, hitSuccessBonus:  0,    eventCostMult: 1.0, aiAggressionBonus:   0, diplomacyTensionMult: 1.0, tensionDecayMult: 1.0 },
+  hard:   { playerMoneyMult: 0.75, aiIncomeMult: 1.5, aiRecruitCapBonus: 2, policeHeatMult: 1.3, hitSuccessBonus: -0.10, eventCostMult: 1.3, aiAggressionBonus: +15, diplomacyTensionMult: 1.4, tensionDecayMult: 0.6 },
 };
 
 // ============ HEAT HELPER ============
