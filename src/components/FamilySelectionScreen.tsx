@@ -253,10 +253,6 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
 
   const activeFamily = FAMILIES.find(f => f.id === selectedFamily);
 
-  const playClick = () => {
-    try { (useSoundSystem as any) && undefined; } catch { /* noop */ }
-  };
-
   return (
     <div
       className="min-h-screen bg-background flex flex-col items-center justify-center p-6 overflow-hidden relative"
