@@ -253,15 +253,26 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
 
   const activeFamily = FAMILIES.find(f => f.id === selectedFamily);
 
+  const playClick = () => {
+    try { (useSoundSystem as any) && undefined; } catch { /* noop */ }
+  };
+
   return (
     <div
       className="min-h-screen bg-background flex flex-col items-center justify-center p-6 overflow-hidden relative"
-      style={{
-        backgroundImage: `url(${mafiaSitdownBg})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}
     >
+      {/* Ken-Burns background layer */}
+      <motion.div
+        className="absolute inset-0 z-0"
+        style={{
+          backgroundImage: `url(${mafiaSitdownBg})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+        initial={{ scale: 1.05, x: 0, y: 0 }}
+        animate={{ scale: [1.05, 1.15, 1.08, 1.05], x: [0, -20, 10, 0], y: [0, -10, 5, 0] }}
+        transition={{ duration: 40, repeat: Infinity, ease: 'easeInOut' }}
+      />
       {/* Dark overlay + vignette for dramatic atmosphere */}
       <div className="absolute inset-0 bg-black/60 z-0" />
       <div
@@ -312,17 +323,32 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-3 font-source">
           New York City, 1955
         </p>
-        <h1 className="text-5xl md:text-6xl font-bold text-primary font-playfair tracking-wider">
+        <h1 className="text-5xl md:text-6xl font-bold text-primary font-playfair tracking-wider drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
           THE FIVE FAMILIES
         </h1>
-        <div className="w-24 h-px bg-primary/30 mx-auto mt-4" />
+        <motion.div
+          className="h-px bg-primary/60 mx-auto mt-4 origin-center"
+          initial={{ width: 0 }}
+          animate={{ width: 96 }}
+          transition={{ delay: 0.5, duration: 0.9, ease: 'easeOut' }}
+        />
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.0, duration: 0.8 }}
+          className="text-xs italic text-primary/80 mt-3 font-playfair tracking-wide"
+        >
+          Five families. One throne. The Commission watches.
+        </motion.p>
         <p className="text-sm text-muted-foreground mt-4 font-source max-w-md mx-auto">
           Choose your family and difficulty. Each has unique strengths, weaknesses, and strategies for domination.
         </p>
         {/* Difficulty Selector */}
         <div className="flex items-center justify-center gap-2 mt-5">
           {(['easy', 'normal', 'hard'] as const).map(d => {
-            const labels = { easy: '🟢 Easy', normal: '🟡 Normal', hard: '🔴 Hard' };
+            const labels = { easy: 'Made Man', normal: 'Wiseguy', hard: 'The Don' };
+            const sublabels = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
+            const dots = { easy: '🟢', normal: '🟡', hard: '🔴' };
             const descs = { easy: '+50% money, weaker AI', normal: 'Balanced experience', hard: '-25% money, stronger AI' };
             const isActive = difficulty === d;
             return (
@@ -330,7 +356,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 key={d}
                 onClick={() => setDifficulty(d)}
                 className={cn(
-                  'px-4 py-2 rounded-lg border-2 text-xs font-bold uppercase tracking-wider transition-all duration-200',
+                  'px-4 py-2 rounded-lg border-2 text-xs font-bold uppercase tracking-wider transition-all duration-200 flex flex-col items-center gap-0.5',
                   'bg-card/80 backdrop-blur-sm',
                   isActive
                     ? 'border-primary text-primary shadow-md scale-105'
@@ -338,7 +364,8 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 )}
                 title={descs[d]}
               >
-                {labels[d]}
+                <span className="font-playfair text-sm normal-case tracking-wide">{dots[d]} {labels[d]}</span>
+                <span className="text-[8px] opacity-70">{sublabels[d]} · {descs[d]}</span>
               </button>
             );
           })}
