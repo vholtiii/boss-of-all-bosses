@@ -1862,9 +1862,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           });
                           setActionMenu(null);
                         }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-secondary/90 hover:bg-secondary text-secondary-foreground text-xs font-bold transition-colors"
+                        className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-secondary/90 hover:bg-secondary text-secondary-foreground text-xs font-bold transition-colors", isRec('claim') && recCls)}
                       >
-                        🏴 Claim Territory
+                        🏴 Claim<CostChip k="claim" />
                       </button>
                     ) : reasons.claim ? (
                       <DisabledAction icon="🏴" label="Claim Territory" reason={reasons.claim} />
