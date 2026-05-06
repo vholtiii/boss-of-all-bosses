@@ -287,6 +287,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   }, [selectedFamily, selectFamily]);
 
   return (
+    <TooltipProvider delayDuration={150}>
     <div
       className="min-h-screen bg-background flex flex-col items-center justify-center p-6 overflow-hidden relative"
     >
@@ -303,15 +304,36 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         transition={{ duration: 40, repeat: Infinity, ease: 'easeInOut' }}
       />
       {/* Dark overlay + vignette for dramatic atmosphere */}
-      <div className="absolute inset-0 bg-black/60 z-0" />
+      <div className="absolute inset-0 bg-black/55 z-0" />
       <div
         className="absolute inset-0 z-0"
         style={{
-          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.7) 70%, rgba(0,0,0,0.95) 100%)',
+          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.6) 70%, rgba(0,0,0,0.85) 100%)',
         }}
       />
       {/* Atmospheric particles */}
       <AtmosphericParticles />
+
+      {/* Art-deco corner ornaments — framed playbill feel */}
+      {([
+        { pos: 'top-3 left-3', rotate: 0 },
+        { pos: 'top-3 right-3', rotate: 90 },
+        { pos: 'bottom-3 right-3', rotate: 180 },
+        { pos: 'bottom-3 left-3', rotate: 270 },
+      ] as const).map(({ pos, rotate }) => (
+        <svg
+          key={pos}
+          className={cn('absolute pointer-events-none z-[2] opacity-30', pos)}
+          width="56" height="56" viewBox="0 0 56 56" fill="none"
+          style={{ transform: `rotate(${rotate}deg)` }}
+        >
+          <path d="M2 20 V2 H20" stroke="hsl(var(--primary))" strokeWidth="1.2" />
+          <path d="M6 14 V6 H14" stroke="hsl(var(--primary))" strokeWidth="0.8" opacity="0.7" />
+          <circle cx="2" cy="2" r="1.5" fill="hsl(var(--primary))" />
+        </svg>
+      ))}
+
+      {/* Music mute toggle */}
 
       {/* Music mute toggle */}
       <button
