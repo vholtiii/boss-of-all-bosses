@@ -1607,8 +1607,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         points={pts.map(p => `${p.x},${p.y}`).join(' ')}
                         fill="none"
                         stroke={storedColor}
-                        strokeWidth="3"
-                        strokeOpacity="0.2"
+                        strokeWidth="5"
+                        strokeOpacity="0.25"
                         strokeLinejoin="round"
                         strokeLinecap="round"
                         filter={`url(#supply-glow-${playerFamily})`}
@@ -1618,9 +1618,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         points={pts.map(p => `${p.x},${p.y}`).join(' ')}
                         fill="none"
                         stroke={storedColor}
-                        strokeWidth="2"
-                        strokeOpacity="0.8"
-                        strokeDasharray="6 3"
+                        strokeWidth="3"
+                        strokeOpacity="0.95"
+                        strokeDasharray="7 3"
                         strokeLinejoin="round"
                         strokeLinecap="round"
                         markerMid={`url(#${markerId})`}
