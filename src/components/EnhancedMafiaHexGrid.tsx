@@ -1924,7 +1924,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                         }}
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-destructive hover:bg-destructive/80 text-destructive-foreground text-xs font-bold transition-colors"
                       >
-                        💀 Assault HQ
+                        💀 Assault HQ<CostChip k="assault_hq" />
                       </button>
                     ) : reasons.assault_hq ? (
                       <DisabledAction icon="💀" label="Assault HQ" reason={reasons.assault_hq} />
