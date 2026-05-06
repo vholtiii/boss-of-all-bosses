@@ -3927,11 +3927,13 @@ export const useEnhancedMafiaGameState = (
 
       // ============ WAR & TENSION LIFECYCLE ============
       {
-        // 1. Decay tension by TENSION_DECAY_PER_TURN for all pairs
+        // 1. Decay tension by TENSION_DECAY_PER_TURN × difficulty.tensionDecayMult for all pairs
+        const decayMult = newState.difficultyModifiers?.tensionDecayMult ?? 1;
+        const tensionDecay = Math.max(1, Math.round(TENSION_DECAY_PER_TURN * decayMult));
         const allPairs = getAllFamilyPairKeys();
         allPairs.forEach(key => {
           if ((newState.familyTensions[key] || 0) > 0) {
-            newState.familyTensions[key] = Math.max(0, (newState.familyTensions[key] || 0) - TENSION_DECAY_PER_TURN);
+            newState.familyTensions[key] = Math.max(0, (newState.familyTensions[key] || 0) - tensionDecay);
           }
         });
 
