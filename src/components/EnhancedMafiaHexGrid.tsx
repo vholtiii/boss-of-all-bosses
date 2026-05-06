@@ -2220,7 +2220,27 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               const districtHexes = (gameState?.hexMap || []).filter(t => t.district === displayHex.district);
               const playerDistrictHexes = districtHexes.filter(t => t.controllingFamily === playerFamily);
               const districtPct = districtHexes.length > 0 ? Math.round((playerDistrictHexes.length / districtHexes.length) * 100) : 0;
-              return <h3 className="font-semibold text-mafia-gold mb-2">{displayHex.district} ({districtPct}% controlled)</h3>;
+              const scoutInfo = scoutedHexes.find((s: ScoutedHex) => s.q === displayHex.q && s.r === displayHex.r && s.s === displayHex.s);
+              const currentTurn = gameState?.turn || 0;
+              const isStale = scoutInfo && currentTurn > scoutInfo.freshUntilTurn;
+              const isFresh = scoutInfo && currentTurn <= scoutInfo.freshUntilTurn;
+              const staleAge = scoutInfo ? currentTurn - scoutInfo.scoutedTurn : 0;
+              return (
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <h3 className="font-semibold text-mafia-gold flex-1 truncate">{displayHex.district} ({districtPct}%)</h3>
+                  {scoutInfo && (
+                    <span
+                      className={cn(
+                        "text-[9px] px-1.5 py-0.5 rounded border flex items-center gap-1 shrink-0",
+                        isFresh ? "border-emerald-500/50 text-emerald-300 bg-emerald-900/30" : "border-amber-500/50 text-amber-300 bg-amber-900/30"
+                      )}
+                      title={isFresh ? 'Fresh intel — combat bonuses active' : `Stale intel — ${staleAge} turn${staleAge !== 1 ? 's' : ''} old`}
+                    >
+                      🕓 {isFresh ? 'Fresh' : `${staleAge}t old`}
+                    </span>
+                  )}
+                </div>
+              );
             })()}
             <div className="space-y-1 text-sm">
               <p><span className="text-muted-foreground">Owner:</span> {(displayHex.controllingFamily || 'neutral').toUpperCase()}</p>
