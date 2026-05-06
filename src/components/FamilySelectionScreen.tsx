@@ -486,21 +486,12 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
               aria-pressed={isSelected}
               aria-label={`Select ${family.name} family`}
               className={cn(
-                'w-[180px] cursor-pointer p-5 transition-all duration-200 relative group',
-                'bg-card/90 backdrop-blur-sm outline-none',
-                'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                'w-[180px] cursor-pointer transition-all duration-200 relative group outline-none',
+                'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm',
               )}
-              style={{
-                clipPath: CARD_CLIP,
-                backgroundImage: NOISE_BG,
-                border: `2px solid ${isSelected ? family.color : 'hsl(var(--border))'}`,
-                boxShadow: isSelected
-                  ? `0 0 25px ${family.color}55, 0 0 60px ${family.color}25, inset 0 1px 0 ${family.color}30`
-                  : '0 4px 12px hsl(20 15% 5% / 0.4)',
-                transformStyle: 'preserve-3d',
-              }}
+              style={{ transformStyle: 'preserve-3d' }}
             >
-              {/* Spotlight cone behind selected card */}
+              {/* Spotlight cone behind selected card (outside clip) */}
               {isSelected && (
                 <div
                   className="absolute -inset-6 -z-10 pointer-events-none"
@@ -510,11 +501,11 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 />
               )}
 
-              {/* Spray-paint style accent bar */}
+              {/* Spray-paint style accent bar (outside clip) */}
               {isSelected && (
                 <motion.div
                   layoutId="selectedAccent"
-                  className="absolute -top-0.5 left-2 right-2 h-1 rounded-full"
+                  className="absolute -top-0.5 left-2 right-2 h-1 rounded-full z-20"
                   style={{
                     backgroundColor: family.color,
                     boxShadow: `0 0 8px ${family.color}80`,
@@ -522,16 +513,28 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 />
               )}
 
-              {/* Recommended tag for new players */}
+              {/* Recommended tag for new players (outside clip) */}
               {isRecommended && !isSelected && (
                 <div
-                  className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider flex items-center gap-1 bg-emerald-500/90 text-emerald-950 shadow-md whitespace-nowrap"
+                  className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider flex items-center gap-1 bg-emerald-500/90 text-emerald-950 shadow-md whitespace-nowrap z-20"
                 >
                   <Star className="h-2.5 w-2.5 fill-current" />
                   New player pick
                 </div>
               )}
 
+              {/* Clipped inner card surface */}
+              <div
+                className="relative p-5 bg-card/90 backdrop-blur-sm"
+                style={{
+                  clipPath: CARD_CLIP,
+                  backgroundImage: NOISE_BG,
+                  border: `2px solid ${isSelected ? family.color : 'hsl(var(--border))'}`,
+                  boxShadow: isSelected
+                    ? `0 0 25px ${family.color}55, 0 0 60px ${family.color}25, inset 0 1px 0 ${family.color}30`
+                    : '0 4px 12px hsl(20 15% 5% / 0.4)',
+                }}
+              >
               <motion.div
                 className="flex justify-center mb-2"
                 whileHover={{ filter: `drop-shadow(0 0 6px ${family.color})` }}
