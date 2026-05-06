@@ -705,6 +705,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         )}
       </div>
     </div>
+    </TooltipProvider>
   );
 };
 
