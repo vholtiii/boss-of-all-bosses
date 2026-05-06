@@ -1902,9 +1902,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           });
                           setActionMenu(null);
                         }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-600/90 hover:bg-amber-600 text-white text-xs font-bold transition-colors"
+                        className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-600/90 hover:bg-amber-600 text-white text-xs font-bold transition-colors", isRec('safehouse') && recCls)}
                       >
-                        🏠 Safehouse
+                        🏠 Safehouse<CostChip k="safehouse" />
                       </button>
                     ) : reasons.safehouse ? (
                       <DisabledAction icon="🏠" label="Safehouse" reason={reasons.safehouse} />
