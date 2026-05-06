@@ -1,61 +1,41 @@
-## Tighten AI-only phase pacing
+## Balance Diagnostic + Simulations
 
-AI currently shares `calculatePhaseForFamily` with the player, so it inherits the new performance gates. But AI bookkeeping (starting respect, padded income on harder difficulties, deterministic capo deployment) lets it satisfy perf reqs the moment its turn floor opens — leading to "AI jumps to P3 on turn 10" while the player is still organizing. We also want a small safety net so a single fluke turn (one-time income spike, brief district control) doesn't promote the AI.
+Run two automated game simulations against the current mechanics, then produce a written balance report.
 
-### Changes
+### What I'll do
 
-**1. Difficulty-scaled AI turn floor (`src/hooks/useEnhancedMafiaGameState.ts`)**
+1. **Build a headless simulation harness** (`/tmp/sim/run.ts`) that imports the real game state from `src/hooks/useEnhancedMafiaGameState.ts` and `src/types/game-mechanics.ts`. The harness:
+   - Initializes a game with a chosen family + difficulty + map size.
+   - Plays a scripted "reasonable" player turn loop (deploy reserves to HQ-adjacent, scout, claim/extort when allowed, build a legal business when reqs near, advance phase when ready) plus the real `processAITurn` for opponents.
+   - Logs per-turn snapshots: turn, phase, money, soldiers, capos, hexes, respect, influence, heat, AI phases, AI hex counts, AI heat, war/pact state.
 
-Add an AI-only offset on top of `PHASE_CONFIGS[p].minTurn` inside `calculatePhaseForFamily` when `family !== state.playerFamily`:
+2. **Run 2 simulations** with different seeds/families:
+   - Sim A: Gambino, Normal, Medium map, 60 turns or until victory/defeat.
+   - Sim B: Colombo, Hard, Medium map, 60 turns or until victory/defeat.
 
-- Easy: `+4` turns
-- Normal: `+2` turns
-- Hard: `+0` (parity with player)
+3. **Diagnostic checks** against the documented rules in memory:
+   - AI phase pacing respects difficulty turn-floor offsets (E+4/N+2/H+0) and player+1 cap (Easy/Normal).
+   - Sustained-perf streak ≥ 2 (≥1 Hard) before AI promotion.
+   - Player phase progression isn't blocked by missing perf reqs.
+   - Economy: net income trend, bankruptcy frequency, maintenance vs revenue ratio.
+   - Heat: tier escalation curve, RICO triggers.
+   - Combat: hit success rates, casualty rates, capo survival.
+   - Diplomacy: pact uptake, tension/war triggers.
+   - Territory: hex distribution between player and AIs, district control progression.
 
-Implementation: read `state.difficulty` (or `state.difficultyModifiers`), compute `aiTurnOffset`, and use `state.turn < cfg.minTurn + aiTurnOffset` for the AI branch only. Player path unchanged.
+4. **Write a markdown report** to `/mnt/documents/balance-report-2026-05-06.md` with:
+   - Executive summary (balanced / minor issues / major issues).
+   - Per-sim turn-by-turn highlights and final state.
+   - Metric tables (phase timing, economy, combat, AI parity).
+   - Flagged imbalances with suggested tuning ranges (no code changes — diagnostic only).
+   - Verification that the recent AI-only phase pacing rules behave as designed.
 
-**2. Sustained-performance gate for AI**
+5. Emit the report as a `<lov-artifact>` so you can download it.
 
-Track a per-opponent counter `resources.phaseReqStreak` (turns in a row meeting all perf reqs for the next phase). In `processAITurn` (around the existing `aiPhase` computation, L5355), before promoting:
+### Notes / risks
 
-- Compute `meetsPerf = meetsNextPhasePerfReqs(state, fam)` (extract the perf-only check; reuse the helper added for the player).
-- If `meetsPerf`, increment streak; else reset to 0.
-- Require `streak >= 2` (Normal/Easy) or `>= 1` (Hard) **in addition to** turn floor + perf gate before allowing `aiPhase` to be returned higher than `cachedPhase`.
+- The game hook is a React hook; the harness will need to call its underlying pure functions (`processAITurn`, `calculatePhaseForFamily`, etc.) directly rather than mounting React. If any logic is locked inside the hook closure, I'll extract just enough to drive a turn loop in a Node script via `bun`.
+- No gameplay code will be modified. This is purely a read + simulate + report task.
+- Output: one markdown report file. No UI changes.
 
-This prevents one-turn promotions caused by transient income spikes or temporary district flips.
-
-**3. Soft "rubber-band" cap: AI phase ≤ player phase + 1**
-
-In `processAITurn` at the phase-transition block (L6862-6873), clamp:
-
-```
-const cap = (state.gamePhase || 1) + 1;
-const effective = Math.min(aiPhase, cap);
-```
-
-Only promote `cachedPhase` up to `effective`. Once the player advances, the AI catches up next turn (no perf re-check needed because they already qualified). Hard difficulty skips this cap so elite AI can still pull ahead by 2 phases.
-
-**4. Generalize `meetsNextPhasePerfReqs`**
-
-The existing helper hardcodes `state.gamePhase` for player. Refactor to take `(state, family, currentPhase)` so AI can pass `opponent.resources.cachedPhase`. Player call site updated to pass `state.gamePhase`.
-
-**5. Memory update**
-
-Update `mem://gameplay/ai-behavior` with: difficulty-scaled AI turn floor offsets (E+4/N+2/H+0), 2-turn sustained perf streak required, and player+1 phase cap (Normal/Easy only).
-
-### Files
-
-- `src/hooks/useEnhancedMafiaGameState.ts` — `calculatePhaseForFamily`, `meetsNextPhasePerfReqs`, AI promotion block in `processAITurn`
-- `mem://gameplay/ai-behavior` — pacing rules
-
-### Result
-
-| Difficulty | AI turn floor | Streak req | Phase cap vs player |
-|------------|---------------|------------|---------------------|
-| Easy       | cfg + 4       | 2 turns    | player + 1          |
-| Normal     | cfg + 2       | 2 turns    | player + 1          |
-| Hard       | cfg + 0       | 1 turn     | none (cfg + 2 cap)  |
-
-Skilled players advancing fast still face accelerating AI; slow players get breathing room without trivializing Hard.
-
-Approve to implement, or adjust offsets/cap.
+Approve to run.
