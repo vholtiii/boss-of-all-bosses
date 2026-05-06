@@ -415,21 +415,17 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         >
           {(['easy', 'normal', 'hard'] as const).map(d => {
             type Tone = 'buff' | 'neutral' | 'debuff';
-            const meta: {
-              icon: string; name: string; chip: string; tagline: string; quote: string;
-              color: string; glow: string; tint: string;
-              stats: { icon: string; label: string; value: string; tone: Tone }[];
-            } = ({
+            const meta = ({
               easy: {
                 icon: '🎩', name: 'Made Man', chip: 'EASY',
                 tagline: 'Learn the ropes',
                 quote: '"Welcome to the family, kid."',
                 color: 'rgb(16,185,129)', glow: 'rgba(16,185,129,0.55)', tint: 'rgba(16,185,129,0.10)',
                 stats: [
-                  { icon: '💰', label: 'Income',      value: '+50%',      tone: 'buff' },
-                  { icon: '⚔️', label: 'AI Rivals',   value: 'Hesitant',  tone: 'buff' },
-                  { icon: '🚓', label: 'Police Heat', value: 'Lenient',   tone: 'buff' },
-                  { icon: '🤝', label: 'Diplomacy',   value: 'Forgiving', tone: 'buff' },
+                  { icon: '💰', label: 'Income',      value: '+50%',      tone: 'buff' as Tone },
+                  { icon: '⚔️', label: 'AI Rivals',   value: 'Hesitant',  tone: 'buff' as Tone },
+                  { icon: '🚓', label: 'Police Heat', value: 'Lenient',   tone: 'buff' as Tone },
+                  { icon: '🤝', label: 'Diplomacy',   value: 'Forgiving', tone: 'buff' as Tone },
                 ],
               },
               normal: {
@@ -438,10 +434,10 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 quote: '"No favors. No mercy."',
                 color: 'rgb(251,191,36)', glow: 'rgba(251,191,36,0.55)', tint: 'rgba(251,191,36,0.10)',
                 stats: [
-                  { icon: '💰', label: 'Income',      value: 'Base',     tone: 'neutral' },
-                  { icon: '⚔️', label: 'AI Rivals',   value: 'Tactical', tone: 'neutral' },
-                  { icon: '🚓', label: 'Police Heat', value: 'Standard', tone: 'neutral' },
-                  { icon: '🤝', label: 'Diplomacy',   value: 'Cautious', tone: 'neutral' },
+                  { icon: '💰', label: 'Income',      value: 'Base',     tone: 'neutral' as Tone },
+                  { icon: '⚔️', label: 'AI Rivals',   value: 'Tactical', tone: 'neutral' as Tone },
+                  { icon: '🚓', label: 'Police Heat', value: 'Standard', tone: 'neutral' as Tone },
+                  { icon: '🤝', label: 'Diplomacy',   value: 'Cautious', tone: 'neutral' as Tone },
                 ],
               },
               hard: {
@@ -450,13 +446,13 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 quote: '"Only the strong survive."',
                 color: 'rgb(244,63,94)', glow: 'rgba(244,63,94,0.55)', tint: 'rgba(244,63,94,0.10)',
                 stats: [
-                  { icon: '💰', label: 'Income',      value: '−25%',        tone: 'debuff' },
-                  { icon: '⚔️', label: 'AI Rivals',   value: 'Ruthless',    tone: 'debuff' },
-                  { icon: '🚓', label: 'Police Heat', value: 'Aggressive',  tone: 'debuff' },
-                  { icon: '🤝', label: 'Diplomacy',   value: 'Treacherous', tone: 'debuff' },
+                  { icon: '💰', label: 'Income',      value: '−25%',        tone: 'debuff' as Tone },
+                  { icon: '⚔️', label: 'AI Rivals',   value: 'Ruthless',    tone: 'debuff' as Tone },
+                  { icon: '🚓', label: 'Police Heat', value: 'Aggressive',  tone: 'debuff' as Tone },
+                  { icon: '🤝', label: 'Diplomacy',   value: 'Treacherous', tone: 'debuff' as Tone },
                 ],
               },
-            } as const)[d];
+            })[d];
             const isActive = difficulty === d;
             const toneClass: Record<Tone, string> = {
               buff: 'text-emerald-400',
