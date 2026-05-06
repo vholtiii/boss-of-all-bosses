@@ -638,7 +638,11 @@ const addPairTension = (state: EnhancedMafiaGameState, familyA: string, familyB:
   const key = getTensionPairKey(familyA, familyB);
   // Check cooldown (Hole #3)
   if ((state.tensionCooldowns[key] || 0) > 0) return;
-  state.familyTensions[key] = Math.min(100, Math.max(0, (state.familyTensions[key] || 0) + amount));
+  // Difficulty: scale player-involved tension gains (Easy 0.7, Hard 1.4)
+  const isPlayerInvolved = familyA === state.playerFamily || familyB === state.playerFamily;
+  const mult = isPlayerInvolved ? (state.difficultyModifiers?.diplomacyTensionMult ?? 1) : 1;
+  const scaled = amount * mult;
+  state.familyTensions[key] = Math.min(100, Math.max(0, (state.familyTensions[key] || 0) + scaled));
 };
 
 const addGlobalTension = (state: EnhancedMafiaGameState, amount: number) => {
