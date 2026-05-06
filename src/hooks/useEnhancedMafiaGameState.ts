@@ -172,12 +172,16 @@ export interface DifficultyModifiers {
   policeHeatMult: number;
   hitSuccessBonus: number;
   eventCostMult: number;
+  // NEW — wires the dossier's "AI Rivals" + "Diplomacy" levers
+  aiAggressionBonus: number;     // added to every AI's aggressionLevel (clamped 0-100)
+  diplomacyTensionMult: number;  // multiplies tension *gains* on player-involved pairs
+  tensionDecayMult: number;      // multiplies passive per-turn tension decay
 }
 
 const DIFFICULTY_MODIFIERS: Record<Difficulty, DifficultyModifiers> = {
-  easy: { playerMoneyMult: 1.5, aiIncomeMult: 0.6, aiRecruitCapBonus: 0, policeHeatMult: 0.7, hitSuccessBonus: 0.10, eventCostMult: 0.7 },
-  normal: { playerMoneyMult: 1.0, aiIncomeMult: 1.0, aiRecruitCapBonus: 0, policeHeatMult: 1.0, hitSuccessBonus: 0, eventCostMult: 1.0 },
-  hard: { playerMoneyMult: 0.75, aiIncomeMult: 1.5, aiRecruitCapBonus: 2, policeHeatMult: 1.3, hitSuccessBonus: -0.10, eventCostMult: 1.3 },
+  easy:   { playerMoneyMult: 1.5,  aiIncomeMult: 0.6, aiRecruitCapBonus: 0, policeHeatMult: 0.7, hitSuccessBonus:  0.10, eventCostMult: 0.7, aiAggressionBonus: -15, diplomacyTensionMult: 0.7, tensionDecayMult: 1.5 },
+  normal: { playerMoneyMult: 1.0,  aiIncomeMult: 1.0, aiRecruitCapBonus: 0, policeHeatMult: 1.0, hitSuccessBonus:  0,    eventCostMult: 1.0, aiAggressionBonus:   0, diplomacyTensionMult: 1.0, tensionDecayMult: 1.0 },
+  hard:   { playerMoneyMult: 0.75, aiIncomeMult: 1.5, aiRecruitCapBonus: 2, policeHeatMult: 1.3, hitSuccessBonus: -0.10, eventCostMult: 1.3, aiAggressionBonus: +15, diplomacyTensionMult: 1.4, tensionDecayMult: 0.6 },
 };
 
 // ============ HEAT HELPER ============
@@ -634,7 +638,11 @@ const addPairTension = (state: EnhancedMafiaGameState, familyA: string, familyB:
   const key = getTensionPairKey(familyA, familyB);
   // Check cooldown (Hole #3)
   if ((state.tensionCooldowns[key] || 0) > 0) return;
-  state.familyTensions[key] = Math.min(100, Math.max(0, (state.familyTensions[key] || 0) + amount));
+  // Difficulty: scale player-involved tension gains (Easy 0.7, Hard 1.4)
+  const isPlayerInvolved = familyA === state.playerFamily || familyB === state.playerFamily;
+  const mult = isPlayerInvolved ? (state.difficultyModifiers?.diplomacyTensionMult ?? 1) : 1;
+  const scaled = amount * mult;
+  state.familyTensions[key] = Math.min(100, Math.max(0, (state.familyTensions[key] || 0) + scaled));
 };
 
 const addGlobalTension = (state: EnhancedMafiaGameState, amount: number) => {
@@ -3919,11 +3927,13 @@ export const useEnhancedMafiaGameState = (
 
       // ============ WAR & TENSION LIFECYCLE ============
       {
-        // 1. Decay tension by TENSION_DECAY_PER_TURN for all pairs
+        // 1. Decay tension by TENSION_DECAY_PER_TURN × difficulty.tensionDecayMult for all pairs
+        const decayMult = newState.difficultyModifiers?.tensionDecayMult ?? 1;
+        const tensionDecay = Math.max(1, Math.round(TENSION_DECAY_PER_TURN * decayMult));
         const allPairs = getAllFamilyPairKeys();
         allPairs.forEach(key => {
           if ((newState.familyTensions[key] || 0) > 0) {
-            newState.familyTensions[key] = Math.max(0, (newState.familyTensions[key] || 0) - TENSION_DECAY_PER_TURN);
+            newState.familyTensions[key] = Math.max(0, (newState.familyTensions[key] || 0) - tensionDecay);
           }
         });
 
@@ -5615,7 +5625,9 @@ export const useEnhancedMafiaGameState = (
 
       // ── PERSONALITY-DRIVEN MOVEMENT & COMBAT ──
       // (personality already declared above; reassignable for war override)
-      const aggression = opponent.strategy.aggressionLevel || 50;
+      // Difficulty: shift AI aggression baseline (Easy -15, Hard +15)
+      const aggressionBonus = state.difficultyModifiers?.aiAggressionBonus ?? 0;
+      const aggression = Math.max(0, Math.min(100, (opponent.strategy.aggressionLevel || 50) + aggressionBonus));
       const cooperation = opponent.strategy.cooperationTendency || 50;
 
       // War aggression override: if at war, behave as aggressive and prioritize war target
