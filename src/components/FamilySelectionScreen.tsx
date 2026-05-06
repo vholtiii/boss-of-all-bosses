@@ -705,7 +705,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
             </div>
 
             <Button
-              onClick={() => onSelectFamily(activeFamily.id, activeFamily.startingResources, difficulty, seedInput ? parseInt(seedInput) : undefined, mapSize)}
+              onClick={() => { playSound('success'); onSelectFamily(activeFamily.id, activeFamily.startingResources, difficulty, seedInput ? parseInt(seedInput) : undefined, mapSize); }}
               className="w-full font-playfair font-bold text-base py-5 transition-all duration-200"
               style={{
                 backgroundColor: activeFamily.color,
@@ -718,16 +718,19 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
           </motion.div>
         ) : (
           <motion.div
+            key="empty"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
+            exit={{ opacity: 0 }}
+            transition={{ delay: 0.3 }}
             className="text-center py-12"
           >
             <p className="text-muted-foreground text-sm">
-              Select a family above to see their strengths and begin your rise to power.
+              Select a family above to see their strengths. Use ← → to browse, Enter to confirm.
             </p>
           </motion.div>
         )}
+        </AnimatePresence>
       </div>
     </div>
     </TooltipProvider>
