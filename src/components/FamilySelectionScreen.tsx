@@ -398,26 +398,28 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         <div className="flex items-center justify-center gap-2 mt-5">
           {(['easy', 'normal', 'hard'] as const).map(d => {
             const labels = { easy: 'Made Man', normal: 'Wiseguy', hard: 'The Don' };
-            const sublabels = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
-            const dots = { easy: '🟢', normal: '🟡', hard: '🔴' };
+            const dotColors = { easy: 'bg-emerald-500', normal: 'bg-amber-400', hard: 'bg-rose-500' };
             const descs = { easy: '+50% money, weaker AI', normal: 'Balanced experience', hard: '-25% money, stronger AI' };
             const isActive = difficulty === d;
             return (
-              <button
-                key={d}
-                onClick={() => setDifficulty(d)}
-                className={cn(
-                  'px-4 py-2 rounded-lg border-2 text-xs font-bold uppercase tracking-wider transition-all duration-200 flex flex-col items-center gap-0.5',
-                  'bg-card/80 backdrop-blur-sm',
-                  isActive
-                    ? 'border-primary text-primary shadow-md scale-105'
-                    : 'border-border/50 text-muted-foreground hover:border-muted-foreground/50'
-                )}
-                title={descs[d]}
-              >
-                <span className="font-playfair text-sm normal-case tracking-wide">{dots[d]} {labels[d]}</span>
-                <span className="text-[8px] opacity-70">{sublabels[d]} · {descs[d]}</span>
-              </button>
+              <Tooltip key={d}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => { setDifficulty(d); playSound('click'); }}
+                    className={cn(
+                      'px-4 h-10 rounded-lg border-2 text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-2',
+                      'bg-card/80 backdrop-blur-sm font-playfair normal-case text-sm',
+                      isActive
+                        ? 'border-primary text-primary shadow-md scale-105'
+                        : 'border-border/50 text-muted-foreground hover:border-muted-foreground/50'
+                    )}
+                  >
+                    <span className={cn('inline-block w-2 h-2 rounded-full', dotColors[d])} />
+                    {labels[d]}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{descs[d]}</TooltipContent>
+              </Tooltip>
             );
           })}
         </div>
