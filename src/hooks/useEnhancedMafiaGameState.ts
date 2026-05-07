@@ -9537,6 +9537,30 @@ export const useEnhancedMafiaGameState = (
         checkSupplySabotage(state, targetQ, targetR, targetS, state.playerFamily);
         // Destroy fortification on captured hex
         state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === targetQ && f.r === targetR && f.s === targetS));
+
+        // ============ BOLD-MOVE RESPECT BONUSES ============
+        // Outnumbered victory ("Bold Strike")
+        if (attackers < defenders) {
+          awardBoldRespect(state, state.playerFamily, 2, 'outnumbered_strike',
+            `Won outnumbered (${attackers} vs ${defenders}) at ${tile.district}`);
+        }
+        // "Send a Message": sabotage + hit on the same enemy hex this turn
+        const sabotagedHere = (state._sabotagedThisTurn || []).some(s =>
+          s.q === targetQ && s.r === targetR && s.s === targetS && targetFamily && s.family === targetFamily
+        );
+        if (sabotagedHere && targetFamily) {
+          awardBoldRespect(state, state.playerFamily, 4, 'send_a_message',
+            `Sent a message to the ${targetFamily} — sabotaged and hit the same hex`);
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'success', title: '📨 Sent a Message',
+            message: `Sabotage + hit on the same hex. The ${targetFamily} family hears you loud and clear. +4 respect.`,
+          }];
+        }
+        // Wartime Plan Hit bonus
+        if (isExecutingPlanHit && targetFamily && areFamiliesAtWar(state, state.playerFamily, targetFamily)) {
+          awardBoldRespect(state, state.playerFamily, 1, 'wartime_plan_hit',
+            `Wartime Plan Hit on the ${targetFamily}`);
+        }
         
         // Check if enemy had a safehouse on this hex → player gets bounty + intel
         // (AI safehouses are tracked per-AI; for now we check if any AI opponent has a safehouse here)
