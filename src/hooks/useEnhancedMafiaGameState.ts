@@ -9607,6 +9607,8 @@ export const useEnhancedMafiaGameState = (
             type: 'success', title: '🏠 Enemy Safehouse Captured!',
             message: `You raided their safehouse! +$${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} bounty and full intel on ${targetFamily} operations for 1 turn.${stockpileDesc ? ` Seized stockpile: ${stockpileDesc}!` : ''}`,
           }];
+          awardBoldRespect(state, state.playerFamily, 3, 'safehouse_capture',
+            `Captured ${targetFamily} safehouse`);
         }
         
         if (!isScouted) {
