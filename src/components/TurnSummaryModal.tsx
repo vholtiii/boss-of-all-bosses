@@ -136,6 +136,23 @@ const TurnSummaryModal: React.FC<TurnSummaryModalProps> = ({ report, open, onClo
             </div>
           )}
 
+          {/* Bold Moves */}
+          {report.boldActions && report.boldActions.length > 0 && (
+            <div className="rounded-lg bg-background/40 border border-amber-500/40 p-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2">🔥 Bold Moves</h4>
+              <div className="space-y-1">
+                {report.boldActions.map((b, i) => (
+                  <div key={i} className="text-xs flex items-start gap-1.5">
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0 text-amber-300 border-amber-500/40">
+                      +{b.respect} Respect
+                    </Badge>
+                    <span className="text-muted-foreground">{b.detail}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Territories gained/lost */}
           {(report.territoriesGained.length > 0 || report.territoriesLost.length > 0) && (
             <div className="rounded-lg bg-background/40 border border-border/50 p-3">
