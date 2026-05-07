@@ -723,6 +723,8 @@ const awardBoldRespect = (state: EnhancedMafiaGameState, family: string, amount:
     tr.boldActions.push({ family, action, respect: amount, detail });
   }
 };
+
+// Hole #5: Check encroachment (claiming neutral hex surrounded by 3+ rival hexes)
 const checkEncroachment = (state: EnhancedMafiaGameState, q: number, r: number, s: number, claimingFamily: string) => {
   const neighbors = getHexNeighbors(q, r, s);
   const familyCounts: Record<string, number> = {};
