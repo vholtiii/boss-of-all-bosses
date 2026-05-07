@@ -8912,7 +8912,13 @@ export const useEnhancedMafiaGameState = (
 
     const destroyedType = tile.business.type;
     const destroyedIncome = tile.business.income;
+    const sabotagedFamily = tile.controllingFamily;
     tile.business = undefined;
+
+    // Track for "Send a Message" bold-move detection
+    state._sabotagedThisTurn = [...(state._sabotagedThisTurn || []), {
+      q: targetQ, r: targetR, s: targetS, family: sabotagedFamily as string,
+    }];
 
     // Increase police heat (+15)
     applyPlayerHeat(state, 15);
