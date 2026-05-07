@@ -4498,7 +4498,7 @@ export const useEnhancedMafiaGameState = (
       ).length;
       const legalBusinessHexes = playerHexes.filter(t => t.business && t.business.isLegal).length;
       const activePoliticalBribes = (newState.activeBribes || []).filter(b =>
-        b.active && (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'commissioner')
+        b.active && (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'mayor')
       ).length;
       const playerDistricts60 = new Set(
         (newState.activeDistrictBonuses || [])
