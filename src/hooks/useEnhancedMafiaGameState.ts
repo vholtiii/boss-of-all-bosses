@@ -4476,36 +4476,57 @@ export const useEnhancedMafiaGameState = (
       }
       
       // --- Diminishing returns helper for passive Respect/Influence gains ---
-      // 0–59: 1.0x | 60–74: 0.6x | 75–89: 0.35x | 90+: 0.15x
-      // Combat-earned spikes (Blind/Planned Hits, expansion) bypass this.
+      // Steeper curve: 0–49: 1.0x | 50–69: 0.55x | 70–84: 0.30x | 85+: 0.12x
+      // Combat-earned spikes (Blind/Planned Hits, expansion, bold moves) bypass this.
       const applyDiminishingReturns = (current: number, rawGain: number): number => {
         if (rawGain <= 0) return rawGain;
-        const mult = current >= 90 ? 0.15 : current >= 75 ? 0.35 : current >= 60 ? 0.6 : 1.0;
+        const mult = current >= 85 ? 0.12 : current >= 70 ? 0.30 : current >= 50 ? 0.55 : 1.0;
         return rawGain * mult;
       };
       // Steeper decay above 70 to prevent "set and forget" high stats
       const passiveDecay = (current: number): number => (current > 70 ? 1.0 : 0.5);
 
-      // --- Per-turn Influence growth (reduced base ~30%) ---
-      const playerControlledHexes = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).length;
+      // --- Per-turn Influence growth (real-world drivers) ---
+      // Drivers: businesses YOU built, legal fronts, alliances, political bribes, district dominance.
+      // Raw hex count contributes only a small floor.
+      const playerHexes = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily);
+      const playerControlledHexes = playerHexes.length;
       const activeAlliances = newState.alliances.filter(a => a.active).length;
-      // Was: floor(hexes/3) + alliances. Now: hexes/4 + alliances*0.7 → ~30% less
-      const rawInfluenceGain = (playerControlledHexes / 4) + activeAlliances * 0.7;
+      const builtBusinessHexes = playerHexes.filter(t =>
+        t.business && !t.business.isExtorted &&
+        !(t.business.constructionProgress !== undefined && t.business.constructionProgress < (t.business.constructionGoal || 3))
+      ).length;
+      const legalBusinessHexes = playerHexes.filter(t => t.business && t.business.isLegal).length;
+      const activePoliticalBribes = (newState.activeBribes || []).filter(b =>
+        b.active && (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'commissioner')
+      ).length;
+      const playerDistricts60 = new Set(
+        (newState.activeDistrictBonuses || [])
+          .filter(b => b.family === newState.playerFamily)
+          .map(b => b.district)
+      ).size;
+      const rawInfluenceGain =
+        builtBusinessHexes * 0.4 +
+        legalBusinessHexes * 0.25 +
+        activeAlliances * 0.7 +
+        activePoliticalBribes * 0.5 +
+        playerDistricts60 * 0.4 +
+        Math.min(1.5, playerControlledHexes / 15);
       const scaledInfluenceGain = applyDiminishingReturns(newState.resources.influence, rawInfluenceGain);
       const influenceDecay = passiveDecay(newState.resources.influence);
       newState.resources.influence = Math.min(100, Math.max(0, newState.resources.influence + scaledInfluenceGain - influenceDecay));
       // Sync influence with streetInfluence
       newState.reputation.streetInfluence = Math.round(newState.resources.influence);
       
-      // --- Per-turn Respect growth (reduced base ~30%) ---
+      // --- Per-turn Respect growth (harder; bold moves bypass via direct awards) ---
       const hexesWithBusinesses = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily && t.business).length;
-      // Income gain: was min(5, income/5000). Reduced ~30%: cap 3, divisor 7000.
-      const incomeRespectGain = Math.min(3, newState.finances.totalIncome / 7000);
-      // Business gain: was hexes/5. Now hexes/7 (~30% less).
-      let rawRespectGain = (hexesWithBusinesses / 7) + incomeRespectGain;
-      // Phase 1 dampener: halve passive respect gains in early game (combat spikes & claim rewards bypass).
+      // Income gain: cap 2, divisor 10000 (was cap 3, divisor 7000)
+      const incomeRespectGain = Math.min(2, newState.finances.totalIncome / 10000);
+      // Business gain: hexes/10 (was /7)
+      let rawRespectGain = (hexesWithBusinesses / 10) + incomeRespectGain;
+      // Phase 1 dampener: stronger early-game brake — bold combat moves are the way up.
       if ((newState.gamePhase || 1) === 1) {
-        rawRespectGain *= 0.5;
+        rawRespectGain *= 0.4;
       }
       const scaledRespectGain = applyDiminishingReturns(newState.reputation.respect, rawRespectGain);
       const respectDecay = passiveDecay(newState.reputation.respect);
