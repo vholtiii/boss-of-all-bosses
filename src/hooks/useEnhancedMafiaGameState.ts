@@ -3188,6 +3188,7 @@ export const useEnhancedMafiaGameState = (
         resourceDeltas: { money: 0, soldiers: 0, respect: 0, influence: 0, loyalty: 0, heat: 0, territories: 0 },
         territoriesLost: [],
         territoriesGained: [],
+        boldActions: [],
       };
 
       // Flush mid-turn combat log into turn report events
