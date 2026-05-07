@@ -707,7 +707,22 @@ const areFamiliesAtWar = (state: EnhancedMafiaGameState, familyA: string, family
   );
 };
 
-// Hole #5: Check encroachment (claiming neutral hex surrounded by 3+ rival hexes)
+// Bold-action respect award — bypasses diminishing returns; logs to turnReport.boldActions if available.
+const awardBoldRespect = (state: EnhancedMafiaGameState, family: string, amount: number, action: string, detail: string) => {
+  if (amount <= 0) return;
+  if (family === state.playerFamily) {
+    state.reputation.respect = Math.min(100, (state.reputation.respect || 0) + amount);
+    state.resources.respect = Math.round(state.reputation.respect);
+  } else {
+    const opp = state.aiOpponents.find(o => o.family === family);
+    if (opp) opp.resources.respect = Math.min(100, (opp.resources.respect || 0) + amount);
+  }
+  const tr = state.turnReport;
+  if (tr) {
+    if (!tr.boldActions) tr.boldActions = [];
+    tr.boldActions.push({ family, action, respect: amount, detail });
+  }
+};
 const checkEncroachment = (state: EnhancedMafiaGameState, q: number, r: number, s: number, claimingFamily: string) => {
   const neighbors = getHexNeighbors(q, r, s);
   const familyCounts: Record<string, number> = {};
