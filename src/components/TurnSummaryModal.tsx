@@ -29,6 +29,7 @@ export interface TurnReport {
   };
   territoriesLost: string[];
   territoriesGained: string[];
+  boldActions?: Array<{ family: string; action: string; respect: number; detail: string }>;
 }
 
 interface TurnSummaryModalProps {
