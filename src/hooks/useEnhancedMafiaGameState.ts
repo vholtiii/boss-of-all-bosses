@@ -505,6 +505,8 @@ export interface EnhancedMafiaGameState {
   aiBounties: AIBounty[];
   aiPlannedHits: AIPlannedHit[];
   combatLog: string[];
+  /** Transient: hexes sabotaged this turn — used to detect "Send a Message" (sabotage + claim same turn). Cleared on turn end. */
+  _sabotagedThisTurn?: Array<{ q: number; r: number; s: number; family: string }>;
   activeDistrictBonuses: Array<{
     district: string;
     family: string;
