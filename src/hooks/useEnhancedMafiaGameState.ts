@@ -5023,9 +5023,13 @@ export const useEnhancedMafiaGameState = (
           tile.business.constructionGoal = undefined;
           tile.business.constructionProgress = undefined;
           tile.business.turnsUntilComplete = undefined;
+          // One-off influence spike for completing a build (legal +3, illegal +2)
+          const influenceSpike = tile.business.isLegal ? 3 : 2;
+          state.resources.influence = Math.min(100, (state.resources.influence || 0) + influenceSpike);
+          state.reputation.streetInfluence = Math.round(state.resources.influence);
           state.pendingNotifications = [...(state.pendingNotifications || []), {
             type: 'success' as const, title: '🏢 Business Complete!',
-            message: `Your ${tile.business.type} is now operational and generating $${tile.business.income.toLocaleString()}/turn.`,
+            message: `Your ${tile.business.type} is now operational and generating $${tile.business.income.toLocaleString()}/turn. +${influenceSpike} Influence — your new ${tile.business.isLegal ? 'legitimate front' : 'operation'} cements your standing in ${tile.district}.`,
           }];
         }
       }
