@@ -6771,13 +6771,30 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // ── AI RESPECT & INFLUENCE GROWTH ──
-      const aiTerritoryCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
-      // Influence: +1 per 3 hexes controlled, with decay
-      const influenceGain = Math.floor(aiTerritoryCount / 3);
-      opponent.resources.influence = Math.min(100, Math.max(0, opponent.resources.influence + influenceGain - 0.5));
-      // Respect: grows with territory and combat activity
-      const respectGain = Math.floor(aiTerritoryCount / 4) + (aggression > 60 ? 1 : 0);
+      // ── AI RESPECT & INFLUENCE GROWTH (mirrors player real-world drivers) ──
+      const aiHexes = state.hexMap.filter(t => t.controllingFamily === fam);
+      const aiTerritoryCount = aiHexes.length;
+      const aiBuiltBiz = aiHexes.filter(t => t.business && !t.business.isExtorted &&
+        !(t.business.constructionProgress !== undefined && t.business.constructionProgress < (t.business.constructionGoal || 3))
+      ).length;
+      const aiLegalBiz = aiHexes.filter(t => t.business && t.business.isLegal).length;
+      const aiAlliancesInvolving = (state.alliances || []).filter(a => a.active && a.alliedFamily === fam).length;
+      const aiDistricts60 = new Set(
+        (state.activeDistrictBonuses || []).filter(b => b.family === fam).map(b => b.district)
+      ).size;
+      const aiRawInfluence =
+        aiBuiltBiz * 0.4 +
+        aiLegalBiz * 0.25 +
+        aiAlliancesInvolving * 0.7 +
+        aiDistricts60 * 0.4 +
+        Math.min(1.5, aiTerritoryCount / 15);
+      // Mild diminishing returns above 70 to mirror player decay pressure
+      const aiCur = opponent.resources.influence;
+      const aiInfMult = aiCur >= 85 ? 0.12 : aiCur >= 70 ? 0.30 : aiCur >= 50 ? 0.55 : 1.0;
+      const aiInfDecay = aiCur > 70 ? 1.0 : 0.5;
+      opponent.resources.influence = Math.min(100, Math.max(0, aiCur + aiRawInfluence * aiInfMult - aiInfDecay));
+      // Respect: harder passive — bold combat moves still award via combat handlers
+      const respectGain = Math.floor(aiTerritoryCount / 6) + (aggression > 60 ? 1 : 0);
       opponent.resources.respect = Math.min(100, Math.max(0, (opponent.resources.respect || 0) + respectGain - 0.5));
 
       // ── AI FLIP SOLDIER (weaken enemy HQ defenses) — Capo within 3 hexes of enemy HQ ──
