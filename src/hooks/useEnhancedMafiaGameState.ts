@@ -395,6 +395,7 @@ export interface TurnReport {
   resourceDeltas: { money: number; soldiers: number; respect: number; influence: number; loyalty: number; heat: number; territories: number };
   territoriesLost: string[];
   territoriesGained: string[];
+  boldActions?: Array<{ family: string; action: string; respect: number; detail: string }>;
 }
 
 export interface EnhancedMafiaGameState {
