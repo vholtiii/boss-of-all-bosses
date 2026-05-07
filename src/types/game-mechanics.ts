@@ -615,7 +615,7 @@ export interface AIBounty {
 }
 
 export const BLIND_HIT_PENALTY = 0.20;     // -20% success on unscouted hits
-export const BLIND_HIT_RESPECT = 20;        // respect gained on unscouted hit victory
+export const BLIND_HIT_RESPECT = 30;        // respect gained on unscouted hit victory (bold-move premium)
 export const BLIND_HIT_FEAR = 20;           // fear gained on unscouted hit victory
 export const HIDING_DURATION = 3;           // turns a soldier hides after civilian hit
 export const BOUNTY_DURATION = 3;           // turns AI prioritizes revenge
