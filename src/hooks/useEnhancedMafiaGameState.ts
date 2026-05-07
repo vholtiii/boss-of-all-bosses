@@ -395,6 +395,7 @@ export interface TurnReport {
   resourceDeltas: { money: number; soldiers: number; respect: number; influence: number; loyalty: number; heat: number; territories: number };
   territoriesLost: string[];
   territoriesGained: string[];
+  boldActions?: Array<{ family: string; action: string; respect: number; detail: string }>;
 }
 
 export interface EnhancedMafiaGameState {
@@ -504,6 +505,8 @@ export interface EnhancedMafiaGameState {
   aiBounties: AIBounty[];
   aiPlannedHits: AIPlannedHit[];
   combatLog: string[];
+  /** Transient: hexes sabotaged this turn — used to detect "Send a Message" (sabotage + claim same turn). Cleared on turn end. */
+  _sabotagedThisTurn?: Array<{ q: number; r: number; s: number; family: string }>;
   activeDistrictBonuses: Array<{
     district: string;
     family: string;
@@ -702,6 +705,23 @@ const areFamiliesAtWar = (state: EnhancedMafiaGameState, familyA: string, family
   return (state.activeWars || []).some(w => 
     (w.family1 === familyA && w.family2 === familyB) || (w.family1 === familyB && w.family2 === familyA)
   );
+};
+
+// Bold-action respect award — bypasses diminishing returns; logs to turnReport.boldActions if available.
+const awardBoldRespect = (state: EnhancedMafiaGameState, family: string, amount: number, action: string, detail: string) => {
+  if (amount <= 0) return;
+  if (family === state.playerFamily) {
+    state.reputation.respect = Math.min(100, (state.reputation.respect || 0) + amount);
+    state.resources.respect = Math.round(state.reputation.respect);
+  } else {
+    const opp = state.aiOpponents.find(o => o.family === family);
+    if (opp) opp.resources.respect = Math.min(100, (opp.resources.respect || 0) + amount);
+  }
+  const tr = state.turnReport;
+  if (tr) {
+    if (!tr.boldActions) tr.boldActions = [];
+    tr.boldActions.push({ family, action, respect: amount, detail });
+  }
 };
 
 // Hole #5: Check encroachment (claiming neutral hex surrounded by 3+ rival hexes)
@@ -3064,6 +3084,8 @@ export const useEnhancedMafiaGameState = (
       newState.incomingSitdowns = newState.incomingSitdowns.filter(s => s.expiresOnTurn > newState.turn + 1);
       
       newState.turn += 1;
+      // Clear transient bold-move trackers at turn boundary
+      newState._sabotagedThisTurn = [];
 
       // ============ A1: PENDING CLAIM FINALIZATION ============
       // For every hex with a pendingClaim from two turns ago (claim turn N → resolves at end of turn N+1):
@@ -3187,6 +3209,7 @@ export const useEnhancedMafiaGameState = (
         resourceDeltas: { money: 0, soldiers: 0, respect: 0, influence: 0, loyalty: 0, heat: 0, territories: 0 },
         territoriesLost: [],
         territoriesGained: [],
+        boldActions: [],
       };
 
       // Flush mid-turn combat log into turn report events
@@ -4476,36 +4499,57 @@ export const useEnhancedMafiaGameState = (
       }
       
       // --- Diminishing returns helper for passive Respect/Influence gains ---
-      // 0–59: 1.0x | 60–74: 0.6x | 75–89: 0.35x | 90+: 0.15x
-      // Combat-earned spikes (Blind/Planned Hits, expansion) bypass this.
+      // Steeper curve: 0–49: 1.0x | 50–69: 0.55x | 70–84: 0.30x | 85+: 0.12x
+      // Combat-earned spikes (Blind/Planned Hits, expansion, bold moves) bypass this.
       const applyDiminishingReturns = (current: number, rawGain: number): number => {
         if (rawGain <= 0) return rawGain;
-        const mult = current >= 90 ? 0.15 : current >= 75 ? 0.35 : current >= 60 ? 0.6 : 1.0;
+        const mult = current >= 85 ? 0.12 : current >= 70 ? 0.30 : current >= 50 ? 0.55 : 1.0;
         return rawGain * mult;
       };
       // Steeper decay above 70 to prevent "set and forget" high stats
       const passiveDecay = (current: number): number => (current > 70 ? 1.0 : 0.5);
 
-      // --- Per-turn Influence growth (reduced base ~30%) ---
-      const playerControlledHexes = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).length;
+      // --- Per-turn Influence growth (real-world drivers) ---
+      // Drivers: businesses YOU built, legal fronts, alliances, political bribes, district dominance.
+      // Raw hex count contributes only a small floor.
+      const playerHexes = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily);
+      const playerControlledHexes = playerHexes.length;
       const activeAlliances = newState.alliances.filter(a => a.active).length;
-      // Was: floor(hexes/3) + alliances. Now: hexes/4 + alliances*0.7 → ~30% less
-      const rawInfluenceGain = (playerControlledHexes / 4) + activeAlliances * 0.7;
+      const builtBusinessHexes = playerHexes.filter(t =>
+        t.business && !t.business.isExtorted &&
+        !(t.business.constructionProgress !== undefined && t.business.constructionProgress < (t.business.constructionGoal || 3))
+      ).length;
+      const legalBusinessHexes = playerHexes.filter(t => t.business && t.business.isLegal).length;
+      const activePoliticalBribes = (newState.activeBribes || []).filter(b =>
+        b.active && (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'mayor')
+      ).length;
+      const playerDistricts60 = new Set(
+        (newState.activeDistrictBonuses || [])
+          .filter(b => b.family === newState.playerFamily)
+          .map(b => b.district)
+      ).size;
+      const rawInfluenceGain =
+        builtBusinessHexes * 0.4 +
+        legalBusinessHexes * 0.25 +
+        activeAlliances * 0.7 +
+        activePoliticalBribes * 0.5 +
+        playerDistricts60 * 0.4 +
+        Math.min(1.5, playerControlledHexes / 15);
       const scaledInfluenceGain = applyDiminishingReturns(newState.resources.influence, rawInfluenceGain);
       const influenceDecay = passiveDecay(newState.resources.influence);
       newState.resources.influence = Math.min(100, Math.max(0, newState.resources.influence + scaledInfluenceGain - influenceDecay));
       // Sync influence with streetInfluence
       newState.reputation.streetInfluence = Math.round(newState.resources.influence);
       
-      // --- Per-turn Respect growth (reduced base ~30%) ---
+      // --- Per-turn Respect growth (harder; bold moves bypass via direct awards) ---
       const hexesWithBusinesses = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily && t.business).length;
-      // Income gain: was min(5, income/5000). Reduced ~30%: cap 3, divisor 7000.
-      const incomeRespectGain = Math.min(3, newState.finances.totalIncome / 7000);
-      // Business gain: was hexes/5. Now hexes/7 (~30% less).
-      let rawRespectGain = (hexesWithBusinesses / 7) + incomeRespectGain;
-      // Phase 1 dampener: halve passive respect gains in early game (combat spikes & claim rewards bypass).
+      // Income gain: cap 2, divisor 10000 (was cap 3, divisor 7000)
+      const incomeRespectGain = Math.min(2, newState.finances.totalIncome / 10000);
+      // Business gain: hexes/10 (was /7)
+      let rawRespectGain = (hexesWithBusinesses / 10) + incomeRespectGain;
+      // Phase 1 dampener: stronger early-game brake — bold combat moves are the way up.
       if ((newState.gamePhase || 1) === 1) {
-        rawRespectGain *= 0.5;
+        rawRespectGain *= 0.4;
       }
       const scaledRespectGain = applyDiminishingReturns(newState.reputation.respect, rawRespectGain);
       const respectDecay = passiveDecay(newState.reputation.respect);
@@ -4981,9 +5025,13 @@ export const useEnhancedMafiaGameState = (
           tile.business.constructionGoal = undefined;
           tile.business.constructionProgress = undefined;
           tile.business.turnsUntilComplete = undefined;
+          // One-off influence spike for completing a build (legal +3, illegal +2)
+          const influenceSpike = tile.business.isLegal ? 3 : 2;
+          state.resources.influence = Math.min(100, (state.resources.influence || 0) + influenceSpike);
+          state.reputation.streetInfluence = Math.round(state.resources.influence);
           state.pendingNotifications = [...(state.pendingNotifications || []), {
             type: 'success' as const, title: '🏢 Business Complete!',
-            message: `Your ${tile.business.type} is now operational and generating $${tile.business.income.toLocaleString()}/turn.`,
+            message: `Your ${tile.business.type} is now operational and generating $${tile.business.income.toLocaleString()}/turn. +${influenceSpike} Influence — your new ${tile.business.isLegal ? 'legitimate front' : 'operation'} cements your standing in ${tile.district}.`,
           }];
         }
       }
@@ -6750,13 +6798,30 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // ── AI RESPECT & INFLUENCE GROWTH ──
-      const aiTerritoryCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
-      // Influence: +1 per 3 hexes controlled, with decay
-      const influenceGain = Math.floor(aiTerritoryCount / 3);
-      opponent.resources.influence = Math.min(100, Math.max(0, opponent.resources.influence + influenceGain - 0.5));
-      // Respect: grows with territory and combat activity
-      const respectGain = Math.floor(aiTerritoryCount / 4) + (aggression > 60 ? 1 : 0);
+      // ── AI RESPECT & INFLUENCE GROWTH (mirrors player real-world drivers) ──
+      const aiHexes = state.hexMap.filter(t => t.controllingFamily === fam);
+      const aiTerritoryCount = aiHexes.length;
+      const aiBuiltBiz = aiHexes.filter(t => t.business && !t.business.isExtorted &&
+        !(t.business.constructionProgress !== undefined && t.business.constructionProgress < (t.business.constructionGoal || 3))
+      ).length;
+      const aiLegalBiz = aiHexes.filter(t => t.business && t.business.isLegal).length;
+      const aiAlliancesInvolving = (state.alliances || []).filter(a => a.active && a.alliedFamily === fam).length;
+      const aiDistricts60 = new Set(
+        (state.activeDistrictBonuses || []).filter(b => b.family === fam).map(b => b.district)
+      ).size;
+      const aiRawInfluence =
+        aiBuiltBiz * 0.4 +
+        aiLegalBiz * 0.25 +
+        aiAlliancesInvolving * 0.7 +
+        aiDistricts60 * 0.4 +
+        Math.min(1.5, aiTerritoryCount / 15);
+      // Mild diminishing returns above 70 to mirror player decay pressure
+      const aiCur = opponent.resources.influence;
+      const aiInfMult = aiCur >= 85 ? 0.12 : aiCur >= 70 ? 0.30 : aiCur >= 50 ? 0.55 : 1.0;
+      const aiInfDecay = aiCur > 70 ? 1.0 : 0.5;
+      opponent.resources.influence = Math.min(100, Math.max(0, aiCur + aiRawInfluence * aiInfMult - aiInfDecay));
+      // Respect: harder passive — bold combat moves still award via combat handlers
+      const respectGain = Math.floor(aiTerritoryCount / 6) + (aggression > 60 ? 1 : 0);
       opponent.resources.respect = Math.min(100, Math.max(0, (opponent.resources.respect || 0) + respectGain - 0.5));
 
       // ── AI FLIP SOLDIER (weaken enemy HQ defenses) — Capo within 3 hexes of enemy HQ ──
@@ -8870,7 +8935,13 @@ export const useEnhancedMafiaGameState = (
 
     const destroyedType = tile.business.type;
     const destroyedIncome = tile.business.income;
+    const sabotagedFamily = tile.controllingFamily;
     tile.business = undefined;
+
+    // Track for "Send a Message" bold-move detection
+    state._sabotagedThisTurn = [...(state._sabotagedThisTurn || []), {
+      q: targetQ, r: targetR, s: targetS, family: sabotagedFamily as string,
+    }];
 
     // Increase police heat (+15)
     applyPlayerHeat(state, 15);
@@ -9472,6 +9543,30 @@ export const useEnhancedMafiaGameState = (
         checkSupplySabotage(state, targetQ, targetR, targetS, state.playerFamily);
         // Destroy fortification on captured hex
         state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === targetQ && f.r === targetR && f.s === targetS));
+
+        // ============ BOLD-MOVE RESPECT BONUSES ============
+        // Outnumbered victory ("Bold Strike")
+        if (attackers < defenders) {
+          awardBoldRespect(state, state.playerFamily, 2, 'outnumbered_strike',
+            `Won outnumbered (${attackers} vs ${defenders}) at ${tile.district}`);
+        }
+        // "Send a Message": sabotage + hit on the same enemy hex this turn
+        const sabotagedHere = (state._sabotagedThisTurn || []).some(s =>
+          s.q === targetQ && s.r === targetR && s.s === targetS && targetFamily && s.family === targetFamily
+        );
+        if (sabotagedHere && targetFamily) {
+          awardBoldRespect(state, state.playerFamily, 4, 'send_a_message',
+            `Sent a message to the ${targetFamily} — sabotaged and hit the same hex`);
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'success', title: '📨 Sent a Message',
+            message: `Sabotage + hit on the same hex. The ${targetFamily} family hears you loud and clear. +4 respect.`,
+          }];
+        }
+        // Wartime Plan Hit bonus
+        if (isExecutingPlanHit && targetFamily && areFamiliesAtWar(state, state.playerFamily, targetFamily)) {
+          awardBoldRespect(state, state.playerFamily, 1, 'wartime_plan_hit',
+            `Wartime Plan Hit on the ${targetFamily}`);
+        }
         
         // Check if enemy had a safehouse on this hex → player gets bounty + intel
         // (AI safehouses are tracked per-AI; for now we check if any AI opponent has a safehouse here)
@@ -9518,6 +9613,8 @@ export const useEnhancedMafiaGameState = (
             type: 'success', title: '🏠 Enemy Safehouse Captured!',
             message: `You raided their safehouse! +$${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} bounty and full intel on ${targetFamily} operations for 1 turn.${stockpileDesc ? ` Seized stockpile: ${stockpileDesc}!` : ''}`,
           }];
+          awardBoldRespect(state, state.playerFamily, 3, 'safehouse_capture',
+            `Captured ${targetFamily} safehouse`);
         }
         
         if (!isScouted) {
