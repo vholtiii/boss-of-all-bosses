@@ -3084,6 +3084,8 @@ export const useEnhancedMafiaGameState = (
       newState.incomingSitdowns = newState.incomingSitdowns.filter(s => s.expiresOnTurn > newState.turn + 1);
       
       newState.turn += 1;
+      // Clear transient bold-move trackers at turn boundary
+      newState._sabotagedThisTurn = [];
 
       // ============ A1: PENDING CLAIM FINALIZATION ============
       // For every hex with a pendingClaim from two turns ago (claim turn N → resolves at end of turn N+1):
