@@ -1,109 +1,108 @@
 ## Goal
 
-The difficulty selector now advertises four levers — **Income**, **AI Rivals**, **Police Heat**, **Diplomacy** — but only Income, Heat, and a generic AI knob are wired. Make every advertised lever actually move during the turn-based game so the dossier stops lying.
+1. **Respect** — harder to earn passively, but **bold moves pay big**. Slow drip from sitting on territory; meaningful spikes from risky aggressive plays.
+2. **Influence** — driven by real-world mob power: legitimate fronts, political/police corruption, alliances, district dominance — and especially **businesses you build yourself**.
 
-## Current wiring audit (`src/hooks/useEnhancedMafiaGameState.ts`)
+Symmetric where relevant so AI follows the same rules.
 
-`DIFFICULTY_MODIFIERS` (lines 177–181) currently exposes 6 numbers:
+---
 
-| Modifier | Easy / Normal / Hard | Used? |
-|---|---|---|
-| `playerMoneyMult` | 1.5 / 1.0 / 0.75 | ✅ starting cash + income (lines 1065, 5142–5147) |
-| `aiIncomeMult` | 0.6 / 1.0 / 1.5 | ✅ AI minimum income (line 5508) |
-| `aiRecruitCapBonus` | 0 / 0 / +2 | ✅ AI recruit cap (line 5529) |
-| `policeHeatMult` | 0.7 / 1.0 / 1.3 | ✅ player heat via `applyPlayerHeat` |
-| `hitSuccessBonus` | +0.10 / 0 / -0.10 | ✅ player hit chance (line 9403) |
-| `eventCostMult` | 0.7 / 1.0 / 1.3 | ✅ event costs (line 7108) |
+## Respect — harder passive, bigger bold-move payouts
 
-So **Income** and **Police Heat** already match. **AI Rivals** is partly wired (income + recruit cap) but doesn't change *behavior* (aggression). **Diplomacy** has zero modifier — tension decay, treachery odds, and AI sitdown willingness are difficulty-blind.
+### Nerf the passive drip
+In `src/hooks/useEnhancedMafiaGameState.ts` (~lines 4500–4512):
+- Income contribution: cap `3 → 2`, divisor `7000 → 10000`.
+- Business contribution: `hexesWithBusinesses / 7 → / 10`.
+- Phase 1 dampener: `0.5 → 0.4`.
+- Steeper diminishing returns curve (`applyDiminishingReturns` ~4481):
+  - 0–49: 1.0x | 50–69: 0.55x | 70–84: 0.30x | 85+: 0.12x
 
-## Changes
+### Boost existing bold-move respect rewards
+Bold moves bypass diminishing returns (apply directly, capped at 100). Add helper `awardBoldRespect(state, amount, reason)` that pushes a notification and a `boldActions` log entry.
 
-### 1. Extend `DifficultyModifiers` with two new fields
+| Action | Change |
+|---|---|
+| Blind Hit success (`BLIND_HIT_RESPECT`) | +50% |
+| Planned Hit on rival Capo | +3 |
+| Planned Hit on rival Boss | +5 |
+| Successful HQ Assault | +10 |
+| Capturing a rival safehouse | +3 |
+| Winning combat outnumbered (attacker units < defender units) | +2 "Bold Strike" bonus |
+| Successful Plan Hit during active war | +1 wartime bonus |
 
-In `src/hooks/useEnhancedMafiaGameState.ts` lines 168–181:
+### New bold action: **Send a Message**
+Sabotage + claim on the same enemy hex within the same turn. If both succeed, grant **+4 bonus respect** ("Sent a message to the {family}"). No new UI — detected automatically in turn resolution. Tracked in `state.metrics.boldActions[]`.
 
-```ts
-export interface DifficultyModifiers {
-  playerMoneyMult: number;
-  aiIncomeMult: number;
-  aiRecruitCapBonus: number;
-  policeHeatMult: number;
-  hitSuccessBonus: number;
-  eventCostMult: number;
-  aiAggressionBonus: number;     // NEW — added to every AI's aggressionLevel (0-100)
-  diplomacyTensionMult: number;  // NEW — multiplies all tension *gains* against the player
-  tensionDecayMult: number;      // NEW — multiplies passive per-turn tension decay
-}
+(Public Execution and Defy the Commission removed per user direction.)
+
+### AI parity
+AI gets the same bold-move bonuses on equivalent successes (Blind Hit, HQ Assault, safehouse capture, outnumbered combat, sabotage+claim combo).
+
+---
+
+## Influence — real-world drivers, bigger reward for building
+
+Replace formula at line 4493:
+
+```text
+rawInfluenceGain =
+    builtBusinessHexes      * 0.4    // YOU constructed it — biggest single driver
+  + legalBusinessHexes      * 0.25   // legitimate fronts (overlaps with built)
+  + activeAlliances         * 0.7
+  + activePoliticalBribes   * 0.5    // captain/chief/commissioner
+  + districtsControlled60   * 0.4
+  + min(1.5, totalHexes / 15)        // small generic floor
 ```
 
-Values:
+Definitions:
+- `builtBusinessHexes`: tiles where `business.built === true` AND controlled by player. **Only counts businesses constructed in-game — starter businesses don't count.** If the schema doesn't already distinguish, add `business.constructedTurn?: number` set on construction completion; absence means starter.
+- `legalBusinessHexes`: `business.isLegal && controlled by player`. Built legal storefront stacks both bonuses (intentional).
+- `activePoliticalBribes`: `activeBribes` filtered to `['police_captain','police_chief','commissioner']` with `active === true`.
+- `districtsControlled60`: count of districts where player owns ≥60% of hexes (reuse logic behind `hasPlayerDistrictBonus`).
 
-| Field | Easy | Normal | Hard | Effect |
-|---|---|---|---|---|
-| `aiAggressionBonus` | -15 | 0 | +15 | Hesitant / Tactical / Ruthless |
-| `diplomacyTensionMult` | 0.7 | 1.0 | 1.4 | Forgiving / Cautious / Treacherous |
-| `tensionDecayMult` | 1.5 | 1.0 | 0.6 | tensions cool faster on Easy, linger on Hard |
+### One-off influence spike on construction completion
+When a build finishes (near `pendingBusinessBuild` / built-business empire bonus ~4122), grant **+2 influence immediately** (legal builds: +3). Notification: "Your new {type} cements your influence in {district}." Bypasses diminishing returns.
 
-### 2. Apply `aiAggressionBonus` to AI behavior
+### AI parity
+Line 6756: replace `floor(aiTerritoryCount / 3)` with the same weighted formula using AI-tracked equivalents. For fields the AI doesn't track in detail, use conservative proxies. Goal: AI growth roughly matches the player's reworked rate — not faster.
 
-In the AI turn loop (around line 5618), where `aggression = opponent.strategy.aggressionLevel || 50`:
+District-control passive `+1 influence/turn`, `EXPANSION_INFLUENCE_GAIN`, `BLIND_HIT_INFLUENCE_GAIN`, and built-biz seizure influence remain **unchanged**.
 
-```ts
-const diffMods = state.difficultyModifiers || DIFFICULTY_MODIFIERS.normal;
-const aggression = clamp(0, 100,
-  (opponent.strategy.aggressionLevel || 50) + diffMods.aiAggressionBonus);
-```
+---
 
-This automatically flows into all aggression-gated decisions already in place (defense chance line 5641, attack threshold line 6178, combat willingness line 5866, etc.) — no new branches needed.
+## Tests (`src/hooks/__tests__/`)
 
-Also bias war declaration: nudge `WAR_TENSION_THRESHOLD` checks via the existing pipeline by feeding `aiAggressionBonus` into the `personality` override step — on Hard, aggression ≥60 personalities act `aggressive` more often.
+- `respect-passive-gain.test.ts` (new): with same seed, respect after 10 idle turns ≤ 70% of pre-change baseline.
+- `respect-bold-moves.test.ts` (new): Blind Hit grants ≥ +6 respect; outnumbered-attack victory adds +2 bonus; sabotage+claim combo adds +4 "Send a Message" bonus.
+- `influence-real-world-drivers.test.ts` (new):
+  - Identical hex counts; the state with built+legal businesses + active police_captain bribe gains strictly more influence/turn.
+  - Pure dirt-hex empire gains < 1.0 influence/turn.
+  - Construction completion grants the +2/+3 spike.
 
-### 3. Apply diplomacy modifiers to tension flow
+---
 
-Two narrowly-scoped touches to keep tests stable:
+## UI touches (minimal)
 
-**a. Player-direction tension gains.** In `addPairTension` (line 632), when one of the two families is the player's, scale `amount` by `diffMods.diplomacyTensionMult`:
+- Turn Summary modal: new "Bold Moves" line listing entries from `state.metrics.boldActions[]` for the turn.
+- Resource tooltip on Influence: short list of contributing factors ("+0.4 from 1 built business, +0.7 from 1 alliance, ...").
 
-```ts
-const isPlayerInvolved = familyA === state.playerFamily || familyB === state.playerFamily;
-const mult = isPlayerInvolved
-  ? (state.difficultyModifiers?.diplomacyTensionMult ?? 1)
-  : 1;
-state.familyTensions[key] = clamp(0, 100,
-  (state.familyTensions[key] || 0) + amount * mult);
-```
+---
 
-This makes Hard rivals get angrier *at the player* faster, leaves AI–AI tension untouched (preserves emergent diplomacy).
+## Memory updates
 
-**b. Per-turn tension decay.** In the war/tension lifecycle (line 3922–3928), scale `TENSION_DECAY_PER_TURN` by `diffMods.tensionDecayMult` (rounded). On Easy decay 3/turn, on Hard 1/turn.
+- `mem://gameplay/respect-influence-balance`: new respect curve, bold-move bonus list, influence formula with built-business emphasis (0.4 weight).
+- New `mem://gameplay/bold-actions`: "Send a Message" rule (sabotage + claim same turn → +4 respect) and bold-move respect bonus table.
+- `mem://index.md`: add bold-actions entry; update respect/influence summary line.
 
-### 4. Boost AI starting soldiers asymmetry
+## Files touched
 
-The existing `+ (difficulty === 'hard' ? 1 : 0)` (line 1172) is fine. Add Easy-side leniency for parity with the dossier's "Hesitant" claim:
-
-```ts
-soldiers: 2 + Math.floor(Math.random() * 2)
-  + (difficulty === 'hard' ? 1 : 0)
-  - (difficulty === 'easy' ? 1 : 0),  // floor at 1 inside Math.max
-```
-
-Wrap whole expression in `Math.max(1, …)` to prevent zero starts.
-
-### 5. Update tests + memory
-
-- `src/hooks/__tests__/difficulty-modifiers.test.ts`: add assertions that all 9 fields are present on `state.difficultyModifiers` for each tier and that the new values match the table above. Existing six-field assertions stay green.
-- Memory: update `mem://gameplay/difficulty-levels` to document the 9 modifiers and what each scales.
+- `src/hooks/useEnhancedMafiaGameState.ts` (passive blocks ~4490–4525, AI influence ~6756, build-completion handler near 4122, combat resolution for outnumbered + sabotage+claim detection, new `awardBoldRespect` helper)
+- `src/components/TurnSummaryModal.tsx` — Bold Moves section
+- New tests above
+- Memory files
 
 ## Out of scope
 
-- UI changes (the dossier cards already render the new flavor text).
-- Rebalancing the existing six modifiers' magnitudes.
-- Changing AI personality archetypes or starting relationships range.
-- Hitman / sitdown cost tweaks (covered by existing `eventCostMult`).
-
-## Files
-
-- `src/hooks/useEnhancedMafiaGameState.ts` — modifier table, `addPairTension`, tension decay, AI aggression read, AI starting soldiers.
-- `src/hooks/__tests__/difficulty-modifiers.test.ts` — extend coverage.
-- `mem://gameplay/difficulty-levels` — document new fields.
+- Public Execution and Defy the Commission actions (removed per user).
+- Reworking starter-business definition beyond adding `constructedTurn` flag.
+- Combat-earned respect rebalance beyond the listed bumps.
