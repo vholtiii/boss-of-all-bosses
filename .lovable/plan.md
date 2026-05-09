@@ -1,108 +1,98 @@
 ## Goal
 
-The game engine currently only checks victory conditions for the **player**. AI rivals can dominate the map forever without ever "winning". This plan adds symmetric AI victory detection inside the engine and a new end-game screen for when an AI wins (you lose by AI victory, not by RICO/bankruptcy/assassination).
+Fix the visual glitch where promoting a soldier to capo can leave **no unit icon** on the hex after the promotion ceremony resolves — the soldier disappears (it became a capo) but the capo icon never appears.
 
 ---
 
-## Step 1 — Engine: AI victory detection
+## Root cause
 
-In `src/hooks/useEnhancedMafiaGameState.ts`, extend `updateVictoryProgress` (line ~1328) so that after computing the player's victory progress, it also evaluates each surviving AI opponent against the **same** thresholds:
+The promotion engine logic (`useEnhancedMafiaGameState.ts` line ~3477, end-of-turn promotion-ceremony resolution) is correct: it converts the soldier in place to `type: 'capo'` while preserving `id`, `q/r/s`, and family. `deployedUnits` is updated and `syncLegacyUnits` runs at the end of `endTurn`. So the data is fine.
 
-- **Territory:** AI controls ≥ `TERRITORY_TARGET` hexes (40/60/80 by map size).
-- **Economic:** AI `lastTurnIncome` ≥ `$50,000`.
-- **Legacy:** Same formula already used for AI as a "rival" (`territory*3 + soldiers*2 + money/500`), but now compared against every other family (player + other AIs); AI wins if it exceeds the next-best by 25% AND `turn > 15`.
-- **Domination:** All non-AI families eliminated (player + every other AI).
-- **Commission:** Already a player-only flow; for AI parity we won't auto-trigger AI commission votes in this loop (out of scope — flagged in the plan summary, not implemented). The state field is preserved.
+The bug is in the **renderer** in `src/components/EnhancedMafiaHexGrid.tsx` around line **1409**:
 
-If multiple AIs hit thresholds the same turn, prefer in this order: domination > territory > economic > legacy. If both player and an AI qualify the same turn, **player wins** (existing behavior — player check runs first; we only set AI victory when player's `victoryType` is still null).
-
-### State additions
-
-Add a new field on `EnhancedMafiaGameState`:
-
-```ts
-aiVictor?: {
-  family: FamilyId;
-  type: 'territory' | 'economic' | 'legacy' | 'domination';
-  turn: number;
-} | null;
+```tsx
+{showSoldiers && unitsHere.length > 0 && (
+  !tile.isHeadquarters
+  || expandedHQKey === key
+  || gameState?.turnPhase === 'move'
+  || gameState?.turnPhase === 'action'
+) && (() => { /* render CapoIcon / SoldierIcon */ })()}
 ```
 
-When AI victory is detected and player has no `victoryType` and no `gameOver`:
-- Set `state.aiVictor = { family, type, turn }`.
-- Push a notification: `❌ DEFEAT — The {Family} family has won by {type}!`
+Units on **HQ hexes** are intentionally hidden during `deploy` and `tactical` phases (the design relies on the side "HQ deployment" menu instead — which only opens when the HQ is clicked / `expandedHQKey` is set).
 
-Also update `endTurn`'s end-of-turn flow so once `aiVictor` is set, no further AI/turn processing is needed (similar to how `victoryType` short-circuits).
+Promotion timing makes this surface as a "vanishing unit":
 
-### Last-standing edge case
+1. During turn N the player promotes a soldier sitting at HQ. The 🎖️ ceremony badge shows.
+2. Player ends turn → ceremony resolves → soldier becomes capo at the same HQ hex.
+3. Turn N+1 starts in `deploy` phase. The HQ-suppression kicks in: the capo icon is *not* drawn on the HQ hex, and because the player has not yet clicked HQ to expand, the deployment menu is also not visible. Result: the unit appears to have vanished entirely.
 
-If the player is already in `gameOver` (RICO/bankruptcy/etc) and exactly one AI survives, set `aiVictor` with `type: 'domination'`. This way the existing game-over screen can still show, but we also know who "inherited" the city — used in the new screen variant below.
+It only manifests when the promotion happens at HQ, which is the most common case (players promote at HQ for safety), so the report is "sometimes". Promotions on a non-HQ hex render correctly.
+
+A secondary, smaller issue: even when this happens, no `🎖️ Soldier Promoted to Capo!` notification draws attention to where to look — it pops as a generic toast and is easy to miss.
 
 ---
 
-## Step 2 — UI: AI Victory / Player Defeat screen
+## Fix
 
-In `src/pages/UltimateMafiaGame.tsx`, add a new conditional block **before** the existing `gameOver` block (so AI victory takes precedence over a same-turn player bankruptcy, since the AI win is the more meaningful outcome):
+### 1. Always render units on the player's own HQ hex
 
-```text
-if (gameState.aiVictor) { ...new screen... }
-else if (gameState.gameOver?.type === 'rico' | 'bankruptcy' | ...) { ...existing... }
-else if (isWinner) { ...existing victory screen... }
+In `EnhancedMafiaHexGrid.tsx` line ~1409, change the gating so that:
+
+- For the **player's HQ**, units are always rendered on the hex (small icons, same as any other hex), regardless of phase.
+- For **rival HQs**, keep current behavior (still gated; otherwise we'd reveal capo personalities behind fog of war on rival HQs without intel).
+
+Concretely:
+
+```tsx
+const showOnHex =
+  !tile.isHeadquarters
+  || tile.isHeadquarters === playerFamily      // ← new: always show on own HQ
+  || expandedHQKey === key
+  || gameState?.turnPhase === 'move'
+  || gameState?.turnPhase === 'action';
+
+{showSoldiers && unitsHere.length > 0 && showOnHex && (() => { ... })()}
 ```
 
-The new screen mirrors the existing GAME OVER layout (same motion, same Card styling, same "Return to Main Menu" button) but with:
+This makes the just-promoted capo visible immediately on turn N+1 without requiring the player to click HQ. The HQ deployment menu (which still opens on HQ click) keeps working unchanged — it's a separate UI surface for the "deploy from reserves" flow.
 
-- Header emoji per win type: 👑 territory, 💰 economic, 🏛️ legacy, ☠️ domination.
-- Title: `{FAMILY NAME} WINS` (uppercase, family color via existing family color tokens).
-- Subtitle describing the win type, e.g. "The Genovese family controls 60+ hexes — the city is theirs."
-- Stat grid:
-  - Turns Played
-  - Winner Family
-  - Winner Territory
-  - Winner Soldiers
-  - Your Final Territory
-  - Your Final Wealth
-  - Families Eliminated
-- Defeat badge: `DEFEAT — Turn {n}`.
-- Same `Return to Main Menu` action (`onExitToMenu`).
+### 2. Verify the engine path
 
-Use the same semantic tokens (no raw colors) and `font-playfair` headings to match the existing screens.
+Read-only confirmation step (no code change expected): walk through the promotion-resolution block at `useEnhancedMafiaGameState.ts` ~3477 and confirm:
 
----
+- The promoted unit keeps its `id`, `q/r/s`, `family`.
+- `pendingPromotion` is cleared.
+- `maxMoves` and `movesRemaining` are reset to `CAPO_MOVES_PER_TURN` (2).
+- `syncLegacyUnits(newState)` runs later in `endTurn` (line ~4909).
 
-## Step 3 — Tests
+If anything is off (e.g. `escortingSoldierIds` not cleared on a soldier-being-escorted promotion, or duplicate-id collisions), patch in the same loop. Current read says it's clean.
 
-Add `src/hooks/__tests__/ai-victory-detection.test.ts`:
+### 3. Test
 
-- Build a synthetic state where one AI controls ≥ territory target → call `updateVictoryProgress` → assert `state.aiVictor.type === 'territory'`.
-- Build a state where AI `lastTurnIncome` ≥ 50k → assert `economic`.
-- Build a state where player is `gameOver` and one AI is the only survivor → assert `domination`.
-- Player victory takes precedence: both player and AI meet territory the same call → `aiVictor` is null, `victoryType` is set.
+Add `src/components/__tests__/HexGrid.promotion-render.test.tsx` (or extend an existing test) that:
 
-The existing simulation harness (`src/hooks/__tests__/simulation.test.ts`) keeps its harness-side `checkAIVictory` for now but should also surface `state.aiVictor` if the engine sets it first — small update to record `winner = state.aiVictor.family` in the report.
+- Builds an initial state, places a player soldier at the HQ hex, marks it with `pendingPromotion: true`.
+- Renders `EnhancedMafiaHexGrid` with `turnPhase='deploy'`.
+- Mutates the unit to `type: 'capo'` (simulating post-promotion state) and re-renders.
+- Asserts a `<CapoIcon>` (or its identifying element / `data-testid`) is present at the HQ hex without needing `expandedHQKey` to be set.
 
----
-
-## Step 4 — Verify
-
-- `bunx vitest run` — all existing 51+ tests pass plus the 4 new ones.
-- Re-run the 3 simulations; reports should now show `winner` populated for AI wins via the engine field, not just the harness-side detector.
+Existing tests (`bunx vitest run`) must continue to pass.
 
 ---
 
 ## Out of scope
 
-- AI initiating Commission Votes (separate design call: needs an AI policy for when to call a vote and how rivals decide).
-- Rebalancing thresholds (e.g. economic target may be too easy for AI — flagged for a follow-up if sims show instant AI economic wins).
-- Any changes to the player-victory or player-game-over screens.
-- AI personality-specific defeat copy.
-
----
+- Reworking the HQ deployment menu UX.
+- Changing fog-of-war rules for rival HQ units.
+- Auto-pulsing/highlighting the freshly-promoted capo (could be a follow-up UX polish — separate ticket).
 
 ## Files
 
-- `src/hooks/useEnhancedMafiaGameState.ts` — extend `updateVictoryProgress`, add `aiVictor` to state + initial value, short-circuit in `endTurn`.
-- `src/types/game-mechanics.ts` (or wherever `EnhancedMafiaGameState` lives) — add `aiVictor` field type.
-- `src/pages/UltimateMafiaGame.tsx` — new defeat-by-AI screen block.
-- `src/hooks/__tests__/ai-victory-detection.test.ts` — new tests.
-- `src/hooks/__tests__/simulation.test.ts` — small update to record engine-set `aiVictor`.
+- `src/components/EnhancedMafiaHexGrid.tsx` — render-condition tweak (~line 1409).
+- `src/components/__tests__/HexGrid.promotion-render.test.tsx` — new test (or addition to an existing render test if there is one).
+- *(Confirm only, no expected change)* `src/hooks/useEnhancedMafiaGameState.ts` — promotion resolution at line ~3477.
+
+## Risks
+
+- Showing units on the player's HQ hex slightly increases visual density at the HQ (typically the busiest hex). Mitigation: the icons use the same offset stacking the renderer already does for any non-HQ hex, so it should remain readable. If clutter becomes an issue, follow-up could add a "+N" badge instead of stacking individual icons past 2.
