@@ -244,7 +244,7 @@ function writeReport(n: number, r: SimReport) {
   const md: string[] = [];
   md.push(`# Sim ${n} — ${r.config.name}`);
   md.push("");
-  md.push(`**Config:** ${r.config.family} / ${r.config.difficulty} / ${r.config.opponents} opps / ${r.config.mapSize} map / seed ${r.config.seed}`);
+  md.push(`**Config:** ${r.config.family} / ${r.config.difficulty} / ${r.config.mapSize} map / seed ${r.config.seed}`);
   md.push(`**Outcome:** winner=${r.winner ?? "—"} (${r.winType ?? r.endReason}) on turn ${r.endTurn}`);
   md.push("");
   md.push("## Final Standings");
@@ -275,9 +275,9 @@ function writeReport(n: number, r: SimReport) {
 }
 
 const SIMS: SimConfig[] = [
-  { name: "Gambino normal medium", family: "gambino", difficulty: "normal", opponents: 4, mapSize: "medium", seed: 1337 },
-  { name: "Colombo hard large",    family: "colombo", difficulty: "hard",   opponents: 4, mapSize: "large",  seed: 4242 },
-  { name: "Bonanno easy small",    family: "bonanno", difficulty: "easy",   opponents: 3, mapSize: "small",  seed: 9001 },
+  { name: "Gambino normal medium", family: "gambino", difficulty: "normal", mapSize: "medium", seed: 1337 },
+  { name: "Colombo hard large",    family: "colombo", difficulty: "hard",   mapSize: "large",  seed: 4242 },
+  { name: "Bonanno easy small",    family: "bonanno", difficulty: "easy",   mapSize: "small",  seed: 9001 },
 ];
 
 describe("Game simulation harness", () => {
