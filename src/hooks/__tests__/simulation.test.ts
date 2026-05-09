@@ -137,15 +137,9 @@ function runOneSim(config: SimConfig): SimReport {
     combatLog: [],
   };
 
-  const initial = createInitialGameState(
-    config.family,
-    config.seed,
-    config.difficulty,
-    config.opponents,
-    config.mapSize
+  const { result } = renderHook(() =>
+    useEnhancedMafiaGameState(config.family, undefined, config.difficulty, config.seed, config.mapSize)
   );
-
-  const { result } = renderHook(() => useEnhancedMafiaGameState(initial));
 
   const safeAct = (label: string, fn: () => void) => {
     try {
