@@ -1385,7 +1385,6 @@ export const useEnhancedMafiaGameState = (
 
       // Compute legacy "rep" for every family (player + AIs)
       const allFamilyReps: Record<string, number> = {};
-      const playerSoldierCount = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier').length;
       allFamilyReps[state.playerFamily] = playerRep;
       survivingAIs.forEach(opp => {
         const ht = state.hexMap.filter(t => t.controllingFamily === opp.family).length;
