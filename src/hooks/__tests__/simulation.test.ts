@@ -107,16 +107,19 @@ function scanAnomalies(state: any, turn: number): string[] {
     }
   }
 
-  // > 2 units per non-HQ hex
-  const stack = new Map<string, number>();
+  // > 2 friendly units per non-HQ hex (the actual movement-rule check;
+  // 3+ mixed-family units can transiently exist when a capo lands on an
+  // enemy-occupied hex before combat resolves)
+  const friendlyStack = new Map<string, number>();
   for (const u of state.deployedUnits || []) {
-    const k = `${u.q},${u.r},${u.s}`;
-    stack.set(k, (stack.get(k) || 0) + 1);
+    const k = `${u.family}|${u.q},${u.r},${u.s}`;
+    friendlyStack.set(k, (friendlyStack.get(k) || 0) + 1);
   }
-  for (const [k, n] of stack) {
+  for (const [k, n] of friendlyStack) {
     if (n > 2) {
-      const hex = state.hexMap.find((t: any) => `${t.q},${t.r},${t.s}` === k);
-      if (!hex?.isHeadquarters) out.push(`T${turn}: hex ${k} has ${n} units (limit 2)`);
+      const [, coords] = k.split("|");
+      const hex = state.hexMap.find((t: any) => `${t.q},${t.r},${t.s}` === coords);
+      if (!hex?.isHeadquarters) out.push(`T${turn}: hex ${coords} has ${n} friendly units (limit 2)`);
     }
   }
 
