@@ -17,7 +17,8 @@ import { renderHook, act } from "@testing-library/react";
 import * as fs from "fs";
 import * as path from "path";
 import { useEnhancedMafiaGameState, createInitialGameState } from "@/hooks/useEnhancedMafiaGameState";
-import type { FamilyId } from "@/types/game-mechanics";
+
+type FamilyId = "gambino" | "genovese" | "lucchese" | "bonanno" | "colombo";
 
 const MAX_TURNS = 200;
 const OUT_DIR = "/mnt/documents";
@@ -26,7 +27,6 @@ interface SimConfig {
   name: string;
   family: FamilyId;
   difficulty: "easy" | "normal" | "hard";
-  opponents: number;
   mapSize: "small" | "medium" | "large";
   seed: number;
 }
