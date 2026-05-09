@@ -1376,6 +1376,64 @@ export const useEnhancedMafiaGameState = (
         message: labels[state.victoryType] || 'You have won the game!',
       }];
     }
+
+    // ============ AI VICTORY DETECTION ============
+    // Only set if player hasn't already won this turn.
+    if (!state.victoryType && !state.aiVictor) {
+      const eliminated = new Set(state.eliminatedFamilies || []);
+      const survivingAIs = (state.aiOpponents || []).filter(o => !eliminated.has(o.family));
+
+      // Compute legacy "rep" for every family (player + AIs)
+      const allFamilyReps: Record<string, number> = {};
+      const playerSoldierCount = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier').length;
+      allFamilyReps[state.playerFamily] = playerRep;
+      survivingAIs.forEach(opp => {
+        const ht = state.hexMap.filter(t => t.controllingFamily === opp.family).length;
+        allFamilyReps[opp.family] = (ht * 3) + (opp.resources.soldiers * 2) + (opp.resources.money / 500);
+      });
+
+      type Win = { family: string; type: 'territory' | 'economic' | 'legacy' | 'domination' };
+      const candidates: Win[] = [];
+
+      // Domination: player dead + only one AI survives, OR an AI is the only non-eliminated family
+      const playerDead = !!state.gameOver;
+      if (playerDead && survivingAIs.length === 1) {
+        candidates.push({ family: survivingAIs[0].family, type: 'domination' });
+      }
+
+      for (const opp of survivingAIs) {
+        const oppHexes = state.hexMap.filter(t => t.controllingFamily === opp.family).length;
+        if (oppHexes >= TERRITORY_TARGET) candidates.push({ family: opp.family, type: 'territory' });
+        if ((opp.resources.lastTurnIncome || 0) >= ECONOMIC_TARGET) candidates.push({ family: opp.family, type: 'economic' });
+        if (state.turn > LEGACY_MIN_TURN) {
+          const myRep = allFamilyReps[opp.family] || 0;
+          const others = Object.entries(allFamilyReps).filter(([f]) => f !== opp.family).map(([, v]) => v);
+          const nextBest = others.length ? Math.max(...others) : 0;
+          if (myRep > 0 && nextBest > 0 && myRep >= nextBest * LEGACY_MARGIN) {
+            candidates.push({ family: opp.family, type: 'legacy' });
+          }
+        }
+      }
+
+      if (candidates.length > 0) {
+        const order = { domination: 0, territory: 1, economic: 2, legacy: 3 } as const;
+        candidates.sort((a, b) => order[a.type] - order[b.type]);
+        const winner = candidates[0];
+        state.aiVictor = { family: winner.family, type: winner.type, turn: state.turn };
+        const famLabel = winner.family.charAt(0).toUpperCase() + winner.family.slice(1);
+        const typeLabel: Record<string, string> = {
+          territory: 'Territory Domination',
+          economic: 'Economic Empire',
+          legacy: 'Legacy of Power',
+          domination: 'Total Domination',
+        };
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'error' as const,
+          title: '❌ DEFEAT',
+          message: `The ${famLabel} family has won by ${typeLabel[winner.type]}.`,
+        }];
+      }
+    }
   };
 
   // ============ GAMEPLAY PHASE CALCULATION ============
