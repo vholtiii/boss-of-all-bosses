@@ -1,108 +1,67 @@
 ## Goal
 
-1. **Respect** — harder to earn passively, but **bold moves pay big**. Slow drip from sitting on territory; meaningful spikes from risky aggressive plays.
-2. **Influence** — driven by real-world mob power: legitimate fronts, political/police corruption, alliances, district dominance — and especially **businesses you build yourself**.
+Run 3 full simulated games end-to-end (until someone wins or a game-over fires), capture every runtime error / warning / inconsistency the engine emits, then fix confirmed bugs and report design holes for the rest.
 
-Symmetric where relevant so AI follows the same rules.
+The game logic lives in `src/hooks/useEnhancedMafiaGameState.ts` (~10.6k lines). It's a React hook, but the per-turn engine work happens in plain functions called from `endTurn` (`processAITurn`, `processWeather`, `processEvents`, `processBribes`, `processPacts`, `processInfluenceSystem`, war/tension lifecycle, bankruptcy/RICO checks, etc.). That makes a headless harness practical.
 
----
-
-## Respect — harder passive, bigger bold-move payouts
-
-### Nerf the passive drip
-In `src/hooks/useEnhancedMafiaGameState.ts` (~lines 4500–4512):
-- Income contribution: cap `3 → 2`, divisor `7000 → 10000`.
-- Business contribution: `hexesWithBusinesses / 7 → / 10`.
-- Phase 1 dampener: `0.5 → 0.4`.
-- Steeper diminishing returns curve (`applyDiminishingReturns` ~4481):
-  - 0–49: 1.0x | 50–69: 0.55x | 70–84: 0.30x | 85+: 0.12x
-
-### Boost existing bold-move respect rewards
-Bold moves bypass diminishing returns (apply directly, capped at 100). Add helper `awardBoldRespect(state, amount, reason)` that pushes a notification and a `boldActions` log entry.
-
-| Action | Change |
-|---|---|
-| Blind Hit success (`BLIND_HIT_RESPECT`) | +50% |
-| Planned Hit on rival Capo | +3 |
-| Planned Hit on rival Boss | +5 |
-| Successful HQ Assault | +10 |
-| Capturing a rival safehouse | +3 |
-| Winning combat outnumbered (attacker units < defender units) | +2 "Bold Strike" bonus |
-| Successful Plan Hit during active war | +1 wartime bonus |
-
-### New bold action: **Send a Message**
-Sabotage + claim on the same enemy hex within the same turn. If both succeed, grant **+4 bonus respect** ("Sent a message to the {family}"). No new UI — detected automatically in turn resolution. Tracked in `state.metrics.boldActions[]`.
-
-(Public Execution and Defy the Commission removed per user direction.)
-
-### AI parity
-AI gets the same bold-move bonuses on equivalent successes (Blind Hit, HQ Assault, safehouse capture, outnumbered combat, sabotage+claim combo).
+A blocker we already see in the code: only the **player** has victory detection (`victoryType` is set off `state.victoryProgress`). AI rivals can dominate the map forever without "winning". So a real "until someone wins" sim needs symmetric victory detection.
 
 ---
 
-## Influence — real-world drivers, bigger reward for building
+## Step 1 — Headless simulator harness
 
-Replace formula at line 4493:
+Create `scripts/sim/runSimulation.ts` (run via `bunx tsx scripts/sim/runSimulation.ts`). It will:
 
-```text
-rawInfluenceGain =
-    builtBusinessHexes      * 0.4    // YOU constructed it — biggest single driver
-  + legalBusinessHexes      * 0.25   // legitimate fronts (overlaps with built)
-  + activeAlliances         * 0.7
-  + activePoliticalBribes   * 0.5    // captain/chief/commissioner
-  + districtsControlled60   * 0.4
-  + min(1.5, totalHexes / 15)        // small generic floor
-```
+1. Build a fresh state with `createInitialGameState(family, seed, difficulty, opponentCount, mapSize)`.
+2. Drive turns by calling the same per-turn helpers `endTurn` calls — extracted into a small `runTurn(state)` adapter that mirrors the order in `endTurn` (income → upkeep/desertion → bankruptcy/assassination check → `processAITurn` → weather → events → bribes → pacts → influence → war/tension lifecycle → victory check).
+3. Use a **scripted player policy** (passive-but-solvent): collect income, auto-decline events, never expand. Goal is engine coverage, not playing well; if the player dies via bankruptcy/RICO/assassination it's a recorded outcome, sim continues until an AI hits a victory threshold or `MAX_TURNS` (200) is reached.
+4. Add **symmetric victory detection** in the harness only (does not change game code yet): for each AI, compute territory %, money, respect, eliminations against the same `victoryProgress` thresholds the player uses; first to meet any condition is the "winner".
+5. Wrap every per-turn call in `try/catch`; record stack traces with turn number + family context.
+6. Emit a JSON report per game: winner, turn count, final standings, all notifications, all combat-log entries, and any caught exceptions / NaN money / negative soldiers / orphaned units (units pointing at non-existent hexes) / hexes with `controllingFamily` not in roster / pact pointing at eliminated family / etc.
 
-Definitions:
-- `builtBusinessHexes`: tiles where `business.built === true` AND controlled by player. **Only counts businesses constructed in-game — starter businesses don't count.** If the schema doesn't already distinguish, add `business.constructedTurn?: number` set on construction completion; absence means starter.
-- `legalBusinessHexes`: `business.isLegal && controlled by player`. Built legal storefront stacks both bonuses (intentional).
-- `activePoliticalBribes`: `activeBribes` filtered to `['police_captain','police_chief','commissioner']` with `active === true`.
-- `districtsControlled60`: count of districts where player owns ≥60% of hexes (reuse logic behind `hasPlayerDistrictBonus`).
+Refactor needed in `useEnhancedMafiaGameState.ts`: extract the body of `endTurn`'s state updater into a pure `runEndTurn(state): { state, report }` function and have `endTurn` call it inside its `setGameState`. No behavior change for the UI, but unlocks the harness. (If extraction proves too invasive, fall back to copying the call sequence into the harness — tracked as a risk.)
 
-### One-off influence spike on construction completion
-When a build finishes (near `pendingBusinessBuild` / built-business empire bonus ~4122), grant **+2 influence immediately** (legal builds: +3). Notification: "Your new {type} cements your influence in {district}." Bypasses diminishing returns.
+## Step 2 — Run 3 sims
 
-### AI parity
-Line 6756: replace `floor(aiTerritoryCount / 3)` with the same weighted formula using AI-tracked equivalents. For fields the AI doesn't track in detail, use conservative proxies. Goal: AI growth roughly matches the player's reworked rate — not faster.
+Three different setups for variety:
 
-District-control passive `+1 influence/turn`, `EXPANSION_INFLUENCE_GAIN`, `BLIND_HIT_INFLUENCE_GAIN`, and built-biz seizure influence remain **unchanged**.
+| # | Family | Difficulty | Opponents | Map | Seed |
+|---|--------|------------|-----------|-----|------|
+| 1 | gambino | normal | 4 | medium | 1337 |
+| 2 | colombo | hard | 4 | large | 4242 |
+| 3 | bonanno | easy | 3 | small | 9001 |
 
----
+Each game writes `/mnt/documents/sim-report-{n}.json` and a human-readable `sim-report-{n}.md` summary.
 
-## Tests (`src/hooks/__tests__/`)
+## Step 3 — Triage & fix
 
-- `respect-passive-gain.test.ts` (new): with same seed, respect after 10 idle turns ≤ 70% of pre-change baseline.
-- `respect-bold-moves.test.ts` (new): Blind Hit grants ≥ +6 respect; outnumbered-attack victory adds +2 bonus; sabotage+claim combo adds +4 "Send a Message" bonus.
-- `influence-real-world-drivers.test.ts` (new):
-  - Identical hex counts; the state with built+legal businesses + active police_captain bribe gains strictly more influence/turn.
-  - Pure dirt-hex empire gains < 1.0 influence/turn.
-  - Construction completion grants the +2/+3 spike.
+Categorize findings into:
 
----
+- **Bugs** (clear engine errors): runtime exceptions, NaN/Infinity, negative resources, duplicate units, orphan references, pacts/alliances ticking on dead families, victory thresholds never reachable on small maps, etc. → fix in this loop.
+- **Gameplay holes** (design): no AI victory detection, AI never builds legal businesses (so influence formula tilts unfair to player), bankruptcy spiral with no comeback, Phase 4 commission vote never fires in AI-only games, supply lines/heat decay rates that produce stalemates, etc. → documented in the final report, **not** auto-fixed (each one is a design call for you).
 
-## UI touches (minimal)
+Bug fixes are scoped: only patches with an obvious correct behavior + small blast radius go in this loop. Anything ambiguous gets reported instead.
 
-- Turn Summary modal: new "Bold Moves" line listing entries from `state.metrics.boldActions[]` for the turn.
-- Resource tooltip on Influence: short list of contributing factors ("+0.4 from 1 built business, +0.7 from 1 alliance, ...").
+## Step 4 — Verify
 
----
+- `bunx vitest run` (existing 51 tests must still pass).
+- Re-run all 3 sims after fixes; confirm prior exceptions are gone and report.
 
-## Memory updates
+## Deliverables
 
-- `mem://gameplay/respect-influence-balance`: new respect curve, bold-move bonus list, influence formula with built-business emphasis (0.4 weight).
-- New `mem://gameplay/bold-actions`: "Send a Message" rule (sabotage + claim same turn → +4 respect) and bold-move respect bonus table.
-- `mem://index.md`: add bold-actions entry; update respect/influence summary line.
-
-## Files touched
-
-- `src/hooks/useEnhancedMafiaGameState.ts` (passive blocks ~4490–4525, AI influence ~6756, build-completion handler near 4122, combat resolution for outnumbered + sabotage+claim detection, new `awardBoldRespect` helper)
-- `src/components/TurnSummaryModal.tsx` — Bold Moves section
-- New tests above
-- Memory files
+- `scripts/sim/runSimulation.ts` (+ tiny `runTurn` adapter, ideally extracted `runEndTurn`).
+- `/mnt/documents/sim-report-{1,2,3}.{json,md}` before/after fixes.
+- Code patches for confirmed bugs.
+- A final chat summary listing: bugs fixed, gameplay holes found (with proposed remedies and severity), and which sim they came from.
 
 ## Out of scope
 
-- Public Execution and Defy the Commission actions (removed per user).
-- Reworking starter-business definition beyond adding `constructedTurn` flag.
-- Combat-earned respect rebalance beyond the listed bumps.
+- Building a competent player AI (passive policy is intentional).
+- Auto-fixing design-level holes — only reported.
+- Adding real AI victory detection to the game itself (only added in the harness; flagged as a recommended fix).
+- UI changes.
+
+## Risks
+
+- Extracting `runEndTurn` from inside `setGameState` may surface hidden coupling to closure state. Fallback: harness reproduces the call sequence directly.
+- 200-turn cap may not be enough on `large` + `easy`; if no winner, report game as "stalemate" and flag as a hole.
