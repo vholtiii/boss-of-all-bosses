@@ -1,67 +1,108 @@
 ## Goal
 
-Run 3 full simulated games end-to-end (until someone wins or a game-over fires), capture every runtime error / warning / inconsistency the engine emits, then fix confirmed bugs and report design holes for the rest.
-
-The game logic lives in `src/hooks/useEnhancedMafiaGameState.ts` (~10.6k lines). It's a React hook, but the per-turn engine work happens in plain functions called from `endTurn` (`processAITurn`, `processWeather`, `processEvents`, `processBribes`, `processPacts`, `processInfluenceSystem`, war/tension lifecycle, bankruptcy/RICO checks, etc.). That makes a headless harness practical.
-
-A blocker we already see in the code: only the **player** has victory detection (`victoryType` is set off `state.victoryProgress`). AI rivals can dominate the map forever without "winning". So a real "until someone wins" sim needs symmetric victory detection.
+The game engine currently only checks victory conditions for the **player**. AI rivals can dominate the map forever without ever "winning". This plan adds symmetric AI victory detection inside the engine and a new end-game screen for when an AI wins (you lose by AI victory, not by RICO/bankruptcy/assassination).
 
 ---
 
-## Step 1 — Headless simulator harness
+## Step 1 — Engine: AI victory detection
 
-Create `scripts/sim/runSimulation.ts` (run via `bunx tsx scripts/sim/runSimulation.ts`). It will:
+In `src/hooks/useEnhancedMafiaGameState.ts`, extend `updateVictoryProgress` (line ~1328) so that after computing the player's victory progress, it also evaluates each surviving AI opponent against the **same** thresholds:
 
-1. Build a fresh state with `createInitialGameState(family, seed, difficulty, opponentCount, mapSize)`.
-2. Drive turns by calling the same per-turn helpers `endTurn` calls — extracted into a small `runTurn(state)` adapter that mirrors the order in `endTurn` (income → upkeep/desertion → bankruptcy/assassination check → `processAITurn` → weather → events → bribes → pacts → influence → war/tension lifecycle → victory check).
-3. Use a **scripted player policy** (passive-but-solvent): collect income, auto-decline events, never expand. Goal is engine coverage, not playing well; if the player dies via bankruptcy/RICO/assassination it's a recorded outcome, sim continues until an AI hits a victory threshold or `MAX_TURNS` (200) is reached.
-4. Add **symmetric victory detection** in the harness only (does not change game code yet): for each AI, compute territory %, money, respect, eliminations against the same `victoryProgress` thresholds the player uses; first to meet any condition is the "winner".
-5. Wrap every per-turn call in `try/catch`; record stack traces with turn number + family context.
-6. Emit a JSON report per game: winner, turn count, final standings, all notifications, all combat-log entries, and any caught exceptions / NaN money / negative soldiers / orphaned units (units pointing at non-existent hexes) / hexes with `controllingFamily` not in roster / pact pointing at eliminated family / etc.
+- **Territory:** AI controls ≥ `TERRITORY_TARGET` hexes (40/60/80 by map size).
+- **Economic:** AI `lastTurnIncome` ≥ `$50,000`.
+- **Legacy:** Same formula already used for AI as a "rival" (`territory*3 + soldiers*2 + money/500`), but now compared against every other family (player + other AIs); AI wins if it exceeds the next-best by 25% AND `turn > 15`.
+- **Domination:** All non-AI families eliminated (player + every other AI).
+- **Commission:** Already a player-only flow; for AI parity we won't auto-trigger AI commission votes in this loop (out of scope — flagged in the plan summary, not implemented). The state field is preserved.
 
-Refactor needed in `useEnhancedMafiaGameState.ts`: extract the body of `endTurn`'s state updater into a pure `runEndTurn(state): { state, report }` function and have `endTurn` call it inside its `setGameState`. No behavior change for the UI, but unlocks the harness. (If extraction proves too invasive, fall back to copying the call sequence into the harness — tracked as a risk.)
+If multiple AIs hit thresholds the same turn, prefer in this order: domination > territory > economic > legacy. If both player and an AI qualify the same turn, **player wins** (existing behavior — player check runs first; we only set AI victory when player's `victoryType` is still null).
 
-## Step 2 — Run 3 sims
+### State additions
 
-Three different setups for variety:
+Add a new field on `EnhancedMafiaGameState`:
 
-| # | Family | Difficulty | Opponents | Map | Seed |
-|---|--------|------------|-----------|-----|------|
-| 1 | gambino | normal | 4 | medium | 1337 |
-| 2 | colombo | hard | 4 | large | 4242 |
-| 3 | bonanno | easy | 3 | small | 9001 |
+```ts
+aiVictor?: {
+  family: FamilyId;
+  type: 'territory' | 'economic' | 'legacy' | 'domination';
+  turn: number;
+} | null;
+```
 
-Each game writes `/mnt/documents/sim-report-{n}.json` and a human-readable `sim-report-{n}.md` summary.
+When AI victory is detected and player has no `victoryType` and no `gameOver`:
+- Set `state.aiVictor = { family, type, turn }`.
+- Push a notification: `❌ DEFEAT — The {Family} family has won by {type}!`
 
-## Step 3 — Triage & fix
+Also update `endTurn`'s end-of-turn flow so once `aiVictor` is set, no further AI/turn processing is needed (similar to how `victoryType` short-circuits).
 
-Categorize findings into:
+### Last-standing edge case
 
-- **Bugs** (clear engine errors): runtime exceptions, NaN/Infinity, negative resources, duplicate units, orphan references, pacts/alliances ticking on dead families, victory thresholds never reachable on small maps, etc. → fix in this loop.
-- **Gameplay holes** (design): no AI victory detection, AI never builds legal businesses (so influence formula tilts unfair to player), bankruptcy spiral with no comeback, Phase 4 commission vote never fires in AI-only games, supply lines/heat decay rates that produce stalemates, etc. → documented in the final report, **not** auto-fixed (each one is a design call for you).
+If the player is already in `gameOver` (RICO/bankruptcy/etc) and exactly one AI survives, set `aiVictor` with `type: 'domination'`. This way the existing game-over screen can still show, but we also know who "inherited" the city — used in the new screen variant below.
 
-Bug fixes are scoped: only patches with an obvious correct behavior + small blast radius go in this loop. Anything ambiguous gets reported instead.
+---
+
+## Step 2 — UI: AI Victory / Player Defeat screen
+
+In `src/pages/UltimateMafiaGame.tsx`, add a new conditional block **before** the existing `gameOver` block (so AI victory takes precedence over a same-turn player bankruptcy, since the AI win is the more meaningful outcome):
+
+```text
+if (gameState.aiVictor) { ...new screen... }
+else if (gameState.gameOver?.type === 'rico' | 'bankruptcy' | ...) { ...existing... }
+else if (isWinner) { ...existing victory screen... }
+```
+
+The new screen mirrors the existing GAME OVER layout (same motion, same Card styling, same "Return to Main Menu" button) but with:
+
+- Header emoji per win type: 👑 territory, 💰 economic, 🏛️ legacy, ☠️ domination.
+- Title: `{FAMILY NAME} WINS` (uppercase, family color via existing family color tokens).
+- Subtitle describing the win type, e.g. "The Genovese family controls 60+ hexes — the city is theirs."
+- Stat grid:
+  - Turns Played
+  - Winner Family
+  - Winner Territory
+  - Winner Soldiers
+  - Your Final Territory
+  - Your Final Wealth
+  - Families Eliminated
+- Defeat badge: `DEFEAT — Turn {n}`.
+- Same `Return to Main Menu` action (`onExitToMenu`).
+
+Use the same semantic tokens (no raw colors) and `font-playfair` headings to match the existing screens.
+
+---
+
+## Step 3 — Tests
+
+Add `src/hooks/__tests__/ai-victory-detection.test.ts`:
+
+- Build a synthetic state where one AI controls ≥ territory target → call `updateVictoryProgress` → assert `state.aiVictor.type === 'territory'`.
+- Build a state where AI `lastTurnIncome` ≥ 50k → assert `economic`.
+- Build a state where player is `gameOver` and one AI is the only survivor → assert `domination`.
+- Player victory takes precedence: both player and AI meet territory the same call → `aiVictor` is null, `victoryType` is set.
+
+The existing simulation harness (`src/hooks/__tests__/simulation.test.ts`) keeps its harness-side `checkAIVictory` for now but should also surface `state.aiVictor` if the engine sets it first — small update to record `winner = state.aiVictor.family` in the report.
+
+---
 
 ## Step 4 — Verify
 
-- `bunx vitest run` (existing 51 tests must still pass).
-- Re-run all 3 sims after fixes; confirm prior exceptions are gone and report.
+- `bunx vitest run` — all existing 51+ tests pass plus the 4 new ones.
+- Re-run the 3 simulations; reports should now show `winner` populated for AI wins via the engine field, not just the harness-side detector.
 
-## Deliverables
-
-- `scripts/sim/runSimulation.ts` (+ tiny `runTurn` adapter, ideally extracted `runEndTurn`).
-- `/mnt/documents/sim-report-{1,2,3}.{json,md}` before/after fixes.
-- Code patches for confirmed bugs.
-- A final chat summary listing: bugs fixed, gameplay holes found (with proposed remedies and severity), and which sim they came from.
+---
 
 ## Out of scope
 
-- Building a competent player AI (passive policy is intentional).
-- Auto-fixing design-level holes — only reported.
-- Adding real AI victory detection to the game itself (only added in the harness; flagged as a recommended fix).
-- UI changes.
+- AI initiating Commission Votes (separate design call: needs an AI policy for when to call a vote and how rivals decide).
+- Rebalancing thresholds (e.g. economic target may be too easy for AI — flagged for a follow-up if sims show instant AI economic wins).
+- Any changes to the player-victory or player-game-over screens.
+- AI personality-specific defeat copy.
 
-## Risks
+---
 
-- Extracting `runEndTurn` from inside `setGameState` may surface hidden coupling to closure state. Fallback: harness reproduces the call sequence directly.
-- 200-turn cap may not be enough on `large` + `easy`; if no winner, report game as "stalemate" and flag as a hole.
+## Files
+
+- `src/hooks/useEnhancedMafiaGameState.ts` — extend `updateVictoryProgress`, add `aiVictor` to state + initial value, short-circuit in `endTurn`.
+- `src/types/game-mechanics.ts` (or wherever `EnhancedMafiaGameState` lives) — add `aiVictor` field type.
+- `src/pages/UltimateMafiaGame.tsx` — new defeat-by-AI screen block.
+- `src/hooks/__tests__/ai-victory-detection.test.ts` — new tests.
+- `src/hooks/__tests__/simulation.test.ts` — small update to record engine-set `aiVictor`.

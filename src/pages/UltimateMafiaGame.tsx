@@ -370,6 +370,114 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     },
   ];
 
+  // AI Victory — Player Defeat (takes precedence over same-turn bankruptcy/RICO)
+  if ((gameState as any).aiVictor) {
+    const v = (gameState as any).aiVictor as { family: string; type: 'territory' | 'economic' | 'legacy' | 'domination'; turn: number };
+    const famLabel = v.family.charAt(0).toUpperCase() + v.family.slice(1);
+    const winnerHexes = gameState.hexMap.filter(h => h.controllingFamily === v.family).length;
+    const winnerOpp = gameState.aiOpponents?.find(o => o.family === v.family);
+    const winnerSoldiers = winnerOpp?.resources?.soldiers ?? 0;
+    const playerHexes = gameState.hexMap.filter(h => h.controllingFamily === gameState.playerFamily).length;
+    const eliminatedCount = (gameState as any).eliminatedFamilies?.length || 0;
+    const emoji = v.type === 'territory' ? '👑' : v.type === 'economic' ? '💰' : v.type === 'legacy' ? '🏛️' : '☠️';
+    const typeTitle: Record<string, string> = {
+      territory: 'TERRITORY DOMINATION',
+      economic: 'ECONOMIC EMPIRE',
+      legacy: 'LEGACY OF POWER',
+      domination: 'TOTAL DOMINATION',
+    };
+    const typeDesc: Record<string, string> = {
+      territory: `The ${famLabel} family controls the city — block by block, the streets are theirs.`,
+      economic: `The ${famLabel} family runs the money. Every dollar in this city flows through them.`,
+      legacy: `The ${famLabel} name now towers over every rival. The reputation is unmatched.`,
+      domination: `Every other family is broken. ${famLabel} stands alone over the ashes.`,
+    };
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8 }}
+          className="text-center p-8 max-w-lg"
+        >
+          <motion.div
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="text-6xl mb-4"
+          >
+            {emoji}
+          </motion.div>
+          <motion.h1
+            initial={{ y: -30, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="text-4xl font-bold text-destructive mb-2 font-playfair"
+          >
+            {famLabel.toUpperCase()} WINS
+          </motion.h1>
+          <motion.h2
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="text-lg font-semibold text-mafia-gold mb-4 font-playfair tracking-wider"
+          >
+            {typeTitle[v.type]}
+          </motion.h2>
+          <motion.p
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.7 }}
+            className="text-base text-muted-foreground mb-6"
+          >
+            {typeDesc[v.type]}
+          </motion.p>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.9 }}
+            className="grid grid-cols-2 gap-3 mb-6 text-left bg-card/80 rounded-lg p-4 border border-border"
+          >
+            <div className="text-xs text-muted-foreground">Turns Played</div>
+            <div className="text-xs font-bold text-foreground">{v.turn}</div>
+            <div className="text-xs text-muted-foreground">Winning Family</div>
+            <div className="text-xs font-bold text-foreground">{famLabel}</div>
+            <div className="text-xs text-muted-foreground">Winner Territory</div>
+            <div className="text-xs font-bold text-foreground">{winnerHexes} hexes</div>
+            <div className="text-xs text-muted-foreground">Winner Soldiers</div>
+            <div className="text-xs font-bold text-foreground">{winnerSoldiers}</div>
+            <div className="text-xs text-muted-foreground">Your Territory</div>
+            <div className="text-xs font-bold text-foreground">{playerHexes} hexes</div>
+            <div className="text-xs text-muted-foreground">Your Final Wealth</div>
+            <div className="text-xs font-bold text-foreground">${gameState.resources.money.toLocaleString()}</div>
+            <div className="text-xs text-muted-foreground">Families Eliminated</div>
+            <div className="text-xs font-bold text-foreground">{eliminatedCount}/4</div>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+          >
+            <Badge variant="destructive" className="text-xl px-6 py-3 font-playfair">
+              DEFEAT — Turn {v.turn}
+            </Badge>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.5 }}
+            className="mt-8"
+          >
+            <Button size="lg" onClick={onExitToMenu} className="font-playfair text-lg px-8 py-3">
+              <LogOut className="h-5 w-5 mr-2" />
+              Return to Main Menu
+            </Button>
+          </motion.div>
+        </motion.div>
+      </div>
+    );
+  }
+
   // RICO or Bankruptcy Game Over
   if (gameState.gameOver?.type === 'rico' || (gameState.gameOver as any)?.type === 'bankruptcy' || (gameState.gameOver as any)?.type === 'assassination' || (gameState.gameOver as any)?.type === 'federal_indictment') {
     const goType = (gameState.gameOver as any)?.type;
