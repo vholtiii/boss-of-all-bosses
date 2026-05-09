@@ -498,6 +498,7 @@ export interface EnhancedMafiaGameState {
   arrestedSoldiers: Array<{ unitId: string; returnTurn: number; source?: 'heat' | 'prosecution' }>;
   arrestedCapos: Array<{ unitId: string; returnTurn: number }>;
   gameOver?: { type: 'rico' | 'federal_indictment'; turn: number } | null;
+  aiVictor?: { family: string; type: 'territory' | 'economic' | 'legacy' | 'domination'; turn: number } | null;
   pendingBusinessBuild?: { businessType: string; cost: number; isLegal: boolean } | null;
   
   // Blind hit system
@@ -1157,6 +1158,7 @@ export const createInitialGameState = (
     bonannoPurgeImmunity: [],
     incomingSitdowns: [],
     victoryType: null,
+    aiVictor: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
     pendingNotifications: [],
