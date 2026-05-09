@@ -67,8 +67,9 @@ describe("AI victory detection", () => {
       const s: any = result.current.gameState;
       // Player gets 60+ territory (medium target). Flip player first so AI flips
       // overwrite some — but because hex map > 60, both can be at threshold.
-      flipHexesTo(s, s.playerFamily, 80);
+      // Flip AI first then player so player ends with the threshold met.
       flipHexesTo(s, targetAI, 60);
+      flipHexesTo(s, s.playerFamily, 80);
       result.current.endTurn();
     });
 
