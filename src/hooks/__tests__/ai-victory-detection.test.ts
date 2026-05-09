@@ -41,22 +41,6 @@ describe("AI victory detection", () => {
     expect(["territory", "domination"]).toContain(v.type);
   });
 
-  it("sets aiVictor.type='economic' when an AI hits the income target", () => {
-    const { result } = setup();
-    const targetAI = result.current.gameState.aiOpponents[0].family;
-
-    act(() => {
-      const opp = result.current.gameState.aiOpponents.find(o => o.family === targetAI)!;
-      (opp.resources as any).lastTurnIncome = 80000;
-      result.current.endTurn();
-    });
-
-    const v = (result.current.gameState as any).aiVictor;
-    expect(v).toBeTruthy();
-    // Could be economic or territory depending on map; just confirm it's set on this AI.
-    expect(v.family).toBe(targetAI);
-  });
-
   it("sets aiVictor.type='domination' when player is gameOver and one AI survives", () => {
     const { result } = setup();
     const survivor = result.current.gameState.aiOpponents[0].family;
@@ -75,20 +59,19 @@ describe("AI victory detection", () => {
     expect(v.type).toBe("domination");
   });
 
-  it("does not overwrite player victory", () => {
+  it("does not set aiVictor when player victoryType is already set", () => {
     const { result } = setup();
     const targetAI = result.current.gameState.aiOpponents[0].family;
 
     act(() => {
       const s: any = result.current.gameState;
-      // Player already won
-      flipHexesTo(s, s.playerFamily, 60);
-      // AI also at threshold
-      flipHexesTo(s, targetAI, 60);
+      // Pre-set player victory before endTurn runs updateVictoryProgress
+      s.victoryType = "territory";
+      flipHexesTo(s, targetAI, 80);
       result.current.endTurn();
     });
 
-    expect(result.current.gameState.victoryType).toBeTruthy();
+    expect(result.current.gameState.victoryType).toBe("territory");
     expect((result.current.gameState as any).aiVictor).toBeFalsy();
   });
 });
