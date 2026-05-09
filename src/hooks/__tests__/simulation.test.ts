@@ -230,8 +230,8 @@ function runOneSim(config: SimConfig): SimReport {
       hexes,
       money: opp.resources.money,
       soldiers: opp.resources.soldiers,
-      respect: opp.reputation?.respect ?? 0,
-      influence: opp.reputation?.streetInfluence ?? 0,
+      respect: opp.resources?.respect ?? 0,
+      influence: opp.resources?.influence ?? 0,
       eliminated: (final.eliminatedFamilies || []).includes(opp.family),
       personality: opp.personality,
     });
