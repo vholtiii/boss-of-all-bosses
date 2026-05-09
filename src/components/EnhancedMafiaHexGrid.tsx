@@ -1406,7 +1406,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   )}
 
                   {/* Render units */}
-                  {showSoldiers && unitsHere.length > 0 && (!tile.isHeadquarters || expandedHQKey === key || gameState?.turnPhase === 'move' || gameState?.turnPhase === 'action') && (() => {
+                  {showSoldiers && unitsHere.length > 0 && (!tile.isHeadquarters || tile.isHeadquarters === playerFamily || expandedHQKey === key || gameState?.turnPhase === 'move' || gameState?.turnPhase === 'action') && (() => {
                     const turnPhase = gameState?.turnPhase || 'waiting';
                     const selectedUnitId = gameState?.selectedUnitId;
                     // Group by family and type
