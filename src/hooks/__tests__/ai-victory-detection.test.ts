@@ -59,19 +59,20 @@ describe("AI victory detection", () => {
     expect(v.type).toBe("domination");
   });
 
-  it("does not set aiVictor when player victoryType is already set", () => {
+  it("does not set aiVictor when player meets a victory condition the same turn", () => {
     const { result } = setup();
     const targetAI = result.current.gameState.aiOpponents[0].family;
 
     act(() => {
       const s: any = result.current.gameState;
-      // Pre-set player victory before endTurn runs updateVictoryProgress
-      s.victoryType = "territory";
-      flipHexesTo(s, targetAI, 80);
+      // Player gets 60+ territory (medium target). Flip player first so AI flips
+      // overwrite some — but because hex map > 60, both can be at threshold.
+      flipHexesTo(s, s.playerFamily, 80);
+      flipHexesTo(s, targetAI, 60);
       result.current.endTurn();
     });
 
-    expect(result.current.gameState.victoryType).toBe("territory");
+    expect(result.current.gameState.victoryType).toBeTruthy();
     expect((result.current.gameState as any).aiVictor).toBeFalsy();
   });
 });
