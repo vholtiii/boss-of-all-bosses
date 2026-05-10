@@ -119,7 +119,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     if (gameState.lastCombatResult) {
       const { success, type } = gameState.lastCombatResult;
       if (type === 'hit') {
-        if (success) playSoundSequence(['hit_success', 'success']);
+        if (success) playSound('hit_kill');
         else playSoundSequence(['hit_fail', 'error']);
       } else if (type === 'extort') {
         if (success) playSoundSequence(['extort_success', 'money']);

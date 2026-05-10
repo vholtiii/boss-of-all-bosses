@@ -33,6 +33,7 @@ const SOUND_CATEGORIES: Record<string, SoundCategory> = {
   notification: 'alert',
   danger: 'alert',
   combat: 'combat',
+  hit_kill: 'combat',
   hit_success: 'combat',
   hit_fail: 'combat',
   extort_success: 'combat',
@@ -43,6 +44,7 @@ const SOUND_CATEGORIES: Record<string, SoundCategory> = {
 
 export const useSoundSystem = () => {
   const audioContextRef = useRef<AudioContext | null>(null);
+  const audioFileCacheRef = useRef<Record<string, HTMLAudioElement>>({});
   const [soundConfig, setSoundConfig] = useState<SoundConfig>(loadConfig);
   const soundConfigRef = useRef(soundConfig);
 
@@ -69,9 +71,32 @@ export const useSoundSystem = () => {
     }
   }, []);
 
+  const SOUND_FILES: Record<string, string> = {
+    hit_kill: '/sounds/gunshot-hit.mp3',
+  };
+
   const playSound = useCallback((type: string, frequency?: number, duration?: number) => {
     const volume = getVolumeForSound(type);
-    if (volume <= 0 || !audioContextRef.current) return;
+    if (volume <= 0) return;
+
+    // File-based sounds (e.g. gunshot for successful hits)
+    const fileUrl = SOUND_FILES[type];
+    if (fileUrl) {
+      try {
+        let audio = audioFileCacheRef.current[type];
+        if (!audio) {
+          audio = new Audio(fileUrl);
+          audio.preload = 'auto';
+          audioFileCacheRef.current[type] = audio;
+        }
+        audio.volume = Math.max(0, Math.min(1, volume));
+        audio.currentTime = 0;
+        void audio.play().catch(() => {});
+      } catch {}
+      return;
+    }
+
+    if (!audioContextRef.current) return;
 
     const audioContext = audioContextRef.current;
     const oscillator = audioContext.createOscillator();
