@@ -89,7 +89,14 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     if (gameState.pendingNotifications.length > 0) {
       gameState.pendingNotifications.forEach(n => {
         switch (n.type) {
-          case 'success': notifySuccess(n.title, n.message); playSound('success'); break;
+          case 'success':
+            notifySuccess(n.title, n.message);
+            if (typeof n.title === 'string' && n.title.includes('Contract Fulfilled')) {
+              playSound('assassin_kill');
+            } else {
+              playSound('success');
+            }
+            break;
           case 'error': notifyError(n.title, n.message); playSound('danger'); break;
           case 'warning': notifyWarning(n.title, n.message); playSound('error'); break;
           case 'info': notifyInfo(n.title, n.message); playSound('notification'); break;
