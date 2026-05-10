@@ -44,6 +44,7 @@ const SOUND_CATEGORIES: Record<string, SoundCategory> = {
 
 export const useSoundSystem = () => {
   const audioContextRef = useRef<AudioContext | null>(null);
+  const audioFileCacheRef = useRef<Record<string, HTMLAudioElement>>({});
   const [soundConfig, setSoundConfig] = useState<SoundConfig>(loadConfig);
   const soundConfigRef = useRef(soundConfig);
 
