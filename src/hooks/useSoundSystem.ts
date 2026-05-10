@@ -33,6 +33,7 @@ const SOUND_CATEGORIES: Record<string, SoundCategory> = {
   notification: 'alert',
   danger: 'alert',
   combat: 'combat',
+  hit_kill: 'combat',
   hit_success: 'combat',
   hit_fail: 'combat',
   extort_success: 'combat',
