@@ -35,6 +35,7 @@ const SOUND_CATEGORIES: Record<string, SoundCategory> = {
   combat: 'combat',
   hit_kill: 'combat',
   assassin_kill: 'combat',
+  capo_fail: 'alert',
   hit_success: 'combat',
   hit_fail: 'combat',
   extort_success: 'combat',
