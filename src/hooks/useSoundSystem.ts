@@ -35,6 +35,7 @@ const SOUND_CATEGORIES: Record<string, SoundCategory> = {
   combat: 'combat',
   hit_kill: 'combat',
   assassin_kill: 'combat',
+  capo_fail: 'alert',
   hit_success: 'combat',
   hit_fail: 'combat',
   extort_success: 'combat',
@@ -75,6 +76,7 @@ export const useSoundSystem = () => {
   const SOUND_FILES: Record<string, string> = {
     hit_kill: '/sounds/gunshot-hit.mp3',
     assassin_kill: '/sounds/assassin-kill.mp3',
+    capo_fail: '/sounds/capo-fail.mp3',
   };
 
   const playSound = useCallback((type: string, frequency?: number, duration?: number) => {

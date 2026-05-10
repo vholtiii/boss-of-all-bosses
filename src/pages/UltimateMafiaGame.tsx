@@ -98,7 +98,21 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             }
             break;
           case 'error': notifyError(n.title, n.message); playSound('danger'); break;
-          case 'warning': notifyWarning(n.title, n.message); playSound('error'); break;
+          case 'warning': {
+            notifyWarning(n.title, n.message);
+            const t = typeof n.title === 'string' ? n.title : '';
+            if (
+              t.includes('Assassination Foiled') ||
+              t.includes('Enemy Capo Wounded') ||
+              t.includes('Capo Wounded') ||
+              t.includes('Plan Hit Expired')
+            ) {
+              playSound('capo_fail');
+            } else {
+              playSound('error');
+            }
+            break;
+          }
           case 'info': notifyInfo(n.title, n.message); playSound('notification'); break;
         }
       });
