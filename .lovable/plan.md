@@ -1,34 +1,55 @@
 ## Goal
 
-Replace the generic synthesized combat sound played when a Hit or Planned Hit succeeds with the uploaded AK-47 gunshot burst MP3.
+Make the save system reliable so players don't lose progress. Today the system has gaps: autosave is defined but never called, saves go only to localStorage (~5 MB cap, easy to exceed with full map state), overwrites/deletes have no confirmation or backup, and there's no safeguard for tab close or quota errors.
 
-## Scope
+## Findings
 
-The gunshot replaces only the **success** sound for hit-type combat results (regular Hit Territory and Plan Hit). Failed hits, extortion, sabotage, and other events keep their current sounds.
+- `useGameSaveLoad.ts` exposes `autoSave()` but **nothing in the app calls it** — there is no automatic save at all.
+- All saves go to `localStorage` only. Game state (hex grid, units, history) can grow large; a single JSON write can hit the ~5 MB browser quota and fail silently aside from a generic toast.
+- `saveGame()` overwrites in place with no prior backup. A failed/corrupt write can wipe the previous save in that slot.
+- `loadGame()` has no shape validation beyond version — a partially corrupted JSON parses but can crash the game on load.
+- The autosave slot (`0`) isn't shown in the Save/Load dialog (loop iterates 1..5), so even if autosave ran, players couldn't see/restore it.
+- No "save before unload" guard — closing the tab loses unsaved progress.
+- Delete and overwrite have no confirmation prompt.
 
-## Steps
+## Plan
 
-1. **Add the audio asset**
-   - Copy the uploaded file to `public/sounds/gunshot-hit.mp3` so it's served as a static asset.
+### 1. Add automatic saves (no user action needed)
+- Call `autoSave(gameState)` at end of every turn (in `UltimateMafiaGame.tsx`, hook into the turn-advance flow).
+- Debounce to once per few seconds to avoid thrash during multi-step turns.
+- Add a `beforeunload` listener that runs a final autosave when the tab is closing.
+- Surface the autosave slot (slot 0) as "Auto Save" in the Load tab so players can recover from it.
 
-2. **Extend `useSoundSystem` to support file-based sounds** (`src/hooks/useSoundSystem.ts`)
-   - Add a small `playSoundFile(url, category)` helper that uses an `HTMLAudioElement`, respects the master `enabled` flag, and scales volume by the appropriate category (combat for the gunshot).
-   - Register a new sound key `hit_kill` mapped to the `combat` category and wired to `gunshot-hit.mp3`. `playSound('hit_kill')` should route to the file player when the key has a file mapping, otherwise fall back to the existing oscillator path. This keeps the public API (`playSound`) unchanged for callers.
-   - Preload the audio once (lazy on first use) to avoid playback latency.
+### 2. Backup-before-overwrite
+- On every write to a slot, first copy the existing payload to a `*_backup` key.
+- On load failure (parse error, shape mismatch), automatically try the backup and notify the player.
+- Keep one rolling backup per slot (no unlimited history).
 
-3. **Swap the success sound for hits** (`src/pages/UltimateMafiaGame.tsx`, ~line 122)
-   - Replace `playSoundSequence(['hit_success', 'success'])` with `playSound('hit_kill')` for successful hits.
-   - Leave the failure branch (`hit_fail` + `error`) untouched.
-   - Since planned hits resolve through `processTerritoryHit` and set `lastCombatResult` with `type: 'hit'`, this single change covers both regular hits and planned hits automatically.
+### 3. Storage upgrade with fallback
+- Use IndexedDB (via a tiny wrapper, no new deps — native `idb` API) as the primary store; keep localStorage as a mirror for the most recent autosave only (small footprint).
+- Catch `QuotaExceededError` explicitly and: retry by trimming the localStorage mirror, surface a clear toast, and still succeed in IndexedDB.
+- Migrate any existing localStorage saves to IndexedDB on first load (one-time, non-destructive).
 
-## Out of Scope
+### 4. Safer load + validation
+- Add a lightweight shape validator (check required top-level keys: `playerFamily`, `resources`, `hexGrid`, `turn`, `units`, etc.).
+- If validation fails, refuse to apply the state and offer the backup.
+- Wrap the existing version check so "minor" version diffs only warn, "major" diffs block (already partially done — keep).
 
-- Sounds for sabotage, extortion, AI-on-player planned hits announced via notifications, or generic success/danger toasts.
-- Volume/mixing UI changes — the existing Combat slider already controls this category.
-- Any gameplay/balance changes.
+### 5. UX safeguards
+- Add a confirmation dialog (shadcn `AlertDialog`) before Overwrite and Delete actions.
+- Show a small "Saved ✓ HH:MM" indicator in the top bar after each autosave so players know it's working.
+- In the dialog, show the autosave slot at the top of the Load tab with an "Auto" badge.
 
-## Technical notes
+### Technical notes (for the engineer)
 
-- Static MP3 in `public/` is referenced as `/sounds/gunshot-hit.mp3` from the audio element.
-- `HTMLAudioElement.volume` is set from `soundConfigRef.current.combatVolume` at play time; `currentTime = 0` then `play()` so rapid retriggers restart cleanly.
-- The clip is short (~2s), so no truncation logic is needed.
+- New file: `src/lib/gameStorage.ts` — wraps IndexedDB (`indexedDB.open('mafia-saves', 1)`, object store `saves` keyed by slot id). Exposes `get/put/delete/list` returning Promises. No external library.
+- `useGameSaveLoad.ts`: refactor `saveGame/loadGame/deleteSave/getSaveSlots/exportSave/importSave` to be `async` and delegate to `gameStorage`. Keep the same return shape so `SaveLoadDialog` only needs minor `await` updates. Add backup logic inside `saveGame` (read existing → write to `${slot}_backup` → write new). Add migration function called once on hook init.
+- `useGameSaveLoad.ts`: add `autoSave` debouncer using a module-level timestamp (e.g. min 5 s between writes). Slot id `auto`.
+- `UltimateMafiaGame.tsx`: call `autoSave(gameState)` in the existing turn-end effect; add `useEffect` for `beforeunload` that calls a synchronous localStorage mirror write (IndexedDB is async and unreliable on unload). Render a `Saved ✓ HH:MM` badge near the End Turn button.
+- `SaveLoadDialog.tsx`: include the autosave slot in both Save (read-only) and Load tabs. Wrap Overwrite/Delete buttons in `AlertDialog` confirmations. Update handlers to `await` the now-async hook methods.
+- Validation: add `isValidGameState(s)` in `src/lib/gameStorage.ts` that checks the required keys above.
+- No DB / backend changes. No new packages.
+
+### Out of scope
+- Cloud sync to Lovable Cloud (can be a follow-up if you want cross-device saves).
+- Versioned save migrations beyond the existing major/minor check.
