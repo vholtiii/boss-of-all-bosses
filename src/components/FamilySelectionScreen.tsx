@@ -247,7 +247,23 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const [selectedFamily, setSelectedFamily] = useState<FamilyId | null>(null);
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
   const [mapSize, setMapSize] = useState<MapSize>('medium');
-  const [seedInput, setSeedInput] = useState('');
+  const [seedInput, setSeedInput] = useState<string>(() => Math.floor(Math.random() * 1e9).toString());
+  const [seedFlash, setSeedFlash] = useState(0);
+  const [seedCopied, setSeedCopied] = useState(false);
+
+  const rerollSeed = useCallback(() => {
+    setSeedInput(Math.floor(Math.random() * 1e9).toString());
+    setSeedFlash(f => f + 1);
+  }, []);
+
+  const copySeed = useCallback(async () => {
+    if (!seedInput) return;
+    try {
+      await navigator.clipboard.writeText(seedInput);
+      setSeedCopied(true);
+      setTimeout(() => setSeedCopied(false), 1400);
+    } catch {}
+  }, [seedInput]);
   const { soundConfig, updateSoundConfig, playSound } = useSoundSystem();
   const detailRef = useRef<HTMLDivElement>(null);
 
