@@ -435,7 +435,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 color: 'rgb(251,191,36)', glow: 'rgba(251,191,36,0.55)', tint: 'rgba(251,191,36,0.10)',
                 stats: [
                   { icon: '💰', label: 'Income',      value: 'Base',     tone: 'neutral' as Tone },
-                  { icon: '⚔️', label: 'AI Rivals',   value: 'Tactical', tone: 'neutral' as Tone },
+                  { icon: '⚔️', label: 'AI Rivals',   value: 'Adaptive', tone: 'neutral' as Tone },
                   { icon: '🚓', label: 'Police Heat', value: 'Standard', tone: 'neutral' as Tone },
                   { icon: '🤝', label: 'Diplomacy',   value: 'Cautious', tone: 'neutral' as Tone },
                 ],
