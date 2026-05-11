@@ -1,5 +1,15 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { EnhancedMafiaGameState } from './useEnhancedMafiaGameState';
+import {
+  readSlot,
+  writeSlot,
+  deleteSlot,
+  listSlots,
+  isValidSaveData,
+  emergencyMirrorAuto,
+  migrateLegacySaves,
+  type SlotId,
+} from '@/lib/gameStorage';
 
 export interface SaveGameData {
   gameState: EnhancedMafiaGameState;
@@ -8,12 +18,27 @@ export interface SaveGameData {
   playerName?: string;
 }
 
-export const useGameSaveLoad = () => {
-  const SAVE_KEY_PREFIX = 'mafia_game_save_';
-  const CURRENT_VERSION = '1.0.0';
+export type { SlotId };
 
-  // Save game to localStorage
-  const saveGame = useCallback((gameState: EnhancedMafiaGameState, slot: number = 1, playerName?: string) => {
+const CURRENT_VERSION = '1.0.0';
+const AUTOSAVE_MIN_INTERVAL_MS = 4000;
+
+let lastAutoSaveAt = 0;
+
+export const useGameSaveLoad = () => {
+  // One-time legacy migration on first mount
+  const migratedRef = useRef(false);
+  useEffect(() => {
+    if (migratedRef.current) return;
+    migratedRef.current = true;
+    migrateLegacySaves().catch(err => console.warn('[save] migration failed', err));
+  }, []);
+
+  const saveGame = useCallback(async (
+    gameState: EnhancedMafiaGameState,
+    slot: SlotId = 1,
+    playerName?: string,
+  ) => {
     try {
       const saveData: SaveGameData = {
         gameState,
@@ -21,10 +46,7 @@ export const useGameSaveLoad = () => {
         gameVersion: CURRENT_VERSION,
         playerName,
       };
-
-      const saveKey = `${SAVE_KEY_PREFIX}${slot}`;
-      localStorage.setItem(saveKey, JSON.stringify(saveData));
-      
+      await writeSlot(slot, saveData);
       return { success: true, message: `Game saved to slot ${slot}` };
     } catch (error) {
       console.error('Failed to save game:', error);
@@ -32,38 +54,32 @@ export const useGameSaveLoad = () => {
     }
   }, []);
 
-  // Load game from localStorage
-  const loadGame = useCallback((slot: number = 1) => {
+  const loadGame = useCallback(async (slot: SlotId = 1) => {
     try {
-      const saveKey = `${SAVE_KEY_PREFIX}${slot}`;
-      const saveDataString = localStorage.getItem(saveKey);
-      
-      if (!saveDataString) {
-        return { success: false, message: 'No save data found' };
-      }
+      const { data, fromBackup } = await readSlot(slot);
+      if (!data) return { success: false, message: 'No save data found' };
 
-      const saveData: SaveGameData = JSON.parse(saveDataString);
-      
-      // Check version compatibility — only reject on major version mismatch
-      const savedMajor = parseInt(saveData.gameVersion?.split('.')[0] || '0');
+      // Version check
+      const savedMajor = parseInt(data.gameVersion?.split('.')[0] || '0');
       const currentMajor = parseInt(CURRENT_VERSION.split('.')[0]);
-      const versionWarning = saveData.gameVersion !== CURRENT_VERSION
-        ? ` (saved with v${saveData.gameVersion}, current v${CURRENT_VERSION})`
-        : '';
-      
       if (savedMajor !== currentMajor) {
-        return { 
-          success: false, 
-          message: `Save file version ${saveData.gameVersion} is not compatible with current version ${CURRENT_VERSION}` 
+        return {
+          success: false,
+          message: `Save file version ${data.gameVersion} is not compatible with current version ${CURRENT_VERSION}`,
         };
       }
 
-      return { 
-        success: true, 
-        gameState: saveData.gameState,
-        saveDate: saveData.saveDate,
-        playerName: saveData.playerName,
-        message: `Game loaded successfully${versionWarning}` 
+      const versionWarning = data.gameVersion !== CURRENT_VERSION
+        ? ` (saved with v${data.gameVersion})`
+        : '';
+      const backupNote = fromBackup ? ' — recovered from backup' : '';
+
+      return {
+        success: true,
+        gameState: data.gameState,
+        saveDate: data.saveDate,
+        playerName: data.playerName,
+        message: `Game loaded successfully${versionWarning}${backupNote}`,
       };
     } catch (error) {
       console.error('Failed to load game:', error);
@@ -71,34 +87,26 @@ export const useGameSaveLoad = () => {
     }
   }, []);
 
-  // Get all available save slots
-  const getSaveSlots = useCallback(() => {
-    const slots: Array<{ slot: number; saveData?: SaveGameData; exists: boolean }> = [];
-    
-    for (let i = 1; i <= 5; i++) {
-      const saveKey = `${SAVE_KEY_PREFIX}${i}`;
-      const saveDataString = localStorage.getItem(saveKey);
-      
-      if (saveDataString) {
-        try {
-          const saveData: SaveGameData = JSON.parse(saveDataString);
-          slots.push({ slot: i, saveData, exists: true });
-        } catch (error) {
-          slots.push({ slot: i, exists: false });
+  const getSaveSlots = useCallback(async () => {
+    const slotIds: SlotId[] = ['auto', 1, 2, 3, 4, 5];
+    const present = new Set(await listSlots());
+    const out: Array<{ slot: SlotId; saveData?: SaveGameData; exists: boolean }> = [];
+    for (const id of slotIds) {
+      if (present.has(id)) {
+        const { data } = await readSlot(id);
+        if (data) {
+          out.push({ slot: id, saveData: data, exists: true });
+          continue;
         }
-      } else {
-        slots.push({ slot: i, exists: false });
       }
+      out.push({ slot: id, exists: false });
     }
-    
-    return slots;
+    return out;
   }, []);
 
-  // Delete a save slot
-  const deleteSave = useCallback((slot: number) => {
+  const deleteSave = useCallback(async (slot: SlotId) => {
     try {
-      const saveKey = `${SAVE_KEY_PREFIX}${slot}`;
-      localStorage.removeItem(saveKey);
+      await deleteSlot(slot);
       return { success: true, message: `Save slot ${slot} deleted` };
     } catch (error) {
       console.error('Failed to delete save:', error);
@@ -106,25 +114,35 @@ export const useGameSaveLoad = () => {
     }
   }, []);
 
-  // Auto-save functionality
-  const autoSave = useCallback((gameState: EnhancedMafiaGameState) => {
-    return saveGame(gameState, 0, 'Auto Save');
+  /** Throttled autosave — call freely, only writes once per few seconds. */
+  const autoSave = useCallback(async (gameState: EnhancedMafiaGameState) => {
+    const now = Date.now();
+    if (now - lastAutoSaveAt < AUTOSAVE_MIN_INTERVAL_MS) {
+      return { success: false, message: 'throttled' };
+    }
+    lastAutoSaveAt = now;
+    return saveGame(gameState, 'auto', 'Auto Save');
   }, [saveGame]);
 
-  // Export save data as JSON
-  const exportSave = useCallback((slot: number = 1) => {
+  /** Synchronous emergency save for `beforeunload`. */
+  const emergencySaveAuto = useCallback((gameState: EnhancedMafiaGameState) => {
     try {
-      const saveKey = `${SAVE_KEY_PREFIX}${slot}`;
-      const saveDataString = localStorage.getItem(saveKey);
-      
-      if (!saveDataString) {
-        return { success: false, message: 'No save data found' };
-      }
+      emergencyMirrorAuto({
+        gameState,
+        saveDate: new Date().toISOString(),
+        gameVersion: CURRENT_VERSION,
+        playerName: 'Auto Save',
+      });
+    } catch {
+      // best effort
+    }
+  }, []);
 
-      const saveData: SaveGameData = JSON.parse(saveDataString);
-      const exportData = JSON.stringify(saveData, null, 2);
-      
-      // Create and download file
+  const exportSave = useCallback(async (slot: SlotId = 1) => {
+    try {
+      const { data } = await readSlot(slot);
+      if (!data) return { success: false, message: 'No save data found' };
+      const exportData = JSON.stringify(data, null, 2);
       const blob = new Blob([exportData], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -134,7 +152,6 @@ export const useGameSaveLoad = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
       return { success: true, message: 'Save data exported successfully' };
     } catch (error) {
       console.error('Failed to export save:', error);
@@ -142,36 +159,24 @@ export const useGameSaveLoad = () => {
     }
   }, []);
 
-  // Import save data from JSON
-  const importSave = useCallback((file: File, slot: number = 1) => {
+  const importSave = useCallback((file: File, slot: SlotId = 1) => {
     return new Promise<{ success: boolean; message: string }>((resolve) => {
       const reader = new FileReader();
-      
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
-          const saveData: SaveGameData = JSON.parse(e.target?.result as string);
-          
-          // Validate save data structure
-          if (!saveData.gameState || !saveData.saveDate || !saveData.gameVersion) {
+          const parsed = JSON.parse(e.target?.result as string);
+          if (!isValidSaveData(parsed)) {
             resolve({ success: false, message: 'Invalid save file format' });
             return;
           }
-          
-          // Save to specified slot
-          const saveKey = `${SAVE_KEY_PREFIX}${slot}`;
-          localStorage.setItem(saveKey, JSON.stringify(saveData));
-          
+          await writeSlot(slot, parsed);
           resolve({ success: true, message: 'Save data imported successfully' });
         } catch (error) {
           console.error('Failed to import save:', error);
           resolve({ success: false, message: 'Failed to import save file' });
         }
       };
-      
-      reader.onerror = () => {
-        resolve({ success: false, message: 'Failed to read file' });
-      };
-      
+      reader.onerror = () => resolve({ success: false, message: 'Failed to read file' });
       reader.readAsText(file);
     });
   }, []);
@@ -182,6 +187,7 @@ export const useGameSaveLoad = () => {
     getSaveSlots,
     deleteSave,
     autoSave,
+    emergencySaveAuto,
     exportSave,
     importSave,
   };
