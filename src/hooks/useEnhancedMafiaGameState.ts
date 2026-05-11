@@ -10693,6 +10693,11 @@ export const useEnhancedMafiaGameState = (
   // ============ WINNER CHECK ============
   const isWinner = gameState.victoryType !== null;
 
+  // Replace full game state (used by Load Game)
+  const loadGameState = useCallback((next: EnhancedMafiaGameState) => {
+    setGameState(next);
+  }, []);
+
   return {
     gameState,
     endTurn,
