@@ -725,7 +725,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           <Button variant="outline" size="sm" onClick={() => setZoom(z => Math.max(z - 0.15, 0.3))} className="h-8 w-8 p-0">
             <ZoomOut className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setZoom(1)} className="h-8 w-8 p-0">
+          <Button variant="outline" size="sm" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="h-8 w-8 p-0">
             <RotateCcw className="h-4 w-4" />
           </Button>
           <div className="h-6 w-px bg-noir-light mx-1" />
