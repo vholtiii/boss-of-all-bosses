@@ -26,7 +26,7 @@ const CapoIcon: React.FC<CapoIconProps> = ({
   x, y, family, name, level, isPlayerFamily = false, selected = false, wounded = false, onClick 
 }) => {
   const familyColor = familyColors[family];
-  const size = 26;
+  const size = 32;
   
   return (
     <motion.g
