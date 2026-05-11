@@ -15,8 +15,10 @@ import { useGameSaveLoad, SaveSlotInfo, SlotId } from '@/hooks/useGameSaveLoad';
 import { EnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import { useAuth } from '@/hooks/useAuth';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { supabase } from '@/integrations/supabase/client';
 import CloudAuthPanel from '@/components/CloudAuthPanel';
+import { Link } from 'react-router-dom';
 
 interface SaveLoadDialogProps {
   gameState: EnhancedMafiaGameState;
@@ -37,6 +39,7 @@ const SaveLoadDialog: React.FC<SaveLoadDialogProps> = ({ gameState, onLoadGame, 
     cloudSyncing, isSignedIn,
   } = useGameSaveLoad();
   const { user } = useAuth();
+  const { isAdmin } = useIsAdmin();
   const { playSound } = useSoundSystem();
 
   const refreshSlots = async () => setSaveSlots(await getSaveSlots());
@@ -146,9 +149,16 @@ const SaveLoadDialog: React.FC<SaveLoadDialogProps> = ({ gameState, onLoadGame, 
                   {cloudSyncing ? 'Syncing…' : 'Cloud sync on'}
                 </Badge>
               </div>
-              <Button size="sm" variant="ghost" onClick={handleSignOut}>
-                <LogOut className="h-3 w-3 mr-1" /> Sign out
-              </Button>
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <Link to="/admin">
+                    <Button size="sm" variant="outline">Admin</Button>
+                  </Link>
+                )}
+                <Button size="sm" variant="ghost" onClick={handleSignOut}>
+                  <LogOut className="h-3 w-3 mr-1" /> Sign out
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="space-y-2">
