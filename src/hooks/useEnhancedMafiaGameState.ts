@@ -6522,7 +6522,33 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      // ── D1: AI CAPO TERRITORY SITDOWNS (Phase 2+) ──
+      // ── AI-TO-AI HOSTILITY DRIFT (mood-driven, feeds tension→war pipeline) ──
+      // Dominant or aggressive AIs push tension on weak rivals. Diplomatic AIs
+      // dampen pair tension with rivals they have positive relations with.
+      // This makes the world feel alive: AIs go to war with each other, not
+      // just the player.
+      if (aiPhase >= 2) {
+        const otherRivals = (state.aiOpponents || []).filter(o =>
+          o.family !== fam && !(state.eliminatedFamilies || []).includes(o.family)
+        );
+        for (const other of otherRivals) {
+          const otherHexes = state.hexMap.filter(t => t.controllingFamily === other.family).length;
+          const rel = (opponent.relationships?.[other.family] || 0);
+          // Hostility roll: aggressive/dominant push tension on weaker neighbors
+          if ((dynamicMood === 'dominant' || personality === 'aggressive') && otherHexes < myHexCount * 0.85) {
+            if (turnRng() < 0.35) {
+              addPairTension(state, fam, other.family, TENSION_ENCROACHMENT);
+            }
+          }
+          // Diplomatic mood with positive relations dampens tension
+          if (personality === 'diplomatic' && rel > 10) {
+            if (turnRng() < 0.4) {
+              addPairTension(state, fam, other.family, -TENSION_REDUCE_CEASEFIRE);
+            }
+          }
+        }
+      }
+
       // Each living AI capo has a low chance to propose a territory deal on a juicy player hex.
       if (!atWarWithPlayer && aiPhase >= 2) {
         const aiCapos = state.deployedUnits.filter(u =>
