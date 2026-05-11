@@ -218,7 +218,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         switch (event.key) {
           case '=': case '+': event.preventDefault(); setZoom(prev => Math.min(prev + 0.1, 2.5)); break;
           case '-': event.preventDefault(); setZoom(prev => Math.max(prev - 0.1, 0.3)); break;
-          case '0': event.preventDefault(); setZoom(1); break;
+          case '0': event.preventDefault(); setZoom(1); setPan({ x: 0, y: 0 }); break;
         }
       }
     };
