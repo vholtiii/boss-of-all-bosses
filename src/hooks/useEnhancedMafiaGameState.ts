@@ -3477,7 +3477,7 @@ export const useEnhancedMafiaGameState = (
         newState.deployedUnits = newState.deployedUnits.map(u => {
           if (!u.pendingPromotion || u.type !== 'soldier') return u;
           const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
-          const capoName = `Capo ${Math.floor(Math.random() * 100)}`;
+          const capoName = generateCapoName();
           const personalityLabel = randomPersonality.charAt(0).toUpperCase() + randomPersonality.slice(1);
           newState.pendingNotifications.push({
             type: 'success' as const,
