@@ -6549,6 +6549,7 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
+      // ── D1: AI CAPO TERRITORY SITDOWNS (Phase 2+) ──
       // Each living AI capo has a low chance to propose a territory deal on a juicy player hex.
       if (!atWarWithPlayer && aiPhase >= 2) {
         const aiCapos = state.deployedUnits.filter(u =>
