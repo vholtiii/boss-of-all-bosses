@@ -5476,7 +5476,37 @@ export const useEnhancedMafiaGameState = (
       if (!hq) return;
       const aiPhase = calculatePhaseForFamily(state, fam);
       const oppAny = opponent as any;
-      let personality = opponent.personality || 'aggressive';
+      const basePersonality = (opponent.personality || 'aggressive') as AIPersonality;
+      // ── DYNAMIC MOOD: reactive overlay based on board state ──
+      const myHexCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
+      const rivalHexCounts = (state.aiOpponents || [])
+        .filter(o => o.family !== fam && !(state.eliminatedFamilies || []).includes(o.family))
+        .map(o => state.hexMap.filter(t => t.controllingFamily === o.family).length);
+      const playerHexCount = state.hexMap.filter(t => t.controllingFamily === state.playerFamily).length;
+      const allRivalCounts = [...rivalHexCounts, playerHexCount];
+      const rivalAvgHexes = allRivalCounts.length > 0 ? allRivalCounts.reduce((a, b) => a + b, 0) / allRivalCounts.length : 0;
+      const _recentSoldierLosses = (oppAny.recentSoldierLosses) || 0;
+      const _recentCapoLosses = (oppAny.recentCapoLosses) || 0;
+      const _hqAssaultedRecently = (oppAny.lastAssaultedOnTurn || -99) >= state.turn - 1;
+      const _isAtWarMood = (state.activeWars || []).some(w => w.family1 === fam || w.family2 === fam);
+      const upkeepEstimate = ((opponent.resources.soldiers || 0) + state.deployedUnits.filter(u => u.family === fam).length) * 200 + 1500;
+      const dynamicMood: DynamicMood = computeDynamicMood({
+        myHexes: myHexCount,
+        rivalAvgHexes,
+        myMoney: opponent.resources.money,
+        myUpkeepPerTurn: upkeepEstimate,
+        myHeat: opponent.resources.heat || 0,
+        recentCapoLosses: _recentCapoLosses,
+        hqAssaultedRecently: _hqAssaultedRecently,
+        isAtWar: _isAtWarMood,
+        phase: aiPhase,
+      });
+      oppAny.dynamicMood = dynamicMood;
+      // Effective personality = base blended with mood (war override happens later)
+      let personality: AIPersonality = blendMoodWithPersonality(basePersonality, dynamicMood);
+      const signaturePref = familySignaturePreference(fam as FamilyId);
+      // Per-turn rng for jitter (seeded by mapSeed + turn + family)
+      const turnRng = mulberry32((state.mapSeed || 0) + state.turn * 31 + fam.charCodeAt(0));
 
       // ── AI LAY LOW + MATTRESSES TRIGGERS (heat-baseline + personality-weighted) ──
       // Personality multiplier: defensive/diplomatic lean in, aggressive avoids
