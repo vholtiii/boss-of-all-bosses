@@ -5970,7 +5970,37 @@ export const useEnhancedMafiaGameState = (
           }
 
           if (targetPool.length === 0) targetPool = validMoves;
-          const target = targetPool[Math.floor(Math.random() * targetPool.length)];
+          // ── SCORED TARGET PICK (replaces pure random) ──
+          const focusSet = new Set((opponent.strategy.focusAreas || []) as string[]);
+          const scores = targetPool.map(n => {
+            const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+            const defenderCount = tile && tile.controllingFamily && tile.controllingFamily !== fam
+              ? state.deployedUnits.filter(u => u.family === tile.controllingFamily && u.q === n.q && u.r === n.r && u.s === n.s).length
+              : 0;
+            const isAdjOwn = getHexNeighbors(n.q, n.r, n.s).some(nn => {
+              const nt = state.hexMap.find(t => t.q === nn.q && t.r === nn.r && t.s === nn.s);
+              return nt && nt.controllingFamily === fam;
+            });
+            return scoreHexForAI({
+              hexIncome: tile?.business?.income || 0,
+              defenderCount,
+              isInFocusDistrict: !!(tile?.district && focusSet.has(tile.district)),
+              distanceToOwnHQ: hexDistance(n, hq),
+              isFortified: isHexFortified(state.fortifiedHexes || [], n.q, n.r, n.s, tile?.controllingFamily as string),
+              isSafehouse: state.safehouses.some(s => s.q === n.q && s.r === n.r && s.s === n.s),
+              hasScoutIntel: aiHasScoutIntel(state, fam, n.q, n.r, n.s),
+              isWarTarget: !!(warTargetFamily && tile?.controllingFamily === warTargetFamily),
+              isAdjacentToOwnTerritory: isAdjOwn,
+              isPlayerHex: tile?.controllingFamily === state.playerFamily,
+              effectivePersonality: personality as AIPersonality,
+              signaturePref,
+              phase: aiPhase,
+              mood: dynamicMood,
+              jitter: turnRng() * 2 - 1,
+            });
+          });
+          const pickIdx = softmaxPick(scores, turnRng, 4, 1.5);
+          const target = pickIdx >= 0 ? targetPool[pickIdx] : targetPool[Math.floor(Math.random() * targetPool.length)];
           
           // Save original position — only commit move after combat resolution
           const origQ = unit.q, origR = unit.r, origS = unit.s;
