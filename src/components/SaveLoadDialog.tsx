@@ -35,7 +35,7 @@ const SaveLoadDialog: React.FC<SaveLoadDialogProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('save');
-  const [saveSlots, setSaveSlots] = useState<Array<{ slot: number; saveData?: SaveGameData; exists: boolean }>>([]);
+  const [saveSlots, setSaveSlots] = useState<Array<{ slot: number | 'auto'; saveData?: SaveGameData; exists: boolean }>>([]);
   const [playerName, setPlayerName] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   
@@ -50,27 +50,31 @@ const SaveLoadDialog: React.FC<SaveLoadDialogProps> = ({
   
   const { playSound } = useSoundSystem();
 
+  const refreshSlots = async () => {
+    setSaveSlots(await getSaveSlots());
+  };
+
   // Load save slots when dialog opens
   useEffect(() => {
     if (isOpen) {
-      setSaveSlots(getSaveSlots());
+      refreshSlots();
     }
-  }, [isOpen, getSaveSlots]);
+  }, [isOpen]);
 
-  const handleSave = async (slot: number) => {
+  const handleSave = async (slot: number | 'auto') => {
     playSound('success');
-    const result = saveGame(gameState, slot, playerName || undefined);
+    const result = await saveGame(gameState, slot, playerName || undefined);
     setMessage({ type: result.success ? 'success' : 'error', text: result.message });
     
     if (result.success) {
-      setSaveSlots(getSaveSlots());
+      await refreshSlots();
       setTimeout(() => setMessage(null), 3000);
     }
   };
 
-  const handleLoad = async (slot: number) => {
+  const handleLoad = async (slot: number | 'auto') => {
     playSound('click');
-    const result = loadGame(slot);
+    const result = await loadGame(slot);
     setMessage({ type: result.success ? 'success' : 'error', text: result.message });
     
     if (result.success && result.gameState) {
@@ -79,20 +83,21 @@ const SaveLoadDialog: React.FC<SaveLoadDialogProps> = ({
     }
   };
 
-  const handleDelete = async (slot: number) => {
+  const handleDelete = async (slot: number | 'auto') => {
+    if (!window.confirm(`Delete save in slot ${slot}? This cannot be undone.`)) return;
     playSound('error');
-    const result = deleteSave(slot);
+    const result = await deleteSave(slot);
     setMessage({ type: result.success ? 'success' : 'error', text: result.message });
     
     if (result.success) {
-      setSaveSlots(getSaveSlots());
+      await refreshSlots();
       setTimeout(() => setMessage(null), 3000);
     }
   };
 
-  const handleExport = async (slot: number) => {
+  const handleExport = async (slot: number | 'auto') => {
     playSound('success');
-    const result = exportSave(slot);
+    const result = await exportSave(slot);
     setMessage({ type: result.success ? 'success' : 'error', text: result.message });
     setTimeout(() => setMessage(null), 3000);
   };
@@ -106,7 +111,7 @@ const SaveLoadDialog: React.FC<SaveLoadDialogProps> = ({
     setMessage({ type: result.success ? 'success' : 'error', text: result.message });
     
     if (result.success) {
-      setSaveSlots(getSaveSlots());
+      await refreshSlots();
       setTimeout(() => setMessage(null), 3000);
     }
   };
