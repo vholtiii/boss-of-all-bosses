@@ -10722,5 +10722,6 @@ export const useEnhancedMafiaGameState = (
     setMoveAction,
     startEscort,
     resolveEnemyHexAction,
+    loadGameState,
   };
 };
