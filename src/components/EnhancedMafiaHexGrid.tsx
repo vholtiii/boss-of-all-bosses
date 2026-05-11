@@ -57,6 +57,55 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   bossHighlightHex, highlightedFamily, onClearHighlight
 }) => {
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const svgRef = React.useRef<SVGSVGElement | null>(null);
+  const panStateRef = React.useRef<{
+    active: boolean;
+    startClientX: number;
+    startClientY: number;
+    startPanX: number;
+    startPanY: number;
+    moved: boolean;
+    ctmScaleX: number;
+    ctmScaleY: number;
+  }>({ active: false, startClientX: 0, startClientY: 0, startPanX: 0, startPanY: 0, moved: false, ctmScaleX: 1, ctmScaleY: 1 });
+  const suppressBgClickRef = React.useRef(false);
+
+  const beginPan = (clientX: number, clientY: number) => {
+    const svg = svgRef.current;
+    let sx = 1, sy = 1;
+    if (svg) {
+      const ctm = svg.getScreenCTM();
+      if (ctm) { sx = ctm.a || 1; sy = ctm.d || 1; }
+    }
+    panStateRef.current = {
+      active: true,
+      startClientX: clientX,
+      startClientY: clientY,
+      startPanX: pan.x,
+      startPanY: pan.y,
+      moved: false,
+      ctmScaleX: sx,
+      ctmScaleY: sy,
+    };
+  };
+
+  const updatePan = (clientX: number, clientY: number) => {
+    const s = panStateRef.current;
+    if (!s.active) return;
+    const dx = (clientX - s.startClientX) / (s.ctmScaleX || 1);
+    const dy = (clientY - s.startClientY) / (s.ctmScaleY || 1);
+    if (!s.moved && (Math.abs(clientX - s.startClientX) > 4 || Math.abs(clientY - s.startClientY) > 4)) {
+      s.moved = true;
+    }
+    setPan({ x: s.startPanX + dx, y: s.startPanY + dy });
+  };
+
+  const endPan = () => {
+    const s = panStateRef.current;
+    if (s.moved) suppressBgClickRef.current = true;
+    s.active = false;
+  };
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [showSupplyLines, setShowSupplyLines] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
