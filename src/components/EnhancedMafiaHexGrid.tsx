@@ -57,6 +57,55 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   bossHighlightHex, highlightedFamily, onClearHighlight
 }) => {
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const svgRef = React.useRef<SVGSVGElement | null>(null);
+  const panStateRef = React.useRef<{
+    active: boolean;
+    startClientX: number;
+    startClientY: number;
+    startPanX: number;
+    startPanY: number;
+    moved: boolean;
+    ctmScaleX: number;
+    ctmScaleY: number;
+  }>({ active: false, startClientX: 0, startClientY: 0, startPanX: 0, startPanY: 0, moved: false, ctmScaleX: 1, ctmScaleY: 1 });
+  const suppressBgClickRef = React.useRef(false);
+
+  const beginPan = (clientX: number, clientY: number) => {
+    const svg = svgRef.current;
+    let sx = 1, sy = 1;
+    if (svg) {
+      const ctm = svg.getScreenCTM();
+      if (ctm) { sx = ctm.a || 1; sy = ctm.d || 1; }
+    }
+    panStateRef.current = {
+      active: true,
+      startClientX: clientX,
+      startClientY: clientY,
+      startPanX: pan.x,
+      startPanY: pan.y,
+      moved: false,
+      ctmScaleX: sx,
+      ctmScaleY: sy,
+    };
+  };
+
+  const updatePan = (clientX: number, clientY: number) => {
+    const s = panStateRef.current;
+    if (!s.active) return;
+    const dx = (clientX - s.startClientX) / (s.ctmScaleX || 1);
+    const dy = (clientY - s.startClientY) / (s.ctmScaleY || 1);
+    if (!s.moved && (Math.abs(clientX - s.startClientX) > 4 || Math.abs(clientY - s.startClientY) > 4)) {
+      s.moved = true;
+    }
+    setPan({ x: s.startPanX + dx, y: s.startPanY + dy });
+  };
+
+  const endPan = () => {
+    const s = panStateRef.current;
+    if (s.moved) suppressBgClickRef.current = true;
+    s.active = false;
+  };
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [showSupplyLines, setShowSupplyLines] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
@@ -169,7 +218,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         switch (event.key) {
           case '=': case '+': event.preventDefault(); setZoom(prev => Math.min(prev + 0.1, 2.5)); break;
           case '-': event.preventDefault(); setZoom(prev => Math.max(prev - 0.1, 0.3)); break;
-          case '0': event.preventDefault(); setZoom(1); break;
+          case '0': event.preventDefault(); setZoom(1); setPan({ x: 0, y: 0 }); break;
         }
       }
     };
@@ -676,7 +725,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           <Button variant="outline" size="sm" onClick={() => setZoom(z => Math.max(z - 0.15, 0.3))} className="h-8 w-8 p-0">
             <ZoomOut className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setZoom(1)} className="h-8 w-8 p-0">
+          <Button variant="outline" size="sm" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="h-8 w-8 p-0">
             <RotateCcw className="h-4 w-4" />
           </Button>
           <div className="h-6 w-px bg-noir-light mx-1" />
@@ -704,10 +753,25 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
       {/* Grid */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <svg width="100%" height="100%" viewBox={viewBox} className="overflow-visible">
+        <svg
+          ref={svgRef}
+          width="100%"
+          height="100%"
+          viewBox={viewBox}
+          className="overflow-visible"
+          style={{ cursor: panStateRef.current.active ? 'grabbing' : 'grab', touchAction: 'none' }}
+          onMouseDown={(e) => { if (e.button !== 0) return; beginPan(e.clientX, e.clientY); }}
+          onMouseMove={(e) => updatePan(e.clientX, e.clientY)}
+          onMouseUp={endPan}
+          onMouseLeave={endPan}
+          onTouchStart={(e) => { const t = e.touches[0]; if (t) beginPan(t.clientX, t.clientY); }}
+          onTouchMove={(e) => { const t = e.touches[0]; if (t) updatePan(t.clientX, t.clientY); }}
+          onTouchEnd={endPan}
+          onTouchCancel={endPan}
+        >
           {/* Invisible background rect to capture clicks on empty area */}
-          <rect x={viewBox.split(' ').map(Number)[0]} y={viewBox.split(' ').map(Number)[1]} width={viewBox.split(' ').map(Number)[2]} height={viewBox.split(' ').map(Number)[3]} fill="transparent" onClick={() => { onClearHighlight?.(); setPinnedHex(null); }} />
-          <g transform={`scale(${zoom})`}>
+          <rect x={viewBox.split(' ').map(Number)[0]} y={viewBox.split(' ').map(Number)[1]} width={viewBox.split(' ').map(Number)[2]} height={viewBox.split(' ').map(Number)[3]} fill="transparent" onClick={() => { if (suppressBgClickRef.current) { suppressBgClickRef.current = false; return; } onClearHighlight?.(); setPinnedHex(null); }} />
+          <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
             {/* Compute supply route hex set for tint overlay */}
             {(() => {
               const sNodes: SupplyNode[] = gameState?.supplyNodes || [];
