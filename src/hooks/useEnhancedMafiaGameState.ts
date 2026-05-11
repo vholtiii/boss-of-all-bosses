@@ -7894,7 +7894,7 @@ export const useEnhancedMafiaGameState = (
           // Promote in place: convert soldier → capo
           const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
           const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
-          const capoName = `Capo ${Math.floor(Math.random() * 100)} (Persico)`;
+          const capoName = generateCapoName();
           const idx = newState.deployedUnits.findIndex(u => u.id === soldierId);
           if (idx !== -1) {
             newState.deployedUnits[idx] = {
