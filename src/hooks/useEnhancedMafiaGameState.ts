@@ -6388,7 +6388,7 @@ export const useEnhancedMafiaGameState = (
             anyAiSoldier.maxMoves = 2;
             anyAiSoldier.movesRemaining = 2;
             (anyAiSoldier as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
-            (anyAiSoldier as any).name = `${fam.charAt(0).toUpperCase() + fam.slice(1)} Capo`;
+            (anyAiSoldier as any).name = generateCapoName();
             opponent.resources.money -= CAPO_PROMOTION_COST * 2; // Costs double for forced promotion
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'promote', detail: `Force-promoted a soldier to Capo` });
           }
