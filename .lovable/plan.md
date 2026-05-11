@@ -1,77 +1,38 @@
-# Plan: Gated Saves + Admin User List
-
 ## Goal
-- Players can play freely without an account.
-- Sign-in becomes **required** to use Save / Load (local or cloud).
-- Every registered player is captured in a `profiles` table.
-- You get an in-app `/admin` page that lists everyone, with an export.
+Every Capo — starting Capos, player-promoted, AI-promoted, Persico-anointed, and jail-released — gets a realistic Italian-American name with a nickname in quotes (e.g., `Anthony "Marbles" Solerna`).
 
----
+## Approach
 
-## Part 1 — Database
+### 1. New name generator utility
+Create `src/lib/capo-names.ts`:
+- Three pools: `firstNames` (~40 entries: Anthony, Vincent, Salvatore, Carmine, Dominic, Pasquale, Rocco, Gennaro, Giuseppe, Nicholas, Frank, Michael, Joseph, Sal, Tony, Angelo, Vito, Aniello, Nunzio, Silvio, Rudy, Paulie, Benny, Jimmy, Johnny, Eddie, Lou, Ralph, Tommy, Richie, Bobby, Larry, Phil, Gus, Sonny, Albert, Vinnie, Mickey, Joey, Petey…)
+- `nicknames` (~60 entries: Marbles, The Chin, Big Pussy, Fat Tony, The Ant, Ice Pick, Three Fingers, The Snake, Sally Boy, Tough Tony, The Saint, Bones, Knuckles, Pretty Boy, The Hat, The Nose, Quack-Quack, Joe Bananas, The Bull, Lefty, Cigars, The Beast, Tiny, The Weasel, Curly, The Chief, Buckles, Cheech, The Wig, Meatball, Specs, The Whale, Don Cheech, Half-Nose, The Owl, Skinny, Junior, The Mooch, Vinny Gorgeous, Crazy Joe…)
+- `lastNames` (~40 entries: Solerna, Gambino, Castellano, Gigante, Bonanno, Persico, Lucchese, Gravano, Aiello, Riina, Provenzano, Genovese, Magaddino, Anastasia, Galante, Gotti, Profaci, Massino, Casso, Amuso, Corallo, Salerno, Ruggiero, DeCavalcante, Scarpa, Burke, Vario, Cirillo, Ianniello, Lombardozzi, Tieri, Pagano, Migliore, Indelicato, Napolitano, Coppola, Marangello, Trafficante…)
+- Export `generateCapoName(): string` returning `` `${first} "${nick}" ${last}` ``
+- Use `usedNames` Set to avoid dupes within a single game session (passed in optionally) — simplest version just picks randomly each call; collisions are rare and cosmetic.
 
-New tables (migration):
+### 2. Wire it into every Capo creation site in `src/hooks/useEnhancedMafiaGameState.ts`
 
-**`profiles`** — auto-created on signup via trigger
-- `user_id` (FK → auth.users, unique, cascade)
-- `email`, `display_name`, `avatar_url`
-- `last_family_played`, `last_seen_at`, `total_saves`
-- `created_at`, `updated_at`
+Replace these existing name strings with `generateCapoName()`:
 
-**`app_role`** enum (`admin`, `player`) and **`user_roles`** table
-- Stored separately from profiles (security best practice — avoids privilege-escalation).
-- `has_role(user_id, role)` SECURITY DEFINER function for RLS checks.
+| Line | Context | Current |
+|------|---------|---------|
+| 1056-1059 | Starting Capos (one per family at game init) | hardcoded `capoNames` map |
+| 3483 | Player promotion (pendingPromotion → capo) | `Capo ${randInt}` |
+| 4263 | Capo released from jail back to HQ | `Capo` |
+| 6374 | AI promotes a soldier to Capo | `${fam} Capo` |
+| 6394 | AI force-promotion fallback | `${fam} Capo` |
+| 7900 | Colombo "Persico Succession" power | `Capo ${randInt} (Persico)` |
 
-**Trigger**: `on_auth_user_created` → inserts a `profiles` row + assigns default `player` role.
+For the jail-release case (4263), reuse the unit's existing `name` if it already had one (it should, since it was a Capo before arrest); only generate a new name if missing.
 
-**RLS**:
-- Players can view/update only their own profile.
-- Admins can view all profiles and all roles via `has_role(auth.uid(), 'admin')`.
-- `cloud_saves` table already exists; admins also get read access for the admin view.
-
-**Bootstrap**: After migration, I'll insert your `admin` role row using the email you confirm below.
-
----
-
-## Part 2 — Gate Save/Load behind sign-in
-
-- `SaveLoadDialog` already shows `CloudAuthPanel` for unauthenticated users. Change behavior so:
-  - When signed out, the Save and Load tabs show a **"Sign in to save your progress"** prompt with the auth panel inline (no save slots visible).
-  - Manage Saves / Export / Import remain available for already-downloaded JSON files only.
-- Disable the autosave loop in `UltimateMafiaGame.tsx` while signed-out (current autosave silently writes to IndexedDB; we'll skip it cleanly with a one-time "Sign in to enable autosave" toast).
-- Update the Save/Load button badge to read **"Sign in to save"** when signed out.
-
----
-
-## Part 3 — `/admin` page
-
-New route + page (`src/pages/Admin.tsx`):
-- Guarded by `has_role(auth.uid(), 'admin')`. Non-admins get a 404-style message.
-- Table view of all profiles:
-  - Email, display name, signed-up date, last seen, last family played, save count.
-  - Search box (by email), sortable columns, pagination (50/page).
-- **Export CSV** button — downloads the full list.
-- Row click → drawer showing that user's `cloud_saves` slots (slot, turn, family, save date).
-
-Add a small "Admin" link in the main menu, only rendered when the current user has the admin role.
-
----
-
-## Part 4 — Profile auto-update
-
-Lightweight hook so `last_seen_at`, `last_family_played`, and `total_saves` stay current:
-- `last_seen_at`: updated on app load if signed in.
-- `last_family_played`: updated when a new game starts.
-- `total_saves`: incremented inside `saveGame` after a successful cloud write.
-
----
+### 3. Notifications
+Notification messages already interpolate the `capoName` variable (e.g. line 3488, 7921), so they automatically pick up the new format — no extra changes.
 
 ## Out of scope
-- Email verification gating (Lovable Cloud sends default verification emails; not blocking play).
-- Banning/deleting users from the admin page (read-only v1).
-- Admin analytics beyond the user list.
+- Soldier names (only Capos requested).
+- Persisted save migrations: existing saved Capos keep their old names; only newly created/promoted Capos get the new format.
 
----
-
-## Question before I start
-What email address should be granted the `admin` role? (I'll seed it in the migration so you can open `/admin` immediately after signing up with that email.)
+## Files
+- New: `src/lib/capo-names.ts`
+- Edited: `src/hooks/useEnhancedMafiaGameState.ts` (6 small replacements)
