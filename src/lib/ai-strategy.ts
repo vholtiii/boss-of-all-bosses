@@ -135,10 +135,84 @@ export interface ScoreHexInputs {
   mood: DynamicMood;
   /** small jitter in [-1, +1] from per-turn rng for tie-breaking */
   jitter: number;
+  /** Game difficulty — scales scoring sharpness. Defaults to 'normal' if omitted. */
+  difficulty?: AIDifficulty;
 }
 
 export function scoreHexForAI(i: ScoreHexInputs): number {
-  let s = 0;
+  let raw = 0;
+  // Track positive vs. negative components separately so difficulty can
+  // asymmetrically scale opportunity-seeking vs. risk-aversion.
+  let pos = 0; let neg = 0;
+  const add = (v: number) => { if (v >= 0) pos += v; else neg += v; raw += v; };
+  // Base attraction: businesses
+  add(Math.min(20, i.hexIncome / 200));
+  // Weak hex bonus / strong hex penalty
+  if (i.defenderCount === 0) add(6);
+  else if (i.defenderCount === 1) add(1);
+  else add(-4);
+  // Family identity: focus districts
+  if (i.isInFocusDistrict) add(4);
+  // Don't overextend
+  add(-Math.max(0, i.distanceToOwnHQ - 3) * 1.5);
+  // Consolidation bonus (defensive moods love this)
+  if (i.isAdjacentToOwnTerritory) {
+    add(i.mood === 'desperate' || i.mood === 'cautious' ? 5 : 2);
+  }
+  // Avoid fortified / safehouses without intel
+  if (i.isFortified) add(-5);
+  if (i.isSafehouse && !i.hasScoutIntel) add(-4);
+  if (i.isSafehouse && i.hasScoutIntel) add(3); // bounty + intel target
+  // War prioritization
+  if (i.isWarTarget) add(10);
+  // Phase 4 endgame: lean toward player when winning
+  if (i.phase >= 4 && i.isPlayerHex && i.mood === 'dominant') add(4);
+
+  // Personality biases
+  switch (i.effectivePersonality) {
+    case 'aggressive':
+      if (i.defenderCount === 0) add(2);
+      add(2);
+      break;
+    case 'defensive':
+      if (i.isAdjacentToOwnTerritory) add(3);
+      add(-2);
+      break;
+    case 'opportunistic':
+      if (i.defenderCount === 0 && i.hexIncome > 1000) add(4);
+      break;
+    case 'diplomatic':
+      if (i.isPlayerHex) add(-3);
+      if (i.isAdjacentToOwnTerritory) add(2);
+      break;
+    case 'unpredictable':
+      add(i.jitter * 4);
+      break;
+  }
+
+  // Signature preferences
+  if (i.signaturePref.preferExtort && i.hexIncome > 0 && i.isPlayerHex) add(2);
+  if (i.signaturePref.preferAdjacentExpansion && i.isAdjacentToOwnTerritory) add(2);
+  if (i.signaturePref.preferHighValueOnly && i.hexIncome < 1000) add(-2);
+
+  // ── Difficulty asymmetric scaling ──
+  // Easy AI undervalues opportunities and overestimates risk; Hard AI does the opposite.
+  const diff = i.difficulty || 'normal';
+  const posMul = diff === 'hard' ? 1.15 : diff === 'easy' ? 0.85 : 1.0;
+  const negMul = diff === 'hard' ? 0.85 : diff === 'easy' ? 1.15 : 1.0;
+  let s = pos * posMul + neg * negMul;
+
+  // Always sprinkle a little jitter so identical scores don't tie
+  s += i.jitter * 0.8;
+  return s;
+}
+
+// Legacy reference: previous monolithic body retained as comment for clarity removed.
+function _unused_priorBody() {
+  return 0;
+}
+// silence unused
+void _unused_priorBody;
   // Base attraction: businesses
   s += Math.min(20, i.hexIncome / 200);
   // Weak hex bonus / strong hex penalty
