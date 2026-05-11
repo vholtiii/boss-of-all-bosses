@@ -1180,27 +1180,25 @@ export const createInitialGameState = (
       supplyChains: [], economicEvents: [],
     },
     
-    aiOpponents: allFamilies
-      .filter(f => f !== family)
-      .map(f => {
-        const personalities: Record<string, any> = {
-          gambino: { personality: 'diplomatic', aggressionLevel: 50, cooperationTendency: 60, primaryGoal: 'money', riskTolerance: 40, focusAreas: ['Little Italy', 'Manhattan'] },
-          genovese: { personality: 'aggressive', aggressionLevel: 80, cooperationTendency: 30, primaryGoal: 'territory', riskTolerance: 70, focusAreas: ['Manhattan', 'Bronx'] },
-          lucchese: { personality: 'opportunistic', aggressionLevel: 40, cooperationTendency: 60, primaryGoal: 'money', riskTolerance: 50, focusAreas: ['Brooklyn', 'Queens'] },
-          bonanno: { personality: 'defensive', aggressionLevel: 25, cooperationTendency: 70, primaryGoal: 'reputation', riskTolerance: 30, focusAreas: ['Staten Island', 'Little Italy'] },
-          colombo: { personality: 'unpredictable', aggressionLevel: 95, cooperationTendency: 10, primaryGoal: 'elimination', riskTolerance: 90, focusAreas: ['Queens', 'Brooklyn'] },
-        };
-        const p = personalities[f];
-        const otherFamilies = allFamilies.filter(x => x !== f);
-        const relationships: Record<string, number> = {};
-        otherFamilies.forEach(x => { relationships[x] = Math.floor(Math.random() * 40) - 20; });
-        return {
-          family: f, personality: p.personality,
-          resources: { money: 35000 + Math.floor(Math.random() * 15000), soldiers: 2 + Math.floor(Math.random() * 2) + (difficulty === 'hard' ? 1 : 0), influence: 8 + Math.floor(Math.random() * 8), respect: 15 + Math.floor(Math.random() * 10), heat: 0 },
-          strategy: { primaryGoal: p.primaryGoal, riskTolerance: p.riskTolerance, aggressionLevel: p.aggressionLevel, cooperationTendency: p.cooperationTendency, focusAreas: p.focusAreas },
-          relationships, lastAction: null, nextAction: null,
-        };
-      }),
+    aiOpponents: (() => {
+      // Per-game personality variability — seeded by mapSeed so saves stay deterministic
+      const aiRng = mulberry32(mapSeed + 13337);
+      return allFamilies
+        .filter(f => f !== family)
+        .map(f => {
+          const rolledPersonality = rollFamilyPersonality(f as FamilyId, aiRng);
+          const rolledStrat = rollFamilyStrategy(f as FamilyId, aiRng);
+          const otherFamilies = allFamilies.filter(x => x !== f);
+          const relationships: Record<string, number> = {};
+          otherFamilies.forEach(x => { relationships[x] = Math.floor(aiRng() * 40) - 20; });
+          return {
+            family: f, personality: rolledPersonality,
+            resources: { money: 35000 + Math.floor(aiRng() * 15000), soldiers: 2 + Math.floor(aiRng() * 2) + (difficulty === 'hard' ? 1 : 0), influence: 8 + Math.floor(aiRng() * 8), respect: 15 + Math.floor(aiRng() * 10), heat: 0 },
+            strategy: { primaryGoal: rolledStrat.primaryGoal, riskTolerance: rolledStrat.riskTolerance, aggressionLevel: rolledStrat.aggressionLevel, cooperationTendency: rolledStrat.cooperationTendency, focusAreas: rolledStrat.focusAreas },
+            relationships, lastAction: null, nextAction: null,
+          };
+        });
+    })(),
     
     events: [],
     weather: {
