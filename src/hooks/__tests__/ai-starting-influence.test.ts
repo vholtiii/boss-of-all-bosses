@@ -33,23 +33,19 @@ describe("AI opponents starting influence", () => {
   });
 
   it("AI influence range is family-agnostic (same bounds regardless of family)", () => {
-    // Force Math.random to its extremes and verify every AI lands at the bound,
-    // proving no per-family multiplier is silently applied.
+    // AI personality/resources are now seeded by mapSeed (mulberry32) for
+    // per-game variability while remaining deterministic across saves.
+    // Verify every family lands within the documented [8..15] range across
+    // several seeds and that no family is systematically pinned outside it.
     const families = ["gambino", "genovese", "lucchese", "bonanno", "colombo"] as const;
-
-    vi.spyOn(Math, "random").mockReturnValue(0); // floor of every range
-    for (const f of families) {
-      const state = createInitialGameState(f, undefined, "normal", 1, "medium");
-      for (const opp of state.aiOpponents) {
-        expect(opp.resources.influence).toBe(AI_INFLUENCE_MIN);
-      }
-    }
-
-    vi.spyOn(Math, "random").mockReturnValue(0.9999); // ceiling of every range
-    for (const f of families) {
-      const state = createInitialGameState(f, undefined, "normal", 1, "medium");
-      for (const opp of state.aiOpponents) {
-        expect(opp.resources.influence).toBe(AI_INFLUENCE_MAX);
+    const seeds = [1, 42, 1337, 99999, 2468013];
+    for (const seed of seeds) {
+      for (const f of families) {
+        const state = createInitialGameState(f, undefined, "normal", seed, "medium");
+        for (const opp of state.aiOpponents) {
+          expect(opp.resources.influence).toBeGreaterThanOrEqual(AI_INFLUENCE_MIN);
+          expect(opp.resources.influence).toBeLessThanOrEqual(AI_INFLUENCE_MAX);
+        }
       }
     }
   });

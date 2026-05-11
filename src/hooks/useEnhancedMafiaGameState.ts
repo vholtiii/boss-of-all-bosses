@@ -91,6 +91,11 @@ import {
   AlertEntry, AlertCategory, categorizeAlert,
 } from '@/types/game-mechanics';
 import { generateCapoName } from '@/lib/capo-names';
+import {
+  rollFamilyPersonality, rollFamilyStrategy, computeDynamicMood, blendMoodWithPersonality,
+  scoreHexForAI, softmaxPick, familySignaturePreference,
+  type FamilyId, type AIPersonality, type DynamicMood,
+} from '@/lib/ai-strategy';
 
 // ============ SEEDED PRNG (Mulberry32) ============
 function mulberry32(seed: number): () => number {
@@ -1180,27 +1185,25 @@ export const createInitialGameState = (
       supplyChains: [], economicEvents: [],
     },
     
-    aiOpponents: allFamilies
-      .filter(f => f !== family)
-      .map(f => {
-        const personalities: Record<string, any> = {
-          gambino: { personality: 'diplomatic', aggressionLevel: 50, cooperationTendency: 60, primaryGoal: 'money', riskTolerance: 40, focusAreas: ['Little Italy', 'Manhattan'] },
-          genovese: { personality: 'aggressive', aggressionLevel: 80, cooperationTendency: 30, primaryGoal: 'territory', riskTolerance: 70, focusAreas: ['Manhattan', 'Bronx'] },
-          lucchese: { personality: 'opportunistic', aggressionLevel: 40, cooperationTendency: 60, primaryGoal: 'money', riskTolerance: 50, focusAreas: ['Brooklyn', 'Queens'] },
-          bonanno: { personality: 'defensive', aggressionLevel: 25, cooperationTendency: 70, primaryGoal: 'reputation', riskTolerance: 30, focusAreas: ['Staten Island', 'Little Italy'] },
-          colombo: { personality: 'unpredictable', aggressionLevel: 95, cooperationTendency: 10, primaryGoal: 'elimination', riskTolerance: 90, focusAreas: ['Queens', 'Brooklyn'] },
-        };
-        const p = personalities[f];
-        const otherFamilies = allFamilies.filter(x => x !== f);
-        const relationships: Record<string, number> = {};
-        otherFamilies.forEach(x => { relationships[x] = Math.floor(Math.random() * 40) - 20; });
-        return {
-          family: f, personality: p.personality,
-          resources: { money: 35000 + Math.floor(Math.random() * 15000), soldiers: 2 + Math.floor(Math.random() * 2) + (difficulty === 'hard' ? 1 : 0), influence: 8 + Math.floor(Math.random() * 8), respect: 15 + Math.floor(Math.random() * 10), heat: 0 },
-          strategy: { primaryGoal: p.primaryGoal, riskTolerance: p.riskTolerance, aggressionLevel: p.aggressionLevel, cooperationTendency: p.cooperationTendency, focusAreas: p.focusAreas },
-          relationships, lastAction: null, nextAction: null,
-        };
-      }),
+    aiOpponents: (() => {
+      // Per-game personality variability — seeded by mapSeed so saves stay deterministic
+      const aiRng = mulberry32(mapSeed + 13337);
+      return allFamilies
+        .filter(f => f !== family)
+        .map(f => {
+          const rolledPersonality = rollFamilyPersonality(f as FamilyId, aiRng);
+          const rolledStrat = rollFamilyStrategy(f as FamilyId, aiRng);
+          const otherFamilies = allFamilies.filter(x => x !== f);
+          const relationships: Record<string, number> = {};
+          otherFamilies.forEach(x => { relationships[x] = Math.floor(aiRng() * 40) - 20; });
+          return {
+            family: f, personality: rolledPersonality,
+            resources: { money: 35000 + Math.floor(aiRng() * 15000), soldiers: 2 + Math.floor(aiRng() * 2) + (difficulty === 'hard' ? 1 : 0), influence: 8 + Math.floor(aiRng() * 8), respect: 15 + Math.floor(aiRng() * 10), heat: 0 },
+            strategy: { primaryGoal: rolledStrat.primaryGoal, riskTolerance: rolledStrat.riskTolerance, aggressionLevel: rolledStrat.aggressionLevel, cooperationTendency: rolledStrat.cooperationTendency, focusAreas: rolledStrat.focusAreas },
+            relationships, lastAction: null, nextAction: null,
+          };
+        });
+    })(),
     
     events: [],
     weather: {
@@ -5473,7 +5476,37 @@ export const useEnhancedMafiaGameState = (
       if (!hq) return;
       const aiPhase = calculatePhaseForFamily(state, fam);
       const oppAny = opponent as any;
-      let personality = opponent.personality || 'aggressive';
+      const basePersonality = (opponent.personality || 'aggressive') as AIPersonality;
+      // ── DYNAMIC MOOD: reactive overlay based on board state ──
+      const myHexCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
+      const rivalHexCounts = (state.aiOpponents || [])
+        .filter(o => o.family !== fam && !(state.eliminatedFamilies || []).includes(o.family))
+        .map(o => state.hexMap.filter(t => t.controllingFamily === o.family).length);
+      const playerHexCount = state.hexMap.filter(t => t.controllingFamily === state.playerFamily).length;
+      const allRivalCounts = [...rivalHexCounts, playerHexCount];
+      const rivalAvgHexes = allRivalCounts.length > 0 ? allRivalCounts.reduce((a, b) => a + b, 0) / allRivalCounts.length : 0;
+      const _recentSoldierLosses = (oppAny.recentSoldierLosses) || 0;
+      const _recentCapoLosses = (oppAny.recentCapoLosses) || 0;
+      const _hqAssaultedRecently = (oppAny.lastAssaultedOnTurn || -99) >= state.turn - 1;
+      const _isAtWarMood = (state.activeWars || []).some(w => w.family1 === fam || w.family2 === fam);
+      const upkeepEstimate = ((opponent.resources.soldiers || 0) + state.deployedUnits.filter(u => u.family === fam).length) * 200 + 1500;
+      const dynamicMood: DynamicMood = computeDynamicMood({
+        myHexes: myHexCount,
+        rivalAvgHexes,
+        myMoney: opponent.resources.money,
+        myUpkeepPerTurn: upkeepEstimate,
+        myHeat: opponent.resources.heat || 0,
+        recentCapoLosses: _recentCapoLosses,
+        hqAssaultedRecently: _hqAssaultedRecently,
+        isAtWar: _isAtWarMood,
+        phase: aiPhase,
+      });
+      oppAny.dynamicMood = dynamicMood;
+      // Effective personality = base blended with mood (war override happens later)
+      let personality: AIPersonality = blendMoodWithPersonality(basePersonality, dynamicMood);
+      const signaturePref = familySignaturePreference(fam as FamilyId);
+      // Per-turn rng for jitter (seeded by mapSeed + turn + family)
+      const turnRng = mulberry32((state.mapSeed || 0) + state.turn * 31 + fam.charCodeAt(0));
 
       // ── AI LAY LOW + MATTRESSES TRIGGERS (heat-baseline + personality-weighted) ──
       // Personality multiplier: defensive/diplomatic lean in, aggressive avoids
@@ -5484,10 +5517,10 @@ export const useEnhancedMafiaGameState = (
         : /* unpredictable */ 0.8 + (Math.random() * 0.8 - 0.4);
 
       const aiHeat = opponent.resources.heat || 0;
-      // Track soldier losses crudely via a counter we maintain elsewhere; if missing, skip loss-trigger
-      const recentSoldierLosses = (oppAny.recentSoldierLosses) || 0;
-      const recentCapoLosses = (oppAny.recentCapoLosses) || 0;
-      const hqAssaultedRecently = (oppAny.lastAssaultedOnTurn || -99) >= state.turn - 1;
+      // Reuse counters captured above for mood
+      const recentSoldierLosses = _recentSoldierLosses;
+      const recentCapoLosses = _recentCapoLosses;
+      const hqAssaultedRecently = _hqAssaultedRecently;
 
       // Decay loss counters each turn
       oppAny.recentSoldierLosses = Math.max(0, recentSoldierLosses - 1);
@@ -5937,7 +5970,37 @@ export const useEnhancedMafiaGameState = (
           }
 
           if (targetPool.length === 0) targetPool = validMoves;
-          const target = targetPool[Math.floor(Math.random() * targetPool.length)];
+          // ── SCORED TARGET PICK (replaces pure random) ──
+          const focusSet = new Set((opponent.strategy.focusAreas || []) as string[]);
+          const scores = targetPool.map(n => {
+            const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+            const defenderCount = tile && tile.controllingFamily && tile.controllingFamily !== fam
+              ? state.deployedUnits.filter(u => u.family === tile.controllingFamily && u.q === n.q && u.r === n.r && u.s === n.s).length
+              : 0;
+            const isAdjOwn = getHexNeighbors(n.q, n.r, n.s).some(nn => {
+              const nt = state.hexMap.find(t => t.q === nn.q && t.r === nn.r && t.s === nn.s);
+              return nt && nt.controllingFamily === fam;
+            });
+            return scoreHexForAI({
+              hexIncome: tile?.business?.income || 0,
+              defenderCount,
+              isInFocusDistrict: !!(tile?.district && focusSet.has(tile.district)),
+              distanceToOwnHQ: hexDistance(n, hq),
+              isFortified: isHexFortified(state.fortifiedHexes || [], n.q, n.r, n.s, tile?.controllingFamily as string),
+              isSafehouse: state.safehouses.some(s => s.q === n.q && s.r === n.r && s.s === n.s),
+              hasScoutIntel: aiHasScoutIntel(state, fam, n.q, n.r, n.s),
+              isWarTarget: !!(warTargetFamily && tile?.controllingFamily === warTargetFamily),
+              isAdjacentToOwnTerritory: isAdjOwn,
+              isPlayerHex: tile?.controllingFamily === state.playerFamily,
+              effectivePersonality: personality as AIPersonality,
+              signaturePref,
+              phase: aiPhase,
+              mood: dynamicMood,
+              jitter: turnRng() * 2 - 1,
+            });
+          });
+          const pickIdx = softmaxPick(scores, turnRng, 4, 1.5);
+          const target = pickIdx >= 0 ? targetPool[pickIdx] : targetPool[Math.floor(Math.random() * targetPool.length)];
           
           // Save original position — only commit move after combat resolution
           const origQ = unit.q, origR = unit.r, origS = unit.s;
@@ -6455,6 +6518,33 @@ export const useEnhancedMafiaGameState = (
           if (aiPhase >= 2 && !hasCeasefire && aiHexCount < 4 && Math.random() < 0.2) {
             pushSitdown('ceasefire');
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire (desperate)' });
+          }
+        }
+      }
+
+      // ── AI-TO-AI HOSTILITY DRIFT (mood-driven, feeds tension→war pipeline) ──
+      // Dominant or aggressive AIs push tension on weak rivals. Diplomatic AIs
+      // dampen pair tension with rivals they have positive relations with.
+      // This makes the world feel alive: AIs go to war with each other, not
+      // just the player.
+      if (aiPhase >= 2) {
+        const otherRivals = (state.aiOpponents || []).filter(o =>
+          o.family !== fam && !(state.eliminatedFamilies || []).includes(o.family)
+        );
+        for (const other of otherRivals) {
+          const otherHexes = state.hexMap.filter(t => t.controllingFamily === other.family).length;
+          const rel = (opponent.relationships?.[other.family] || 0);
+          // Hostility roll: aggressive/dominant push tension on weaker neighbors
+          if ((dynamicMood === 'dominant' || personality === 'aggressive') && otherHexes < myHexCount * 0.85) {
+            if (turnRng() < 0.35) {
+              addPairTension(state, fam, other.family, TENSION_ENCROACHMENT);
+            }
+          }
+          // Diplomatic mood with positive relations dampens tension
+          if (personality === 'diplomatic' && rel > 10) {
+            if (turnRng() < 0.4) {
+              addPairTension(state, fam, other.family, -TENSION_REDUCE_CEASEFIRE);
+            }
           }
         }
       }
