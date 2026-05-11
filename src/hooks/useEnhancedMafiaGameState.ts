@@ -6368,7 +6368,7 @@ export const useEnhancedMafiaGameState = (
           promUnit.maxMoves = 2;
           promUnit.movesRemaining = 2;
           (promUnit as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
-          (promUnit as any).name = `${fam.charAt(0).toUpperCase() + fam.slice(1)} Capo`;
+          (promUnit as any).name = generateCapoName();
           opponent.resources.money -= CAPO_PROMOTION_COST;
           if (turnReport) {
             turnReport.aiActions.push({ family: fam, action: 'promote', detail: `Promoted a soldier to Capo` });
