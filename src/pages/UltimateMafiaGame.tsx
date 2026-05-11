@@ -78,6 +78,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     setMoveAction,
     startEscort,
     resolveEnemyHexAction,
+    loadGameState,
   } = useEnhancedMafiaGameState(config.family, config.resources, config.difficulty, config.seed, config.mapSize);
 
   const { notifySuccess, notifyError, notifyWarning, notifyInfo, notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
