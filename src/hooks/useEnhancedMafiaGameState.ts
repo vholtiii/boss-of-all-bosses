@@ -90,6 +90,7 @@ import {
   // Alerts log
   AlertEntry, AlertCategory, categorizeAlert,
 } from '@/types/game-mechanics';
+import { generateCapoName } from '@/lib/capo-names';
 
 // ============ SEEDED PRNG (Mulberry32) ============
 function mulberry32(seed: number): () => number {
