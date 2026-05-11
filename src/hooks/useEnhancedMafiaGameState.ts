@@ -6001,9 +6001,10 @@ export const useEnhancedMafiaGameState = (
               phase: aiPhase,
               mood: dynamicMood,
               jitter: turnRng() * 2 - 1,
+              difficulty: state.difficulty || 'normal',
             });
           });
-          const pickIdx = softmaxPick(scores, turnRng, 4, 1.5);
+          const pickIdx = softmaxPick(scores, turnRng, 4, difficultySoftmaxTemperature(state.difficulty || 'normal'));
           const target = pickIdx >= 0 ? targetPool[pickIdx] : targetPool[Math.floor(Math.random() * targetPool.length)];
           
           // Save original position — only commit move after combat resolution
