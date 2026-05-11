@@ -753,10 +753,25 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
 
       {/* Grid */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <svg width="100%" height="100%" viewBox={viewBox} className="overflow-visible">
+        <svg
+          ref={svgRef}
+          width="100%"
+          height="100%"
+          viewBox={viewBox}
+          className="overflow-visible"
+          style={{ cursor: panStateRef.current.active ? 'grabbing' : 'grab', touchAction: 'none' }}
+          onMouseDown={(e) => { if (e.button !== 0) return; beginPan(e.clientX, e.clientY); }}
+          onMouseMove={(e) => updatePan(e.clientX, e.clientY)}
+          onMouseUp={endPan}
+          onMouseLeave={endPan}
+          onTouchStart={(e) => { const t = e.touches[0]; if (t) beginPan(t.clientX, t.clientY); }}
+          onTouchMove={(e) => { const t = e.touches[0]; if (t) updatePan(t.clientX, t.clientY); }}
+          onTouchEnd={endPan}
+          onTouchCancel={endPan}
+        >
           {/* Invisible background rect to capture clicks on empty area */}
-          <rect x={viewBox.split(' ').map(Number)[0]} y={viewBox.split(' ').map(Number)[1]} width={viewBox.split(' ').map(Number)[2]} height={viewBox.split(' ').map(Number)[3]} fill="transparent" onClick={() => { onClearHighlight?.(); setPinnedHex(null); }} />
-          <g transform={`scale(${zoom})`}>
+          <rect x={viewBox.split(' ').map(Number)[0]} y={viewBox.split(' ').map(Number)[1]} width={viewBox.split(' ').map(Number)[2]} height={viewBox.split(' ').map(Number)[3]} fill="transparent" onClick={() => { if (suppressBgClickRef.current) { suppressBgClickRef.current = false; return; } onClearHighlight?.(); setPinnedHex(null); }} />
+          <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
             {/* Compute supply route hex set for tint overlay */}
             {(() => {
               const sNodes: SupplyNode[] = gameState?.supplyNodes || [];
