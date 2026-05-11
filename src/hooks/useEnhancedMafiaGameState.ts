@@ -4257,7 +4257,7 @@ export const useEnhancedMafiaGameState = (
                 id: a.unitId, type: 'capo', family: newState.playerFamily,
                 q: hq.q, r: hq.r, s: hq.s,
                 movesRemaining: 2, maxMoves: 2, level: 1,
-                name: stats ? `Capo` : `Capo`,
+                name: (capoUnit as any)?.name || generateCapoName(),
               });
               turnReport.events.push(`🔓 Capo released from jail and returned to HQ.`);
             }
