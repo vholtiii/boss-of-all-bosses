@@ -106,16 +106,18 @@ export const useGameSaveLoad = () => {
       } catch (e) {
         console.warn('[save] cloud write failed', e);
       }
-      // Bump profile save counter (best-effort)
+      // Best-effort profile bump
       try {
         const { supabase } = await import('@/integrations/supabase/client');
-        await supabase.rpc as any;
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('total_saves')
+          .eq('user_id', userId)
+          .maybeSingle();
         await supabase
           .from('profiles')
           .update({
-            total_saves: (await supabase.from('profiles').select('total_saves').eq('user_id', userId).maybeSingle()).data?.total_saves
-              ? ((await supabase.from('profiles').select('total_saves').eq('user_id', userId).maybeSingle()).data!.total_saves as number) + 1
-              : 1,
+            total_saves: (prof?.total_saves ?? 0) + 1,
             last_seen_at: new Date().toISOString(),
             last_family_played: gameState.playerFamily as any,
           })
@@ -127,7 +129,6 @@ export const useGameSaveLoad = () => {
       return { success: false, message: 'Failed to save game' };
     }
   }, [userId]);
-
   const loadGame = useCallback(async (slot: SlotId = 1, source: 'local' | 'cloud' = 'local') => {
     try {
       let data: SaveGameData | null = null;
