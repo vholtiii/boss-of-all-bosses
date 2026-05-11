@@ -1,131 +1,77 @@
+# Plan: Gated Saves + Admin User List
+
 ## Goal
+- Players can play freely without an account.
+- Sign-in becomes **required** to use Save / Load (local or cloud).
+- Every registered player is captured in a `profiles` table.
+- You get an in-app `/admin` page that lists everyone, with an export.
 
-Two related problems to solve:
+---
 
-1. **Cloud sync** — saves currently live only in the browser (IndexedDB + localStorage mirror). Clearing site data, switching devices, or switching browsers loses everything. We want saves backed up to Lovable Cloud and restorable on any device the player signs into.
-2. **Version compatibility** — the game updates frequently. Today `useGameSaveLoad.loadGame` blocks any save whose major version differs from `CURRENT_VERSION` ('1.0.0'), and minor diffs only show a warning. Frequent updates will start invalidating saves silently or break them at runtime.
+## Part 1 — Database
 
-## Part 1 — Link saves to Lovable Cloud
+New tables (migration):
 
-### Approach
+**`profiles`** — auto-created on signup via trigger
+- `user_id` (FK → auth.users, unique, cascade)
+- `email`, `display_name`, `avatar_url`
+- `last_family_played`, `last_seen_at`, `total_saves`
+- `created_at`, `updated_at`
 
-- Enable Lovable Cloud and turn on email/password + Google sign-in.
-- Add a lightweight "Sign in to sync" surface in the Save/Load dialog. Anonymous play keeps working exactly as today (local-only).
-- When the player is signed in, every save (manual + autosave) writes to **both** local storage and a `cloud_saves` table.
-- On sign-in (or app load), pull the cloud slot list and merge with local: newer-by-`saveDate` wins. Show conflicts as a banner ("Cloud save is newer — Use cloud / Keep local").
+**`app_role`** enum (`admin`, `player`) and **`user_roles`** table
+- Stored separately from profiles (security best practice — avoids privilege-escalation).
+- `has_role(user_id, role)` SECURITY DEFINER function for RLS checks.
 
-### Data model
+**Trigger**: `on_auth_user_created` → inserts a `profiles` row + assigns default `player` role.
 
-Single table `cloud_saves`:
+**RLS**:
+- Players can view/update only their own profile.
+- Admins can view all profiles and all roles via `has_role(auth.uid(), 'admin')`.
+- `cloud_saves` table already exists; admins also get read access for the admin view.
 
-| column | type | notes |
-|---|---|---|
-| `id` | uuid pk | |
-| `user_id` | uuid | FK `auth.users`, RLS scoped |
-| `slot` | text | `'auto' | '1' | '2' | '3' | '4' | '5'` |
-| `save_data` | jsonb | full `SaveGameData` |
-| `game_version` | text | denormalized for filtering |
-| `schema_version` | int | see Part 2 |
-| `save_date` | timestamptz | from payload |
-| `updated_at` | timestamptz | trigger |
+**Bootstrap**: After migration, I'll insert your `admin` role row using the email you confirm below.
 
-- Unique constraint on `(user_id, slot)`.
-- RLS: owner can `select/insert/update/delete` their rows only. No public read.
-- Roles table not needed (no admin features here).
+---
 
-### Sync logic
+## Part 2 — Gate Save/Load behind sign-in
 
-- `gameStorage.ts` gains a `cloudAdapter` with the same `readSlot/writeSlot/deleteSlot/listSlots` shape.
-- New `syncCloud()` helper run on sign-in and after each successful local write:
-  - Push: upload local payload if local `saveDate` > cloud `saveDate`.
-  - Pull: if cloud is newer, surface a non-destructive prompt before overwriting local.
-- Autosave throttle is unchanged locally; cloud writes piggy-back on the same throttle to avoid spamming the DB.
-- Failures degrade silently to local-only with a small "Cloud sync failed — retrying" toast; we never block gameplay on a failed cloud write.
+- `SaveLoadDialog` already shows `CloudAuthPanel` for unauthenticated users. Change behavior so:
+  - When signed out, the Save and Load tabs show a **"Sign in to save your progress"** prompt with the auth panel inline (no save slots visible).
+  - Manage Saves / Export / Import remain available for already-downloaded JSON files only.
+- Disable the autosave loop in `UltimateMafiaGame.tsx` while signed-out (current autosave silently writes to IndexedDB; we'll skip it cleanly with a one-time "Sign in to enable autosave" toast).
+- Update the Save/Load button badge to read **"Sign in to save"** when signed out.
 
-### UI changes
+---
 
-- `SaveLoadDialog`:
-  - Header strip: "Signed in as X · Cloud sync ✓" or "Sign in to sync saves across devices" with a button.
-  - Each slot card gets a tiny badge: `Local`, `Cloud`, `Synced`, or `Conflict`.
-  - "Restore from Cloud" action on cloud-only slots.
+## Part 3 — `/admin` page
 
-## Part 2 — Versioning that survives frequent updates
+New route + page (`src/pages/Admin.tsx`):
+- Guarded by `has_role(auth.uid(), 'admin')`. Non-admins get a 404-style message.
+- Table view of all profiles:
+  - Email, display name, signed-up date, last seen, last family played, save count.
+  - Search box (by email), sortable columns, pagination (50/page).
+- **Export CSV** button — downloads the full list.
+- Row click → drawer showing that user's `cloud_saves` slots (slot, turn, family, save date).
 
-### Problem with the current scheme
+Add a small "Admin" link in the main menu, only rendered when the current user has the admin role.
 
-- `CURRENT_VERSION = '1.0.0'` is hand-edited and rarely bumped.
-- Any major bump instantly bricks every old save.
-- There is no migration path — only "compatible / not compatible".
+---
 
-### New scheme
+## Part 4 — Profile auto-update
 
-Introduce a **numeric `schemaVersion`** separate from the cosmetic `gameVersion` string:
+Lightweight hook so `last_seen_at`, `last_family_played`, and `total_saves` stay current:
+- `last_seen_at`: updated on app load if signed in.
+- `last_family_played`: updated when a new game starts.
+- `total_saves`: incremented inside `saveGame` after a successful cloud write.
 
-- `gameVersion` = human-readable build tag (still shown in UI). Pulled from `package.json` automatically so we stop forgetting to bump it.
-- `schemaVersion` = integer that only changes when the **shape of `EnhancedMafiaGameState` changes** in a way that needs handling. Most frequent updates (balance tweaks, new sounds, UI) won't touch it.
+---
 
-### Migration registry
+## Out of scope
+- Email verification gating (Lovable Cloud sends default verification emails; not blocking play).
+- Banning/deleting users from the admin page (read-only v1).
+- Admin analytics beyond the user list.
 
-New file `src/lib/saveMigrations.ts`:
+---
 
-```ts
-export const CURRENT_SCHEMA_VERSION = 7;
-
-type Migration = (state: any) => any;
-export const migrations: Record<number, Migration> = {
-  // 1 -> 2: added supplyNodes
-  2: (s) => ({ ...s, supplyNodes: s.supplyNodes ?? [] }),
-  // 2 -> 3: renamed hexMap -> hexGrid
-  3: (s) => { const { hexMap, ...rest } = s; return { ...rest, hexGrid: hexGrid ?? hexMap ?? [] }; },
-  // ...
-};
-
-export function migrate(state: any, fromVersion: number) {
-  let v = fromVersion ?? 1;
-  let cur = state;
-  while (v < CURRENT_SCHEMA_VERSION) {
-    v += 1;
-    const fn = migrations[v];
-    if (!fn) throw new Error(`No migration to v${v}`);
-    cur = fn(cur);
-  }
-  return { state: cur, version: v };
-}
-```
-
-### Load pipeline
-
-`useGameSaveLoad.loadGame` becomes:
-
-1. Read payload (local or cloud).
-2. Validate shape with `isValidSaveData` (already exists).
-3. If `payload.schemaVersion < CURRENT_SCHEMA_VERSION` → run `migrate()`.
-4. If `payload.schemaVersion > CURRENT_SCHEMA_VERSION` → refuse load with "This save was made on a newer version. Update the game to continue."
-5. After a successful migration, **re-save migrated state back to the slot** (and to backup) so the next load is a no-op.
-6. If migration throws, fall back to the slot's `__backup` copy and surface a clear toast.
-
-### Discipline going forward
-
-- `CURRENT_SCHEMA_VERSION` is bumped only when a code change requires it. A short checklist comment in `saveMigrations.ts` tells the engineer when: new required field, renamed field, removed field, changed value semantics.
-- Balance/UI/sound changes never touch `schemaVersion`; old saves keep loading untouched.
-- One write-up in `GAME_MECHANICS.md` documents the policy so it's not lost.
-
-### Out of scope
-
-- Realtime cross-device sync while two tabs play simultaneously (last-writer-wins is fine).
-- Cloud save sharing between users.
-- Snapshot history beyond the existing one-deep `__backup`.
-
-## Implementation order
-
-1. Add `schemaVersion` + `saveMigrations.ts`, wire into existing local load. Bump to v1, no migrations yet — pure groundwork.
-2. Enable Lovable Cloud + auth, create `cloud_saves` table with RLS.
-3. Add cloud adapter + sync logic in `gameStorage.ts` and `useGameSaveLoad.ts`.
-4. Update `SaveLoadDialog` with sign-in strip, slot badges, and conflict resolution.
-5. Document the schema-bump policy in `GAME_MECHANICS.md`.
-
-## Questions before I build
-
-1. **Auth methods** — OK to default to email/password + Google sign-in (Lovable Cloud defaults), or do you want only one of them?
-2. **Anonymous play** — keep local-only saves working without an account (recommended), or require sign-in for saving at all?
-3. **Conflict policy** — when local and cloud disagree, prompt the player every time, or auto-pick the newest by `saveDate` and just notify?
+## Question before I start
+What email address should be granted the `admin` role? (I'll seed it in the migration so you can open `/admin` immediately after signing up with that email.)
