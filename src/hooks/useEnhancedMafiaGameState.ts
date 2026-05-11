@@ -94,6 +94,7 @@ import { generateCapoName } from '@/lib/capo-names';
 import {
   rollFamilyPersonality, rollFamilyStrategy, computeDynamicMood, blendMoodWithPersonality,
   scoreHexForAI, softmaxPick, familySignaturePreference,
+  difficultySoftmaxTemperature, difficultyMoodSensitivity,
   type FamilyId, type AIPersonality, type DynamicMood,
 } from '@/lib/ai-strategy';
 
