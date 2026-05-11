@@ -281,13 +281,36 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   }, []);
   // notifyTerritoryCaptured and notifyReputationChange already destructured above
 
-  // Handle loading a saved game
+  // ---- Save/Load: autosave + reliable load ----
+  const { autoSave, emergencySaveAuto } = useGameSaveLoad();
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<number | null>(null);
+
   const handleLoadGame = (loadedGameState: any) => {
-    // This would need to be implemented in the game state hook
-    // For now, we'll just show a notification
-    console.log('Loading game:', loadedGameState);
-    playSound('success');
+    try {
+      loadGameState(loadedGameState);
+      playSound('success');
+      notifySuccess('Game Loaded', 'Your saved game has been restored.');
+    } catch (e) {
+      console.error('Load failed', e);
+      notifyError('Load Failed', 'Could not restore the saved game.');
+    }
   };
+
+  // Autosave whenever the turn advances (throttled inside the hook).
+  useEffect(() => {
+    if (!gameState || isWinner) return;
+    autoSave(gameState).then(r => {
+      if (r.success) setLastAutoSavedAt(Date.now());
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.turn]);
+
+  // Emergency save on tab close — synchronous LS mirror, picked up next session.
+  useEffect(() => {
+    const handler = () => emergencySaveAuto(gameState);
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [gameState, emergencySaveAuto]);
 
   // Sitdowns minicard handlers (shared between mobile/tab and desktop sidebar mounts)
   const handleOpenOutgoingSitdown = useCallback((p: any) => {
