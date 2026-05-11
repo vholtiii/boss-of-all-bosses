@@ -2105,6 +2105,26 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
 const UltimateMafiaGame: React.FC = () => {
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
 
+  // Heartbeat: bump last_seen_at + last_family_played for the signed-in player
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data: { user } } = await supabase.auth.getUser();
+        if (cancelled || !user) return;
+        await supabase
+          .from('profiles')
+          .update({
+            last_seen_at: new Date().toISOString(),
+            ...(gameConfig?.family ? { last_family_played: gameConfig.family } : {}),
+          })
+          .eq('user_id', user.id);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [gameConfig?.family]);
+
   if (!gameConfig) {
     return (
       <FamilySelectionScreen
