@@ -5517,10 +5517,10 @@ export const useEnhancedMafiaGameState = (
         : /* unpredictable */ 0.8 + (Math.random() * 0.8 - 0.4);
 
       const aiHeat = opponent.resources.heat || 0;
-      // Track soldier losses crudely via a counter we maintain elsewhere; if missing, skip loss-trigger
-      const recentSoldierLosses = (oppAny.recentSoldierLosses) || 0;
-      const recentCapoLosses = (oppAny.recentCapoLosses) || 0;
-      const hqAssaultedRecently = (oppAny.lastAssaultedOnTurn || -99) >= state.turn - 1;
+      // Reuse counters captured above for mood
+      const recentSoldierLosses = _recentSoldierLosses;
+      const recentCapoLosses = _recentCapoLosses;
+      const hqAssaultedRecently = _hqAssaultedRecently;
 
       // Decay loss counters each turn
       oppAny.recentSoldierLosses = Math.max(0, recentSoldierLosses - 1);
