@@ -207,67 +207,6 @@ export function scoreHexForAI(i: ScoreHexInputs): number {
   return s;
 }
 
-// Legacy reference: previous monolithic body retained as comment for clarity removed.
-function _unused_priorBody() {
-  return 0;
-}
-// silence unused
-void _unused_priorBody;
-  // Base attraction: businesses
-  s += Math.min(20, i.hexIncome / 200);
-  // Weak hex bonus / strong hex penalty
-  if (i.defenderCount === 0) s += 6;
-  else if (i.defenderCount === 1) s += 1;
-  else s -= 4;
-  // Family identity: focus districts
-  if (i.isInFocusDistrict) s += 4;
-  // Don't overextend
-  s -= Math.max(0, i.distanceToOwnHQ - 3) * 1.5;
-  // Consolidation bonus (defensive moods love this)
-  if (i.isAdjacentToOwnTerritory) {
-    s += i.mood === 'desperate' || i.mood === 'cautious' ? 5 : 2;
-  }
-  // Avoid fortified / safehouses without intel
-  if (i.isFortified) s -= 5;
-  if (i.isSafehouse && !i.hasScoutIntel) s -= 4;
-  if (i.isSafehouse && i.hasScoutIntel) s += 3; // bounty + intel target
-  // War prioritization
-  if (i.isWarTarget) s += 10;
-  // Phase 4 endgame: lean toward player when winning
-  if (i.phase >= 4 && i.isPlayerHex && i.mood === 'dominant') s += 4;
-
-  // Personality biases
-  switch (i.effectivePersonality) {
-    case 'aggressive':
-      if (i.defenderCount === 0) s += 2;
-      s += 2;
-      break;
-    case 'defensive':
-      if (i.isAdjacentToOwnTerritory) s += 3;
-      s -= 2;
-      break;
-    case 'opportunistic':
-      // really loves weak juicy hexes
-      if (i.defenderCount === 0 && i.hexIncome > 1000) s += 4;
-      break;
-    case 'diplomatic':
-      if (i.isPlayerHex) s -= 3;
-      if (i.isAdjacentToOwnTerritory) s += 2;
-      break;
-    case 'unpredictable':
-      s += i.jitter * 4; // amplified randomness
-      break;
-  }
-
-  // Signature preferences
-  if (i.signaturePref.preferExtort && i.hexIncome > 0 && i.isPlayerHex) s += 2;
-  if (i.signaturePref.preferAdjacentExpansion && i.isAdjacentToOwnTerritory) s += 2;
-  if (i.signaturePref.preferHighValueOnly && i.hexIncome < 1000) s -= 2;
-
-  // Always sprinkle a little jitter so identical scores don't tie
-  s += i.jitter * 0.8;
-  return s;
-}
 
 /**
  * Softmax-pick from candidates. Returns index of selected candidate.
