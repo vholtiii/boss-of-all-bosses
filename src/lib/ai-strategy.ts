@@ -9,6 +9,18 @@
 export type AIPersonality = 'aggressive' | 'defensive' | 'opportunistic' | 'diplomatic' | 'unpredictable';
 export type DynamicMood = 'neutral' | 'desperate' | 'cornered' | 'dominant' | 'cautious';
 export type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
+export type AIDifficulty = 'easy' | 'normal' | 'hard';
+
+/** Softmax temperature controls how greedily the AI picks top-scoring targets.
+ *  Lower = more deterministic/optimal; higher = more exploratory/random. */
+export function difficultySoftmaxTemperature(d: AIDifficulty): number {
+  return d === 'hard' ? 1.0 : d === 'easy' ? 2.2 : 1.5;
+}
+
+/** Multiplier applied to mood-trigger sensitivity (rivalAvg comparison). */
+export function difficultyMoodSensitivity(d: AIDifficulty): number {
+  return d === 'hard' ? 1.3 : d === 'easy' ? 0.5 : 1.0;
+}
 
 // ─── PRNG (mulberry32) ────────────────────────────────────────────────
 export function mulberry32(seed: number): () => number {
