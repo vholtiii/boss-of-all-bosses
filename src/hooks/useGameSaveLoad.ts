@@ -89,6 +89,9 @@ export const useGameSaveLoad = () => {
     slot: SlotId = 1,
     playerName?: string,
   ) => {
+    if (!userId) {
+      return { success: false, message: 'Sign in to save your game.' };
+    }
     try {
       const saveData: SaveGameData = {
         gameState,
@@ -98,17 +101,34 @@ export const useGameSaveLoad = () => {
         playerName,
       };
       await writeSlot(slot, saveData);
-      // Mirror to cloud (best-effort, non-blocking failure)
-      if (userId) {
-        cloudWriteSlot(userId, slot, saveData, CURRENT_SCHEMA_VERSION).catch(() => {});
+      try {
+        await cloudWriteSlot(userId, slot, saveData, CURRENT_SCHEMA_VERSION);
+      } catch (e) {
+        console.warn('[save] cloud write failed', e);
       }
+      // Best-effort profile bump
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('total_saves')
+          .eq('user_id', userId)
+          .maybeSingle();
+        await supabase
+          .from('profiles')
+          .update({
+            total_saves: (prof?.total_saves ?? 0) + 1,
+            last_seen_at: new Date().toISOString(),
+            last_family_played: gameState.playerFamily as any,
+          })
+          .eq('user_id', userId);
+      } catch {}
       return { success: true, message: `Game saved to slot ${slot}` };
     } catch (error) {
       console.error('Failed to save game:', error);
       return { success: false, message: 'Failed to save game' };
     }
   }, [userId]);
-
   const loadGame = useCallback(async (slot: SlotId = 1, source: 'local' | 'cloud' = 'local') => {
     try {
       let data: SaveGameData | null = null;
@@ -238,18 +258,20 @@ export const useGameSaveLoad = () => {
     }
   }, [userId]);
 
-  /** Throttled autosave — call freely, only writes once per few seconds. */
+  /** Throttled autosave — call freely, only writes once per few seconds. Skipped when signed out. */
   const autoSave = useCallback(async (gameState: EnhancedMafiaGameState) => {
+    if (!userId) return { success: false, message: 'signed-out' };
     const now = Date.now();
     if (now - lastAutoSaveAt < AUTOSAVE_MIN_INTERVAL_MS) {
       return { success: false, message: 'throttled' };
     }
     lastAutoSaveAt = now;
     return saveGame(gameState, 'auto', 'Auto Save');
-  }, [saveGame]);
+  }, [saveGame, userId]);
 
-  /** Synchronous emergency save for `beforeunload`. */
+  /** Synchronous emergency save for `beforeunload`. Only runs when signed in. */
   const emergencySaveAuto = useCallback((gameState: EnhancedMafiaGameState) => {
+    if (!userId) return;
     try {
       emergencyMirrorAuto({
         gameState,
@@ -261,7 +283,7 @@ export const useGameSaveLoad = () => {
     } catch {
       // best effort
     }
-  }, []);
+  }, [userId]);
 
   /** Push every local save up to cloud. Used on sign-in. */
   const syncLocalToCloud = useCallback(async () => {
