@@ -94,6 +94,7 @@ import { generateCapoName } from '@/lib/capo-names';
 import {
   rollFamilyPersonality, rollFamilyStrategy, computeDynamicMood, blendMoodWithPersonality,
   scoreHexForAI, softmaxPick, familySignaturePreference,
+  difficultySoftmaxTemperature, difficultyMoodSensitivity,
   type FamilyId, type AIPersonality, type DynamicMood,
 } from '@/lib/ai-strategy';
 
@@ -5490,9 +5491,12 @@ export const useEnhancedMafiaGameState = (
       const _hqAssaultedRecently = (oppAny.lastAssaultedOnTurn || -99) >= state.turn - 1;
       const _isAtWarMood = (state.activeWars || []).some(w => w.family1 === fam || w.family2 === fam);
       const upkeepEstimate = ((opponent.resources.soldiers || 0) + state.deployedUnits.filter(u => u.family === fam).length) * 200 + 1500;
+      // Difficulty scales how quickly mood swings: Easy dampens trigger sensitivity, Hard amplifies it.
+      const moodSens = difficultyMoodSensitivity(state.difficulty || 'normal');
+      const adjustedRivalAvg = rivalAvgHexes * moodSens;
       const dynamicMood: DynamicMood = computeDynamicMood({
         myHexes: myHexCount,
-        rivalAvgHexes,
+        rivalAvgHexes: adjustedRivalAvg,
         myMoney: opponent.resources.money,
         myUpkeepPerTurn: upkeepEstimate,
         myHeat: opponent.resources.heat || 0,
@@ -5997,9 +6001,10 @@ export const useEnhancedMafiaGameState = (
               phase: aiPhase,
               mood: dynamicMood,
               jitter: turnRng() * 2 - 1,
+              difficulty: state.difficulty || 'normal',
             });
           });
-          const pickIdx = softmaxPick(scores, turnRng, 4, 1.5);
+          const pickIdx = softmaxPick(scores, turnRng, 4, difficultySoftmaxTemperature(state.difficulty || 'normal'));
           const target = pickIdx >= 0 ? targetPool[pickIdx] : targetPool[Math.floor(Math.random() * targetPool.length)];
           
           // Save original position — only commit move after combat resolution

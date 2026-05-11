@@ -9,6 +9,18 @@
 export type AIPersonality = 'aggressive' | 'defensive' | 'opportunistic' | 'diplomatic' | 'unpredictable';
 export type DynamicMood = 'neutral' | 'desperate' | 'cornered' | 'dominant' | 'cautious';
 export type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
+export type AIDifficulty = 'easy' | 'normal' | 'hard';
+
+/** Softmax temperature controls how greedily the AI picks top-scoring targets.
+ *  Lower = more deterministic/optimal; higher = more exploratory/random. */
+export function difficultySoftmaxTemperature(d: AIDifficulty): number {
+  return d === 'hard' ? 1.0 : d === 'easy' ? 2.2 : 1.5;
+}
+
+/** Multiplier applied to mood-trigger sensitivity (rivalAvg comparison). */
+export function difficultyMoodSensitivity(d: AIDifficulty): number {
+  return d === 'hard' ? 1.3 : d === 'easy' ? 0.5 : 1.0;
+}
 
 // ─── PRNG (mulberry32) ────────────────────────────────────────────────
 export function mulberry32(seed: number): () => number {
@@ -123,65 +135,78 @@ export interface ScoreHexInputs {
   mood: DynamicMood;
   /** small jitter in [-1, +1] from per-turn rng for tie-breaking */
   jitter: number;
+  /** Game difficulty — scales scoring sharpness. Defaults to 'normal' if omitted. */
+  difficulty?: AIDifficulty;
 }
 
 export function scoreHexForAI(i: ScoreHexInputs): number {
-  let s = 0;
+  let raw = 0;
+  // Track positive vs. negative components separately so difficulty can
+  // asymmetrically scale opportunity-seeking vs. risk-aversion.
+  let pos = 0; let neg = 0;
+  const add = (v: number) => { if (v >= 0) pos += v; else neg += v; raw += v; };
   // Base attraction: businesses
-  s += Math.min(20, i.hexIncome / 200);
+  add(Math.min(20, i.hexIncome / 200));
   // Weak hex bonus / strong hex penalty
-  if (i.defenderCount === 0) s += 6;
-  else if (i.defenderCount === 1) s += 1;
-  else s -= 4;
+  if (i.defenderCount === 0) add(6);
+  else if (i.defenderCount === 1) add(1);
+  else add(-4);
   // Family identity: focus districts
-  if (i.isInFocusDistrict) s += 4;
+  if (i.isInFocusDistrict) add(4);
   // Don't overextend
-  s -= Math.max(0, i.distanceToOwnHQ - 3) * 1.5;
+  add(-Math.max(0, i.distanceToOwnHQ - 3) * 1.5);
   // Consolidation bonus (defensive moods love this)
   if (i.isAdjacentToOwnTerritory) {
-    s += i.mood === 'desperate' || i.mood === 'cautious' ? 5 : 2;
+    add(i.mood === 'desperate' || i.mood === 'cautious' ? 5 : 2);
   }
   // Avoid fortified / safehouses without intel
-  if (i.isFortified) s -= 5;
-  if (i.isSafehouse && !i.hasScoutIntel) s -= 4;
-  if (i.isSafehouse && i.hasScoutIntel) s += 3; // bounty + intel target
+  if (i.isFortified) add(-5);
+  if (i.isSafehouse && !i.hasScoutIntel) add(-4);
+  if (i.isSafehouse && i.hasScoutIntel) add(3); // bounty + intel target
   // War prioritization
-  if (i.isWarTarget) s += 10;
+  if (i.isWarTarget) add(10);
   // Phase 4 endgame: lean toward player when winning
-  if (i.phase >= 4 && i.isPlayerHex && i.mood === 'dominant') s += 4;
+  if (i.phase >= 4 && i.isPlayerHex && i.mood === 'dominant') add(4);
 
   // Personality biases
   switch (i.effectivePersonality) {
     case 'aggressive':
-      if (i.defenderCount === 0) s += 2;
-      s += 2;
+      if (i.defenderCount === 0) add(2);
+      add(2);
       break;
     case 'defensive':
-      if (i.isAdjacentToOwnTerritory) s += 3;
-      s -= 2;
+      if (i.isAdjacentToOwnTerritory) add(3);
+      add(-2);
       break;
     case 'opportunistic':
-      // really loves weak juicy hexes
-      if (i.defenderCount === 0 && i.hexIncome > 1000) s += 4;
+      if (i.defenderCount === 0 && i.hexIncome > 1000) add(4);
       break;
     case 'diplomatic':
-      if (i.isPlayerHex) s -= 3;
-      if (i.isAdjacentToOwnTerritory) s += 2;
+      if (i.isPlayerHex) add(-3);
+      if (i.isAdjacentToOwnTerritory) add(2);
       break;
     case 'unpredictable':
-      s += i.jitter * 4; // amplified randomness
+      add(i.jitter * 4);
       break;
   }
 
   // Signature preferences
-  if (i.signaturePref.preferExtort && i.hexIncome > 0 && i.isPlayerHex) s += 2;
-  if (i.signaturePref.preferAdjacentExpansion && i.isAdjacentToOwnTerritory) s += 2;
-  if (i.signaturePref.preferHighValueOnly && i.hexIncome < 1000) s -= 2;
+  if (i.signaturePref.preferExtort && i.hexIncome > 0 && i.isPlayerHex) add(2);
+  if (i.signaturePref.preferAdjacentExpansion && i.isAdjacentToOwnTerritory) add(2);
+  if (i.signaturePref.preferHighValueOnly && i.hexIncome < 1000) add(-2);
+
+  // ── Difficulty asymmetric scaling ──
+  // Easy AI undervalues opportunities and overestimates risk; Hard AI does the opposite.
+  const diff = i.difficulty || 'normal';
+  const posMul = diff === 'hard' ? 1.15 : diff === 'easy' ? 0.85 : 1.0;
+  const negMul = diff === 'hard' ? 0.85 : diff === 'easy' ? 1.15 : 1.0;
+  let s = pos * posMul + neg * negMul;
 
   // Always sprinkle a little jitter so identical scores don't tie
   s += i.jitter * 0.8;
   return s;
 }
+
 
 /**
  * Softmax-pick from candidates. Returns index of selected candidate.
