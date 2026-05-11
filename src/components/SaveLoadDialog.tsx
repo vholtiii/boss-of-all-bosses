@@ -189,106 +189,128 @@ const SaveLoadDialog: React.FC<SaveLoadDialogProps> = ({ gameState, onLoadGame, 
           </TabsList>
 
           <TabsContent value="save" className="space-y-4">
-            <div>
-              <Label htmlFor="playerName">Player Name (Optional)</Label>
-              <Input id="playerName" value={playerName} onChange={e => setPlayerName(e.target.value)} placeholder="Enter your name..." />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[1, 2, 3, 4, 5].map((slot) => {
-                const info = saveSlots.find(s => s.slot === slot);
-                return (
-                  <Card key={slot}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center justify-between">
-                        Save Slot {slot}
-                        {info && renderSlotBadges(info)}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {info?.exists ? (
-                        <div className="space-y-2">
-                          <div className="text-xs text-muted-foreground space-y-1">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {formatDate(info.saveData!.saveDate)}
-                            </div>
-                            {info.saveData!.playerName && (
-                              <div className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                {info.saveData!.playerName}
+            {!isSignedIn ? (
+              <div className="space-y-3">
+                <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center">
+                  <Save className="h-6 w-6 mx-auto mb-2 opacity-60" />
+                  Sign in to save your progress. Saves are stored to your account and synced across devices.
+                </div>
+                <CloudAuthPanel />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <Label htmlFor="playerName">Player Name (Optional)</Label>
+                  <Input id="playerName" value={playerName} onChange={e => setPlayerName(e.target.value)} placeholder="Enter your name..." />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3, 4, 5].map((slot) => {
+                    const info = saveSlots.find(s => s.slot === slot);
+                    return (
+                      <Card key={slot}>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm flex items-center justify-between">
+                            Save Slot {slot}
+                            {info && renderSlotBadges(info)}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {info?.exists ? (
+                            <div className="space-y-2">
+                              <div className="text-xs text-muted-foreground space-y-1">
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {formatDate(info.saveData!.saveDate)}
+                                </div>
+                                {info.saveData!.playerName && (
+                                  <div className="flex items-center gap-1">
+                                    <User className="h-3 w-3" />
+                                    {info.saveData!.playerName}
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                          <Button size="sm" className="w-full"
-                            onClick={() => { if (window.confirm(`Overwrite save in slot ${slot}?`)) handleSave(slot); }}>
-                            <Save className="h-3 w-3 mr-1" /> Overwrite
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button size="sm" onClick={() => handleSave(slot)} className="w-full">
-                          <Save className="h-3 w-3 mr-1" /> Save Game
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                              <Button size="sm" className="w-full"
+                                onClick={() => { if (window.confirm(`Overwrite save in slot ${slot}?`)) handleSave(slot); }}>
+                                <Save className="h-3 w-3 mr-1" /> Overwrite
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button size="sm" onClick={() => handleSave(slot)} className="w-full">
+                              <Save className="h-3 w-3 mr-1" /> Save Game
+                            </Button>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </TabsContent>
 
           <TabsContent value="load" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {saveSlots.map(s => (
-                <Card key={String(s.slot)}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center justify-between gap-2">
-                      <span>{slotLabel(s.slot)}</span>
-                      {renderSlotBadges(s)}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {s.exists && s.saveData ? (
-                      <div className="space-y-3">
-                        <div className="text-xs text-muted-foreground space-y-1">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {formatDate(s.saveData.saveDate)}
-                          </div>
-                          {s.saveData.playerName && (
+            {!isSignedIn ? (
+              <div className="space-y-3">
+                <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center">
+                  <Download className="h-6 w-6 mx-auto mb-2 opacity-60" />
+                  Sign in to load your saved games. Or import a previously exported JSON from the Manage tab.
+                </div>
+                <CloudAuthPanel />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {saveSlots.map(s => (
+                  <Card key={String(s.slot)}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center justify-between gap-2">
+                        <span>{slotLabel(s.slot)}</span>
+                        {renderSlotBadges(s)}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {s.exists && s.saveData ? (
+                        <div className="space-y-3">
+                          <div className="text-xs text-muted-foreground space-y-1">
                             <div className="flex items-center gap-1">
-                              <User className="h-3 w-3" />{s.saveData.playerName}
+                              <Calendar className="h-3 w-3" />
+                              {formatDate(s.saveData.saveDate)}
+                            </div>
+                            {s.saveData.playerName && (
+                              <div className="flex items-center gap-1">
+                                <User className="h-3 w-3" />{s.saveData.playerName}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1">
+                              <span className="text-lg">{getFamilyEmoji(s.saveData.gameState.playerFamily)}</span>
+                              {s.saveData.gameState.playerFamily.toUpperCase()} Family
+                            </div>
+                            <div className="text-xs">
+                              Turn {s.saveData.gameState.turn} • ${s.saveData.gameState.resources.money.toLocaleString()}
+                            </div>
+                          </div>
+                          <Button size="sm" onClick={() => handleLoad(s.slot, s.newer === 'cloud' ? 'cloud' : 'local')} className="w-full">
+                            <Download className="h-3 w-3 mr-1" />
+                            Load {s.newer === 'cloud' ? '(Cloud)' : ''}
+                          </Button>
+                          {s.conflict && (
+                            <div className="grid grid-cols-2 gap-1">
+                              <Button size="sm" variant="outline" onClick={() => handleLoad(s.slot, 'local')}>
+                                Use Local
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => handleLoad(s.slot, 'cloud')}>
+                                Use Cloud
+                              </Button>
                             </div>
                           )}
-                          <div className="flex items-center gap-1">
-                            <span className="text-lg">{getFamilyEmoji(s.saveData.gameState.playerFamily)}</span>
-                            {s.saveData.gameState.playerFamily.toUpperCase()} Family
-                          </div>
-                          <div className="text-xs">
-                            Turn {s.saveData.gameState.turn} • ${s.saveData.gameState.resources.money.toLocaleString()}
-                          </div>
                         </div>
-                        <Button size="sm" onClick={() => handleLoad(s.slot, s.newer === 'cloud' ? 'cloud' : 'local')} className="w-full">
-                          <Download className="h-3 w-3 mr-1" />
-                          Load {s.newer === 'cloud' ? '(Cloud)' : ''}
-                        </Button>
-                        {s.conflict && (
-                          <div className="grid grid-cols-2 gap-1">
-                            <Button size="sm" variant="outline" onClick={() => handleLoad(s.slot, 'local')}>
-                              Use Local
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleLoad(s.slot, 'cloud')}>
-                              Use Cloud
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-center py-4 text-muted-foreground text-sm">No save data</div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      ) : (
+                        <div className="text-center py-4 text-muted-foreground text-sm">No save data</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="manage" className="space-y-4">
