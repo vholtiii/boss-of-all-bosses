@@ -1032,6 +1032,14 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           gameState={gameState} 
           onLoadGame={handleLoadGame}
         />
+        {lastAutoSavedAt && (
+          <span
+            className="text-[10px] text-muted-foreground self-center"
+            title="Game is autosaved at the end of every turn"
+          >
+            Saved ✓ {new Date(lastAutoSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
         <AlertsLogPanel
           alerts={gameState.alertsLog || []}
           currentTurn={gameState.turn}
