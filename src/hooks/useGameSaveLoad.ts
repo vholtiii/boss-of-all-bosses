@@ -258,18 +258,20 @@ export const useGameSaveLoad = () => {
     }
   }, [userId]);
 
-  /** Throttled autosave — call freely, only writes once per few seconds. */
+  /** Throttled autosave — call freely, only writes once per few seconds. Skipped when signed out. */
   const autoSave = useCallback(async (gameState: EnhancedMafiaGameState) => {
+    if (!userId) return { success: false, message: 'signed-out' };
     const now = Date.now();
     if (now - lastAutoSaveAt < AUTOSAVE_MIN_INTERVAL_MS) {
       return { success: false, message: 'throttled' };
     }
     lastAutoSaveAt = now;
     return saveGame(gameState, 'auto', 'Auto Save');
-  }, [saveGame]);
+  }, [saveGame, userId]);
 
-  /** Synchronous emergency save for `beforeunload`. */
+  /** Synchronous emergency save for `beforeunload`. Only runs when signed in. */
   const emergencySaveAuto = useCallback((gameState: EnhancedMafiaGameState) => {
+    if (!userId) return;
     try {
       emergencyMirrorAuto({
         gameState,
@@ -281,7 +283,7 @@ export const useGameSaveLoad = () => {
     } catch {
       // best effort
     }
-  }, []);
+  }, [userId]);
 
   /** Push every local save up to cloud. Used on sign-in. */
   const syncLocalToCloud = useCallback(async () => {
