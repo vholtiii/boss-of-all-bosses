@@ -91,6 +91,11 @@ import {
   AlertEntry, AlertCategory, categorizeAlert,
 } from '@/types/game-mechanics';
 import { generateCapoName } from '@/lib/capo-names';
+import {
+  rollFamilyPersonality, rollFamilyStrategy, computeDynamicMood, blendMoodWithPersonality,
+  scoreHexForAI, softmaxPick, familySignaturePreference,
+  type FamilyId, type AIPersonality, type DynamicMood,
+} from '@/lib/ai-strategy';
 
 // ============ SEEDED PRNG (Mulberry32) ============
 function mulberry32(seed: number): () => number {
