@@ -89,6 +89,9 @@ export const useGameSaveLoad = () => {
     slot: SlotId = 1,
     playerName?: string,
   ) => {
+    if (!userId) {
+      return { success: false, message: 'Sign in to save your game.' };
+    }
     try {
       const saveData: SaveGameData = {
         gameState,
@@ -98,10 +101,26 @@ export const useGameSaveLoad = () => {
         playerName,
       };
       await writeSlot(slot, saveData);
-      // Mirror to cloud (best-effort, non-blocking failure)
-      if (userId) {
-        cloudWriteSlot(userId, slot, saveData, CURRENT_SCHEMA_VERSION).catch(() => {});
+      try {
+        await cloudWriteSlot(userId, slot, saveData, CURRENT_SCHEMA_VERSION);
+      } catch (e) {
+        console.warn('[save] cloud write failed', e);
       }
+      // Bump profile save counter (best-effort)
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        await supabase.rpc as any;
+        await supabase
+          .from('profiles')
+          .update({
+            total_saves: (await supabase.from('profiles').select('total_saves').eq('user_id', userId).maybeSingle()).data?.total_saves
+              ? ((await supabase.from('profiles').select('total_saves').eq('user_id', userId).maybeSingle()).data!.total_saves as number) + 1
+              : 1,
+            last_seen_at: new Date().toISOString(),
+            last_family_played: gameState.playerFamily as any,
+          })
+          .eq('user_id', userId);
+      } catch {}
       return { success: true, message: `Game saved to slot ${slot}` };
     } catch (error) {
       console.error('Failed to save game:', error);
