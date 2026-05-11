@@ -1054,16 +1054,12 @@ export const createInitialGameState = (
         extortedHexTurns: 0,
       };
     }
-    const capoNames: Record<string, string> = {
-      gambino: 'Vito Scaletta', genovese: 'Sal Marcano', lucchese: 'Tommy Angelo',
-      bonanno: 'Joe Barbaro', colombo: 'Frank Colletti'
-    };
     const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
     const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
     deployedUnits.push({
       id: `${fam}-capo-0`, type: 'capo', family: fam,
       q: hq.q, r: hq.r, s: hq.s,
-      movesRemaining: 2, maxMoves: 2, level: 1, name: capoNames[fam],
+      movesRemaining: 2, maxMoves: 2, level: 1, name: generateCapoName(),
       personality: randomPersonality,
     });
   });
