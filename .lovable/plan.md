@@ -1,40 +1,32 @@
-## Difficulty ↔ New AI Behavior Integration
+## Goal
+On the family selection screen: always show an active map seed, add a Reroll button, and add a confirmation indicator so the player can clearly see which seed will be loaded when the game starts.
 
-### Problem
-The new AI behavior system (weighted personalities, dynamic moods, heuristic scoring, softmax picking) is live but doesn't fully account for difficulty. Easy/Hard need to influence not just aggression/income/recruit caps, but also how smart the AI is at picking targets and how reactive its mood is.
+## Changes (single file)
+`src/components/FamilySelectionScreen.tsx`, around lines 592–602 (Map Seed block).
 
-### Changes
+### 1. Always show an active seed
+- Initialize `seedInput` lazily with `Math.floor(Math.random() * 1e9).toString()` so the field is never empty.
+- Existing digit-only filter on input is preserved.
 
-#### 1. `src/lib/ai-strategy.ts` — Difficulty-aware scoring & picking
-- Add `difficulty: 'easy' | 'normal' | 'hard'` to `ScoreHexInputs`.
-- In `scoreHexForAI`, apply a difficulty scalar:
-  - Easy: positive scores ×0.85, penalties ×1.15 (AI slightly undervalues good targets and overestimates risk)
-  - Hard: positive scores ×1.15, penalties ×0.85 (AI slightly better at finding value and ignoring risk)
-- Export a `difficultySoftmaxTemperature(difficulty)` helper:
-  - Easy: 2.2 (more random/exploratory)
-  - Normal: 1.5
-  - Hard: 1.0 (more greedy/consistently optimal)
+### 2. Reroll button
+- Small icon button next to the input (using `Dices` from `lucide-react`, already in the project).
+- On click: regenerate seed (`Math.floor(Math.random() * 1e9)`), set `seedInput`, play `playSound('click')`.
+- Styled with the same `border-border/50 bg-card/80` look as nearby controls; tooltip "Reroll seed".
 
-#### 2. `src/hooks/useEnhancedMafiaGameState.ts` — Wire difficulty into AI turn
-- Pass `state.difficulty` (or derive from `difficultyModifiers`) into `scoreHexForAI`.
-- Replace hardcoded `softmaxPick(..., 1.5)` with `difficultySoftmaxTemperature(difficulty)`.
-- In `computeDynamicMood` inputs, scale `rivalAvgHexes` comparison threshold by difficulty:
-  - Easy: 0.5× trigger sensitivity (harder for AI to panic; more relaxed)
-  - Hard: 1.3× trigger sensitivity (AI panics/dominates more readily)
-- Ensure `aiAggressionBonus` from difficulty modifiers is already applied (verified: yes, line 5766).
+### 3. Confirmation UI
+A small confirmation row directly below the input that makes it obvious which seed will be used:
 
-#### 3. `src/components/FamilySelectionScreen.tsx` — Update difficulty descriptions
-- Revise the "AI Rivals" stat label values to reflect the new behavior:
-  - Easy: "Reactive" (mood shifts slowly, scoring muted)
-  - Normal: "Adaptive" (standard mood reactivity)
-  - Hard: "Ruthless" (mood shifts fast, scoring sharp, greedy picks)
-- Keep existing Income/Police Heat/Diplomacy rows.
-- Subtly tweak taglines/quote flavor to match.
+- **Active seed badge**: `Active seed: <value>` rendered in a subtle pill (muted background, primary-colored monospace number). Updates live as the user types or rerolls.
+- **Status line**: short helper text that swaps based on input state:
+  - Valid number → check icon + `"This seed will be used when the game starts"` (success/primary tint).
+  - Empty field → warning icon + `"A random seed will be generated"` (muted/warning tint).
+- **Copy button** (small, optional, same row): copies the active seed to clipboard with a brief "Copied!" confirmation, so players can save a seed for replay.
 
-#### 4. Tests
-- Update `difficulty-modifiers.test.ts` to assert that `aiAggressionBonus` is present and correctly applied to the AI's effective aggression during turns.
-- No new test file needed; the existing AI variability tests should still pass because the seeded PRNG path is unchanged.
+The badge is also briefly highlighted (one-shot scale/flash via existing motion patterns) when the seed changes via Reroll, to confirm the action visually.
 
-### Out of scope
-- Rewriting combat math, economy formulas, or phase progression.
-- Changing the 9 difficulty modifier values themselves — those are already balanced.
+### 4. Pass-through unchanged
+`onSelectFamily(..., seedInput ? parseInt(seedInput) : undefined, mapSize)` already routes the value into `useEnhancedMafiaGameState` — no game-logic changes needed.
+
+## Out of scope
+- No changes to map generation, AI seeding, or game state hooks.
+- No seed history, no word-seed hashing, no shareable URL.

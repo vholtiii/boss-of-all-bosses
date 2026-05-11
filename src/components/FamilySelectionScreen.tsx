@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { DollarSign, Shield, Swords, Users, Eye, Volume2, VolumeX, Crown, Star } from 'lucide-react';
+import { DollarSign, Shield, Swords, Users, Eye, Volume2, VolumeX, Crown, Star, Dices, Check, Copy, AlertTriangle } from 'lucide-react';
 import { useBgMusic } from '@/hooks/useBgMusic';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import AtmosphericParticles from '@/components/AtmosphericParticles';
@@ -247,7 +247,23 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const [selectedFamily, setSelectedFamily] = useState<FamilyId | null>(null);
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
   const [mapSize, setMapSize] = useState<MapSize>('medium');
-  const [seedInput, setSeedInput] = useState('');
+  const [seedInput, setSeedInput] = useState<string>(() => Math.floor(Math.random() * 1e9).toString());
+  const [seedFlash, setSeedFlash] = useState(0);
+  const [seedCopied, setSeedCopied] = useState(false);
+
+  const rerollSeed = useCallback(() => {
+    setSeedInput(Math.floor(Math.random() * 1e9).toString());
+    setSeedFlash(f => f + 1);
+  }, []);
+
+  const copySeed = useCallback(async () => {
+    if (!seedInput) return;
+    try {
+      await navigator.clipboard.writeText(seedInput);
+      setSeedCopied(true);
+      setTimeout(() => setSeedCopied(false), 1400);
+    } catch {}
+  }, [seedInput]);
   const { soundConfig, updateSoundConfig, playSound } = useSoundSystem();
   const detailRef = useRef<HTMLDivElement>(null);
 
@@ -589,16 +605,82 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         </div>
       </motion.div>
 
-      {/* Map Seed Input */}
-      <div className="flex items-center justify-center gap-2 mb-6 relative z-[3]">
-        <label className="text-xs text-muted-foreground font-source">Map Seed:</label>
-        <input
-          type="text"
-          value={seedInput}
-          onChange={(e) => setSeedInput(e.target.value.replace(/[^0-9]/g, ''))}
-          placeholder="Random"
-          className="w-32 px-3 py-1.5 rounded-lg border border-border/50 bg-card/80 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-        />
+      {/* Map Seed Input + confirmation */}
+      <div className="flex flex-col items-center gap-2 mb-6 relative z-[3]">
+        <div className="flex items-center justify-center gap-2">
+          <label className="text-xs text-muted-foreground font-source">Map Seed:</label>
+          <input
+            type="text"
+            value={seedInput}
+            onChange={(e) => setSeedInput(e.target.value.replace(/[^0-9]/g, ''))}
+            placeholder="Random"
+            className="w-36 px-3 py-1.5 rounded-lg border border-border/50 bg-card/80 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono"
+          />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => { playSound('click'); rerollSeed(); }}
+                  className="p-1.5 rounded-lg border border-border/50 bg-card/80 text-muted-foreground hover:text-primary hover:border-primary/60 transition-colors"
+                  aria-label="Reroll seed"
+                >
+                  <Dices className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Reroll seed</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={copySeed}
+                  disabled={!seedInput}
+                  className="p-1.5 rounded-lg border border-border/50 bg-card/80 text-muted-foreground hover:text-primary hover:border-primary/60 transition-colors disabled:opacity-40 disabled:hover:text-muted-foreground disabled:hover:border-border/50"
+                  aria-label="Copy seed"
+                >
+                  {seedCopied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{seedCopied ? 'Copied!' : 'Copy seed'}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+
+        {/* Confirmation row */}
+        <AnimatePresence mode="wait">
+          {seedInput ? (
+            <motion.div
+              key={`active-${seedInput}-${seedFlash}`}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="flex items-center gap-2 text-[11px]"
+            >
+              <span className="px-2.5 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary font-mono tracking-wider">
+                Active seed: {seedInput}
+              </span>
+              <span className="flex items-center gap-1 text-primary/80">
+                <Check className="w-3 h-3" />
+                Will be loaded when game starts
+              </span>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="random"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex items-center gap-1 text-[11px] text-amber-400/90"
+            >
+              <AlertTriangle className="w-3 h-3" />
+              A random seed will be generated
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Family cards — horizontal row */}
