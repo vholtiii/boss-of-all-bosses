@@ -90,6 +90,7 @@ import {
   // Alerts log
   AlertEntry, AlertCategory, categorizeAlert,
 } from '@/types/game-mechanics';
+import { generateCapoName } from '@/lib/capo-names';
 
 // ============ SEEDED PRNG (Mulberry32) ============
 function mulberry32(seed: number): () => number {
@@ -1053,16 +1054,12 @@ export const createInitialGameState = (
         extortedHexTurns: 0,
       };
     }
-    const capoNames: Record<string, string> = {
-      gambino: 'Vito Scaletta', genovese: 'Sal Marcano', lucchese: 'Tommy Angelo',
-      bonanno: 'Joe Barbaro', colombo: 'Frank Colletti'
-    };
     const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
     const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
     deployedUnits.push({
       id: `${fam}-capo-0`, type: 'capo', family: fam,
       q: hq.q, r: hq.r, s: hq.s,
-      movesRemaining: 2, maxMoves: 2, level: 1, name: capoNames[fam],
+      movesRemaining: 2, maxMoves: 2, level: 1, name: generateCapoName(),
       personality: randomPersonality,
     });
   });
@@ -3480,7 +3477,7 @@ export const useEnhancedMafiaGameState = (
         newState.deployedUnits = newState.deployedUnits.map(u => {
           if (!u.pendingPromotion || u.type !== 'soldier') return u;
           const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
-          const capoName = `Capo ${Math.floor(Math.random() * 100)}`;
+          const capoName = generateCapoName();
           const personalityLabel = randomPersonality.charAt(0).toUpperCase() + randomPersonality.slice(1);
           newState.pendingNotifications.push({
             type: 'success' as const,
@@ -4260,7 +4257,7 @@ export const useEnhancedMafiaGameState = (
                 id: a.unitId, type: 'capo', family: newState.playerFamily,
                 q: hq.q, r: hq.r, s: hq.s,
                 movesRemaining: 2, maxMoves: 2, level: 1,
-                name: stats ? `Capo` : `Capo`,
+                name: generateCapoName(),
               });
               turnReport.events.push(`🔓 Capo released from jail and returned to HQ.`);
             }
@@ -6371,7 +6368,7 @@ export const useEnhancedMafiaGameState = (
           promUnit.maxMoves = 2;
           promUnit.movesRemaining = 2;
           (promUnit as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
-          (promUnit as any).name = `${fam.charAt(0).toUpperCase() + fam.slice(1)} Capo`;
+          (promUnit as any).name = generateCapoName();
           opponent.resources.money -= CAPO_PROMOTION_COST;
           if (turnReport) {
             turnReport.aiActions.push({ family: fam, action: 'promote', detail: `Promoted a soldier to Capo` });
@@ -6391,7 +6388,7 @@ export const useEnhancedMafiaGameState = (
             anyAiSoldier.maxMoves = 2;
             anyAiSoldier.movesRemaining = 2;
             (anyAiSoldier as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
-            (anyAiSoldier as any).name = `${fam.charAt(0).toUpperCase() + fam.slice(1)} Capo`;
+            (anyAiSoldier as any).name = generateCapoName();
             opponent.resources.money -= CAPO_PROMOTION_COST * 2; // Costs double for forced promotion
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'promote', detail: `Force-promoted a soldier to Capo` });
           }
@@ -7897,7 +7894,7 @@ export const useEnhancedMafiaGameState = (
           // Promote in place: convert soldier → capo
           const personalities: CapoPersonality[] = ['diplomat', 'enforcer', 'schemer'];
           const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
-          const capoName = `Capo ${Math.floor(Math.random() * 100)} (Persico)`;
+          const capoName = generateCapoName();
           const idx = newState.deployedUnits.findIndex(u => u.id === soldierId);
           if (idx !== -1) {
             newState.deployedUnits[idx] = {
