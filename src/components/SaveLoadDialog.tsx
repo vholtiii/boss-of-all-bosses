@@ -219,7 +219,9 @@ const SaveLoadDialog: React.FC<SaveLoadDialogProps> = ({
                           </div>
                           <Button
                             size="sm"
-                            onClick={() => handleSave(slot)}
+                            onClick={() => {
+                              if (window.confirm(`Overwrite save in slot ${slot}?`)) handleSave(slot);
+                            }}
                             className="w-full"
                           >
                             <Save className="h-3 w-3 mr-1" />
