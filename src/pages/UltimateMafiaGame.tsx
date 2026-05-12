@@ -34,7 +34,8 @@ import {
   SkipForward,
   LogOut,
   Settings,
-  Lock
+  Lock,
+  Hash
 } from 'lucide-react';
 import { PHASE_CONFIGS, COMMISSION_VOTE_COST, SUPPLY_DEPENDENCIES, SupplyNodeType } from '@/types/game-mechanics';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
