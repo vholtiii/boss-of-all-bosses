@@ -446,7 +446,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
               },
               normal: {
                 icon: '🎩', name: 'Made Man', chip: 'STANDARD',
-                tagline: 'A fair fight',
+                tagline: 'Prove your worth',
                 quote: '"No favors. No mercy."',
                 color: 'rgb(251,191,36)', glow: 'rgba(251,191,36,0.55)', tint: 'rgba(251,191,36,0.10)',
                 stats: [
