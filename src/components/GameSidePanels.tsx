@@ -99,7 +99,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           <ResourceTile icon={<DollarSign className="h-4 w-4" />} label="Money" value={`$${resources.money.toLocaleString()}`} color="text-green-400" />
           <ResourceTile icon={<Users className="h-4 w-4" />} label="Soldiers" value={String(resources.soldiers)} color="text-destructive" />
           <ResourceTile icon={<Shield className="h-4 w-4" />} label="Respect" value={`${resources.respect}%`} color="text-blue-400" />
-          <ResourceTile icon={<Crown className="h-4 w-4" />} label="Influence" value={String(resources.influence)} color="text-primary" />
+          <ResourceTile icon={<Crown className="h-4 w-4" />} label="Influence" value={(Math.ceil((resources.influence || 0) * 10) / 10).toFixed(1)} color="text-primary" />
         </div>
 
         {/* ── Status Bars ── */}
@@ -1200,7 +1200,7 @@ export const RightSidePanel: React.FC<{
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Influence</p>
-                    <p className="text-xs font-medium text-foreground">{opponent.resources.influence}</p>
+                    <p className="text-xs font-medium text-foreground">{(Math.ceil((opponent.resources.influence || 0) * 10) / 10).toFixed(1)}</p>
                   </div>
                 </div>
                 {/* Relationship with player */}

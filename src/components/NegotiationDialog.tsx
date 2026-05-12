@@ -252,7 +252,7 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
                   )}
                   {scope === 'family' && Math.floor(playerInfluence / 5) > 0 && (
                     <p className="text-xs text-purple-400 mt-1">
-                      🏛️ +{Math.floor(playerInfluence / 5)}% from Influence ({playerInfluence})
+                      🏛️ +{Math.floor(playerInfluence / 5)}% from Influence ({(Math.ceil(playerInfluence * 10) / 10).toFixed(1)})
                     </p>
                   )}
                   {successBonus > 0 && (
