@@ -6355,6 +6355,13 @@ export const useEnhancedMafiaGameState = (
                   if (prevOwnerCeasefire) {
                     // Can't claim — ceasefire territory freeze
                   } else if (!aiCaptureScouted && unit.type !== 'capo') {
+                    // Heat-precaution: at warm+ (no override), refuse civilian-hit blind capture.
+                    const cautionTier2 = (oppAny.aiHeatCaution || 'cool') as string;
+                    if (cautionTier2 !== 'cool' && cautionTier2 !== 'override') {
+                      unit.q = origQ; unit.r = origR; unit.s = origS;
+                      if (turnReport) turnReport.aiActions.push({ family: fam, action: 'heat_caution', detail: `Aborted blind capture (heat ${aiHeat})` });
+                      break;
+                    }
                     // Blind capture of empty rival hex by a soldier — same risk as player blind hit on empty rival hex.
                     // Apply civilian-hit consequences and revert position so the soldier doesn't claim.
                     applyAICivilianHit(state, fam, unit, tile.district || 'unknown territory', turnReport);
