@@ -6162,10 +6162,16 @@ export const useEnhancedMafiaGameState = (
               }
 
               if (aiStrength >= enemyUnitsHere.length || Math.random() < combatWillingness) {
-                aiActionsRemaining--; // Deduct action point for combat
                 // ===== AI HIT PARITY: classify scout state for this attack =====
                 const isAIScoutedHit = aiHasScoutIntel(state, fam, target.q, target.r, target.s);
                 const aiHitType: 'scouted' | 'blind' = isAIScoutedHit ? 'scouted' : 'blind';
+                // Heat-precaution: at warm+ (no override), refuse blind hits — skip rather than swing reckless.
+                const cautionTier = (oppAny.aiHeatCaution || 'cool') as string;
+                if (aiHitType === 'blind' && cautionTier !== 'cool' && cautionTier !== 'override') {
+                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'heat_caution', detail: `Held off blind hit (heat ${aiHeat})` });
+                  break;
+                }
+                aiActionsRemaining--; // Deduct action point for combat
                 // Safehouse defense bonus: defenders on safehouse hex are harder to kill
               const isTargetSafehouse = state.safehouses.some(s => s.q === target.q && s.r === target.r && s.s === target.s);
                 // Built business defense bonus: player-built businesses on this hex grant defenders +20% protection
