@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight, Handshake, Inbox, Hourglass } from 'lucide-react';
+import { ChevronDown, ChevronRight, Handshake, Inbox, Hourglass, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -73,81 +73,116 @@ const SitdownsPanel: React.FC<SitdownsPanelProps> = ({
       {open && (
         <div className="px-3 pb-3 space-y-3">
           {/* INCOMING */}
-          {incoming.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-1.5">
-                <Inbox className="h-3 w-3 text-mafia-gold" />
-                <span className="text-[10px] uppercase tracking-wider font-bold text-mafia-gold">Incoming Offers</span>
-              </div>
-              {incoming.map(s => {
-                const turnsLeft = s.expiresOnTurn - gameState.turn;
-                const isUrgent = turnsLeft <= 1;
-                const fam = s.fromFamily.charAt(0).toUpperCase() + s.fromFamily.slice(1);
-                const dl = dealLabel(s.proposedDeal);
-                const isTerritory = s.scope === 'territory';
-                return (
-                  <div
-                    key={s.id}
-                    className={cn(
-                      'rounded-md border-2 p-2 text-xs space-y-1.5 cursor-pointer transition-colors',
-                      isUrgent
-                        ? 'bg-red-500/10 border-red-500/50 hover:bg-red-500/15'
-                        : 'bg-mafia-gold/10 border-mafia-gold/40 hover:bg-mafia-gold/15'
-                    )}
-                    onClick={() => isTerritory && s.targetQ !== undefined && onFocusHex?.(s.targetQ, s.targetR!, s.targetS!)}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="font-bold capitalize truncate">
-                          {dl.icon} {dl.label}
-                        </div>
-                        <div className="text-muted-foreground text-[11px]">
-                          From <span className="text-foreground capitalize font-semibold">{fam}</span>
-                          {isTerritory && s.fromCapoName && (
-                            <> · capo <span className="text-foreground">{s.fromCapoName}</span></>
-                          )}
-                        </div>
-                        {isTerritory && s.targetQ !== undefined && (
-                          <div className="text-[10px] text-muted-foreground">
-                            Hex ({s.targetQ}, {s.targetR})
-                          </div>
+          {incoming.length > 0 && (() => {
+            const bossIncoming = incoming.filter(s => s.scope !== 'territory');
+            const capoIncoming = incoming.filter(s => s.scope === 'territory');
+
+            const renderCard = (s: IncomingSitdown, isBoss: boolean) => {
+              const turnsLeft = s.expiresOnTurn - gameState.turn;
+              const isUrgent = turnsLeft <= 1;
+              const fam = s.fromFamily.charAt(0).toUpperCase() + s.fromFamily.slice(1);
+              const dl = dealLabel(s.proposedDeal);
+              return (
+                <div
+                  key={s.id}
+                  className={cn(
+                    'rounded-md border-2 p-2 text-xs space-y-1.5 transition-colors',
+                    isBoss
+                      ? (isUrgent
+                          ? 'bg-red-500/10 border-red-500/60 hover:bg-red-500/15'
+                          : 'bg-mafia-gold/15 border-mafia-gold hover:bg-mafia-gold/20')
+                      : (isUrgent
+                          ? 'bg-red-500/10 border-red-500/50 hover:bg-red-500/15 cursor-pointer'
+                          : 'bg-mafia-gold/10 border-mafia-gold/40 hover:bg-mafia-gold/15 cursor-pointer'),
+                  )}
+                  onClick={() => !isBoss && s.targetQ !== undefined && onFocusHex?.(s.targetQ, s.targetR!, s.targetS!)}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold capitalize truncate">
+                        {dl.icon} {dl.label}
+                      </div>
+                      <div className="text-muted-foreground text-[11px]">
+                        From{' '}
+                        {isBoss ? (
+                          <span className="text-foreground capitalize font-semibold">
+                            {s.fromBossName || `${fam} Boss`}
+                          </span>
+                        ) : (
+                          <>
+                            <span className="text-foreground capitalize font-semibold">{fam}</span>
+                            {s.fromCapoName && (<> · capo <span className="text-foreground">{s.fromCapoName}</span></>)}
+                          </>
                         )}
                       </div>
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        {typeof s.proposedAmount === 'number' && (
-                          <Badge variant="outline" className="text-[10px] h-4 text-green-400 border-green-400/40">
-                            ${s.proposedAmount.toLocaleString()}
-                          </Badge>
-                        )}
-                        <Badge className="text-[9px] h-4 bg-emerald-600/80">+{s.successBonus}%</Badge>
-                        <Badge variant="outline" className={cn('text-[9px] h-4', isUrgent && 'text-red-400 border-red-400/50')}>
-                          {isUrgent ? `⚠️ ${turnsLeft}t` : `${turnsLeft}t left`}
-                        </Badge>
-                      </div>
+                      {!isBoss && s.targetQ !== undefined && (
+                        <div className="text-[10px] text-muted-foreground">
+                          Hex ({s.targetQ}, {s.targetR})
+                        </div>
+                      )}
+                      {isBoss && typeof s.proposedDuration === 'number' && (
+                        <div className="text-[10px] text-muted-foreground">
+                          Duration: {s.proposedDuration} turns
+                        </div>
+                      )}
                     </div>
-                    <div className="flex gap-1.5 pt-1">
-                      <Button
-                        size="sm"
-                        className="h-6 text-[10px] flex-1"
-                        onClick={(e) => { e.stopPropagation(); onAcceptIncoming(s); }}
-                      >
-                        Accept
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="h-6 text-[10px] px-2"
-                        onClick={(e) => { e.stopPropagation(); onDeclineIncoming(s); }}
-                        title="Decline — costs +5 tension"
-                      >
-                        Decline
-                      </Button>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      {typeof s.proposedAmount === 'number' && (
+                        <Badge variant="outline" className="text-[10px] h-4 text-green-400 border-green-400/40">
+                          ${s.proposedAmount.toLocaleString()}
+                        </Badge>
+                      )}
+                      <Badge className="text-[9px] h-4 bg-emerald-600/80">+{s.successBonus}%</Badge>
+                      <Badge variant="outline" className={cn('text-[9px] h-4', isUrgent && 'text-red-400 border-red-400/50')}>
+                        {isUrgent ? `⚠️ ${turnsLeft}t` : `${turnsLeft}t left`}
+                      </Badge>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  <div className="flex gap-1.5 pt-1">
+                    <Button
+                      size="sm"
+                      className="h-6 text-[10px] flex-1"
+                      onClick={(e) => { e.stopPropagation(); onAcceptIncoming(s); }}
+                    >
+                      Accept
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="h-6 text-[10px] px-2"
+                      onClick={(e) => { e.stopPropagation(); onDeclineIncoming(s); }}
+                      title="Decline — costs +5 tension"
+                    >
+                      Decline
+                    </Button>
+                  </div>
+                </div>
+              );
+            };
+
+            return (
+              <>
+                {bossIncoming.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Crown className="h-3 w-3 text-mafia-gold" />
+                      <span className="text-[10px] uppercase tracking-wider font-bold text-mafia-gold">Boss Sitdowns</span>
+                    </div>
+                    {bossIncoming.map(s => renderCard(s, true))}
+                  </div>
+                )}
+                {capoIncoming.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Inbox className="h-3 w-3 text-mafia-gold" />
+                      <span className="text-[10px] uppercase tracking-wider font-bold text-mafia-gold">Capo Sitdowns</span>
+                    </div>
+                    {capoIncoming.map(s => renderCard(s, false))}
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           {/* OUTGOING — READY */}
           {ready.length > 0 && (
