@@ -5665,24 +5665,38 @@ export const useEnhancedMafiaGameState = (
       if (hasFamilyDistrictBonus(state, fam, 'income')) {
         aiIncome = Math.floor(aiIncome * 1.25);
       }
-      const mapScale = state.mapSize === 'small' ? 0.6 : state.mapSize === 'large' ? 1.5 : 1.0;
-      const cappedTurn = Math.min(state.turn, 20);
-      const minIncome = Math.floor((2000 + cappedTurn * 500) * diffMods.aiIncomeMult * mapScale);
-      aiIncome = Math.max(aiIncome, minIncome);
-      // ===== AI HEAT PARITY: heat-tier income penalty (mirrors player line 5295) =====
+      // ===== AI HEAT PARITY: heat-tier income penalty applied BEFORE the floor (mirrors player line 5295) =====
       const aiHeatLevel = opponent.resources.heat || 0;
       let aiHeatPenaltyRate = 0;
       if (aiHeatLevel >= 70) aiHeatPenaltyRate = 0.35;
       else if (aiHeatLevel >= 40) aiHeatPenaltyRate = 0.25;
       const aiHeatPenalty = Math.floor(aiIncome * aiHeatPenaltyRate);
       aiIncome = Math.max(0, aiIncome - aiHeatPenalty);
-      opponent.resources.money += aiIncome;
-      opponent.resources.lastTurnIncome = aiIncome; // Track for phase calculation
+
+      // Income floor — applied AFTER the heat penalty so heat consequences land on AI economy
+      const mapScale = state.mapSize === 'small' ? 0.6 : state.mapSize === 'large' ? 1.5 : 1.0;
+      const cappedTurn = Math.min(state.turn, 20);
+      const minIncome = Math.floor((2000 + cappedTurn * 500) * diffMods.aiIncomeMult * mapScale);
+      aiIncome = Math.max(aiIncome, minIncome);
+
+      // ===== AI ECONOMY PARITY: soldier maintenance + community upkeep (mirrors player lines 5236–5244) =====
+      const aiDeployedSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier').length;
+      const aiSoldierMaintenance = aiDeployedSoldiers * SOLDIER_MAINTENANCE;
+      const aiCommunityHexCount = state.hexMap.filter(t => t.controllingFamily === fam && !t.business && !t.isHeadquarters).length;
+      const aiCommunityUpkeep = aiCommunityHexCount * 150;
+      const aiTotalExpenses = aiSoldierMaintenance + aiCommunityUpkeep;
+      const aiNetIncome = aiIncome - aiTotalExpenses;
+
+      opponent.resources.money = Math.max(0, opponent.resources.money + aiNetIncome);
+      opponent.resources.lastTurnIncome = aiNetIncome; // Track for phase calculation
+
       if (turnReport) {
-        const detail = aiHeatPenalty > 0
-          ? `Earned $${aiIncome.toLocaleString()} income (-$${aiHeatPenalty.toLocaleString()} heat penalty)`
-          : `Earned $${aiIncome.toLocaleString()} income`;
-        turnReport.aiActions.push({ family: fam, action: 'income', detail });
+        const parts: string[] = [`Earned $${aiIncome.toLocaleString()} gross`];
+        if (aiHeatPenalty > 0) parts.push(`-$${aiHeatPenalty.toLocaleString()} heat`);
+        if (aiSoldierMaintenance > 0) parts.push(`-$${aiSoldierMaintenance.toLocaleString()} soldier upkeep`);
+        if (aiCommunityUpkeep > 0) parts.push(`-$${aiCommunityUpkeep.toLocaleString()} community upkeep`);
+        parts.push(`= $${aiNetIncome.toLocaleString()} net`);
+        turnReport.aiActions.push({ family: fam, action: 'income', detail: parts.join(' ') });
       }
 
       // District control bonus: Staten Island +3 respect & +1 influence for AI
