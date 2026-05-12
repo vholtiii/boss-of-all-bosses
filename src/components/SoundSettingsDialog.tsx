@@ -118,37 +118,26 @@ const SoundSettingsDialog: React.FC<SoundSettingsDialogProps> = ({
             />
           </div>
 
-          {/* Category sliders */}
+          {/* Channel sliders */}
           <CategorySlider
-            icon={<Mouse className="h-4 w-4 text-blue-400" />}
-            label="UI Sounds"
-            description="Clicks & button presses"
-            value={soundConfig.uiVolume}
-            onChange={(uiVolume) => onUpdateConfig({ uiVolume })}
+            icon={<Bell className="h-4 w-4 text-blue-400" />}
+            label="SFX"
+            description="Beeps, clicks & alerts"
+            value={soundConfig.sfxVolume}
+            onChange={(sfxVolume) => onUpdateConfig({ sfxVolume })}
             onTest={() => onTestSound('click')}
-            testLabel="Click"
+            testLabel="SFX"
             disabled={!soundConfig.enabled}
           />
 
           <CategorySlider
-            icon={<Bell className="h-4 w-4 text-yellow-400" />}
-            label="Alert Sounds"
-            description="Notifications, warnings & danger"
-            value={soundConfig.alertVolume}
-            onChange={(alertVolume) => onUpdateConfig({ alertVolume })}
-            onTest={() => onTestSound('danger')}
-            testLabel="Alert"
-            disabled={!soundConfig.enabled}
-          />
-
-          <CategorySlider
-            icon={<Swords className="h-4 w-4 text-red-400" />}
-            label="Combat Sounds"
-            description="Hits, extortion & money"
-            value={soundConfig.combatVolume}
-            onChange={(combatVolume) => onUpdateConfig({ combatVolume })}
-            onTest={() => onTestSound('combat')}
-            testLabel="Combat"
+            icon={<Mic className="h-4 w-4 text-red-400" />}
+            label="Voice"
+            description="Spoken lines & gunshots"
+            value={soundConfig.voiceVolume}
+            onChange={(voiceVolume) => onUpdateConfig({ voiceVolume })}
+            onTest={() => onTestSound('arrest')}
+            testLabel="Voice"
             disabled={!soundConfig.enabled}
           />
         </div>
