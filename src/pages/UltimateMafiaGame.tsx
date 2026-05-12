@@ -95,6 +95,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             notifySuccess(n.title, n.message);
             if (typeof n.title === 'string' && n.title.includes('Contract Fulfilled')) {
               playSound('assassin_kill');
+            } else if (typeof n.title === 'string' && n.title.includes('Construction Started')) {
+              playSound('construction_start');
             } else {
               playSound('success');
             }
