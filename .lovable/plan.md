@@ -1,89 +1,71 @@
-## Goal
-Make AI families take **graduated, escalating precautions** as their heat rises — but allow them to push through to RICO when their winning strategy demands it. Mirrors the spirit of the player's bribe-officers / lay-low / hit-tier choices.
+# Fix: Supply deals applied without player consent (Boss-level sitdown, distinct from Capo flow)
 
-All changes are AI-side only in `src/hooks/useEnhancedMafiaGameState.ts`. Player heat behavior unchanged.
+## Problem
 
-## Heat tiers used by AI
-- **Cool** (0–39): no precautions, behaves as today.
-- **Warm** (40–59): soft caution — biases hit-tier choice, avoids blind hits on civilians, occasional spend on bribe-cooldown.
-- **Hot** (60–79): existing Lay Low triggers (already in place) get a higher base chance; AI actively spends money on heat-reduction every 2–3 turns; refuses civilian/empty-hex blind hits entirely.
-- **Critical** (80–89): AI defaults to lay-low / mattresses unless a *strategic override* is true; spends on bribes every turn it can afford.
-- **RICO zone** (90+): AI usually freezes offense (continues the existing 3-turn RICO countdown). Override gate decides whether it pushes through anyway.
+In `useEnhancedMafiaGameState.ts` (~lines 6812–6892), AI families that need supply access auto-create a `supplyDealPacts` entry **and** auto-debit/credit cash. When the chosen supplier is the player, the pact appears already-active with no negotiation step — the player ends up bound to deals they never agreed to.
 
-## Strategic-override gate (when AI ignores heat and keeps swinging)
+AI↔AI supply deals can keep auto-resolve. The bug is the player-as-supplier path.
 
-The AI bypasses precautions and accepts RICO risk only if **any** of these are true:
+## Fix
 
-1. **Endgame winning move available** — territory count ≥ `winThreshold - 2` and a claim/hit this turn could close it.
-2. **HQ assault available** — Phase 4 + adjacent to rival HQ + has the soldier mass.
-3. **Aggressive personality + ahead** — `personality === 'aggressive'` AND already top-1 in territory (rubber-band-aware).
-4. **At war + opportunistic personality** — must press a temporary advantage.
+### 1. AI → Player supply request → Boss-level sitdown (not Capo)
 
-Otherwise, the precaution layer wins.
+When the AI's chosen supplier is the player, don't move money or create a pact. Push an `IncomingSitdown` that is **explicitly a Boss-to-Boss meeting**, distinct from the existing Capo territory-sitdown flow:
 
-## Concrete behaviors
+- `fromFamily`: requesting AI family
+- `fromBossName`: the AI family's boss name (or just the family label) — **no `fromCapoId` / `fromCapoName` / `fromCapoPersonality`**, which is what marks territory/capo sitdowns
+- `proposedDeal: 'supply_deal'`
+- `scope: 'family'` (the existing Boss-scope marker — opposite of `'territory'`)
+- `proposedAmount: 7500`
+- `proposedDuration: 5–7`
+- `successBonus: 15`
+- `expiresOnTurn: state.turn + 2`
 
-### 1. New AI heat-precaution block
-Inserted right after the existing Lay Low + Mattresses block (~line 5605, before `aiOffenseDisabled` is computed).
+Skip if there's already an incoming supply-deal sitdown from this family or an active supply pact between this AI and the player.
 
-```text
-heatTier = bucket(aiHeat)
-strategicOverride = computeOverride(opponent, state, personality, phase)
+Notification: "🏛️ Boss Sitdown Requested — The {Family} boss is offering $7,500 for {duration} turns of supply access. Open the Sitdowns panel."
 
-if heatTier === 'warm' and not strategicOverride:
-  set oppAny.aiHeatCaution = 'warm'   // soft flag, read by action selectors
-  if money >= bribeCost and rng < 0.20 * personalityMult:
-    spend bribeCost, heat -= 12, set oppAny.bribeCooldownUntil = turn + 3
+### 2. Distinct UI treatment in `SitdownsPanel`
 
-if heatTier === 'hot' and not strategicOverride:
-  oppAny.aiHeatCaution = 'hot'
-  // Boost existing Lay Low fire chance by +0.25 (handled inline)
-  if money >= bribeCost and rng < 0.40 * personalityMult and turn >= bribeCooldownUntil:
-    spend bribeCost, heat -= 15, cooldown = turn + 3
+The panel today renders incoming offers in one block. Split visually so the Boss flow can't be mistaken for a Capo sitdown:
 
-if heatTier === 'critical' and not strategicOverride:
-  oppAny.aiHeatCaution = 'critical'
-  // Force lay-low if not already
-  if not isAILayingLow: layLowActiveUntil = turn + 2
-  if money >= bribeCost: spend bribeCost, heat -= 18, cooldown = turn + 2
-  // Will also disable offense via existing aiOffenseDisabled path
+- Group incoming offers by `scope`: render a **"Boss Sitdowns"** subsection (icon: 🏛️ / `Crown`) above the existing **"Capo Sitdowns"** subsection (icon: 🤝 / `Handshake`).
+- Boss cards label the requester as "{Family} Boss" — no capo name, no hex coords, no "Hex (q, r)" line.
+- Card border/accent uses a Boss-tier color (e.g. `mafia-gold` solid) to differentiate from capo cards.
+- Accept/Decline buttons use the same `accept_incoming_sitdown` / `decline_incoming_sitdown` actions; routing is already scope-based (line 8612: `scope === 'territory'` → capo negotiate, else → `boss_negotiate`).
 
-if heatTier === 'rico' and not strategicOverride:
-  // Same as critical, plus skip all hits/sabotage/claim this turn
-  oppAny.aiHeatCaution = 'rico_freeze'
-  aiOffenseDisabled = true
-```
+### 3. Acceptance routes through Boss negotiation roll (existing path)
 
-### 2. Hit-tier preference biased by heat
-At hit-pipeline tier selection (around line 6232), when `heatTier >= warm` and not overriding:
-- Strongly prefer `planned` over `scouted`, `scouted` over `blind`.
-- At `hot+`, refuse `blind` entirely (skip the action instead of taking it raw).
-- Civilian-hit-on-empty-rival-hex block (line ~5414) becomes opt-out at `warm+` (already extreme heat-cost; AI shouldn't pile more on).
+`accept_incoming_sitdown` (line 8606) for `scope: 'family'` already routes to `boss_negotiate`, which calls `processNegotiation` with `isBossNegotiation: true`. That flow:
 
-### 3. Existing Lay Low chance boost
-Add `+ heatBoost` inside the existing `fireChance` calc:
-- warm: +0.05
-- hot: +0.20
-- critical: +0.40
-This makes the existing trigger fire more reliably without rewriting it.
+- Requires Phase 3+ (Boss Diplomacy phase gate at line 8598) — verify this matches design intent for supply deals; if supply deals should be available earlier, lower the gate **only for** `proposedDeal === 'supply_deal'` in this handler.
+- Uses Boss-scope success math (no capo personality bonus; `+respect/4`, `+influence/5`, fear bonus for supply deals) — the success roll at line 10489 then mutates state in the `supply_deal` case at line 10635 (cash transfer + pact).
+- On failure: 50% refund-equivalent, AI walks away.
+- Honor `proposedDuration` in the `supply_deal` case (line 10635) instead of the random 5–7.
 
-### 4. AI-side bribe action
-Single helper `aiSpendOnHeatReduction(opponent, amount, heatDrop)` that:
-- Decrements `opponent.resources.money` by scaled cost (uses difficulty `costMult` like the player).
-- Decrements `opponent.resources.heat` (clamped ≥0).
-- Adds a `turnReport.aiActions` entry: "Bribed officers — heat -X".
-- Pushes a low-priority info notification only if the player has captain+ corruption intel on that family (parity with current intel gating).
+### 4. Player → AI supply request stays a Boss negotiation
 
-### 5. Tests / validation
-- Manual playthrough: verify mid-game AI at heat 50 occasionally pays bribes and prefers planned hits.
-- Verify aggressive AI ahead in territory still pushes through at heat 85.
-- Verify defensive AI at heat 90 stops attacking and the RICO countdown still completes if it can't bring heat down in time.
-- All 57 existing tests still pass.
+Player-initiated `supply_deal` from `NegotiationDialog` already runs through `processNegotiation` with the Boss roll (line 10489). Confirm the dialog opens supply_deal as Boss-scope (no capo selector); no behavior change.
 
-## Memory updates
-After implementation, update `mem://gameplay/ai-behavior` to add a "Heat-graduated precautions" bullet (warm/hot/critical/RICO tiers + strategic-override conditions).
+### 5. AI ↔ AI supply deals → unchanged
+
+## Files
+
+- `src/hooks/useEnhancedMafiaGameState.ts` — split player-supplier branch (~6812–6892); add the supply_deal case to the Phase-gate exception in `boss_negotiate` if needed; thread `proposedDuration` through accept handler (line 8646) into the `supply_deal` case (line 10635).
+- `src/types/game-mechanics.ts` — add `proposedDuration?: number` and `fromBossName?: string` on `IncomingSitdown`.
+- `src/components/SitdownsPanel.tsx` — split incoming list into "Boss Sitdowns" and "Capo Sitdowns" subsections by `scope`; render Boss cards without capo/hex fields and with a Boss-tier accent.
 
 ## Out of scope
-- No changes to player heat mechanics.
-- No new UI surfaces (intel-gated notifications reuse existing notification path).
-- No changes to RICO timing (still 3 consecutive turns at heat ≥ 90).
+
+- Capo territory sitdown UX (untouched).
+- AI↔AI deal balance.
+- New negotiation modal — Boss accept reuses the existing path.
+
+## Validation
+
+- AI proposes supply deal → appears under **Boss Sitdowns** in the panel, never under Capo Sitdowns; no money moves yet.
+- Accept → Boss negotiation roll runs; on success pact forms with the proposed duration and $7,500 lands; on failure 50% refund / no pact.
+- Decline → +5 tension, no pact.
+- Existing Capo territory sitdowns still render in their own subsection and route through capo negotiation.
+- Player-initiated supply_deal still rolls through Boss negotiation.
+- AI↔AI supply deals unchanged. All existing tests pass.
