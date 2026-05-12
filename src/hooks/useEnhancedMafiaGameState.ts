@@ -7246,6 +7246,106 @@ export const useEnhancedMafiaGameState = (
           }
         }
       }
+
+      // ===== AI HEAT PARITY: per-turn heat lifecycle =====
+      {
+        const oppAnyHeat = opponent as any;
+        const prevTier = oppAnyHeat._heatTier || 0;
+
+        // 1. Passive heat from illegal businesses (mirrors player line ~4189)
+        if (!isAILayingLow(opponent, state.turn)) {
+          const aiIllegalBizzes = state.hexMap.filter(t =>
+            t.controllingFamily === fam && t.business && !t.business.isLegal
+          );
+          let aiHeatFromBiz = 0;
+          aiIllegalBizzes.forEach(t => {
+            const isBuilt = !t.business!.isExtorted;
+            aiHeatFromBiz += isBuilt ? 0.5 : 1; // built biz = half heat
+          });
+          const aiPassiveHeat = Math.floor((aiHeatFromBiz / 3) * HEAT_GAIN_MULT);
+          if (aiPassiveHeat > 0) {
+            opponent.resources.heat = Math.min(100, (opponent.resources.heat || 0) + aiPassiveHeat);
+          }
+        }
+
+        // 2. Heat decay (mirrors player reductionPerTurn = 2)
+        opponent.resources.heat = Math.max(0, (opponent.resources.heat || 0) - 2);
+
+        const heatNow = opponent.resources.heat || 0;
+        const newTier = heatNow >= 90 ? 4 : heatNow >= 70 ? 3 : heatNow >= 40 ? 2 : 1;
+        oppAnyHeat._heatTier = newTier;
+        const famLabelHeat = fam.charAt(0).toUpperCase() + fam.slice(1);
+
+        // 3. Tier-transition notifications (only on rising)
+        if (newTier > prevTier && newTier >= 2) {
+          const tierLabel = newTier === 4 ? 'CRITICAL' : newTier === 3 ? 'HIGH' : 'ELEVATED';
+          state.pendingNotifications.push({
+            type: newTier >= 3 ? 'warning' as const : 'info' as const,
+            title: `🔥 ${famLabelHeat} Family Heat: ${tierLabel}`,
+            message: `Police pressure on the ${fam} family is now ${tierLabel.toLowerCase()} (${heatNow}/100).`,
+          });
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'heat_tier', detail: `Heat reached ${tierLabel} (${heatNow}/100)` });
+        }
+
+        // 4. RICO equivalent: heat ≥90 for 3 consecutive turns → AI eliminated
+        if (heatNow >= 90) {
+          oppAnyHeat.ricoTimer = (oppAnyHeat.ricoTimer || 0) + 1;
+          if (oppAnyHeat.ricoTimer === 1) {
+            state.pendingNotifications.push({
+              type: 'warning' as const,
+              title: `🚨 RICO Probe: ${famLabelHeat}`,
+              message: `Federal investigators are closing in on the ${fam} family. 3 turns at critical heat = takedown.`,
+            });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'rico_started', detail: `RICO investigation opened` });
+          }
+          if (oppAnyHeat.ricoTimer >= 3) {
+            // Eliminate AI family — mirrors HQ-fall path
+            state.eliminatedFamilies = [...(state.eliminatedFamilies || []), fam];
+            state.deployedUnits = state.deployedUnits.filter(u => u.family !== fam);
+            state.hexMap.forEach(t => { if (t.controllingFamily === fam && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
+            state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => f.family !== fam);
+            state.aiOpponents = state.aiOpponents.filter(o => o.family !== fam);
+            state.pendingNotifications.push({
+              type: 'success' as const,
+              title: `⚖️ ${famLabelHeat} Family Indicted!`,
+              message: `RICO takedown: the ${fam} family was dismantled by federal indictments after 3 turns at critical heat.`,
+            });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'rico_eliminated', detail: `Eliminated by RICO indictment` });
+            return; // skip rest of this AI's lifecycle
+          }
+        } else if (oppAnyHeat.ricoTimer && oppAnyHeat.ricoTimer > 0) {
+          oppAnyHeat.ricoTimer = 0;
+          state.pendingNotifications.push({
+            type: 'info' as const,
+            title: `✅ RICO Suspended: ${famLabelHeat}`,
+            message: `Heat dropped — federal probe on the ${fam} family is on ice.`,
+          });
+        }
+
+        // 5. Prosecution risk: roll for AI soldier arrest (mirrors player path, soldiers only)
+        if (heatNow >= 30) {
+          const arrestRisk = Math.max(0, Math.floor(heatNow * 0.4) - 10); // -10 base mitigation
+          if (Math.random() * 100 < arrestRisk) {
+            const aiSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
+            if (aiSoldiers.length > 0) {
+              const arrested = aiSoldiers[Math.floor(Math.random() * aiSoldiers.length)];
+              const sentence = 4 + Math.floor(Math.random() * 4); // 4–7 turns
+              state.arrestedSoldiers = [...(state.arrestedSoldiers || []), {
+                unitId: arrested.id,
+                returnTurn: state.turn + sentence,
+                source: 'heat',
+              }];
+              state.deployedUnits = state.deployedUnits.filter(u => u.id !== arrested.id);
+              state.pendingNotifications.push({
+                type: 'info' as const,
+                title: `🚔 ${famLabelHeat} Arrest`,
+                message: `Police arrested a ${fam} soldier (${sentence}-turn sentence) — heat is taking its toll.`,
+              });
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'ai_prosecution_arrest', detail: `Soldier arrested — ${sentence}-turn sentence` });
+            }
+          }
+        }
+      }
     });
 
     // ── RE-CHECK UNDETECTED PLANNED HITS FOR NEW INTEL ──
