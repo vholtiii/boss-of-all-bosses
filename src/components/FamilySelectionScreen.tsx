@@ -972,8 +972,9 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
             </div>
 
             <Button
-              onClick={() => { playSound('success'); onSelectFamily(activeFamily.id, activeFamily.startingResources, difficulty, seedInput ? parseInt(seedInput) : undefined, mapSize); }}
-              className="w-full font-playfair font-bold text-base py-5 transition-all duration-200"
+              onClick={beginGame}
+              disabled={isTransitioning}
+              className="w-full font-playfair font-bold text-base py-5 transition-all duration-200 disabled:opacity-70"
               style={{
                 backgroundColor: activeFamily.color,
                 color: '#000',
