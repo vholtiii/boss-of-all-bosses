@@ -5567,14 +5567,38 @@ export const useEnhancedMafiaGameState = (
       oppAny.recentSoldierLosses = Math.max(0, recentSoldierLosses - 1);
       oppAny.recentCapoLosses = Math.max(0, recentCapoLosses - 1);
 
+      // ── HEAT-TIER PRECAUTION CLASSIFIER ──
+      // Tiers: cool <40, warm 40-59, hot 60-79, critical 80-89, rico 90+
+      const heatTier: 'cool' | 'warm' | 'hot' | 'critical' | 'rico' =
+        aiHeat >= 90 ? 'rico'
+        : aiHeat >= 80 ? 'critical'
+        : aiHeat >= 60 ? 'hot'
+        : aiHeat >= 40 ? 'warm'
+        : 'cool';
+      // Strategic-override gate — if true, AI ignores heat precautions and pushes through (may RICO).
+      const TERRITORY_TARGET_AI = state.mapSize === 'small' ? 40 : state.mapSize === 'large' ? 80 : 60;
+      const myTerritoryNow = state.hexMap.filter(t => t.controllingFamily === fam).length;
+      const allTerritoryCounts = [...rivalHexCounts, playerHexCount, myTerritoryNow];
+      const isTopTerritory = allTerritoryCounts.every(c => c <= myTerritoryNow);
+      const atWarNow = (state.activeWars || []).some(w => w.family1 === fam || w.family2 === fam);
+      const strategicOverride =
+        myTerritoryNow >= TERRITORY_TARGET_AI - 2 // endgame closing move
+        || (aiPhase >= 4 && (oppAny.hqAssaultReady || false))
+        || (basePersonality === 'aggressive' && isTopTerritory)
+        || (atWarNow && basePersonality === 'opportunistic');
+      oppAny.aiHeatCaution = strategicOverride ? 'override' : heatTier;
+
+      // Heat-tier boost to the existing Lay Low fire chance
+      const heatBoost = heatTier === 'critical' ? 0.40 : heatTier === 'hot' ? 0.20 : heatTier === 'warm' ? 0.05 : 0;
+
       // Lay Low trigger: heat ≥60 OR ≥2 recent soldier losses, off cooldown, not already active
       const layLowOnCD = (oppAny.layLowCooldownUntil || 0) > state.turn;
       if (!isAILayingLow(opponent, state.turn) && !layLowOnCD) {
         const heatTrigger = aiHeat >= 60;
         const lossTrigger = recentSoldierLosses >= 2;
-        if (heatTrigger || lossTrigger) {
+        if ((heatTrigger || lossTrigger) && !strategicOverride) {
           const baseChance = 0.5;
-          const fireChance = Math.min(0.95, Math.max(0.05, baseChance * personalityMult));
+          const fireChance = Math.min(0.95, Math.max(0.05, baseChance * personalityMult + heatBoost));
           if (Math.random() < fireChance) {
             oppAny.layLowActiveUntil = state.turn + 2; // 3 turns
             oppAny.layLowCooldownUntil = state.turn + 7;
