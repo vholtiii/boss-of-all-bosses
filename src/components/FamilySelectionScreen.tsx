@@ -329,6 +329,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   // Arrow key navigation across family row
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (isTransitioning) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       e.preventDefault();
