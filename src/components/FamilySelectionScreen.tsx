@@ -433,7 +433,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
             type Tone = 'buff' | 'neutral' | 'debuff';
             const meta = ({
               easy: {
-                icon: '🎩', name: 'Made Man', chip: 'EASY',
+                icon: '🥃', name: 'Wiseguy', chip: 'EASY',
                 tagline: 'Learn the ropes',
                 quote: '"Welcome to the family, kid."',
                 color: 'rgb(16,185,129)', glow: 'rgba(16,185,129,0.55)', tint: 'rgba(16,185,129,0.10)',
@@ -445,7 +445,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 ],
               },
               normal: {
-                icon: '🥃', name: 'Wiseguy', chip: 'STANDARD',
+                icon: '🎩', name: 'Made Man', chip: 'STANDARD',
                 tagline: 'A fair fight',
                 quote: '"No favors. No mercy."',
                 color: 'rgb(251,191,36)', glow: 'rgba(251,191,36,0.55)', tint: 'rgba(251,191,36,0.10)',
