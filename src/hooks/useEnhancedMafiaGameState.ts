@@ -5380,7 +5380,8 @@ export const useEnhancedMafiaGameState = (
   /**
    * Unified AI heat helper — mirrors `applyPlayerHeat` exactly:
    * scales by HEAT_GAIN_MULT (1.30) and the active difficulty's policeHeatMult.
-   * Use this for ALL AI heat gains (claim/extort/sabotage/hit/etc.).
+   * Use this for ALL AI heat gains (claims, extorts, hits, passive biz, etc.).
+   * Note: AI does not currently perform sabotage actions, so the sabotage path is unused.
    */
   const addAIHeatRaw = (state: EnhancedMafiaGameState, fam: string, amount: number): void => {
     const opp = state.aiOpponents.find(o => o.family === fam);
