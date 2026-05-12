@@ -34,7 +34,8 @@ import {
   SkipForward,
   LogOut,
   Settings,
-  Lock
+  Lock,
+  Hash
 } from 'lucide-react';
 import { PHASE_CONFIGS, COMMISSION_VOTE_COST, SUPPLY_DEPENDENCIES, SupplyNodeType } from '@/types/game-mechanics';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
@@ -736,64 +737,92 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   );
 
   const topBar = (
-    <div className="flex items-center justify-between w-full px-6 py-4 bg-gradient-to-r from-noir-dark to-background border-b border-noir-light">
-      {/* Left side - Game Title */}
-      <div className="flex items-center space-x-3">
-        <motion.h1
+    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 w-full px-6 py-3 bg-gradient-to-r from-noir-dark to-background border-b border-noir-light">
+      {/* Left — Title block */}
+      <div className="flex items-center gap-3 min-w-0">
+        <motion.div
           initial={{ x: -50, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.5 }}
-          className="text-xl font-bold text-mafia-gold font-playfair"
+          className="flex flex-col leading-tight min-w-0"
         >
-          ULTIMATE FIVE FAMILIES
-        </motion.h1>
-        <div className="h-6 w-px bg-noir-light" />
-        <span className="text-sm text-muted-foreground font-source">Enhanced Underworld</span>
+          <h1 className="text-lg font-bold text-mafia-gold font-playfair truncate">
+            ULTIMATE FIVE FAMILIES
+          </h1>
+          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70 font-source">
+            Enhanced Underworld
+          </span>
+        </motion.div>
         {(gameState as any).mapSeed && (
-          <span className="text-[10px] text-muted-foreground/50 font-mono">Seed: {(gameState as any).mapSeed}</span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                data-no-sound
+                onClick={() => {
+                  try { navigator.clipboard?.writeText(String((gameState as any).mapSeed)); } catch {}
+                }}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-noir-light/60 text-muted-foreground/60 hover:text-foreground hover:border-mafia-gold/40 transition"
+                aria-label="Copy map seed"
+              >
+                <Hash className="h-3 w-3" />
+                <span className="text-[10px] font-mono">seed</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              Seed: <span className="font-mono">{(gameState as any).mapSeed}</span> · click to copy
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
-      
-      {/* Center - Game Status */}
-      <div className="flex flex-col items-center gap-1">
-        <div className="flex items-center space-x-6">
-          <div className="text-center">
-            <div className="text-lg font-bold text-mafia-gold">Turn {gameState.turn}</div>
-            <div className="text-xs text-muted-foreground capitalize">{gameState.season}</div>
-          </div>
-          {(gameState.ricoTimer || 0) > 0 && (
-            <motion.div
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 0.8, repeat: Infinity }}
-              className="text-center px-3 py-1 rounded-lg bg-destructive/20 border border-destructive/40"
-            >
-              <div className="text-sm font-bold text-destructive">🚨 RICO {gameState.ricoTimer}/5</div>
-            </motion.div>
-          )}
-          {(gameState as any).prosecutionTimer > 0 && (
-            <motion.div
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 1, repeat: Infinity }}
-              className="text-center px-3 py-1 rounded-lg bg-orange-500/20 border border-orange-500/40"
-            >
-              <div className="text-sm font-bold text-orange-400">⚖️ PROSECUTION {(gameState as any).prosecutionTimer}/3</div>
-            </motion.div>
-          )}
-          <div className="text-center">
-            <div className="text-sm font-medium text-green-400">Commission Active</div>
-            <motion.div
-              animate={{ opacity: [0.5, 1, 0.5] }}
+
+      {/* Center — Turn / Season / Commission */}
+      <div className="flex flex-col items-center gap-1.5 min-w-0">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-mafia-gold/30 bg-mafia-gold/5">
+          <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Turn</span>
+          <span className="text-lg font-bold text-mafia-gold tabular-nums leading-none">{gameState.turn}</span>
+          <span className="text-muted-foreground/50">·</span>
+          <span className="text-sm capitalize text-foreground/90">{gameState.season}</span>
+          <span className="text-muted-foreground/50">·</span>
+          <span className="inline-flex items-center gap-1.5">
+            <motion.span
+              animate={{ opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 1.5, repeat: Infinity }}
-              className="w-2 h-2 bg-green-400 rounded-full mx-auto mt-1"
+              className="w-1.5 h-1.5 rounded-full bg-green-400"
             />
-          </div>
+            <span className="text-[11px] text-green-400/90 font-medium">Commission</span>
+          </span>
         </div>
-        {/* Status HUD Badges */}
+
+        {((gameState.ricoTimer || 0) > 0 || ((gameState as any).prosecutionTimer || 0) > 0) && (
+          <div className="flex items-center gap-2">
+            {(gameState.ricoTimer || 0) > 0 && (
+              <motion.div
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 0.8, repeat: Infinity }}
+                className="px-2.5 py-0.5 rounded-full bg-destructive/20 border border-destructive/40"
+              >
+                <span className="text-[11px] font-bold text-destructive">🚨 RICO {gameState.ricoTimer}/5</span>
+              </motion.div>
+            )}
+            {((gameState as any).prosecutionTimer || 0) > 0 && (
+              <motion.div
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 1, repeat: Infinity }}
+                className="px-2.5 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/40"
+              >
+                <span className="text-[11px] font-bold text-orange-400">⚖️ PROSECUTION {(gameState as any).prosecutionTimer}/3</span>
+              </motion.div>
+            )}
+          </div>
+        )}
+
+        {/* Status chip cluster */}
         {(() => {
           const bossCd = (gameState as any).bossNegotiationCooldown || 0;
           const capoCd = (gameState as any).capoNegotiationCooldown || 0;
           const hasCooldowns = bossCd > 0 || capoCd > 0;
-          
+
           const expiringPacts: Array<{ label: string; emoji: string }> = [];
           (gameState.ceasefires || []).filter((c: any) => c.active && c.turnsRemaining <= 1).forEach((c: any) => {
             expiringPacts.push({ label: `Ceasefire w/ ${c.family.charAt(0).toUpperCase() + c.family.slice(1)}`, emoji: '🤝' });
@@ -817,7 +846,6 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           const totalSoldiers = deployedCount + (gameState.resources?.soldiers || 0);
           const deployRatio = totalSoldiers > 0 ? deployedCount / totalSoldiers : 0;
 
-          // Threat counter — mirrors ThreatBoardPanel logic (count + tone)
           const playerFam = gameState.playerFamily;
           const units = gameState.deployedUnits || [];
           let threatCount = 0;
@@ -846,7 +874,6 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             if (s.markedForDeath) { threatCount++; threatHasCritical = true; }
             else if (s.loyalty < 40 && u.type === 'soldier') threatCount++;
           }
-          // Law Enforcement
           const _heat = (gameState as any).policeHeat?.level || 0;
           const _risk = (gameState as any).legalStatus?.prosecutionRisk || 0;
           if (_heat >= 70) { threatCount++; threatHasCritical = true; }
@@ -858,27 +885,29 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           threatCount += ((gameState as any).arrestedSoldiers || []).length;
           const _capJail = ((gameState as any).arrestedCapos || []).length;
           if (_capJail > 0) { threatCount += _capJail; threatHasCritical = true; }
+
           const threatTone = threatCount === 0
             ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
             : threatHasCritical
               ? 'bg-destructive/20 border-destructive/40 text-destructive'
               : 'bg-amber-500/20 border-amber-500/30 text-amber-400';
-          const threatLabel = threatCount === 0 ? '✓' : threatHasIncoming ? '⚠' : '';
           const threatSections = buildThreatSections(gameState);
           const popoverEmptyTone = 'text-emerald-400/80';
-          const threatBadge = (
+
+          const chipBase = 'h-5 px-2 inline-flex items-center gap-1 rounded-full border text-[10px] leading-none';
+
+          const threatChip = (
             <Popover>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   data-no-sound
-                  className={cn(
-                    'px-2 py-0.5 rounded-full text-[10px] border cursor-pointer hover:brightness-125 transition',
-                    threatTone,
-                    threatHasIncoming && 'animate-pulse'
-                  )}
+                  className={cn(chipBase, threatTone, 'cursor-pointer hover:brightness-125 transition', threatHasIncoming && 'animate-pulse')}
                 >
-                  🚨 Threats: {threatCount} {threatLabel}
+                  <span>{threatCount === 0 ? '🛡' : '🚨'}</span>
+                  <span className="font-medium">Threats</span>
+                  <span className="text-muted-foreground/60">·</span>
+                  <span className="font-semibold tabular-nums">{threatCount}</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent align="center" sideOffset={6} className="w-80 max-h-[480px] overflow-y-auto p-2 bg-card border-border">
@@ -948,64 +977,103 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             </Popover>
           );
 
-          if (!hasCooldowns && expiringPacts.length === 0 && totalSoldiers === 0) {
-            return <div className="flex flex-wrap items-center justify-center gap-1">{threatBadge}</div>;
+          const powerCd = gameState.turnPhase === 'move'
+            ? (((gameState as any).familyPowerCooldowns || {})[gameState.playerFamily] || 0)
+            : 0;
+
+          const hasFrontBoss = (gameState as any).frontBossHexes?.length > 0
+            && (gameState as any).frontBossHexes.some((h: any) => h.ownerFamily === gameState.playerFamily);
+          const hasShakedown = (gameState as any).luccheseBoostedDistrict
+            && (gameState as any).luccheseBoostedDistrict.family === gameState.playerFamily;
+          const hasPurge = (gameState as any).bonannoPurgeImmunity?.length > 0;
+
+          const hasAnyChip = hasCooldowns || totalSoldiers > 0 || expiringPacts.length > 0
+            || hasFrontBoss || hasShakedown || hasPurge || powerCd > 0;
+
+          if (!hasAnyChip) {
+            return <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-full">{threatChip}</div>;
           }
 
+          const Divider = () => <span className="h-3 w-px bg-noir-light/60" />;
+
           return (
-            <div className="flex flex-wrap items-center justify-center gap-1">
-              {threatBadge}
-              {expiringPacts.map((p, i) => (
-                <span key={i} className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 border border-amber-500/30 text-amber-400 animate-pulse">
-                  ⚠️ {p.emoji} {p.label} expires!
-                </span>
-              ))}
+            <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-full">
               {hasCooldowns && (
                 <>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] border ${bossCd > 0 ? 'bg-muted/30 border-muted text-muted-foreground' : 'bg-green-500/20 border-green-500/30 text-green-400'}`}>
-                    🏛️ Boss: {bossCd > 0 ? `${bossCd}t` : 'Ready'}
+                  <span className={cn(chipBase, bossCd > 0 ? 'bg-muted/30 border-muted text-muted-foreground' : 'bg-green-500/15 border-green-500/30 text-green-400')}>
+                    🏛️ <span className="font-medium">Boss</span>
+                    <span className="text-muted-foreground/60">·</span>
+                    <span className="font-semibold tabular-nums">{bossCd > 0 ? `${bossCd}t` : 'Ready'}</span>
                   </span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] border ${capoCd > 0 ? 'bg-muted/30 border-muted text-muted-foreground' : 'bg-green-500/20 border-green-500/30 text-green-400'}`}>
-                    👔 Capo: {capoCd > 0 ? `${capoCd}t` : 'Ready'}
+                  <span className={cn(chipBase, capoCd > 0 ? 'bg-muted/30 border-muted text-muted-foreground' : 'bg-green-500/15 border-green-500/30 text-green-400')}>
+                    👔 <span className="font-medium">Capo</span>
+                    <span className="text-muted-foreground/60">·</span>
+                    <span className="font-semibold tabular-nums">{capoCd > 0 ? `${capoCd}t` : 'Ready'}</span>
                   </span>
                 </>
               )}
+
+              {(hasCooldowns && totalSoldiers > 0) && <Divider />}
+
               {totalSoldiers > 0 && (
-                <span className={`px-2 py-0.5 rounded-full text-[10px] border ${deployRatio > 0.5 ? 'bg-green-500/20 border-green-500/30 text-green-400' : deployRatio < 0.3 ? 'bg-amber-500/20 border-amber-500/30 text-amber-400' : 'bg-muted/30 border-muted text-muted-foreground'}`}>
-                  ⚔️ {deployedCount}/{totalSoldiers} deployed
+                <span className={cn(chipBase,
+                  deployRatio > 0.5
+                    ? 'bg-green-500/15 border-green-500/30 text-green-400'
+                    : deployRatio < 0.3
+                      ? 'bg-amber-500/20 border-amber-500/30 text-amber-400'
+                      : 'bg-muted/30 border-muted text-muted-foreground'
+                )}>
+                  ⚔️ <span className="font-medium">Deployed</span>
+                  <span className="text-muted-foreground/60">·</span>
+                  <span className="font-semibold tabular-nums">{deployedCount}/{totalSoldiers}</span>
                 </span>
               )}
-              {/* Active family power effects */}
-              {(gameState as any).frontBossHexes?.length > 0 && (gameState as any).frontBossHexes.some((h: any) => h.ownerFamily === gameState.playerFamily) && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] border bg-purple-500/15 border-purple-500/25 text-purple-400">
-                  🎭 Front Boss: {Math.max(...(gameState as any).frontBossHexes.filter((h: any) => h.ownerFamily === gameState.playerFamily).map((h: any) => h.turnsRemaining))}t
+
+              {(hasFrontBoss || hasShakedown || hasPurge || powerCd > 0) && <Divider />}
+
+              {hasFrontBoss && (
+                <span className={cn(chipBase, 'bg-purple-500/15 border-purple-500/25 text-purple-400')}>
+                  🎭 <span className="font-medium">Front Boss</span>
+                  <span className="text-muted-foreground/60">·</span>
+                  <span className="font-semibold tabular-nums">{Math.max(...(gameState as any).frontBossHexes.filter((h: any) => h.ownerFamily === gameState.playerFamily).map((h: any) => h.turnsRemaining))}t</span>
                 </span>
               )}
-              {(gameState as any).luccheseBoostedDistrict && (gameState as any).luccheseBoostedDistrict.family === gameState.playerFamily && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] border bg-amber-500/15 border-amber-500/25 text-amber-400">
-                  💰 Shakedown: {(gameState as any).luccheseBoostedDistrict.turnsRemaining}t
+              {hasShakedown && (
+                <span className={cn(chipBase, 'bg-amber-500/15 border-amber-500/25 text-amber-400')}>
+                  💰 <span className="font-medium">Shakedown</span>
+                  <span className="text-muted-foreground/60">·</span>
+                  <span className="font-semibold tabular-nums">{(gameState as any).luccheseBoostedDistrict.turnsRemaining}t</span>
                 </span>
               )}
-              {(gameState as any).bonannoPurgeImmunity?.length > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] border bg-teal-500/15 border-teal-500/25 text-teal-400">
-                  🛡️ Purge: {Math.max(...(gameState as any).bonannoPurgeImmunity.map((i: any) => i.turnsRemaining))}t
+              {hasPurge && (
+                <span className={cn(chipBase, 'bg-teal-500/15 border-teal-500/25 text-teal-400')}>
+                  🛡️ <span className="font-medium">Purge</span>
+                  <span className="text-muted-foreground/60">·</span>
+                  <span className="font-semibold tabular-nums">{Math.max(...(gameState as any).bonannoPurgeImmunity.map((i: any) => i.turnsRemaining))}t</span>
                 </span>
               )}
-              {/* Power cooldown (tactical phase only) */}
-              {gameState.turnPhase === 'move' && (() => {
-                const cd = ((gameState as any).familyPowerCooldowns || {})[gameState.playerFamily] || 0;
-                if (cd <= 0) return null;
-                return (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] border bg-muted/30 border-muted text-muted-foreground">
-                    ⚡ Power: {cd}t CD
-                  </span>
-                );
-              })()}
+              {powerCd > 0 && (
+                <span className={cn(chipBase, 'bg-muted/30 border-muted text-muted-foreground')}>
+                  ⚡ <span className="font-medium">Power</span>
+                  <span className="text-muted-foreground/60">·</span>
+                  <span className="font-semibold tabular-nums">{powerCd}t</span>
+                </span>
+              )}
+
+              {expiringPacts.length > 0 && <Divider />}
+              {expiringPacts.map((p, i) => (
+                <span key={i} className={cn(chipBase, 'bg-amber-500/20 border-amber-500/30 text-amber-400 animate-pulse')}>
+                  ⚠️ {p.emoji} <span className="font-medium truncate max-w-[160px]">{p.label}</span>
+                </span>
+              ))}
+
+              <Divider />
+              {threatChip}
             </div>
           );
         })()}
       </div>
-      
+
       {/* Right side - Actions */}
       <div className="flex items-center space-x-2">
         {/* Phase indicator */}
