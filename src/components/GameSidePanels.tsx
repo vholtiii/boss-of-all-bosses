@@ -1573,23 +1573,6 @@ export const RightSidePanel: React.FC<{
           );
         })()}
 
-        {/* ── Weather ── */}
-        <div className="rounded-lg border border-border bg-card p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg">
-              {gameState.weather.currentWeather.type === 'clear' && '☀️'}
-              {gameState.weather.currentWeather.type === 'rain' && '🌧️'}
-              {gameState.weather.currentWeather.type === 'snow' && '❄️'}
-              {gameState.weather.currentWeather.type === 'fog' && '🌫️'}
-              {gameState.weather.currentWeather.type === 'storm' && '⛈️'}
-            </span>
-            <div>
-              <p className="text-sm font-medium capitalize text-foreground">{gameState.weather.currentWeather.type}</p>
-              <p className="text-[10px] text-muted-foreground">{gameState.weather.currentWeather.duration} turns left</p>
-            </div>
-          </div>
-        </div>
-
         {/* ── Businesses ── */}
         {gameState.businesses.length > 0 && (
           <CollapsibleSection
