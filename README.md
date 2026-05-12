@@ -170,7 +170,8 @@ Four business types: Brothel ($3K), Gambling Den ($4K), Loan Sharking ($5K), Sto
 - Respect scales extortion payouts (0.5x at 0 → 1.5x at 100) and recruitment discounts (up to 30%)
 - Influence boosts extortion success (+15%) and bribe success (+12%)
 - Police heat from combat/extortion, reducible via bribe tiers (Patrol Officer → Mayor)
-- **AI heat parity**: Rival families incur the same heat from claims, extorts, hits, and passive illegal businesses as the player (same `HEAT_GAIN_MULT` and difficulty scaling). AI heat decays −2/turn, triggers income penalties (−25% at ≥40, −35% at ≥70), prosecution arrests of soldiers at ≥30, and a RICO equivalent: 3 consecutive turns at ≥90 dismantles that family (HQ falls, units removed, hexes neutralized).
+- **AI heat parity**: Rival families incur the same heat from claims, extorts, hits, and passive illegal businesses as the player (same `HEAT_GAIN_MULT` and difficulty scaling). AI heat decays each turn matching player `reductionPerTurn`, triggers income penalties (−25% at ≥40, −35% at ≥70) **applied before the AI income floor**, prosecution arrests of soldiers at ≥30, and a RICO equivalent: 3 consecutive turns at ≥90 dismantles that family (HQ falls, units removed, hexes neutralized). AI passive heat is suppressed during Lay Low (player passive heat now suppressed too, for parity).
+- **AI economy parity**: AI families pay the same **$600/deployed soldier** maintenance and **$150/empty claimed hex** community upkeep as the player. Net income shows in the turn summary.
 
 ### Prosecution Risk
 Prosecution Risk runs parallel to Police Heat as a dynamic failure condition. Calculated from heat, active informants, recent arrests, minus bribe reductions.
