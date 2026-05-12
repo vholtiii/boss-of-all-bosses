@@ -6343,6 +6343,8 @@ export const useEnhancedMafiaGameState = (
           const payout = Math.round(basePayout * respectMult);
           opponent.resources.money += payout;
           aiActionsRemaining--;
+          // ===== AI HEAT PARITY: neutral extortion (mirrors player +8) =====
+          addAIHeatRaw(state, fam, 8);
           
           // Update soldier stats
           const stats = state.soldierStats[unit.id];
