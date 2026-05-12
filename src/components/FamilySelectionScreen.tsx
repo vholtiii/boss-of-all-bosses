@@ -342,7 +342,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selectedFamily, selectFamily]);
+  }, [selectedFamily, selectFamily, isTransitioning]);
 
   return (
     <TooltipProvider delayDuration={150}>
