@@ -6366,6 +6366,8 @@ export const useEnhancedMafiaGameState = (
           if (applyPendingClaim(state, tile, fam, false)) {
             checkEncroachment(state, tile.q, tile.r, tile.s, fam);
             aiActionsRemaining--;
+            // ===== AI HEAT PARITY: claim heat (mirrors player +3, +6 if biz — empty hex here = +3) =====
+            addAIHeatRaw(state, fam, 3);
           }
         }
       }
