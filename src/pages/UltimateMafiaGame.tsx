@@ -125,7 +125,12 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             }
             break;
           }
-          case 'info': notifyInfo(n.title, n.message); playSound('notification'); break;
+          case 'info': {
+            notifyInfo(n.title, n.message);
+            if (n.title && n.title.includes('Hex Fortified')) playSound('fortify');
+            else playSound('notification');
+            break;
+          }
         }
       });
       clearNotifications();
