@@ -254,7 +254,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       playSound('put_out_hit');
     }
     performAction(action);
-  }, [performAction]);
+  }, [performAction, playSound]);
 
   // playSound/playSoundSequence already destructured above
   const [activeMobileTab, setActiveMobileTab] = useState('map');
