@@ -5432,6 +5432,20 @@ export const useEnhancedMafiaGameState = (
     if (turnReport) turnReport.aiActions.push({ family: fam, action: 'civilian_hit', detail: `Blind hit on civilians in ${districtName} — heat maxed, soldier in hiding` });
   };
 
+  /** AI spends money on a bribe-style heat reduction (mirrors player Bribe Officers). */
+  const aiSpendOnHeatReduction = (state: EnhancedMafiaGameState, fam: string, heatDrop: number, turnReport?: TurnReport): boolean => {
+    const opp = state.aiOpponents.find(o => o.family === fam);
+    if (!opp) return false;
+    const costMult = state.difficultyModifiers?.eventCostMult ?? 1;
+    const cost = Math.floor(10000 * costMult);
+    if ((opp.resources.money || 0) < cost) return false;
+    opp.resources.money -= cost;
+    opp.resources.heat = Math.max(0, (opp.resources.heat || 0) - heatDrop);
+    (opp as any).bribeCooldownUntil = state.turn + 2;
+    if (turnReport) turnReport.aiActions.push({ family: fam, action: 'bribe_officers', detail: `Bribed officers ($${cost.toLocaleString()}) — heat -${heatDrop}` });
+    return true;
+  };
+
   /** Place a bounty on the AI family from the targeted rival (mirrors player blind-hit bounty). */
   const placeBountyOnAI = (state: EnhancedMafiaGameState, attackerFam: string, victimFam: string, turnReport?: TurnReport) => {
     if (!victimFam || victimFam === attackerFam || victimFam === 'neutral') return;
@@ -5553,14 +5567,38 @@ export const useEnhancedMafiaGameState = (
       oppAny.recentSoldierLosses = Math.max(0, recentSoldierLosses - 1);
       oppAny.recentCapoLosses = Math.max(0, recentCapoLosses - 1);
 
+      // ── HEAT-TIER PRECAUTION CLASSIFIER ──
+      // Tiers: cool <40, warm 40-59, hot 60-79, critical 80-89, rico 90+
+      const heatTier: 'cool' | 'warm' | 'hot' | 'critical' | 'rico' =
+        aiHeat >= 90 ? 'rico'
+        : aiHeat >= 80 ? 'critical'
+        : aiHeat >= 60 ? 'hot'
+        : aiHeat >= 40 ? 'warm'
+        : 'cool';
+      // Strategic-override gate — if true, AI ignores heat precautions and pushes through (may RICO).
+      const TERRITORY_TARGET_AI = state.mapSize === 'small' ? 40 : state.mapSize === 'large' ? 80 : 60;
+      const myTerritoryNow = state.hexMap.filter(t => t.controllingFamily === fam).length;
+      const allTerritoryCounts = [...rivalHexCounts, playerHexCount, myTerritoryNow];
+      const isTopTerritory = allTerritoryCounts.every(c => c <= myTerritoryNow);
+      const atWarNow = (state.activeWars || []).some(w => w.family1 === fam || w.family2 === fam);
+      const strategicOverride =
+        myTerritoryNow >= TERRITORY_TARGET_AI - 2 // endgame closing move
+        || (aiPhase >= 4 && (oppAny.hqAssaultReady || false))
+        || (basePersonality === 'aggressive' && isTopTerritory)
+        || (atWarNow && basePersonality === 'opportunistic');
+      oppAny.aiHeatCaution = strategicOverride ? 'override' : heatTier;
+
+      // Heat-tier boost to the existing Lay Low fire chance
+      const heatBoost = heatTier === 'critical' ? 0.40 : heatTier === 'hot' ? 0.20 : heatTier === 'warm' ? 0.05 : 0;
+
       // Lay Low trigger: heat ≥60 OR ≥2 recent soldier losses, off cooldown, not already active
       const layLowOnCD = (oppAny.layLowCooldownUntil || 0) > state.turn;
       if (!isAILayingLow(opponent, state.turn) && !layLowOnCD) {
         const heatTrigger = aiHeat >= 60;
         const lossTrigger = recentSoldierLosses >= 2;
-        if (heatTrigger || lossTrigger) {
+        if ((heatTrigger || lossTrigger) && !strategicOverride) {
           const baseChance = 0.5;
-          const fireChance = Math.min(0.95, Math.max(0.05, baseChance * personalityMult));
+          const fireChance = Math.min(0.95, Math.max(0.05, baseChance * personalityMult + heatBoost));
           if (Math.random() < fireChance) {
             oppAny.layLowActiveUntil = state.turn + 2; // 3 turns
             oppAny.layLowCooldownUntil = state.turn + 7;
@@ -5604,7 +5642,27 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      const aiOffenseDisabled = isAILayingLow(opponent, state.turn) || isAIAtMattresses(opponent, state.turn);
+      // ── HEAT-PRECAUTION SPEND + ESCALATION ──
+      // Skip when overriding (AI is willing to push toward RICO for strategic gain).
+      const bribeOnCD = (oppAny.bribeCooldownUntil || 0) > state.turn;
+      if (!strategicOverride && !bribeOnCD) {
+        const spendChance = heatTier === 'critical' || heatTier === 'rico' ? 0.95
+          : heatTier === 'hot' ? Math.min(0.95, 0.40 * personalityMult)
+          : heatTier === 'warm' ? Math.min(0.95, 0.20 * personalityMult)
+          : 0;
+        const heatDrop = heatTier === 'rico' || heatTier === 'critical' ? 18 : heatTier === 'hot' ? 15 : 12;
+        if (spendChance > 0 && Math.random() < spendChance) {
+          aiSpendOnHeatReduction(state, fam, heatDrop, turnReport);
+        }
+      }
+      // Critical/RICO: force lay-low if not already (still respects strategicOverride).
+      if (!strategicOverride && (heatTier === 'critical' || heatTier === 'rico') && !isAILayingLow(opponent, state.turn)) {
+        oppAny.layLowActiveUntil = state.turn + 2;
+        oppAny.layLowCooldownUntil = state.turn + 7;
+        if (turnReport) turnReport.aiActions.push({ family: fam, action: 'lay_low', detail: `Forced stand-down (heat ${aiHeat})` });
+      }
+      const aiHeatRicoFreeze = heatTier === 'rico' && !strategicOverride;
+      const aiOffenseDisabled = isAILayingLow(opponent, state.turn) || isAIAtMattresses(opponent, state.turn) || aiHeatRicoFreeze;
 
       // Reset per-turn move budget for this AI family's units (mirror player reset).
       // Mattresses locks AI units' movement (parity with player).
@@ -6104,10 +6162,16 @@ export const useEnhancedMafiaGameState = (
               }
 
               if (aiStrength >= enemyUnitsHere.length || Math.random() < combatWillingness) {
-                aiActionsRemaining--; // Deduct action point for combat
                 // ===== AI HIT PARITY: classify scout state for this attack =====
                 const isAIScoutedHit = aiHasScoutIntel(state, fam, target.q, target.r, target.s);
                 const aiHitType: 'scouted' | 'blind' = isAIScoutedHit ? 'scouted' : 'blind';
+                // Heat-precaution: at warm+ (no override), refuse blind hits — skip rather than swing reckless.
+                const cautionTier = (oppAny.aiHeatCaution || 'cool') as string;
+                if (aiHitType === 'blind' && cautionTier !== 'cool' && cautionTier !== 'override') {
+                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'heat_caution', detail: `Held off blind hit (heat ${aiHeat})` });
+                  break;
+                }
+                aiActionsRemaining--; // Deduct action point for combat
                 // Safehouse defense bonus: defenders on safehouse hex are harder to kill
               const isTargetSafehouse = state.safehouses.some(s => s.q === target.q && s.r === target.r && s.s === target.s);
                 // Built business defense bonus: player-built businesses on this hex grant defenders +20% protection
@@ -6291,6 +6355,13 @@ export const useEnhancedMafiaGameState = (
                   if (prevOwnerCeasefire) {
                     // Can't claim — ceasefire territory freeze
                   } else if (!aiCaptureScouted && unit.type !== 'capo') {
+                    // Heat-precaution: at warm+ (no override), refuse civilian-hit blind capture.
+                    const cautionTier2 = (oppAny.aiHeatCaution || 'cool') as string;
+                    if (cautionTier2 !== 'cool' && cautionTier2 !== 'override') {
+                      unit.q = origQ; unit.r = origR; unit.s = origS;
+                      if (turnReport) turnReport.aiActions.push({ family: fam, action: 'heat_caution', detail: `Aborted blind capture (heat ${aiHeat})` });
+                      break;
+                    }
                     // Blind capture of empty rival hex by a soldier — same risk as player blind hit on empty rival hex.
                     // Apply civilian-hit consequences and revert position so the soldier doesn't claim.
                     applyAICivilianHit(state, fam, unit, tile.district || 'unknown territory', turnReport);
