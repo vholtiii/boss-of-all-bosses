@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight, Handshake, Inbox, Hourglass, Crown } from 'lucide-react';
+import { ChevronDown, ChevronRight, Handshake, Inbox, Hourglass, Crown, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
