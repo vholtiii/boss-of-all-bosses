@@ -118,6 +118,8 @@ Blind hit:    heatGain = floor(baseHeat × 1.5)   — 150% (reckless)
 Planned hit:  heatGain = baseHeat                 — normal
 ```
 
+> **AI parity**: Rival AI families incur the same heat from hits using the identical formula and scouted/blind/planned modifiers, scaled by `HEAT_GAIN_MULT` and difficulty `policeHeatMult`.
+
 ### 2.7 Diplomacy Interactions
 
 | Situation | Penalty |
