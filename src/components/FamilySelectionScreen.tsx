@@ -274,6 +274,8 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const prefersReducedMotion = typeof window !== 'undefined'
     && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
+  const activeFamily = FAMILIES.find(f => f.id === selectedFamily);
+
   const beginGame = useCallback(() => {
     if (isTransitioning || !activeFamily) return;
     playSound('success');
@@ -309,8 +311,6 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
       );
     }, totalMs);
   }, [isTransitioning, activeFamily, playSound, fadeOutMusic, prefersReducedMotion, soundConfig, onSelectFamily, difficulty, seedInput, mapSize]);
-
-  const activeFamily = FAMILIES.find(f => f.id === selectedFamily);
 
   const selectFamily = useCallback((id: FamilyId) => {
     setSelectedFamily(prev => {
