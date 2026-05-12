@@ -7290,6 +7290,8 @@ export const useEnhancedMafiaGameState = (
           // Execute the hit
           const targetUnit = state.deployedUnits.find(u => u.id === hit.targetUnitId);
           if (targetUnit) {
+            // ===== AI HEAT PARITY: plan-hit execution heat (planned tier — mirrors player) =====
+            applyAIHeat(state, hit.family, 1, 'planned');
             if (Math.random() < AI_PLAN_HIT_SUCCESS_RATE) {
               // Success — capo is killed
               const capoQ = targetUnit.q, capoR = targetUnit.r, capoS = targetUnit.s;
