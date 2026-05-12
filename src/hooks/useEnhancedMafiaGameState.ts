@@ -6850,42 +6850,59 @@ export const useEnhancedMafiaGameState = (
               // Pick a random supplier
               const supplier = potentialSuppliers[Math.floor(Math.random() * potentialSuppliers.length)];
               const duration = 5 + Math.floor(Math.random() * 3);
-              opponent.resources.money -= 7500;
+              const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
 
               if (supplier.isPlayer) {
-                state.resources.money += 7500;
+                // ── BOSS-LEVEL SITDOWN REQUEST (do not auto-commit) ──
+                // Skip if there's already an incoming supply-deal sitdown from this family
+                const alreadyPending = (state.incomingSitdowns || []).some(
+                  s => s.fromFamily === fam && s.proposedDeal === 'supply_deal' && s.scope === 'family'
+                );
+                if (!alreadyPending) {
+                  state.incomingSitdowns = state.incomingSitdowns || [];
+                  state.incomingSitdowns.push({
+                    id: `incoming-supply-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    fromFamily: fam,
+                    fromBossName: opponent.bossName || `${famLabel} Boss`,
+                    proposedDeal: 'supply_deal',
+                    scope: 'family',
+                    proposedAmount: 7500,
+                    proposedDuration: duration,
+                    successBonus: 15,
+                    turnRequested: state.turn,
+                    expiresOnTurn: state.turn + 2,
+                  });
+                  state.pendingNotifications.push({
+                    type: 'info' as const,
+                    title: `🏛️ Boss Sitdown Requested`,
+                    message: `The ${famLabel} boss is offering $7,500 for ${duration} turns of supply access. Open the Sitdowns panel to negotiate.`,
+                  });
+                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: `Requested supply-deal sitdown with player` });
+                }
               } else {
+                // AI ↔ AI auto-resolve (unchanged)
+                opponent.resources.money -= 7500;
                 const supplierOpp = state.aiOpponents.find(o => o.family === supplier.family);
                 if (supplierOpp) supplierOpp.resources.money += 7500;
-              }
 
-              state.supplyDealPacts = [...(state.supplyDealPacts || []), {
-                id: `supply-deal-ai-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                buyerFamily: fam,
-                targetFamily: supplier.family,
-                turnsRemaining: duration,
-                turnFormed: state.turn,
-                active: true,
-              }];
-              addPairTension(state, fam, supplier.family, -TENSION_REDUCE_SUPPLY_DEAL);
-              state.tensionCooldowns[getTensionPairKey(fam, supplier.family)] = 1;
-              const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
-              const supplierLabel = supplier.family.charAt(0).toUpperCase() + supplier.family.slice(1);
-
-              if (supplier.isPlayer) {
-                state.pendingNotifications.push({
-                  type: 'info' as const,
-                  title: `🚚 ${famLabel} Struck a Supply Deal`,
-                  message: `The ${famLabel} family is paying you $7,500 for access to your supply lines for ${duration} turns.`,
-                });
-              } else {
+                state.supplyDealPacts = [...(state.supplyDealPacts || []), {
+                  id: `supply-deal-ai-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                  buyerFamily: fam,
+                  targetFamily: supplier.family,
+                  turnsRemaining: duration,
+                  turnFormed: state.turn,
+                  active: true,
+                }];
+                addPairTension(state, fam, supplier.family, -TENSION_REDUCE_SUPPLY_DEAL);
+                state.tensionCooldowns[getTensionPairKey(fam, supplier.family)] = 1;
+                const supplierLabel = supplier.family.charAt(0).toUpperCase() + supplier.family.slice(1);
                 state.pendingNotifications.push({
                   type: 'info' as const,
                   title: `🚚 Supply Deal Between Rivals`,
                   message: `The ${famLabel} family struck a supply deal with ${supplierLabel} for ${duration} turns.`,
                 });
+                if (turnReport) turnReport.aiActions.push({ family: fam, action: 'supply_deal', detail: `Struck a supply deal with ${supplier.family} for ${duration} turns` });
               }
-              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'supply_deal', detail: `Struck a supply deal with ${supplier.family} for ${duration} turns` });
             }
           }
         }
