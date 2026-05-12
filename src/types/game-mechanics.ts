@@ -863,6 +863,9 @@ export interface IncomingSitdown {
   fromCapoName?: string;
   fromCapoPersonality?: CapoPersonality;
   proposedAmount?: number;
+  // Family-scope (Boss-to-Boss) fields
+  fromBossName?: string;
+  proposedDuration?: number; // for supply_deal etc.
 }
 
 // ============ INFLUENCE EROSION & PASSIVE EXPANSION (Phase 3+) ============
