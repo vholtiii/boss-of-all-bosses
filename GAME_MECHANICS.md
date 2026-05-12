@@ -336,6 +336,29 @@ Active bribes can also reveal enemy planned hits — see [Intel & Threat Detecti
 
 Higher-tier bribes (Captain+) can also reveal **informants** in your own ranks — see [Counter-Intelligence & Purge Ranks](#27-counter-intelligence--purge-ranks).
 
+### 12.1 AI Heat Parity
+
+Rival AI families are subject to the same police heat system as the player — no hidden discounts.
+
+| Source | AI Heat Gain |
+|---|---|
+| Claim (neutral hex) | +3 |
+| Extort (neutral business) | +8 |
+| Extort (rival business, success) | +12 |
+| Extort (rival business, failure) | +17 |
+| Hit | `min(25, 8 + units × 2)` × scouted/blind/planned modifier |
+| Passive illegal business | +1/turn per owned illegal biz (suppressed during Lay Low) |
+
+All AI heat gains pass through the same `HEAT_GAIN_MULT (1.30)` and difficulty `policeHeatMult` as the player.
+
+**Per-turn lifecycle (AI):**
+- Heat decay: **−2/turn**
+- Income penalty: **−25%** at heat ≥ 40, **−35%** at heat ≥ 70
+- Prosecution: at heat ≥ 30, AI soldiers (not capos) face arrest each turn (4–7 turn sentence)
+- RICO equivalent: **3 consecutive turns at heat ≥ 90** dismantles the family — HQ falls, all units removed, hexes neutralized
+
+Tier transitions, RICO warnings, indictments, and arrests are surfaced via notifications and turn summaries.
+
 ---
 
 ## 13. Recruitment & Promotion
