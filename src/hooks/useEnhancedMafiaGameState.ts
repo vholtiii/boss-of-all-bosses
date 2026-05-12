@@ -5378,14 +5378,25 @@ export const useEnhancedMafiaGameState = (
     return (state.scoutedHexes || []).some(h => h.q === q && h.r === r && h.s === s);
   };
 
-  /** Apply tier-scaled heat to the AI family's resources.heat (mirrors player policeHeat). */
-  const applyAIHeat = (state: EnhancedMafiaGameState, fam: string, totalUnits: number, hitType: 'scouted' | 'blind' | 'planned') => {
+  /**
+   * Unified AI heat helper — mirrors `applyPlayerHeat` exactly:
+   * scales by HEAT_GAIN_MULT (1.30) and the active difficulty's policeHeatMult.
+   * Use this for ALL AI heat gains (claim/extort/sabotage/hit/etc.).
+   */
+  const addAIHeatRaw = (state: EnhancedMafiaGameState, fam: string, amount: number): void => {
     const opp = state.aiOpponents.find(o => o.family === fam);
-    if (!opp) return;
+    if (!opp || amount <= 0) return;
+    const mult = state.difficultyModifiers?.policeHeatMult ?? 1;
+    const scaled = Math.max(0, Math.round(amount * mult * HEAT_GAIN_MULT));
+    opp.resources.heat = Math.min(100, (opp.resources.heat || 0) + scaled);
+  };
+
+  /** Apply tier-scaled heat for an AI hit (mirrors player hit heat at line 9642). */
+  const applyAIHeat = (state: EnhancedMafiaGameState, fam: string, totalUnits: number, hitType: 'scouted' | 'blind' | 'planned') => {
     let baseHeat = Math.min(25, 8 + totalUnits * 2);
     if (hitType === 'scouted') baseHeat = Math.floor(baseHeat / 2);
     else if (hitType === 'blind') baseHeat = Math.floor(baseHeat * 1.5);
-    opp.resources.heat = Math.min(100, (opp.resources.heat || 0) + baseHeat);
+    addAIHeatRaw(state, fam, baseHeat);
   };
 
   /** AI commits a civilian hit on an unscouted empty rival hex — max heat, soldier hides. */
@@ -5658,9 +5669,21 @@ export const useEnhancedMafiaGameState = (
       const cappedTurn = Math.min(state.turn, 20);
       const minIncome = Math.floor((2000 + cappedTurn * 500) * diffMods.aiIncomeMult * mapScale);
       aiIncome = Math.max(aiIncome, minIncome);
+      // ===== AI HEAT PARITY: heat-tier income penalty (mirrors player line 5295) =====
+      const aiHeatLevel = opponent.resources.heat || 0;
+      let aiHeatPenaltyRate = 0;
+      if (aiHeatLevel >= 70) aiHeatPenaltyRate = 0.35;
+      else if (aiHeatLevel >= 40) aiHeatPenaltyRate = 0.25;
+      const aiHeatPenalty = Math.floor(aiIncome * aiHeatPenaltyRate);
+      aiIncome = Math.max(0, aiIncome - aiHeatPenalty);
       opponent.resources.money += aiIncome;
       opponent.resources.lastTurnIncome = aiIncome; // Track for phase calculation
-      if (turnReport) turnReport.aiActions.push({ family: fam, action: 'income', detail: `Earned $${aiIncome.toLocaleString()} income` });
+      if (turnReport) {
+        const detail = aiHeatPenalty > 0
+          ? `Earned $${aiIncome.toLocaleString()} income (-$${aiHeatPenalty.toLocaleString()} heat penalty)`
+          : `Earned $${aiIncome.toLocaleString()} income`;
+        turnReport.aiActions.push({ family: fam, action: 'income', detail });
+      }
 
       // District control bonus: Staten Island +3 respect & +1 influence for AI
       if (hasFamilyDistrictBonus(state, fam, 'respect')) {
@@ -6332,6 +6355,8 @@ export const useEnhancedMafiaGameState = (
           const payout = Math.round(basePayout * respectMult);
           opponent.resources.money += payout;
           aiActionsRemaining--;
+          // ===== AI HEAT PARITY: neutral extortion (mirrors player +8) =====
+          addAIHeatRaw(state, fam, 8);
           
           // Update soldier stats
           const stats = state.soldierStats[unit.id];
@@ -6353,6 +6378,8 @@ export const useEnhancedMafiaGameState = (
           if (applyPendingClaim(state, tile, fam, false)) {
             checkEncroachment(state, tile.q, tile.r, tile.s, fam);
             aiActionsRemaining--;
+            // ===== AI HEAT PARITY: claim heat (mirrors player +3, +6 if biz — empty hex here = +3) =====
+            addAIHeatRaw(state, fam, 3);
           }
         }
       }
@@ -6386,10 +6413,15 @@ export const useEnhancedMafiaGameState = (
               const basePayout = enemyTile.business!.isLegal ? 1500 : 3000;
               const payout = Math.round(basePayout * 0.7); // Enemy extortion pays less
               opponent.resources.money += payout;
+              // ===== AI HEAT PARITY: rival extortion success (mirrors player +12) =====
+              addAIHeatRaw(state, fam, 12);
               
               if (enemyTile.controllingFamily === state.playerFamily && turnReport) {
                 turnReport.aiActions.push({ family: fam, action: 'extort', detail: `Extorted your business in ${enemyTile.district} for $${payout.toLocaleString()}` });
               }
+            } else {
+              // ===== AI HEAT PARITY: rival extortion failure (mirrors player +12 + 5 fail penalty) =====
+              addAIHeatRaw(state, fam, 17);
             }
             aiActionsRemaining--;
           }
@@ -7214,6 +7246,106 @@ export const useEnhancedMafiaGameState = (
           }
         }
       }
+
+      // ===== AI HEAT PARITY: per-turn heat lifecycle =====
+      {
+        const oppAnyHeat = opponent as any;
+        const prevTier = oppAnyHeat._heatTier || 0;
+
+        // 1. Passive heat from illegal businesses (mirrors player line ~4189)
+        if (!isAILayingLow(opponent, state.turn)) {
+          const aiIllegalBizzes = state.hexMap.filter(t =>
+            t.controllingFamily === fam && t.business && !t.business.isLegal
+          );
+          let aiHeatFromBiz = 0;
+          aiIllegalBizzes.forEach(t => {
+            const isBuilt = !t.business!.isExtorted;
+            aiHeatFromBiz += isBuilt ? 0.5 : 1; // built biz = half heat
+          });
+          const aiPassiveHeat = Math.floor((aiHeatFromBiz / 3) * HEAT_GAIN_MULT);
+          if (aiPassiveHeat > 0) {
+            opponent.resources.heat = Math.min(100, (opponent.resources.heat || 0) + aiPassiveHeat);
+          }
+        }
+
+        // 2. Heat decay (mirrors player reductionPerTurn = 2)
+        opponent.resources.heat = Math.max(0, (opponent.resources.heat || 0) - 2);
+
+        const heatNow = opponent.resources.heat || 0;
+        const newTier = heatNow >= 90 ? 4 : heatNow >= 70 ? 3 : heatNow >= 40 ? 2 : 1;
+        oppAnyHeat._heatTier = newTier;
+        const famLabelHeat = fam.charAt(0).toUpperCase() + fam.slice(1);
+
+        // 3. Tier-transition notifications (only on rising)
+        if (newTier > prevTier && newTier >= 2) {
+          const tierLabel = newTier === 4 ? 'CRITICAL' : newTier === 3 ? 'HIGH' : 'ELEVATED';
+          state.pendingNotifications.push({
+            type: newTier >= 3 ? 'warning' as const : 'info' as const,
+            title: `🔥 ${famLabelHeat} Family Heat: ${tierLabel}`,
+            message: `Police pressure on the ${fam} family is now ${tierLabel.toLowerCase()} (${heatNow}/100).`,
+          });
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'heat_tier', detail: `Heat reached ${tierLabel} (${heatNow}/100)` });
+        }
+
+        // 4. RICO equivalent: heat ≥90 for 3 consecutive turns → AI eliminated
+        if (heatNow >= 90) {
+          oppAnyHeat.ricoTimer = (oppAnyHeat.ricoTimer || 0) + 1;
+          if (oppAnyHeat.ricoTimer === 1) {
+            state.pendingNotifications.push({
+              type: 'warning' as const,
+              title: `🚨 RICO Probe: ${famLabelHeat}`,
+              message: `Federal investigators are closing in on the ${fam} family. 3 turns at critical heat = takedown.`,
+            });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'rico_started', detail: `RICO investigation opened` });
+          }
+          if (oppAnyHeat.ricoTimer >= 3) {
+            // Eliminate AI family — mirrors HQ-fall path
+            state.eliminatedFamilies = [...(state.eliminatedFamilies || []), fam];
+            state.deployedUnits = state.deployedUnits.filter(u => u.family !== fam);
+            state.hexMap.forEach(t => { if (t.controllingFamily === fam && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
+            state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => f.family !== fam);
+            state.aiOpponents = state.aiOpponents.filter(o => o.family !== fam);
+            state.pendingNotifications.push({
+              type: 'success' as const,
+              title: `⚖️ ${famLabelHeat} Family Indicted!`,
+              message: `RICO takedown: the ${fam} family was dismantled by federal indictments after 3 turns at critical heat.`,
+            });
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'rico_eliminated', detail: `Eliminated by RICO indictment` });
+            return; // skip rest of this AI's lifecycle
+          }
+        } else if (oppAnyHeat.ricoTimer && oppAnyHeat.ricoTimer > 0) {
+          oppAnyHeat.ricoTimer = 0;
+          state.pendingNotifications.push({
+            type: 'info' as const,
+            title: `✅ RICO Suspended: ${famLabelHeat}`,
+            message: `Heat dropped — federal probe on the ${fam} family is on ice.`,
+          });
+        }
+
+        // 5. Prosecution risk: roll for AI soldier arrest (mirrors player path, soldiers only)
+        if (heatNow >= 30) {
+          const arrestRisk = Math.max(0, Math.floor(heatNow * 0.4) - 10); // -10 base mitigation
+          if (Math.random() * 100 < arrestRisk) {
+            const aiSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
+            if (aiSoldiers.length > 0) {
+              const arrested = aiSoldiers[Math.floor(Math.random() * aiSoldiers.length)];
+              const sentence = 4 + Math.floor(Math.random() * 4); // 4–7 turns
+              state.arrestedSoldiers = [...(state.arrestedSoldiers || []), {
+                unitId: arrested.id,
+                returnTurn: state.turn + sentence,
+                source: 'heat',
+              }];
+              state.deployedUnits = state.deployedUnits.filter(u => u.id !== arrested.id);
+              state.pendingNotifications.push({
+                type: 'info' as const,
+                title: `🚔 ${famLabelHeat} Arrest`,
+                message: `Police arrested a ${fam} soldier (${sentence}-turn sentence) — heat is taking its toll.`,
+              });
+              if (turnReport) turnReport.aiActions.push({ family: fam, action: 'ai_prosecution_arrest', detail: `Soldier arrested — ${sentence}-turn sentence` });
+            }
+          }
+        }
+      }
     });
 
     // ── RE-CHECK UNDETECTED PLANNED HITS FOR NEW INTEL ──
@@ -7270,6 +7402,8 @@ export const useEnhancedMafiaGameState = (
           // Execute the hit
           const targetUnit = state.deployedUnits.find(u => u.id === hit.targetUnitId);
           if (targetUnit) {
+            // ===== AI HEAT PARITY: plan-hit execution heat (planned tier — mirrors player) =====
+            applyAIHeat(state, hit.family, 1, 'planned');
             if (Math.random() < AI_PLAN_HIT_SUCCESS_RATE) {
               // Success — capo is killed
               const capoQ = targetUnit.q, capoR = targetUnit.r, capoS = targetUnit.s;
