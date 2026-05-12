@@ -1,25 +1,31 @@
-# Update READMEs for AI heat parity
 
-Document the new AI heat parity changes so the docs match the implemented behavior. Three doc files reference police heat; two need substantive updates, one needs a one-line note.
+# Fix: Soldier Dedupe + Double-Process Bug
 
-## Files to update
+## Problem
 
-### 1. `README.md` — section "Reputation & Police Heat" (≈ line 168)
-Add a short bullet noting that AI families incur the same heat from claims, extorts, hits, and passive biz operations as the player, with the same per-turn decay (−2), tier income penalties (−25% at ≥40, −35% at ≥70), prosecution arrests, and a RICO equivalent (3 turns at ≥90 → that family is dismantled).
+In `src/hooks/useEnhancedMafiaGameState.ts`:
 
-### 2. `GAME_MECHANICS.md` — section "12. Police Heat & Corruption" (≈ line 326)
-Add a new sub-section **"12.x AI Heat Parity"** that lists:
-- AI uses the same `HEAT_GAIN_MULT (1.30)` and difficulty `policeHeatMult` as the player.
-- Per-action rates: claim +3, neutral extort +8, rival extort +12 (success) / +17 (fail), hits with same `min(25, 8 + units×2)` formula and scouted/blind/planned modifiers.
-- Passive heat from owned illegal businesses (suppressed during Lay Low).
-- Heat decay −2/turn.
-- Tier income penalties (−25% ≥40, −35% ≥70).
-- Prosecution arrests (heat ≥30, soldiers only, 4–7 turn sentence).
-- RICO equivalent: 3 consecutive turns at ≥90 eliminates that AI family (HQ falls, hexes neutralized, units removed).
+1. **No dedupe on jail release** (lines 4233–4250 and 4506–4542): a soldier with the same `id` is pushed back into `deployedUnits` without checking whether one already exists. If anything ever fails to remove the unit on arrest, you get a true duplicate "spontaneous" soldier.
+2. **Double-process / wrong handler wins**: the generic block at 4233 filters arrested soldiers by `returnTurn` only (no `source` filter) and removes all of them. The prosecution-specific block at 4506 then has nothing left to process — so prosecution releases never apply the −10 loyalty penalty or the "served their sentence" notification.
 
-### 3. `COMBAT_SYSTEM_GUIDE.md` — section "2.6 Police Heat from Hits" (≈ line 111)
-Add a one-line note that the same formula and modifiers apply to AI hits.
+## Fix
 
-## Out of scope
-- `HEADQUARTERS_SYSTEM_GUIDE.md` and `SOLDIER_RECRUITMENT_GUIDE.md` — heat refs there are about specific player UI/flows that don't change.
-- No new diagrams or restructuring; just additive updates.
+### 1. Generic jail-release block (~line 4233)
+- Skip arrests with `source === 'prosecution'` so the prosecution block can handle them.
+- Before pushing the soldier, check `deployedUnits.some(u => u.id === a.unitId)` — if true, skip the push (mirror the existing capo dedupe at line 4255).
+- Same dedupe for the capo loop is already correct; leave it.
+
+### 2. Prosecution release block (~line 4506)
+- Add the same `deployedUnits.some(u => u.id === a.unitId)` guard before pushing.
+- Logic otherwise unchanged (it already filters by `source === 'prosecution'`).
+
+## Files
+
+- `src/hooks/useEnhancedMafiaGameState.ts` — two small edits in the post-turn release section.
+
+## Verification
+
+- Run `bunx vitest run` (existing 57 tests should still pass; no test currently asserts prosecution-release loyalty penalty, so behavior change is safe).
+- Manual: trigger a prosecution arrest, advance turns past `returnTurn`, confirm the "⚖️ Soldier Released" toast fires and loyalty drops by 10.
+
+No memory or doc updates needed — this is a pure bug fix matching documented behavior.
