@@ -6863,7 +6863,7 @@ export const useEnhancedMafiaGameState = (
                   state.incomingSitdowns.push({
                     id: `incoming-supply-${Date.now()}-${Math.random().toString(36).slice(2)}`,
                     fromFamily: fam,
-                    fromBossName: opponent.bossName || `${famLabel} Boss`,
+                    fromBossName: `${famLabel} Boss`,
                     proposedDeal: 'supply_deal',
                     scope: 'family',
                     proposedAmount: 7500,
