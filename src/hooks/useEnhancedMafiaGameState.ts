@@ -6401,10 +6401,15 @@ export const useEnhancedMafiaGameState = (
               const basePayout = enemyTile.business!.isLegal ? 1500 : 3000;
               const payout = Math.round(basePayout * 0.7); // Enemy extortion pays less
               opponent.resources.money += payout;
+              // ===== AI HEAT PARITY: rival extortion success (mirrors player +12) =====
+              addAIHeatRaw(state, fam, 12);
               
               if (enemyTile.controllingFamily === state.playerFamily && turnReport) {
                 turnReport.aiActions.push({ family: fam, action: 'extort', detail: `Extorted your business in ${enemyTile.district} for $${payout.toLocaleString()}` });
               }
+            } else {
+              // ===== AI HEAT PARITY: rival extortion failure (mirrors player +12 + 5 fail penalty) =====
+              addAIHeatRaw(state, fam, 17);
             }
             aiActionsRemaining--;
           }
