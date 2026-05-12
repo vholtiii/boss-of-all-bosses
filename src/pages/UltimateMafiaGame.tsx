@@ -243,11 +243,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       return;
     }
     if (action.type === 'plan_hit') {
+      playSound('put_out_hit');
       performAction(action);
       setPlanHitMode(false);
       setPlanHitStep('selectSoldier');
       setPlanHitPlannerId(null);
       return;
+    }
+    if (action.type === 'eliminate_soldier') {
+      playSound('put_out_hit');
     }
     performAction(action);
   }, [performAction]);
