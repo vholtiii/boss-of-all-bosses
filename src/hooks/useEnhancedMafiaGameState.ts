@@ -8670,7 +8670,8 @@ export const useEnhancedMafiaGameState = (
             negotiationType: sitdown.proposedDeal,
             targetFamily: sitdown.fromFamily,
             successBonus: sitdown.successBonus,
-            extraData: action.extraData,
+            proposedAmountOverride: sitdown.proposedAmount,
+            extraData: { ...(action.extraData || {}), proposedDuration: sitdown.proposedDuration },
           });
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
