@@ -99,7 +99,13 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               playSound('success');
             }
             break;
-          case 'error': notifyError(n.title, n.message); playSound('danger'); break;
+          case 'error': {
+            notifyError(n.title, n.message);
+            const t = typeof n.title === 'string' ? n.title : '';
+            if (t.includes('Arrested')) playSound('arrest');
+            else playSound('danger');
+            break;
+          }
           case 'warning': {
             notifyWarning(n.title, n.message);
             const t = typeof n.title === 'string' ? n.title : '';
