@@ -5432,6 +5432,20 @@ export const useEnhancedMafiaGameState = (
     if (turnReport) turnReport.aiActions.push({ family: fam, action: 'civilian_hit', detail: `Blind hit on civilians in ${districtName} — heat maxed, soldier in hiding` });
   };
 
+  /** AI spends money on a bribe-style heat reduction (mirrors player Bribe Officers). */
+  const aiSpendOnHeatReduction = (state: EnhancedMafiaGameState, fam: string, heatDrop: number, turnReport?: TurnReport): boolean => {
+    const opp = state.aiOpponents.find(o => o.family === fam);
+    if (!opp) return false;
+    const costMult = state.difficultyModifiers?.eventCostMult ?? 1;
+    const cost = Math.floor(10000 * costMult);
+    if ((opp.resources.money || 0) < cost) return false;
+    opp.resources.money -= cost;
+    opp.resources.heat = Math.max(0, (opp.resources.heat || 0) - heatDrop);
+    (opp as any).bribeCooldownUntil = state.turn + 2;
+    if (turnReport) turnReport.aiActions.push({ family: fam, action: 'bribe_officers', detail: `Bribed officers ($${cost.toLocaleString()}) — heat -${heatDrop}` });
+    return true;
+  };
+
   /** Place a bounty on the AI family from the targeted rival (mirrors player blind-hit bounty). */
   const placeBountyOnAI = (state: EnhancedMafiaGameState, attackerFam: string, victimFam: string, turnReport?: TurnReport) => {
     if (!victimFam || victimFam === attackerFam || victimFam === 'neutral') return;
