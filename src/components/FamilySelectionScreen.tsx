@@ -1109,7 +1109,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                       The {activeFamily.name} Family
                     </div>
                     <div className="mt-3 text-xs sm:text-sm uppercase tracking-[0.4em] text-foreground/70">
-                      {activeFamily.icon ?? ''} {difficulty === 'hard' ? 'The Don' : difficulty === 'easy' ? 'Wiseguy' : 'Made Man'}
+                      {difficulty === 'hard' ? 'The Don' : difficulty === 'easy' ? 'Wiseguy' : 'Made Man'}
                     </div>
                   </div>
                 </motion.div>
