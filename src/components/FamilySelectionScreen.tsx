@@ -300,7 +300,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
       }).catch(() => {});
     } catch {}
 
-    const totalMs = prefersReducedMotion ? 700 : 2200;
+    const totalMs = prefersReducedMotion ? 700 : 2950;
     window.setTimeout(() => {
       onSelectFamily(
         activeFamily.id,
@@ -1032,14 +1032,15 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                   }}
                   initial={{ scale: 1.05, filter: 'saturate(0.95) brightness(1)' }}
                   animate={{
-                    scale: [1.05, 1.45, 1.6],
+                    scale: [1.05, 1.18, 1.42, 1.6],
                     filter: [
                       'saturate(0.95) brightness(1)',
-                      'saturate(0.7) brightness(0.7)',
+                      'saturate(0.85) brightness(0.9)',
+                      'saturate(0.6) brightness(0.6)',
                       'saturate(0.4) brightness(0.35)',
                     ],
                   }}
-                  transition={{ duration: 2.2, times: [0, 0.45, 1], ease: 'easeInOut' }}
+                  transition={{ duration: 3.0, times: [0, 0.35, 0.75, 1], ease: [0.22, 0.61, 0.36, 1] }}
                 />
 
                 {/* Family-tinted vignette glow */}
@@ -1050,15 +1051,15 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                   }}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: [0, 0.9, 0.6] }}
-                  transition={{ duration: 2.2, times: [0, 0.4, 1], ease: 'easeOut' }}
+                  transition={{ duration: 3.0, times: [0, 0.5, 1], ease: 'easeOut' }}
                 />
 
                 {/* Smoke puffs rushing forward */}
                 {[
-                  { left: '20%', top: '60%', size: 700, delay: 0.5 },
-                  { left: '70%', top: '40%', size: 800, delay: 0.65 },
-                  { left: '50%', top: '55%', size: 1000, delay: 0.4 },
-                  { left: '35%', top: '30%', size: 600, delay: 0.8 },
+                  { left: '20%', top: '60%', size: 700, delay: 0.85 },
+                  { left: '70%', top: '40%', size: 800, delay: 1.0 },
+                  { left: '50%', top: '55%', size: 1000, delay: 0.75 },
+                  { left: '35%', top: '30%', size: 600, delay: 1.15 },
                 ].map((p, i) => (
                   <motion.div
                     key={i}
@@ -1076,7 +1077,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                     }}
                     initial={{ scale: 0.4, opacity: 0 }}
                     animate={{ scale: [0.4, 2.2, 3.4], opacity: [0, 0.95, 0.9] }}
-                    transition={{ duration: 1.6, delay: p.delay, ease: 'easeOut' }}
+                    transition={{ duration: 1.8, delay: p.delay, ease: [0.33, 1, 0.68, 1] }}
                   />
                 ))}
 
@@ -1088,7 +1089,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                   }}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: [0, 0, 0.95] }}
-                  transition={{ duration: 2.2, times: [0, 0.55, 1], ease: 'easeIn' }}
+                  transition={{ duration: 3.0, times: [0, 0.7, 1], ease: 'easeIn' }}
                 />
 
                 {/* Title beat */}
@@ -1096,7 +1097,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                   className="absolute inset-0 flex items-center justify-center"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: [0, 0, 1, 1, 0] }}
-                  transition={{ duration: 2.2, times: [0, 0.6, 0.72, 0.9, 1], ease: 'easeOut' }}
+                  transition={{ duration: 3.0, times: [0, 0.63, 0.74, 0.9, 0.95], ease: 'easeOut' }}
                 >
                   <div className="text-center px-6">
                     <div
