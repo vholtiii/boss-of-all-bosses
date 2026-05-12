@@ -4232,12 +4232,18 @@ export const useEnhancedMafiaGameState = (
       
       // --- Release arrested soldiers & capos ---
       {
-        const releasedSoldiers = (newState.arrestedSoldiers || []).filter(a => a.returnTurn <= newState.turn);
+        // Skip prosecution arrests — those are handled by the dedicated block below
+        // (which applies a loyalty penalty + specific notification).
+        const releasedSoldiers = (newState.arrestedSoldiers || []).filter(
+          a => a.returnTurn <= newState.turn && a.source !== 'prosecution'
+        );
         if (releasedSoldiers.length > 0) {
           releasedSoldiers.forEach(a => {
-            // Re-deploy at HQ
+            // Re-deploy at HQ — dedupe to prevent duplicate units if the original
+            // was somehow never removed from deployedUnits on arrest.
             const hq = newState.headquarters[newState.playerFamily];
-            if (hq) {
+            const alreadyDeployed = newState.deployedUnits.some(u => u.id === a.unitId);
+            if (hq && !alreadyDeployed) {
               newState.deployedUnits.push({
                 id: a.unitId, type: 'soldier', family: newState.playerFamily,
                 q: hq.q, r: hq.r, s: hq.s,
@@ -4246,7 +4252,9 @@ export const useEnhancedMafiaGameState = (
               turnReport.events.push(`🔓 Soldier released from jail and returned to HQ.`);
             }
           });
-          newState.arrestedSoldiers = newState.arrestedSoldiers.filter(a => a.returnTurn > newState.turn);
+          newState.arrestedSoldiers = newState.arrestedSoldiers.filter(
+            a => !(a.returnTurn <= newState.turn && a.source !== 'prosecution')
+          );
         }
         const releasedCapos = (newState.arrestedCapos || []).filter(a => a.returnTurn <= newState.turn);
         if (releasedCapos.length > 0) {
@@ -4511,8 +4519,9 @@ export const useEnhancedMafiaGameState = (
         releasedSoldiers.forEach(a => {
           // Return soldier to HQ with -10 loyalty
           const hq = newState.headquarters[newState.playerFamily];
-          if (hq) {
-            const soldierId = a.unitId;
+          const soldierId = a.unitId;
+          const alreadyDeployed = newState.deployedUnits.some(u => u.id === soldierId);
+          if (hq && !alreadyDeployed) {
             newState.deployedUnits.push({
               id: soldierId,
               family: newState.playerFamily,
