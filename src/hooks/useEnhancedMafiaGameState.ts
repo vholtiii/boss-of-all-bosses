@@ -4187,7 +4187,8 @@ export const useEnhancedMafiaGameState = (
       newState.resources.loyalty = Math.round(newState.reputation.loyalty);
       
       // --- Passive heat from illegal operations (built businesses generate 50% less heat) ---
-      {
+      // Suppressed during Lay Low, scaled by HEAT_GAIN_MULT × policeHeatMult via applyPlayerHeat (parity with AI).
+      if (!isLayingLow(newState)) {
         const illegalBizzes = newState.hexMap.filter(t => 
           t.controllingFamily === newState.playerFamily && t.business && !t.business.isLegal
         );
@@ -4196,12 +4197,10 @@ export const useEnhancedMafiaGameState = (
           const isPlayerBuilt = !t.business!.isExtorted;
           heatFromBiz += isPlayerBuilt ? 0.5 : 1; // built = half heat contribution
         });
-        const passiveHeat = Math.floor((heatFromBiz / 3) * HEAT_GAIN_MULT);
-        if (passiveHeat > 0) {
-          newState.policeHeat.level = Math.min(100, newState.policeHeat.level + passiveHeat);
-        }
+        const passiveHeat = Math.floor(heatFromBiz / 3);
+        if (passiveHeat > 0) applyPlayerHeat(newState, passiveHeat);
       }
-      
+
       // --- Built business empire bonuses: +1 respect & +1 loyalty per 3 built businesses ---
       {
         const builtBizCount = newState.hexMap.filter(t => 
