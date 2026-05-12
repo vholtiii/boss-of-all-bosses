@@ -5669,9 +5669,21 @@ export const useEnhancedMafiaGameState = (
       const cappedTurn = Math.min(state.turn, 20);
       const minIncome = Math.floor((2000 + cappedTurn * 500) * diffMods.aiIncomeMult * mapScale);
       aiIncome = Math.max(aiIncome, minIncome);
+      // ===== AI HEAT PARITY: heat-tier income penalty (mirrors player line 5295) =====
+      const aiHeatLevel = opponent.resources.heat || 0;
+      let aiHeatPenaltyRate = 0;
+      if (aiHeatLevel >= 70) aiHeatPenaltyRate = 0.35;
+      else if (aiHeatLevel >= 40) aiHeatPenaltyRate = 0.25;
+      const aiHeatPenalty = Math.floor(aiIncome * aiHeatPenaltyRate);
+      aiIncome = Math.max(0, aiIncome - aiHeatPenalty);
       opponent.resources.money += aiIncome;
       opponent.resources.lastTurnIncome = aiIncome; // Track for phase calculation
-      if (turnReport) turnReport.aiActions.push({ family: fam, action: 'income', detail: `Earned $${aiIncome.toLocaleString()} income` });
+      if (turnReport) {
+        const detail = aiHeatPenalty > 0
+          ? `Earned $${aiIncome.toLocaleString()} income (-$${aiHeatPenalty.toLocaleString()} heat penalty)`
+          : `Earned $${aiIncome.toLocaleString()} income`;
+        turnReport.aiActions.push({ family: fam, action: 'income', detail });
+      }
 
       // District control bonus: Staten Island +3 respect & +1 influence for AI
       if (hasFamilyDistrictBonus(state, fam, 'respect')) {
