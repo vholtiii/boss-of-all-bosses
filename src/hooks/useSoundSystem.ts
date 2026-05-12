@@ -77,6 +77,7 @@ export const useSoundSystem = () => {
     hit_kill: '/sounds/gunshot-hit.mp3',
     assassin_kill: '/sounds/assassin-kill.mp3',
     capo_fail: '/sounds/capo-fail.mp3',
+    extort_success: '/sounds/extortion-success.mp3',
   };
 
   const playSound = useCallback((type: string, frequency?: number, duration?: number) => {
