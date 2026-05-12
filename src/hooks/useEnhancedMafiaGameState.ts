@@ -10653,7 +10653,9 @@ export const useEnhancedMafiaGameState = (
         break;
       }
       case 'supply_deal': {
-        const duration = 5 + Math.floor(Math.random() * 3); // 5-7 turns
+        const duration = (typeof extraData?.proposedDuration === 'number')
+          ? extraData.proposedDuration
+          : 5 + Math.floor(Math.random() * 3); // 5-7 turns
         // Transfer money to target family
         const targetOpp = state.aiOpponents.find(o => o.family === enemyFamily);
         if (targetOpp) {
