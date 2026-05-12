@@ -347,17 +347,21 @@ Rival AI families are subject to the same police heat system as the player — n
 | Extort (rival business, success) | +12 |
 | Extort (rival business, failure) | +17 |
 | Hit | `min(25, 8 + units × 2)` × scouted/blind/planned modifier |
-| Passive illegal business | +1/turn per owned illegal biz (suppressed during Lay Low) |
+| Passive illegal business | `floor((0.5 × built + 1.0 × extorted) / 3)` per turn — suppressed during Lay Low |
 
-All AI heat gains pass through the same `HEAT_GAIN_MULT (1.30)` and difficulty `policeHeatMult` as the player.
+All AI heat gains pass through the same `HEAT_GAIN_MULT (1.30)` and difficulty `policeHeatMult` as the player (claims/extorts/hits/passive biz all routed through `addAIHeatRaw` / `applyAIHeat`).
 
 **Per-turn lifecycle (AI):**
-- Heat decay: **−2/turn**
-- Income penalty: **−25%** at heat ≥ 40, **−35%** at heat ≥ 70
+- Heat decay: matches player `state.policeHeat.reductionPerTurn` (default **−2/turn**)
+- Income penalty: **−25%** at heat ≥ 40, **−35%** at heat ≥ 70 — applied **before** the AI income floor so heat consequences land on take-home
 - Prosecution: at heat ≥ 30, AI soldiers (not capos) face arrest each turn (4–7 turn sentence)
 - RICO equivalent: **3 consecutive turns at heat ≥ 90** dismantles the family — HQ falls, all units removed, hexes neutralized
 
+**AI economy parity (also new):** AI families now pay the same per-turn expenses as the player — **$600/deployed soldier** in maintenance and **$150/empty claimed hex** in community upkeep. AI net income is `gross − heat penalty − maintenance − upkeep` and is surfaced in the turn-summary income line.
+
 Tier transitions, RICO warnings, indictments, and arrests are surfaced via notifications and turn summaries.
+
+> AI does not currently perform sabotage actions; only the player can sabotage. All other heat-bearing actions are mirrored.
 
 ---
 
