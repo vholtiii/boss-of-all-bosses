@@ -5378,14 +5378,25 @@ export const useEnhancedMafiaGameState = (
     return (state.scoutedHexes || []).some(h => h.q === q && h.r === r && h.s === s);
   };
 
-  /** Apply tier-scaled heat to the AI family's resources.heat (mirrors player policeHeat). */
-  const applyAIHeat = (state: EnhancedMafiaGameState, fam: string, totalUnits: number, hitType: 'scouted' | 'blind' | 'planned') => {
+  /**
+   * Unified AI heat helper — mirrors `applyPlayerHeat` exactly:
+   * scales by HEAT_GAIN_MULT (1.30) and the active difficulty's policeHeatMult.
+   * Use this for ALL AI heat gains (claim/extort/sabotage/hit/etc.).
+   */
+  const addAIHeatRaw = (state: EnhancedMafiaGameState, fam: string, amount: number): void => {
     const opp = state.aiOpponents.find(o => o.family === fam);
-    if (!opp) return;
+    if (!opp || amount <= 0) return;
+    const mult = state.difficultyModifiers?.policeHeatMult ?? 1;
+    const scaled = Math.max(0, Math.round(amount * mult * HEAT_GAIN_MULT));
+    opp.resources.heat = Math.min(100, (opp.resources.heat || 0) + scaled);
+  };
+
+  /** Apply tier-scaled heat for an AI hit (mirrors player hit heat at line 9642). */
+  const applyAIHeat = (state: EnhancedMafiaGameState, fam: string, totalUnits: number, hitType: 'scouted' | 'blind' | 'planned') => {
     let baseHeat = Math.min(25, 8 + totalUnits * 2);
     if (hitType === 'scouted') baseHeat = Math.floor(baseHeat / 2);
     else if (hitType === 'blind') baseHeat = Math.floor(baseHeat * 1.5);
-    opp.resources.heat = Math.min(100, (opp.resources.heat || 0) + baseHeat);
+    addAIHeatRaw(state, fam, baseHeat);
   };
 
   /** AI commits a civilian hit on an unscouted empty rival hex — max heat, soldier hides. */
