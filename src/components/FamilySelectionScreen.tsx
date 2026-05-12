@@ -300,7 +300,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
       }).catch(() => {});
     } catch {}
 
-    const totalMs = prefersReducedMotion ? 700 : 2200;
+    const totalMs = prefersReducedMotion ? 700 : 2950;
     window.setTimeout(() => {
       onSelectFamily(
         activeFamily.id,
