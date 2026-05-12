@@ -1001,6 +1001,123 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         )}
         </AnimatePresence>
       </div>
+
+      {/* Cinematic transition overlay: pull-back through smoke */}
+      <AnimatePresence>
+        {isTransitioning && activeFamily && (
+          <motion.div
+            key="cine"
+            className="fixed inset-0 z-[60] overflow-hidden pointer-events-auto"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            {prefersReducedMotion ? (
+              <motion.div
+                className="absolute inset-0 bg-black"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+              />
+            ) : (
+              <>
+                {/* Zoom-in layer: the sitdown table rushes toward camera */}
+                <motion.div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundImage: `url(${mafiaSitdownBg})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    filter: 'saturate(0.85)',
+                  }}
+                  initial={{ scale: 1.05, filter: 'saturate(0.95) brightness(1)' }}
+                  animate={{
+                    scale: [1.05, 1.45, 1.6],
+                    filter: [
+                      'saturate(0.95) brightness(1)',
+                      'saturate(0.7) brightness(0.7)',
+                      'saturate(0.4) brightness(0.35)',
+                    ],
+                  }}
+                  transition={{ duration: 2.2, times: [0, 0.45, 1], ease: 'easeInOut' }}
+                />
+
+                {/* Family-tinted vignette glow */}
+                <motion.div
+                  className="absolute inset-0"
+                  style={{
+                    background: `radial-gradient(ellipse at center, transparent 30%, ${activeFamily.color}33 65%, rgba(0,0,0,0.85) 100%)`,
+                  }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 0.9, 0.6] }}
+                  transition={{ duration: 2.2, times: [0, 0.4, 1], ease: 'easeOut' }}
+                />
+
+                {/* Smoke puffs rushing forward */}
+                {[
+                  { left: '20%', top: '60%', size: 700, delay: 0.5 },
+                  { left: '70%', top: '40%', size: 800, delay: 0.65 },
+                  { left: '50%', top: '55%', size: 1000, delay: 0.4 },
+                  { left: '35%', top: '30%', size: 600, delay: 0.8 },
+                ].map((p, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute rounded-full"
+                    style={{
+                      left: p.left,
+                      top: p.top,
+                      width: p.size,
+                      height: p.size,
+                      marginLeft: -p.size / 2,
+                      marginTop: -p.size / 2,
+                      background: 'radial-gradient(circle, rgba(180,170,160,0.55) 0%, rgba(40,35,30,0.35) 45%, transparent 70%)',
+                      filter: 'blur(40px)',
+                      mixBlendMode: 'screen',
+                    }}
+                    initial={{ scale: 0.4, opacity: 0 }}
+                    animate={{ scale: [0.4, 2.2, 3.4], opacity: [0, 0.95, 0.9] }}
+                    transition={{ duration: 1.6, delay: p.delay, ease: 'easeOut' }}
+                  />
+                ))}
+
+                {/* Dense haze cap that fully covers screen at the end */}
+                <motion.div
+                  className="absolute inset-0"
+                  style={{
+                    background: 'radial-gradient(ellipse at center, rgba(20,18,16,0.85) 0%, rgba(0,0,0,0.95) 70%)',
+                  }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 0, 0.95] }}
+                  transition={{ duration: 2.2, times: [0, 0.55, 1], ease: 'easeIn' }}
+                />
+
+                {/* Title beat */}
+                <motion.div
+                  className="absolute inset-0 flex items-center justify-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 0, 1, 1, 0] }}
+                  transition={{ duration: 2.2, times: [0, 0.6, 0.72, 0.9, 1], ease: 'easeOut' }}
+                >
+                  <div className="text-center px-6">
+                    <div
+                      className="font-playfair font-bold uppercase tracking-[0.25em] text-3xl sm:text-5xl"
+                      style={{
+                        color: activeFamily.color,
+                        textShadow: `0 0 24px ${activeFamily.color}, 0 2px 8px rgba(0,0,0,0.9)`,
+                      }}
+                    >
+                      The {activeFamily.name} Family
+                    </div>
+                    <div className="mt-3 text-xs sm:text-sm uppercase tracking-[0.4em] text-foreground/70">
+                      {activeFamily.icon ?? ''} {difficulty === 'hard' ? 'The Don' : difficulty === 'easy' ? 'Wiseguy' : 'Made Man'}
+                    </div>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
     </TooltipProvider>
   );
