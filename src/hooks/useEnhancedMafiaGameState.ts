@@ -1096,7 +1096,9 @@ export const createInitialGameState = (
     resources: {
       money: Math.floor((startingResources?.money ?? 50000) * diffMods.playerMoneyMult),
       respect: startingResources?.respect ?? 15,
-      soldiers: startingResources?.soldiers ?? 2,
+      // Starting soldiers are already deployed on the board (see deployedUnits above).
+      // Reserve pool starts empty to avoid double-counting.
+      soldiers: 0,
       influence: startingResources?.influence ?? 10,
       politicalPower: startingResources?.politicalPower ?? 30,
       loyalty: 75,
@@ -3465,7 +3467,8 @@ export const useEnhancedMafiaGameState = (
             turnsIdle: 0, isMercenary: false, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
             extortedHexTurns: 0,
           };
-          newState.resources.soldiers += 1;
+          // NOTE: do NOT bump resources.soldiers — the recruit was deployed directly to HQ,
+          // so it must not also be added to the undeployed reserve pool.
           newState.pendingNotifications.push({
             type: 'success' as const,
             title: '🏠 Bronx Free Recruit',
@@ -7905,7 +7908,7 @@ export const useEnhancedMafiaGameState = (
           const finalCost = Math.max(100, cost - bronxDiscount);
           if (newState.resources.money >= finalCost) {
             newState.resources.money -= finalCost;
-            newState.resources.soldiers += 1;
+            // NOTE: do NOT bump resources.soldiers — mercenary is deployed directly at HQ below.
             newState.actionsRemaining -= 1;
             // Mercenary loyalty penalty
             newState.reputation.loyalty = Math.max(0, newState.reputation.loyalty - 10);
@@ -7952,7 +7955,7 @@ export const useEnhancedMafiaGameState = (
           const finalCost2 = Math.max(100, cost2 - bronxDiscount2);
           if (newState.resources.money >= finalCost2) {
             newState.resources.money -= finalCost2;
-            newState.resources.soldiers += 1;
+            // NOTE: do NOT bump resources.soldiers — local is deployed directly at HQ below.
             newState.actionsRemaining -= 1;
             // Loyal recruit boosts loyalty
             newState.reputation.loyalty = Math.min(100, newState.reputation.loyalty + 2);
