@@ -70,10 +70,11 @@ export const useSoundSystem = () => {
     extort_success: '/sounds/extortion-success.mp3',
     extort_fail: '/sounds/extortion-fail-voice.mp3',
     arrest: '/sounds/police-arrest.mp3',
+    construction_start: '/sounds/construction-start.wav',
   };
 
   // Sound types that should ONLY play their file (no synth fallback layered on top).
-  const FILE_ONLY_SOUNDS = new Set(['hit_kill', 'assassin_kill', 'capo_fail', 'extort_success', 'arrest']);
+  const FILE_ONLY_SOUNDS = new Set(['hit_kill', 'assassin_kill', 'capo_fail', 'extort_success', 'arrest', 'construction_start']);
 
   const playSound = useCallback((type: string, frequency?: number, duration?: number) => {
     // File-based sounds (voice channel)
