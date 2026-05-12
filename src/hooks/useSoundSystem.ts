@@ -42,6 +42,7 @@ const SOUND_CATEGORIES: Record<string, SoundCategory> = {
   extort_fail: 'combat',
   money: 'combat',
   levelup: 'combat',
+  arrest: 'alert',
 };
 
 export const useSoundSystem = () => {
