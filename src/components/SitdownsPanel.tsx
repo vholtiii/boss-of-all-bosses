@@ -133,10 +133,20 @@ const SitdownsPanel: React.FC<SitdownsPanelProps> = ({
                         </Badge>
                       )}
                       <Badge className="text-[9px] h-4 bg-emerald-600/80">+{s.successBonus}%</Badge>
-                      <Badge variant="outline" className={cn('text-[9px] h-4', isUrgent && 'text-red-400 border-red-400/50')}>
-                        {isUrgent ? `⚠️ ${turnsLeft}t` : `${turnsLeft}t left`}
-                      </Badge>
                     </div>
+                  </div>
+                  <div
+                    className={cn(
+                      'flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-semibold',
+                      isUrgent
+                        ? 'bg-red-500/15 text-red-300 border border-red-400/40 animate-pulse'
+                        : 'bg-muted/40 text-muted-foreground border border-border/60'
+                    )}
+                  >
+                    <Clock className="h-3 w-3" />
+                    {turnsLeft <= 0
+                      ? 'Expires this turn'
+                      : `Expires in ${turnsLeft} turn${turnsLeft === 1 ? '' : 's'}`}
                   </div>
                   <div className="flex gap-1.5 pt-1">
                     <Button
