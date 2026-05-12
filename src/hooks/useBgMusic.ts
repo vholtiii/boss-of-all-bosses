@@ -98,4 +98,11 @@ export const useBgMusic = ({
       audio.play().then(() => fadeTo(targetVolume, 300)).catch(() => {});
     }
   }, [targetVolume, fadeTo]);
+
+  // One-shot fade-out (does not mutate user soundConfig)
+  const fadeOut = useCallback((durationMs: number = 1000) => {
+    fadeTo(0, durationMs);
+  }, [fadeTo]);
+
+  return { fadeOut };
 };
