@@ -8612,7 +8612,9 @@ export const useEnhancedMafiaGameState = (
           return result;
         }
         case 'boss_negotiate': {
-          if ((newState.gamePhase || 1) < 3) {
+          // Supply deals are exempt from the Phase 3 Boss Diplomacy gate (AI initiates these from Phase 2)
+          const isSupply = action.negotiationType === 'supply_deal';
+          if (!isSupply && (newState.gamePhase || 1) < 3) {
             newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Boss Diplomacy unlocks in Phase 3: Controlling Territory.' });
             return newState;
           }
