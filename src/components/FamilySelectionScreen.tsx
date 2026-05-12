@@ -526,7 +526,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                     >
                       {meta.icon}
                     </motion.span>
-                    <span className="font-playfair text-lg font-bold leading-tight text-foreground">
+                    <span className="font-playfair text-lg font-bold leading-tight text-foreground whitespace-nowrap">
                       {meta.name}
                     </span>
                   </div>
