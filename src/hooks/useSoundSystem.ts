@@ -2,47 +2,39 @@ import { useCallback, useRef, useEffect, useState } from 'react';
 
 export interface SoundConfig {
   enabled: boolean;
-  uiVolume: number;      // 0-1
-  alertVolume: number;    // 0-1
-  combatVolume: number;   // 0-1
+  sfxVolume: number;    // 0-1, synthesized beeps
+  voiceVolume: number;  // 0-1, recorded mp3 clips
 }
 
 const STORAGE_KEY = 'mafia-sound-settings';
 
 const DEFAULT_CONFIG: SoundConfig = {
   enabled: true,
-  uiVolume: 0.5,
-  alertVolume: 0.5,
-  combatVolume: 0.5,
+  sfxVolume: 0.5,
+  voiceVolume: 0.5,
 };
 
 const loadConfig = (): SoundConfig => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Migrate legacy ui/alert/combat keys.
+      if (parsed && (parsed.uiVolume !== undefined || parsed.alertVolume !== undefined || parsed.combatVolume !== undefined)) {
+        const sfxVolume = Math.max(parsed.uiVolume ?? 0.5, parsed.alertVolume ?? 0.5);
+        const voiceVolume = parsed.combatVolume ?? 0.5;
+        const migrated: SoundConfig = {
+          enabled: parsed.enabled ?? true,
+          sfxVolume,
+          voiceVolume,
+        };
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated)); } catch {}
+        return migrated;
+      }
+      return { ...DEFAULT_CONFIG, ...parsed };
+    }
   } catch {}
   return DEFAULT_CONFIG;
-};
-
-type SoundCategory = 'ui' | 'alert' | 'combat';
-
-const SOUND_CATEGORIES: Record<string, SoundCategory> = {
-  click: 'ui',
-  success: 'alert',
-  error: 'alert',
-  notification: 'alert',
-  danger: 'alert',
-  combat: 'combat',
-  hit_kill: 'combat',
-  assassin_kill: 'combat',
-  capo_fail: 'alert',
-  hit_success: 'combat',
-  hit_fail: 'combat',
-  extort_success: 'combat',
-  extort_fail: 'combat',
-  money: 'combat',
-  levelup: 'combat',
-  arrest: 'alert',
 };
 
 export const useSoundSystem = () => {
@@ -51,7 +43,6 @@ export const useSoundSystem = () => {
   const [soundConfig, setSoundConfig] = useState<SoundConfig>(loadConfig);
   const soundConfigRef = useRef(soundConfig);
 
-  // Keep ref in sync for use in callbacks
   useEffect(() => {
     soundConfigRef.current = soundConfig;
   }, [soundConfig]);
@@ -62,16 +53,14 @@ export const useSoundSystem = () => {
     }
   }, []);
 
-  const getVolumeForSound = useCallback((type: string): number => {
+  const getVoiceVolume = useCallback((): number => {
     const cfg = soundConfigRef.current;
-    if (!cfg.enabled) return 0;
-    const category = SOUND_CATEGORIES[type] || 'ui';
-    switch (category) {
-      case 'ui': return cfg.uiVolume;
-      case 'alert': return cfg.alertVolume;
-      case 'combat': return cfg.combatVolume;
-      default: return 0.5;
-    }
+    return cfg.enabled ? cfg.voiceVolume : 0;
+  }, []);
+
+  const getSfxVolume = useCallback((): number => {
+    const cfg = soundConfigRef.current;
+    return cfg.enabled ? cfg.sfxVolume : 0;
   }, []);
 
   const SOUND_FILES: Record<string, string> = {
@@ -87,27 +76,29 @@ export const useSoundSystem = () => {
   const FILE_ONLY_SOUNDS = new Set(['hit_kill', 'assassin_kill', 'capo_fail', 'extort_success', 'arrest']);
 
   const playSound = useCallback((type: string, frequency?: number, duration?: number) => {
-    const volume = getVolumeForSound(type);
-    if (volume <= 0) return;
-
-    // File-based sounds (e.g. gunshot for successful hits)
+    // File-based sounds (voice channel)
     const fileUrl = SOUND_FILES[type];
     if (fileUrl) {
-      try {
-        let audio = audioFileCacheRef.current[type];
-        if (!audio) {
-          audio = new Audio(fileUrl);
-          audio.preload = 'auto';
-          audioFileCacheRef.current[type] = audio;
-        }
-        audio.volume = Math.max(0, Math.min(1, volume));
-        audio.currentTime = 0;
-        void audio.play().catch(() => {});
-      } catch {}
+      const voiceVol = getVoiceVolume();
+      if (voiceVol > 0) {
+        try {
+          let audio = audioFileCacheRef.current[type];
+          if (!audio) {
+            audio = new Audio(fileUrl);
+            audio.preload = 'auto';
+            audioFileCacheRef.current[type] = audio;
+          }
+          audio.volume = Math.max(0, Math.min(1, voiceVol));
+          audio.currentTime = 0;
+          void audio.play().catch(() => {});
+        } catch {}
+      }
       if (FILE_ONLY_SOUNDS.has(type)) return;
       // Otherwise fall through to also play the synth preset for this type.
     }
 
+    const sfxVol = getSfxVolume();
+    if (sfxVol <= 0) return;
     if (!audioContextRef.current) return;
 
     const audioContext = audioContextRef.current;
@@ -142,7 +133,7 @@ export const useSoundSystem = () => {
 
     gainNode.gain.setValueAtTime(0, audioContext.currentTime);
     gainNode.gain.linearRampToValueAtTime(
-      volume,
+      sfxVol,
       audioContext.currentTime + 0.01
     );
     gainNode.gain.exponentialRampToValueAtTime(
@@ -152,7 +143,7 @@ export const useSoundSystem = () => {
 
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + (duration || preset.duration));
-  }, [getVolumeForSound]);
+  }, [getVoiceVolume, getSfxVolume]);
 
   const playSoundSequence = useCallback((sounds: string[]) => {
     sounds.forEach((sound, index) => {
