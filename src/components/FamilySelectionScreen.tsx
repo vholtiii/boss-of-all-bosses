@@ -267,7 +267,48 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const { soundConfig, updateSoundConfig, playSound } = useSoundSystem();
   const detailRef = useRef<HTMLDivElement>(null);
 
-  useBgMusic({ src: '/audio/mafia-theme.mp3', soundConfig });
+  const { fadeOut: fadeOutMusic } = useBgMusic({ src: '/audio/mafia-theme.mp3', soundConfig });
+
+  // Cinematic transition state
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const prefersReducedMotion = typeof window !== 'undefined'
+    && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+  const beginGame = useCallback(() => {
+    if (isTransitioning || !activeFamily) return;
+    playSound('success');
+    setIsTransitioning(true);
+    fadeOutMusic(prefersReducedMotion ? 500 : 1200);
+
+    // Optional ambience crossfade — silently no-op if file missing
+    try {
+      const ambience = new Audio('/audio/game-ambience.mp3');
+      ambience.loop = true;
+      ambience.volume = 0;
+      const target = soundConfig.enabled ? soundConfig.sfxVolume * 0.4 : 0;
+      ambience.play().then(() => {
+        const steps = 20;
+        const dur = 1200;
+        let i = 0;
+        const id = window.setInterval(() => {
+          i++;
+          ambience.volume = Math.min(1, (target * i) / steps);
+          if (i >= steps) window.clearInterval(id);
+        }, dur / steps);
+      }).catch(() => {});
+    } catch {}
+
+    const totalMs = prefersReducedMotion ? 700 : 2200;
+    window.setTimeout(() => {
+      onSelectFamily(
+        activeFamily.id,
+        activeFamily.startingResources,
+        difficulty,
+        seedInput ? parseInt(seedInput) : undefined,
+        mapSize,
+      );
+    }, totalMs);
+  }, [isTransitioning, activeFamily, playSound, fadeOutMusic, prefersReducedMotion, soundConfig, onSelectFamily, difficulty, seedInput, mapSize]);
 
   const activeFamily = FAMILIES.find(f => f.id === selectedFamily);
 
