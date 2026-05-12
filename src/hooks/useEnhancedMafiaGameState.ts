@@ -7275,14 +7275,13 @@ export const useEnhancedMafiaGameState = (
             const isBuilt = !t.business!.isExtorted;
             aiHeatFromBiz += isBuilt ? 0.5 : 1; // built biz = half heat
           });
-          const aiPassiveHeat = Math.floor((aiHeatFromBiz / 3) * HEAT_GAIN_MULT);
-          if (aiPassiveHeat > 0) {
-            opponent.resources.heat = Math.min(100, (opponent.resources.heat || 0) + aiPassiveHeat);
-          }
+          const aiPassiveHeat = Math.floor(aiHeatFromBiz / 3);
+          if (aiPassiveHeat > 0) addAIHeatRaw(state, fam, aiPassiveHeat);
         }
 
-        // 2. Heat decay (mirrors player reductionPerTurn = 2)
-        opponent.resources.heat = Math.max(0, (opponent.resources.heat || 0) - 2);
+        // 2. Heat decay — mirrors player decay (state.policeHeat.reductionPerTurn, default 2)
+        const aiDecay = state.policeHeat?.reductionPerTurn ?? 2;
+        opponent.resources.heat = Math.max(0, (opponent.resources.heat || 0) - aiDecay);
 
         const heatNow = opponent.resources.heat || 0;
         const newTier = heatNow >= 90 ? 4 : heatNow >= 70 ? 3 : heatNow >= 40 ? 2 : 1;
