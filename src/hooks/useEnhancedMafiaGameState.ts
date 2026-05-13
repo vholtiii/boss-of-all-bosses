@@ -3995,7 +3995,7 @@ export const useEnhancedMafiaGameState = (
       }
 
       processAITurn(newState, turnReport);
-      processWeather(newState);
+      
       processEvents(newState);
       if (newState.events.length > 0) {
         newState.events.forEach(e => turnReport.events.push(e.title));
