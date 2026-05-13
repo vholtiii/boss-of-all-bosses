@@ -285,26 +285,6 @@ export interface MissionReward {
   description: string;
 }
 
-// Weather and Environmental Effects
-export interface WeatherSystem {
-  currentWeather: WeatherCondition;
-  forecast: WeatherCondition[];
-  effects: WeatherEffect[];
-}
-
-export interface WeatherCondition {
-  type: 'clear' | 'rain' | 'snow' | 'fog' | 'storm';
-  intensity: number; // 0-100
-  duration: number; // Turns remaining
-  description: string;
-}
-
-export interface WeatherEffect {
-  type: 'combat' | 'business' | 'movement' | 'heat';
-  modifier: number; // Percentage change
-  description: string;
-}
-
 // Technology and Innovation System
 export interface TechnologySystem {
   researched: Technology[];
