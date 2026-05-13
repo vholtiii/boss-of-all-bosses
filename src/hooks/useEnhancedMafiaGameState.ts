@@ -4,8 +4,6 @@ import {
   AIOpponent, 
   GameEvent, 
   EnhancedReputationSystem,
-  
-  WeatherSystem,
   TechnologySystem,
   SeasonalEvent
 } from '@/types/enhanced-mechanics';
@@ -310,7 +308,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     reputationHistory: [...(state.reputation.reputationHistory || [])],
     achievements: [...(state.reputation.achievements || [])],
   },
-  weather: { ...state.weather, currentWeather: { ...state.weather.currentWeather } },
+  
   finances: { ...state.finances },
   legalStatus: { ...state.legalStatus },
     arrestedSoldiers: [...(state.arrestedSoldiers || [])],
@@ -484,7 +482,6 @@ export interface EnhancedMafiaGameState {
   economy: EconomySystem;
   aiOpponents: AIOpponent[];
   events: GameEvent[];
-  weather: WeatherSystem;
   technology: TechnologySystem;
   seasonalEvents: SeasonalEvent[];
   
@@ -1209,10 +1206,6 @@ export const createInitialGameState = (
     })(),
     
     events: [],
-    weather: {
-      currentWeather: { type: 'clear', intensity: 0, duration: 3, description: 'Clear skies, perfect for business' },
-      forecast: [], effects: [],
-    },
     technology: {
       researched: [],
       available: [
@@ -4002,7 +3995,7 @@ export const useEnhancedMafiaGameState = (
       }
 
       processAITurn(newState, turnReport);
-      processWeather(newState);
+      
       processEvents(newState);
       if (newState.events.length > 0) {
         newState.events.forEach(e => turnReport.events.push(e.title));
@@ -7554,26 +7547,6 @@ export const useEnhancedMafiaGameState = (
         }
       }
       state.aiPlannedHits = remaining;
-    }
-  };
-
-  // ============ WEATHER ============
-  const processWeather = (state: EnhancedMafiaGameState) => {
-    state.weather.currentWeather.duration -= 1;
-    if (state.weather.currentWeather.duration <= 0) {
-      const conditions = [
-        { type: 'clear', description: 'Clear skies' },
-        { type: 'rain', description: 'Heavy rain reduces police patrols' },
-        { type: 'fog', description: 'Fog provides cover' },
-        { type: 'storm', description: 'Storm disrupts operations' },
-      ];
-      const c = conditions[Math.floor(Math.random() * conditions.length)];
-      state.weather.currentWeather = {
-        type: c.type as any,
-        intensity: Math.floor(Math.random() * 100),
-        duration: Math.floor(Math.random() * 4) + 2,
-        description: c.description,
-      };
     }
   };
 

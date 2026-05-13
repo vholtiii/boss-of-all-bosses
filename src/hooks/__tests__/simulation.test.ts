@@ -2,7 +2,7 @@
  * Headless game simulation harness.
  *
  * Drives the real useEnhancedMafiaGameState hook via renderHook + act so the
- * full per-turn engine pipeline (income, AI turns, weather, events, bribes,
+ * full per-turn engine pipeline (income, AI turns, events, bribes,
  * pacts, influence, war/tension, RICO, bankruptcy) executes exactly as in the
  * UI. The "player" is a passive policy: never moves, never attacks, just
  * advances phases and ends turns.
