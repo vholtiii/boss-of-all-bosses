@@ -482,7 +482,6 @@ export interface EnhancedMafiaGameState {
   economy: EconomySystem;
   aiOpponents: AIOpponent[];
   events: GameEvent[];
-  weather: WeatherSystem;
   technology: TechnologySystem;
   seasonalEvents: SeasonalEvent[];
   
