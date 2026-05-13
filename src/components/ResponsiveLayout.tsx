@@ -106,7 +106,13 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
 
   // Desktop Layout
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div
+      className="min-h-screen bg-background text-foreground"
+      style={{
+        ['--right-sidebar-width' as any]: `${rightWidth}px`,
+        ['--top-bar-height' as any]: '4rem',
+      }}
+    >
       <div className="flex h-screen">
         {/* Left Sidebar - Desktop */}
         <motion.div

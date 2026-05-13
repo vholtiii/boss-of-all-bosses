@@ -62,7 +62,7 @@ const NotificationItem: React.FC<{ notification: Notification; onRemove: (id: st
       exit={{ opacity: 0, x: 300, scale: 0.8 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
       className={cn(
-        "relative flex items-start gap-3 p-4 rounded-lg border shadow-lg max-w-sm",
+        "relative flex items-start gap-3 p-4 rounded-lg border shadow-lg w-full pointer-events-auto",
         colorClass
       )}
     >
@@ -128,7 +128,13 @@ const NotificationContainer: React.FC<{
   onRemove: (id: string) => void;
 }> = ({ notifications, onRemove }) => {
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div
+      className="fixed z-50 flex flex-col items-end gap-2 pointer-events-none w-[320px] max-w-[90vw]"
+      style={{
+        top: 'calc(var(--top-bar-height, 1rem) + 0.75rem)',
+        right: 'calc(var(--right-sidebar-width, 0px) + 0.5rem)',
+      }}
+    >
       <AnimatePresence>
         {notifications.map((notification) => (
           <NotificationItem
