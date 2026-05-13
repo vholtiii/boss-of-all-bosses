@@ -62,7 +62,7 @@ const NotificationItem: React.FC<{ notification: Notification; onRemove: (id: st
       exit={{ opacity: 0, x: 300, scale: 0.8 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
       className={cn(
-        "relative flex items-start gap-3 p-4 rounded-lg border shadow-lg max-w-sm",
+        "relative flex items-start gap-3 p-4 rounded-lg border shadow-lg w-full pointer-events-auto",
         colorClass
       )}
     >
