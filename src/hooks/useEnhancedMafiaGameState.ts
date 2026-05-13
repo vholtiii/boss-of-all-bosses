@@ -1206,10 +1206,6 @@ export const createInitialGameState = (
     })(),
     
     events: [],
-    weather: {
-      currentWeather: { type: 'clear', intensity: 0, duration: 3, description: 'Clear skies, perfect for business' },
-      forecast: [], effects: [],
-    },
     technology: {
       researched: [],
       available: [
