@@ -40,6 +40,18 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Publish layout vars to :root so fixed-position overlays (notifications) can read them
+  React.useEffect(() => {
+    const root = document.documentElement;
+    if (isMobile) {
+      root.style.setProperty('--right-sidebar-width', '0px');
+      root.style.setProperty('--top-bar-height', '4rem');
+    } else {
+      root.style.setProperty('--right-sidebar-width', `${rightWidth}px`);
+      root.style.setProperty('--top-bar-height', '4rem');
+    }
+  }, [rightWidth, isMobile]);
+
   React.useEffect(() => {
     if (!dragging) return;
     const onMove = (e: MouseEvent) => {
