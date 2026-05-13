@@ -7550,26 +7550,6 @@ export const useEnhancedMafiaGameState = (
     }
   };
 
-  // ============ WEATHER ============
-  const processWeather = (state: EnhancedMafiaGameState) => {
-    state.weather.currentWeather.duration -= 1;
-    if (state.weather.currentWeather.duration <= 0) {
-      const conditions = [
-        { type: 'clear', description: 'Clear skies' },
-        { type: 'rain', description: 'Heavy rain reduces police patrols' },
-        { type: 'fog', description: 'Fog provides cover' },
-        { type: 'storm', description: 'Storm disrupts operations' },
-      ];
-      const c = conditions[Math.floor(Math.random() * conditions.length)];
-      state.weather.currentWeather = {
-        type: c.type as any,
-        intensity: Math.floor(Math.random() * 100),
-        duration: Math.floor(Math.random() * 4) + 2,
-        description: c.description,
-      };
-    }
-  };
-
   // ============ EVENTS ============
   const processEvents = (state: EnhancedMafiaGameState) => {
     const diffMods = state.difficultyModifiers || DIFFICULTY_MODIFIERS.normal;
