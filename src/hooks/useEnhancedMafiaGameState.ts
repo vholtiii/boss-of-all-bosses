@@ -4,8 +4,6 @@ import {
   AIOpponent, 
   GameEvent, 
   EnhancedReputationSystem,
-  
-  WeatherSystem,
   TechnologySystem,
   SeasonalEvent
 } from '@/types/enhanced-mechanics';
