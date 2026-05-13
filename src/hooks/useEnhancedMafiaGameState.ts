@@ -308,7 +308,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     reputationHistory: [...(state.reputation.reputationHistory || [])],
     achievements: [...(state.reputation.achievements || [])],
   },
-  weather: { ...state.weather, currentWeather: { ...state.weather.currentWeather } },
+  
   finances: { ...state.finances },
   legalStatus: { ...state.legalStatus },
     arrestedSoldiers: [...(state.arrestedSoldiers || [])],
