@@ -7485,6 +7485,7 @@ export const useEnhancedMafiaGameState = (
                 unitId: arrested.id,
                 returnTurn: state.turn + sentence,
                 source: 'heat',
+                family: fam,
               }];
               state.deployedUnits = state.deployedUnits.filter(u => u.id !== arrested.id);
               state.pendingNotifications.push({
