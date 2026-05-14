@@ -8438,21 +8438,31 @@ export const useEnhancedMafiaGameState = (
             newState.lastLawyerTurn = newState.turn;
             newState.lawyerActiveUntil = newState.turn + 3;
             
-            // Reduce all active arrest sentences by 25%
+            // Reduce all active arrest sentences by 25% — but never reduce arrests
+            // created on the current turn (player would lose them next turn), and
+            // always leave at least 2 turns until release so it doesn't feel like
+            // a "spontaneous" return.
+            const MIN_RELEASE_GAP = 2;
             newState.policeHeat.arrests = newState.policeHeat.arrests.map(a => {
+              if (a.turn === newState.turn) return a;
               if (newState.turn - a.turn < a.sentence) {
-                return { ...a, sentence: Math.max(1, Math.floor(a.sentence * 0.75)) };
+                return { ...a, sentence: Math.max(a.sentence - (newState.turn - a.turn), Math.floor(a.sentence * 0.75)) };
               }
               return a;
             });
-            // Also reduce arrested soldiers/capos return times by 25%
+            const reduceReturn = (returnTurn: number, arrestTurn?: number) => {
+              if (arrestTurn !== undefined && arrestTurn === newState.turn) return returnTurn;
+              const remaining = returnTurn - newState.turn;
+              if (remaining <= MIN_RELEASE_GAP) return returnTurn;
+              return newState.turn + Math.max(MIN_RELEASE_GAP, Math.floor(remaining * 0.75));
+            };
             newState.arrestedSoldiers = (newState.arrestedSoldiers || []).map(a => ({
               ...a,
-              returnTurn: Math.max(newState.turn + 1, newState.turn + Math.max(1, Math.floor((a.returnTurn - newState.turn) * 0.75))),
+              returnTurn: reduceReturn(a.returnTurn, a.arrestTurn),
             }));
             newState.arrestedCapos = (newState.arrestedCapos || []).map(a => ({
               ...a,
-              returnTurn: Math.max(newState.turn + 1, newState.turn + Math.max(1, Math.floor((a.returnTurn - newState.turn) * 0.75))),
+              returnTurn: reduceReturn(a.returnTurn, a.arrestTurn),
             }));
             
             // Remove first active arrest if any, otherwise just reduce heat
