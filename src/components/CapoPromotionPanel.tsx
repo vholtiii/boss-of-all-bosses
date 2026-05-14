@@ -154,6 +154,10 @@ const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
                 )}
 
                 {s.eligible && !s.isPending && (
+                  <p className="text-[10px] font-semibold text-green-400 mb-1 text-center">🎖️ Eligible for stripes</p>
+                )}
+
+                {s.eligible && !s.isPending && (
                   <Button
                     size="sm"
                     className="w-full h-7 text-xs"
