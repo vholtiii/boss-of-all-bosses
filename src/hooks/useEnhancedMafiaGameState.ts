@@ -4244,8 +4244,15 @@ export const useEnhancedMafiaGameState = (
                 id: a.unitId, type: 'soldier', family: newState.playerFamily,
                 q: hq.q, r: hq.r, s: hq.s,
                 movesRemaining: 2, maxMoves: 2, level: 1,
-              });
+                recruited: a.recruited,
+              } as any);
+              console.log('[release] heat-arrest soldier returned to HQ', { id: a.unitId, turn: newState.turn });
               turnReport.events.push(`🔓 Soldier released from jail and returned to HQ.`);
+              newState.pendingNotifications.push({
+                type: 'success' as const,
+                title: '🔓 Soldier Released',
+                message: `A soldier finished their sentence and returned to HQ.`,
+              });
             }
           });
           newState.arrestedSoldiers = newState.arrestedSoldiers.filter(
@@ -4259,14 +4266,20 @@ export const useEnhancedMafiaGameState = (
             const capoUnit = newState.deployedUnits.find(u => u.id === a.unitId);
             // Only re-deploy if not already on the map (should have been removed)
             if (hq && !capoUnit) {
-              const stats = newState.soldierStats[a.unitId];
               newState.deployedUnits.push({
                 id: a.unitId, type: 'capo', family: newState.playerFamily,
                 q: hq.q, r: hq.r, s: hq.s,
                 movesRemaining: 2, maxMoves: 2, level: 1,
-                name: generateCapoName(),
+                name: a.name || 'Capo',
+                recruited: a.recruited,
+              } as any);
+              console.log('[release] capo returned to HQ', { id: a.unitId, name: a.name, turn: newState.turn });
+              turnReport.events.push(`🔓 Capo ${a.name || ''} released from jail and returned to HQ.`);
+              newState.pendingNotifications.push({
+                type: 'success' as const,
+                title: '🔓 Capo Released',
+                message: `${a.name || 'Your capo'} finished their sentence and returned to HQ.`,
               });
-              turnReport.events.push(`🔓 Capo released from jail and returned to HQ.`);
             }
           });
           newState.arrestedCapos = newState.arrestedCapos.filter(a => a.returnTurn > newState.turn);
