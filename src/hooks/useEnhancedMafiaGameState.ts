@@ -499,8 +499,8 @@ export interface EnhancedMafiaGameState {
   federalIndictmentTimer: number;
   federalIndictmentActive: boolean;
   federalIndictmentRecoveryTurn: number;
-  arrestedSoldiers: Array<{ unitId: string; returnTurn: number; source?: 'heat' | 'prosecution' }>;
-  arrestedCapos: Array<{ unitId: string; returnTurn: number }>;
+  arrestedSoldiers: Array<{ unitId: string; returnTurn: number; arrestTurn?: number; source?: 'heat' | 'prosecution'; recruited?: boolean }>;
+  arrestedCapos: Array<{ unitId: string; returnTurn: number; arrestTurn?: number; name?: string; recruited?: boolean }>;
   gameOver?: { type: 'rico' | 'federal_indictment'; turn: number } | null;
   aiVictor?: { family: string; type: 'territory' | 'economic' | 'legacy' | 'domination'; turn: number } | null;
   pendingBusinessBuild?: { businessType: string; cost: number; isLegal: boolean } | null;
@@ -3346,6 +3346,7 @@ export const useEnhancedMafiaGameState = (
               maxMoves: 2,
               level: 1,
             });
+            console.log('[spawn] safehouse hidden soldier returned to HQ', { id: h.unitId, family: ownerFam, turn: newState.turn });
             if (!newState.soldierStats[h.unitId]) {
               newState.soldierStats[h.unitId] = {
                 loyalty: 50, training: 0, hits: 0, extortions: 0,
@@ -3444,7 +3445,11 @@ export const useEnhancedMafiaGameState = (
       newState.maxTacticalActions = TACTICAL_ACTIONS_PER_TURN;
 
       // ============ SECONDARY: BRONX FREE RECRUIT (every 3 turns) ============
-      if (hasPlayerDistrictBonus(newState, 'free_recruit') && newState.turn % 3 === 0) {
+      // Double-check actual current Bronx ownership to prevent stale-bonus spawns.
+      const bronxHexes = newState.hexMap.filter(t => t.district === 'Bronx');
+      const bronxPlayerCount = bronxHexes.filter(t => t.controllingFamily === newState.playerFamily).length;
+      const ownsBronxNow = bronxHexes.length > 0 && (bronxPlayerCount / bronxHexes.length) >= 0.6;
+      if (hasPlayerDistrictBonus(newState, 'free_recruit') && ownsBronxNow && newState.turn % 3 === 0) {
         const hq = newState.headquarters[newState.playerFamily];
         if (hq) {
           const freeId = `${newState.playerFamily}-soldier-free-${Date.now()}`;
@@ -3468,6 +3473,7 @@ export const useEnhancedMafiaGameState = (
             message: 'A local from the Bronx has joined the family for free (district control bonus).',
           });
           turnReport.events.push('🏠 Free soldier recruited from Bronx district control.');
+          console.log('[spawn] bronx free recruit', { turn: newState.turn, bronxPlayerCount, bronxTotal: bronxHexes.length });
         }
       }
 
@@ -4244,8 +4250,15 @@ export const useEnhancedMafiaGameState = (
                 id: a.unitId, type: 'soldier', family: newState.playerFamily,
                 q: hq.q, r: hq.r, s: hq.s,
                 movesRemaining: 2, maxMoves: 2, level: 1,
-              });
+                recruited: a.recruited,
+              } as any);
+              console.log('[release] heat-arrest soldier returned to HQ', { id: a.unitId, turn: newState.turn });
               turnReport.events.push(`🔓 Soldier released from jail and returned to HQ.`);
+              newState.pendingNotifications.push({
+                type: 'success' as const,
+                title: '🔓 Soldier Released',
+                message: `A soldier finished their sentence and returned to HQ.`,
+              });
             }
           });
           newState.arrestedSoldiers = newState.arrestedSoldiers.filter(
@@ -4259,14 +4272,20 @@ export const useEnhancedMafiaGameState = (
             const capoUnit = newState.deployedUnits.find(u => u.id === a.unitId);
             // Only re-deploy if not already on the map (should have been removed)
             if (hq && !capoUnit) {
-              const stats = newState.soldierStats[a.unitId];
               newState.deployedUnits.push({
                 id: a.unitId, type: 'capo', family: newState.playerFamily,
                 q: hq.q, r: hq.r, s: hq.s,
                 movesRemaining: 2, maxMoves: 2, level: 1,
-                name: generateCapoName(),
+                name: a.name || 'Capo',
+                recruited: a.recruited,
+              } as any);
+              console.log('[release] capo returned to HQ', { id: a.unitId, name: a.name, turn: newState.turn });
+              turnReport.events.push(`🔓 Capo ${a.name || ''} released from jail and returned to HQ.`);
+              newState.pendingNotifications.push({
+                type: 'success' as const,
+                title: '🔓 Capo Released',
+                message: `${a.name || 'Your capo'} finished their sentence and returned to HQ.`,
               });
-              turnReport.events.push(`🔓 Capo released from jail and returned to HQ.`);
             }
           });
           newState.arrestedCapos = newState.arrestedCapos.filter(a => a.returnTurn > newState.turn);
@@ -4306,7 +4325,7 @@ export const useEnhancedMafiaGameState = (
               newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== arrested.id);
               const baseSentence = 3;
               const sentence = lawyerActive ? Math.max(1, Math.floor(baseSentence * 0.75)) : baseSentence;
-              newState.arrestedSoldiers = [...(newState.arrestedSoldiers || []), { unitId: arrested.id, returnTurn: newState.turn + sentence }];
+              newState.arrestedSoldiers = [...(newState.arrestedSoldiers || []), { unitId: arrested.id, returnTurn: newState.turn + sentence, arrestTurn: newState.turn, source: 'heat', recruited: (arrested as any).recruited }];
               newState.policeHeat.arrests.push({
                 id: `arrest-street-${newState.turn}`,
                 type: 'street',
@@ -4333,7 +4352,7 @@ export const useEnhancedMafiaGameState = (
               newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== arrested.id);
               const baseSentence = 5;
               const sentence = lawyerActive ? Math.max(1, Math.floor(baseSentence * 0.75)) : baseSentence;
-              newState.arrestedCapos = [...(newState.arrestedCapos || []), { unitId: arrested.id, returnTurn: newState.turn + sentence }];
+              newState.arrestedCapos = [...(newState.arrestedCapos || []), { unitId: arrested.id, returnTurn: newState.turn + sentence, arrestTurn: newState.turn, name: (arrested as any).name, recruited: (arrested as any).recruited }];
               newState.policeHeat.arrests.push({
                 id: `arrest-capo-${newState.turn}`,
                 type: 'management',
@@ -4532,6 +4551,7 @@ export const useEnhancedMafiaGameState = (
             if (stats) {
               stats.loyalty = Math.max(0, stats.loyalty - PROSECUTION_ARREST_LOYALTY_PENALTY);
             }
+            console.log('[release] prosecution soldier returned to HQ', { id: soldierId, turn: newState.turn });
             turnReport.events.push(`⚖️ A soldier has been released from federal custody and returned to HQ (−${PROSECUTION_ARREST_LOYALTY_PENALTY} loyalty)`);
             newState.pendingNotifications.push({
               type: 'warning' as const,
@@ -8425,21 +8445,31 @@ export const useEnhancedMafiaGameState = (
             newState.lastLawyerTurn = newState.turn;
             newState.lawyerActiveUntil = newState.turn + 3;
             
-            // Reduce all active arrest sentences by 25%
+            // Reduce all active arrest sentences by 25% — but never reduce arrests
+            // created on the current turn (player would lose them next turn), and
+            // always leave at least 2 turns until release so it doesn't feel like
+            // a "spontaneous" return.
+            const MIN_RELEASE_GAP = 2;
             newState.policeHeat.arrests = newState.policeHeat.arrests.map(a => {
+              if (a.turn === newState.turn) return a;
               if (newState.turn - a.turn < a.sentence) {
-                return { ...a, sentence: Math.max(1, Math.floor(a.sentence * 0.75)) };
+                return { ...a, sentence: Math.max(a.sentence - (newState.turn - a.turn), Math.floor(a.sentence * 0.75)) };
               }
               return a;
             });
-            // Also reduce arrested soldiers/capos return times by 25%
+            const reduceReturn = (returnTurn: number, arrestTurn?: number) => {
+              if (arrestTurn !== undefined && arrestTurn === newState.turn) return returnTurn;
+              const remaining = returnTurn - newState.turn;
+              if (remaining <= MIN_RELEASE_GAP) return returnTurn;
+              return newState.turn + Math.max(MIN_RELEASE_GAP, Math.floor(remaining * 0.75));
+            };
             newState.arrestedSoldiers = (newState.arrestedSoldiers || []).map(a => ({
               ...a,
-              returnTurn: Math.max(newState.turn + 1, newState.turn + Math.max(1, Math.floor((a.returnTurn - newState.turn) * 0.75))),
+              returnTurn: reduceReturn(a.returnTurn, a.arrestTurn),
             }));
             newState.arrestedCapos = (newState.arrestedCapos || []).map(a => ({
               ...a,
-              returnTurn: Math.max(newState.turn + 1, newState.turn + Math.max(1, Math.floor((a.returnTurn - newState.turn) * 0.75))),
+              returnTurn: reduceReturn(a.returnTurn, a.arrestTurn),
             }));
             
             // Remove first active arrest if any, otherwise just reduce heat
