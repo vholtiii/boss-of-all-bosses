@@ -499,8 +499,8 @@ export interface EnhancedMafiaGameState {
   federalIndictmentTimer: number;
   federalIndictmentActive: boolean;
   federalIndictmentRecoveryTurn: number;
-  arrestedSoldiers: Array<{ unitId: string; returnTurn: number; source?: 'heat' | 'prosecution' }>;
-  arrestedCapos: Array<{ unitId: string; returnTurn: number }>;
+  arrestedSoldiers: Array<{ unitId: string; returnTurn: number; arrestTurn?: number; source?: 'heat' | 'prosecution'; recruited?: boolean }>;
+  arrestedCapos: Array<{ unitId: string; returnTurn: number; arrestTurn?: number; name?: string; recruited?: boolean }>;
   gameOver?: { type: 'rico' | 'federal_indictment'; turn: number } | null;
   aiVictor?: { family: string; type: 'territory' | 'economic' | 'legacy' | 'domination'; turn: number } | null;
   pendingBusinessBuild?: { businessType: string; cost: number; isLegal: boolean } | null;
