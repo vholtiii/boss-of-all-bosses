@@ -4236,8 +4236,9 @@ export const useEnhancedMafiaGameState = (
       {
         // Skip prosecution arrests — those are handled by the dedicated block below
         // (which applies a loyalty penalty + specific notification).
+        const isPlayerEntry = (a: any) => !a.family || a.family === newState.playerFamily;
         const releasedSoldiers = (newState.arrestedSoldiers || []).filter(
-          a => a.returnTurn <= newState.turn && a.source !== 'prosecution'
+          a => a.returnTurn <= newState.turn && a.source !== 'prosecution' && isPlayerEntry(a)
         );
         if (releasedSoldiers.length > 0) {
           releasedSoldiers.forEach(a => {
@@ -4262,10 +4263,32 @@ export const useEnhancedMafiaGameState = (
             }
           });
           newState.arrestedSoldiers = newState.arrestedSoldiers.filter(
-            a => !(a.returnTurn <= newState.turn && a.source !== 'prosecution')
+            a => !(a.returnTurn <= newState.turn && a.source !== 'prosecution' && isPlayerEntry(a))
           );
         }
-        const releasedCapos = (newState.arrestedCapos || []).filter(a => a.returnTurn <= newState.turn);
+        // AI heat-arrest releases — return AI soldier to that family's HQ
+        const releasedAISoldiers = (newState.arrestedSoldiers || []).filter(
+          a => a.returnTurn <= newState.turn && a.source !== 'prosecution' && a.family && a.family !== newState.playerFamily
+        );
+        if (releasedAISoldiers.length > 0) {
+          releasedAISoldiers.forEach(a => {
+            const hq = newState.headquarters[a.family!];
+            const alreadyDeployed = newState.deployedUnits.some(u => u.id === a.unitId);
+            if (hq && !alreadyDeployed) {
+              newState.deployedUnits.push({
+                id: a.unitId, type: 'soldier', family: a.family!,
+                q: hq.q, r: hq.r, s: hq.s,
+                movesRemaining: 2, maxMoves: 2, level: 1,
+                recruited: a.recruited,
+              } as any);
+              console.log('[release] AI heat-arrest soldier returned to AI HQ', { id: a.unitId, family: a.family, turn: newState.turn });
+            }
+          });
+          newState.arrestedSoldiers = newState.arrestedSoldiers.filter(
+            a => !(a.returnTurn <= newState.turn && a.source !== 'prosecution' && a.family && a.family !== newState.playerFamily)
+          );
+        }
+        const releasedCapos = (newState.arrestedCapos || []).filter(a => a.returnTurn <= newState.turn && isPlayerEntry(a));
         if (releasedCapos.length > 0) {
           releasedCapos.forEach(a => {
             const hq = newState.headquarters[newState.playerFamily];
@@ -4288,7 +4311,7 @@ export const useEnhancedMafiaGameState = (
               });
             }
           });
-          newState.arrestedCapos = newState.arrestedCapos.filter(a => a.returnTurn > newState.turn);
+          newState.arrestedCapos = newState.arrestedCapos.filter(a => !(a.returnTurn <= newState.turn && isPlayerEntry(a)));
         }
       }
 
