@@ -3447,7 +3447,7 @@ export const useEnhancedMafiaGameState = (
       // Double-check actual current Bronx ownership to prevent stale-bonus spawns.
       const bronxHexes = newState.hexMap.filter(t => t.district === 'Bronx');
       const bronxPlayerCount = bronxHexes.filter(t => t.controllingFamily === newState.playerFamily).length;
-      const ownsBronxNow = bronxHexes.length > 0 && (bronxPlayerCount / bronxHexes.length) >= DISTRICT_CONTROL_THRESHOLD;
+      const ownsBronxNow = bronxHexes.length > 0 && (bronxPlayerCount / bronxHexes.length) >= 0.6;
       if (hasPlayerDistrictBonus(newState, 'free_recruit') && ownsBronxNow && newState.turn % 3 === 0) {
         const hq = newState.headquarters[newState.playerFamily];
         if (hq) {
