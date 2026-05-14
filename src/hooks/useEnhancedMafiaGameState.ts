@@ -4473,6 +4473,7 @@ export const useEnhancedMafiaGameState = (
                 unitId: victim.id,
                 returnTurn: newState.turn + PROSECUTION_ARREST_DURATION,
                 source: 'prosecution',
+                family: newState.playerFamily,
               });
               turnReport.events.push(`⚖️ PROSECUTION ARREST: A soldier was indicted and arrested for ${PROSECUTION_ARREST_DURATION} turns! (Maintenance still due)`);
               newState.pendingNotifications.push({
