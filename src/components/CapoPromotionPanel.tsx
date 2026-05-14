@@ -199,33 +199,31 @@ const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
               <Crown className="h-4 w-4 text-yellow-400" />
               Make Him a Capo?
             </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-2 text-sm">
-                <p>
-                  You're about to promote <span className="font-semibold text-foreground">{confirmTarget?.id.split('-').slice(0, 2).join(' ')}</span> to Capo.
-                </p>
-                <div className="rounded-md border border-border bg-muted/30 p-3 space-y-1.5">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Cost:</span>
-                    <span className="font-semibold text-foreground">${confirmTarget?.cost.toLocaleString()}</span>
-                  </div>
-                  {confirmTarget?.hasDiscount && (
-                    <div className="flex justify-between text-green-400 text-xs">
-                      <span>Loyalty bonus:</span>
-                      <span>25% off applied</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Ceremony:</span>
-                    <span className="font-semibold text-foreground">1 turn</span>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground italic">
-                  He'll be unavailable for the ceremony, then become a Capo at the start of next turn — gaining flight, auto-claim, and combat immunity.
-                </p>
-              </div>
+            <AlertDialogDescription>
+              You're about to promote {confirmTarget?.id.split('-').slice(0, 2).join(' ')} to Capo.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-2 text-sm">
+            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Cost:</span>
+                <span className="font-semibold text-foreground">${confirmTarget?.cost.toLocaleString()}</span>
+              </div>
+              {confirmTarget?.hasDiscount && (
+                <div className="flex justify-between text-green-400 text-xs">
+                  <span>Loyalty bonus:</span>
+                  <span>25% off applied</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Ceremony:</span>
+                <span className="font-semibold text-foreground">1 turn</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground italic">
+              He'll be unavailable for the ceremony, then become a Capo at the start of next turn — gaining flight, auto-claim, and combat immunity.
+            </p>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
