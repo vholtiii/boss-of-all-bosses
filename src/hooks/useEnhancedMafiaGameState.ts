@@ -8489,14 +8489,13 @@ export const useEnhancedMafiaGameState = (
               if (remaining <= MIN_RELEASE_GAP) return returnTurn;
               return newState.turn + Math.max(MIN_RELEASE_GAP, Math.floor(remaining * 0.75));
             };
-            newState.arrestedSoldiers = (newState.arrestedSoldiers || []).map(a => ({
-              ...a,
-              returnTurn: reduceReturn(a.returnTurn, a.arrestTurn),
-            }));
-            newState.arrestedCapos = (newState.arrestedCapos || []).map(a => ({
-              ...a,
-              returnTurn: reduceReturn(a.returnTurn, a.arrestTurn),
-            }));
+            const isPlayerArrest = (a: any) => !a.family || a.family === newState.playerFamily;
+            newState.arrestedSoldiers = (newState.arrestedSoldiers || []).map(a => (
+              isPlayerArrest(a) ? { ...a, returnTurn: reduceReturn(a.returnTurn, a.arrestTurn) } : a
+            ));
+            newState.arrestedCapos = (newState.arrestedCapos || []).map(a => (
+              isPlayerArrest(a) ? { ...a, returnTurn: reduceReturn(a.returnTurn, a.arrestTurn) } : a
+            ));
             
             // Remove first active arrest if any, otherwise just reduce heat
             const activeArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn < a.sentence);
