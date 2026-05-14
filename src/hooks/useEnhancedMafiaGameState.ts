@@ -4552,8 +4552,9 @@ export const useEnhancedMafiaGameState = (
 
       // ============ PROSECUTION-ARRESTED SOLDIER RELEASE ============
       {
+        const isPlayerProsEntry = (a: any) => !a.family || a.family === newState.playerFamily;
         const releasedSoldiers = newState.arrestedSoldiers.filter(
-          a => a.source === 'prosecution' && newState.turn >= a.returnTurn
+          a => a.source === 'prosecution' && newState.turn >= a.returnTurn && isPlayerProsEntry(a)
         );
         releasedSoldiers.forEach(a => {
           // Return soldier to HQ with -10 loyalty
