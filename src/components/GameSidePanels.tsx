@@ -825,17 +825,24 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 />
               );
             })()}
-            {/* Arrested Units Summary */}
-            {(((gameState as any).arrestedSoldiers?.length || 0) > 0 || ((gameState as any).arrestedCapos?.length || 0) > 0) && (
-              <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs space-y-0.5">
-                {((gameState as any).arrestedSoldiers || []).map((a: any, i: number) => (
-                  <div key={i} className="text-muted-foreground">🔒 Soldier jailed — returns turn {a.returnTurn}</div>
-                ))}
-                {((gameState as any).arrestedCapos || []).map((a: any, i: number) => (
-                  <div key={i} className="text-orange-400">🔒 Capo jailed — returns turn {a.returnTurn}</div>
-                ))}
-              </div>
-            )}
+            {/* Arrested Units Summary — player only */}
+            {(() => {
+              const playerFam = (gameState as any).playerFamily;
+              const isMine = (a: any) => !a.family || a.family === playerFam;
+              const playerSoldiers = ((gameState as any).arrestedSoldiers || []).filter(isMine);
+              const playerCapos = ((gameState as any).arrestedCapos || []).filter(isMine);
+              if (playerSoldiers.length === 0 && playerCapos.length === 0) return null;
+              return (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs space-y-0.5">
+                  {playerSoldiers.map((a: any, i: number) => (
+                    <div key={`s-${i}`} className="text-muted-foreground">🔒 Soldier jailed — returns turn {a.returnTurn}</div>
+                  ))}
+                  {playerCapos.map((a: any, i: number) => (
+                    <div key={`c-${i}`} className="text-orange-400">🔒 Capo jailed — returns turn {a.returnTurn}</div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </CollapsibleSection>
 
