@@ -173,7 +173,7 @@ const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
                     size="sm"
                     className="w-full h-7 text-xs"
                     disabled={money < s.cost || !hasSlot}
-                    onClick={(e) => { e.stopPropagation(); onPromote(s.id); }}
+                    onClick={(e) => { e.stopPropagation(); setConfirmTarget({ id: s.id, cost: s.cost, hasDiscount: s.hasDiscount }); }}
                   >
                     <Crown className="h-3 w-3 mr-1" />
                     Promote to Capo · ${s.cost.toLocaleString()}
