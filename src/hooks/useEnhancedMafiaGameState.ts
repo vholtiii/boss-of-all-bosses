@@ -3472,6 +3472,7 @@ export const useEnhancedMafiaGameState = (
             message: 'A local from the Bronx has joined the family for free (district control bonus).',
           });
           turnReport.events.push('🏠 Free soldier recruited from Bronx district control.');
+          console.log('[spawn] bronx free recruit', { turn: newState.turn, bronxPlayerCount, bronxTotal: bronxHexes.length });
         }
       }
 
