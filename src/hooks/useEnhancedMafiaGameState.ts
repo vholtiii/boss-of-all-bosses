@@ -4333,7 +4333,7 @@ export const useEnhancedMafiaGameState = (
               newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== arrested.id);
               const baseSentence = 5;
               const sentence = lawyerActive ? Math.max(1, Math.floor(baseSentence * 0.75)) : baseSentence;
-              newState.arrestedCapos = [...(newState.arrestedCapos || []), { unitId: arrested.id, returnTurn: newState.turn + sentence }];
+              newState.arrestedCapos = [...(newState.arrestedCapos || []), { unitId: arrested.id, returnTurn: newState.turn + sentence, arrestTurn: newState.turn, name: (arrested as any).name, recruited: (arrested as any).recruited }];
               newState.policeHeat.arrests.push({
                 id: `arrest-capo-${newState.turn}`,
                 type: 'management',
