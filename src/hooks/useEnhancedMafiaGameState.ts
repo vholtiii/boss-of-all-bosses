@@ -4587,7 +4587,7 @@ export const useEnhancedMafiaGameState = (
         });
         // Remove released from arrested list
         newState.arrestedSoldiers = newState.arrestedSoldiers.filter(
-          a => !(a.source === 'prosecution' && newState.turn >= a.returnTurn)
+          a => !(a.source === 'prosecution' && newState.turn >= a.returnTurn && isPlayerProsEntry(a))
         );
       }
       {
