@@ -4550,6 +4550,7 @@ export const useEnhancedMafiaGameState = (
             if (stats) {
               stats.loyalty = Math.max(0, stats.loyalty - PROSECUTION_ARREST_LOYALTY_PENALTY);
             }
+            console.log('[release] prosecution soldier returned to HQ', { id: soldierId, turn: newState.turn });
             turnReport.events.push(`⚖️ A soldier has been released from federal custody and returned to HQ (−${PROSECUTION_ARREST_LOYALTY_PENALTY} loyalty)`);
             newState.pendingNotifications.push({
               type: 'warning' as const,
