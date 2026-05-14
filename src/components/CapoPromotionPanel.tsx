@@ -110,7 +110,7 @@ const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
                   s.isPending
                     ? 'border-yellow-500/50 bg-yellow-500/10'
                     : s.eligible
-                    ? 'border-primary/30 bg-primary/5'
+                    ? 'border-green-500/60 bg-green-500/10 ring-1 ring-green-500/40'
                     : 'border-border bg-card'
                 }`}
                 onClick={() => onHighlightSoldier?.(s.id)}
@@ -126,8 +126,8 @@ const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
                       In Ceremony
                     </Badge>
                   ) : s.eligible ? (
-                    <Badge variant="default" className="text-[9px] px-1.5 py-0">
-                      Eligible
+                    <Badge className="text-[9px] px-1.5 py-0 bg-green-500/20 text-green-300 border border-green-500/50 hover:bg-green-500/20">
+                      Eligible for Stripes
                     </Badge>
                   ) : null}
                 </div>
@@ -151,6 +151,10 @@ const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
 
                 {s.hasDiscount && !s.isPending && (
                   <p className="text-[9px] text-green-400 mb-1">💰 Loyalty bonus: 25% off (${s.cost.toLocaleString()})</p>
+                )}
+
+                {s.eligible && !s.isPending && (
+                  <p className="text-[10px] font-semibold text-green-400 mb-1 text-center">🎖️ Eligible for stripes</p>
                 )}
 
                 {s.eligible && !s.isPending && (
