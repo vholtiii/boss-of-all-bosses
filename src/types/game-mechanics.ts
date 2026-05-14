@@ -414,8 +414,8 @@ export const CAPO_PROMOTION_COST = 10000;
 export const CAPO_PROMOTION_LOYALTY_DISCOUNT = 0.25; // 25% off when loyalty is at cap
 export const CAPO_PROMOTION_LOYALTY_THRESHOLD = 80;  // loyalty must be at this value for discount
 export const CAPO_PROMOTION_REQUIREMENTS = {
-  maxThreshold: 5,        // one stat maxed at 5 triggers discount on the other
-  discountedThreshold: 3, // the other stat only needs 3 if one is maxed
+  maxThreshold: 5,        // one stat maxed at 5 triggers minimal floor on the other
+  discountedThreshold: 1, // the other stat only needs 1 if one is maxed
   balancedThreshold: 4,   // both stats need 4 if neither is maxed at 5
 };
 
@@ -423,7 +423,8 @@ export const CAPO_PROMOTION_REQUIREMENTS = {
 export function isCapoPromotionEligible(stats: SoldierStats): boolean {
   const v = stats.victories;
   const r = stats.racketeering;
-  return ((v >= 5 && r >= 3) || (r >= 5 && v >= 3) || (v >= 4 && r >= 4)) && stats.loyalty >= 70 && stats.training >= 3;
+  const { maxThreshold: M, discountedThreshold: D, balancedThreshold: B } = CAPO_PROMOTION_REQUIREMENTS;
+  return ((v >= M && r >= D) || (r >= M && v >= D) || (v >= B && r >= B)) && stats.loyalty >= 70 && stats.training >= 3;
 }
 
 // Helper: get promotion cost with loyalty discount
