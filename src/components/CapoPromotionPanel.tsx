@@ -48,6 +48,7 @@ const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
 }) => {
   const hasSlot = capoCount < MAX_CAPOS;
   const { maxThreshold, discountedThreshold, balancedThreshold } = CAPO_PROMOTION_REQUIREMENTS;
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; cost: number; hasDiscount: boolean } | null>(null);
 
   const soldiers = deployedSoldierIds
     .filter(id => !hitmanIds.includes(id))
