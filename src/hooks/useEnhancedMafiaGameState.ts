@@ -499,8 +499,8 @@ export interface EnhancedMafiaGameState {
   federalIndictmentTimer: number;
   federalIndictmentActive: boolean;
   federalIndictmentRecoveryTurn: number;
-  arrestedSoldiers: Array<{ unitId: string; returnTurn: number; arrestTurn?: number; source?: 'heat' | 'prosecution'; recruited?: boolean }>;
-  arrestedCapos: Array<{ unitId: string; returnTurn: number; arrestTurn?: number; name?: string; recruited?: boolean }>;
+  arrestedSoldiers: Array<{ unitId: string; returnTurn: number; arrestTurn?: number; source?: 'heat' | 'prosecution'; recruited?: boolean; family?: string }>;
+  arrestedCapos: Array<{ unitId: string; returnTurn: number; arrestTurn?: number; name?: string; recruited?: boolean; family?: string }>;
   gameOver?: { type: 'rico' | 'federal_indictment'; turn: number } | null;
   aiVictor?: { family: string; type: 'territory' | 'economic' | 'legacy' | 'domination'; turn: number } | null;
   pendingBusinessBuild?: { businessType: string; cost: number; isLegal: boolean } | null;
@@ -4236,8 +4236,9 @@ export const useEnhancedMafiaGameState = (
       {
         // Skip prosecution arrests — those are handled by the dedicated block below
         // (which applies a loyalty penalty + specific notification).
+        const isPlayerEntry = (a: any) => !a.family || a.family === newState.playerFamily;
         const releasedSoldiers = (newState.arrestedSoldiers || []).filter(
-          a => a.returnTurn <= newState.turn && a.source !== 'prosecution'
+          a => a.returnTurn <= newState.turn && a.source !== 'prosecution' && isPlayerEntry(a)
         );
         if (releasedSoldiers.length > 0) {
           releasedSoldiers.forEach(a => {
@@ -4262,10 +4263,32 @@ export const useEnhancedMafiaGameState = (
             }
           });
           newState.arrestedSoldiers = newState.arrestedSoldiers.filter(
-            a => !(a.returnTurn <= newState.turn && a.source !== 'prosecution')
+            a => !(a.returnTurn <= newState.turn && a.source !== 'prosecution' && isPlayerEntry(a))
           );
         }
-        const releasedCapos = (newState.arrestedCapos || []).filter(a => a.returnTurn <= newState.turn);
+        // AI heat-arrest releases — return AI soldier to that family's HQ
+        const releasedAISoldiers = (newState.arrestedSoldiers || []).filter(
+          a => a.returnTurn <= newState.turn && a.source !== 'prosecution' && a.family && a.family !== newState.playerFamily
+        );
+        if (releasedAISoldiers.length > 0) {
+          releasedAISoldiers.forEach(a => {
+            const hq = newState.headquarters[a.family!];
+            const alreadyDeployed = newState.deployedUnits.some(u => u.id === a.unitId);
+            if (hq && !alreadyDeployed) {
+              newState.deployedUnits.push({
+                id: a.unitId, type: 'soldier', family: a.family!,
+                q: hq.q, r: hq.r, s: hq.s,
+                movesRemaining: 2, maxMoves: 2, level: 1,
+                recruited: a.recruited,
+              } as any);
+              console.log('[release] AI heat-arrest soldier returned to AI HQ', { id: a.unitId, family: a.family, turn: newState.turn });
+            }
+          });
+          newState.arrestedSoldiers = newState.arrestedSoldiers.filter(
+            a => !(a.returnTurn <= newState.turn && a.source !== 'prosecution' && a.family && a.family !== newState.playerFamily)
+          );
+        }
+        const releasedCapos = (newState.arrestedCapos || []).filter(a => a.returnTurn <= newState.turn && isPlayerEntry(a));
         if (releasedCapos.length > 0) {
           releasedCapos.forEach(a => {
             const hq = newState.headquarters[newState.playerFamily];
@@ -4288,7 +4311,7 @@ export const useEnhancedMafiaGameState = (
               });
             }
           });
-          newState.arrestedCapos = newState.arrestedCapos.filter(a => a.returnTurn > newState.turn);
+          newState.arrestedCapos = newState.arrestedCapos.filter(a => !(a.returnTurn <= newState.turn && isPlayerEntry(a)));
         }
       }
 
@@ -4325,7 +4348,7 @@ export const useEnhancedMafiaGameState = (
               newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== arrested.id);
               const baseSentence = 3;
               const sentence = lawyerActive ? Math.max(1, Math.floor(baseSentence * 0.75)) : baseSentence;
-              newState.arrestedSoldiers = [...(newState.arrestedSoldiers || []), { unitId: arrested.id, returnTurn: newState.turn + sentence, arrestTurn: newState.turn, source: 'heat', recruited: (arrested as any).recruited }];
+              newState.arrestedSoldiers = [...(newState.arrestedSoldiers || []), { unitId: arrested.id, returnTurn: newState.turn + sentence, arrestTurn: newState.turn, source: 'heat', recruited: (arrested as any).recruited, family: newState.playerFamily }];
               newState.policeHeat.arrests.push({
                 id: `arrest-street-${newState.turn}`,
                 type: 'street',
@@ -4352,7 +4375,7 @@ export const useEnhancedMafiaGameState = (
               newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== arrested.id);
               const baseSentence = 5;
               const sentence = lawyerActive ? Math.max(1, Math.floor(baseSentence * 0.75)) : baseSentence;
-              newState.arrestedCapos = [...(newState.arrestedCapos || []), { unitId: arrested.id, returnTurn: newState.turn + sentence, arrestTurn: newState.turn, name: (arrested as any).name, recruited: (arrested as any).recruited }];
+              newState.arrestedCapos = [...(newState.arrestedCapos || []), { unitId: arrested.id, returnTurn: newState.turn + sentence, arrestTurn: newState.turn, name: (arrested as any).name, recruited: (arrested as any).recruited, family: newState.playerFamily }];
               newState.policeHeat.arrests.push({
                 id: `arrest-capo-${newState.turn}`,
                 type: 'management',
@@ -4450,6 +4473,7 @@ export const useEnhancedMafiaGameState = (
                 unitId: victim.id,
                 returnTurn: newState.turn + PROSECUTION_ARREST_DURATION,
                 source: 'prosecution',
+                family: newState.playerFamily,
               });
               turnReport.events.push(`⚖️ PROSECUTION ARREST: A soldier was indicted and arrested for ${PROSECUTION_ARREST_DURATION} turns! (Maintenance still due)`);
               newState.pendingNotifications.push({
@@ -4528,8 +4552,9 @@ export const useEnhancedMafiaGameState = (
 
       // ============ PROSECUTION-ARRESTED SOLDIER RELEASE ============
       {
+        const isPlayerProsEntry = (a: any) => !a.family || a.family === newState.playerFamily;
         const releasedSoldiers = newState.arrestedSoldiers.filter(
-          a => a.source === 'prosecution' && newState.turn >= a.returnTurn
+          a => a.source === 'prosecution' && newState.turn >= a.returnTurn && isPlayerProsEntry(a)
         );
         releasedSoldiers.forEach(a => {
           // Return soldier to HQ with -10 loyalty
@@ -4562,7 +4587,7 @@ export const useEnhancedMafiaGameState = (
         });
         // Remove released from arrested list
         newState.arrestedSoldiers = newState.arrestedSoldiers.filter(
-          a => !(a.source === 'prosecution' && newState.turn >= a.returnTurn)
+          a => !(a.source === 'prosecution' && newState.turn >= a.returnTurn && isPlayerProsEntry(a))
         );
       }
       {
@@ -7460,6 +7485,7 @@ export const useEnhancedMafiaGameState = (
                 unitId: arrested.id,
                 returnTurn: state.turn + sentence,
                 source: 'heat',
+                family: fam,
               }];
               state.deployedUnits = state.deployedUnits.filter(u => u.id !== arrested.id);
               state.pendingNotifications.push({
@@ -8463,14 +8489,13 @@ export const useEnhancedMafiaGameState = (
               if (remaining <= MIN_RELEASE_GAP) return returnTurn;
               return newState.turn + Math.max(MIN_RELEASE_GAP, Math.floor(remaining * 0.75));
             };
-            newState.arrestedSoldiers = (newState.arrestedSoldiers || []).map(a => ({
-              ...a,
-              returnTurn: reduceReturn(a.returnTurn, a.arrestTurn),
-            }));
-            newState.arrestedCapos = (newState.arrestedCapos || []).map(a => ({
-              ...a,
-              returnTurn: reduceReturn(a.returnTurn, a.arrestTurn),
-            }));
+            const isPlayerArrest = (a: any) => !a.family || a.family === newState.playerFamily;
+            newState.arrestedSoldiers = (newState.arrestedSoldiers || []).map(a => (
+              isPlayerArrest(a) ? { ...a, returnTurn: reduceReturn(a.returnTurn, a.arrestTurn) } : a
+            ));
+            newState.arrestedCapos = (newState.arrestedCapos || []).map(a => (
+              isPlayerArrest(a) ? { ...a, returnTurn: reduceReturn(a.returnTurn, a.arrestTurn) } : a
+            ));
             
             // Remove first active arrest if any, otherwise just reduce heat
             const activeArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn < a.sentence);

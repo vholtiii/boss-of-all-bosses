@@ -15,13 +15,19 @@
  *   - changed value semantics (enum rename, units changed, etc.)
  */
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 type Migration = (state: any) => any;
 
 export const migrations: Record<number, Migration> = {
-  // 1: baseline. No migrations yet. Add e.g.:
-  // 2: (s) => ({ ...s, supplyNodes: s.supplyNodes ?? [] }),
+  // v2: arrestedSoldiers / arrestedCapos now carry a `family` tag so AI arrests
+  // don't pollute the player's jail UI / HQ. Drop any pre-tag entries — they
+  // were polluted by the AI-arrest leak bug and re-deployed wrong on release.
+  2: (s) => ({
+    ...s,
+    arrestedSoldiers: (s.arrestedSoldiers || []).filter((a: any) => !!a.family),
+    arrestedCapos: (s.arrestedCapos || []).filter((a: any) => !!a.family),
+  }),
 };
 
 export interface MigrationResult {
