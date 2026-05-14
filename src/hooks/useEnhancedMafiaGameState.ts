@@ -3346,6 +3346,7 @@ export const useEnhancedMafiaGameState = (
               maxMoves: 2,
               level: 1,
             });
+            console.log('[spawn] safehouse hidden soldier returned to HQ', { id: h.unitId, family: ownerFam, turn: newState.turn });
             if (!newState.soldierStats[h.unitId]) {
               newState.soldierStats[h.unitId] = {
                 loyalty: 50, training: 0, hits: 0, extortions: 0,
