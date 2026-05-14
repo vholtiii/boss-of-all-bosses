@@ -126,8 +126,8 @@ const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
                       In Ceremony
                     </Badge>
                   ) : s.eligible ? (
-                    <Badge variant="default" className="text-[9px] px-1.5 py-0">
-                      Eligible
+                    <Badge className="text-[9px] px-1.5 py-0 bg-green-500/20 text-green-300 border border-green-500/50 hover:bg-green-500/20">
+                      Eligible for Stripes
                     </Badge>
                   ) : null}
                 </div>
