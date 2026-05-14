@@ -110,7 +110,7 @@ const CapoPromotionPanel: React.FC<CapoPromotionPanelProps> = ({
                   s.isPending
                     ? 'border-yellow-500/50 bg-yellow-500/10'
                     : s.eligible
-                    ? 'border-primary/30 bg-primary/5'
+                    ? 'border-green-500/60 bg-green-500/10 ring-1 ring-green-500/40'
                     : 'border-border bg-card'
                 }`}
                 onClick={() => onHighlightSoldier?.(s.id)}
