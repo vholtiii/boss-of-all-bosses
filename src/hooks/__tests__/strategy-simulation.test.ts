@@ -46,7 +46,6 @@ interface HookApi {
   performAction: (a: any) => void;
   performBusinessAction: (a: any) => void;
   selectTerritory: (t: any) => void;
-  selectUnit: (id: string | null) => void;
   moveUnit: (q: number, r: number, s: number) => void;
   deployUnit: (type: "soldier" | "capo", loc: { q: number; r: number; s: number }, family: string) => void;
   fortifyUnit: () => void;
@@ -123,7 +122,7 @@ const conqueror: StrategyPolicy = {
         if (s.actionsRemaining <= 0) break;
         const u = unitOnHex(s, fam, f.q, f.r, f.s);
         if (!u) continue;
-        try { api.selectUnit(u.id); } catch {}
+        try { } catch {}
         try {
           api.performAction({
             type: "claim_territory",
@@ -173,7 +172,7 @@ const tycoon: StrategyPolicy = {
           (x: any) => x.family === fam && x.q === hq.q && x.r === hq.r && x.s === hq.s
         );
         if (u) {
-          try { api.selectUnit(u.id); api.fortifyUnit(); } catch {}
+          try { api.fortifyUnit(); } catch {}
         }
       }
     } else {
@@ -205,7 +204,7 @@ const tycoon: StrategyPolicy = {
         const u = unitOnHex(s, fam, f.q, f.r, f.s);
         if (!u) continue;
         try {
-          api.selectUnit(u.id);
+          
           api.performAction({ type: "claim_territory", targetQ: f.q, targetR: f.r, targetS: f.s, unitId: u.id });
         } catch {}
       }
@@ -266,7 +265,7 @@ const diplomat: StrategyPolicy = {
         const u = unitOnHex(s, fam, f.q, f.r, f.s);
         if (!u) continue;
         try {
-          api.selectUnit(u.id);
+          
           api.performAction({ type: "claim_territory", targetQ: f.q, targetR: f.r, targetS: f.s, unitId: u.id });
         } catch {}
       }
