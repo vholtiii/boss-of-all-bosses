@@ -5627,6 +5627,29 @@ export const useEnhancedMafiaGameState = (
         || (atWarNow && basePersonality === 'opportunistic');
       oppAny.aiHeatCaution = strategicOverride ? 'override' : heatTier;
 
+      // ── STRATEGIC POSTURE (single high-level choice this turn) ──
+      const upkeepForRunway = Math.max(1, upkeepEstimate);
+      const moneyRunway = opponent.resources.money / upkeepForRunway;
+      const myRank = rankByTerritory(myTerritoryNow, [...rivalHexCounts, playerHexCount]);
+      const victoryGap = TERRITORY_TARGET_AI - myTerritoryNow;
+      const posture: AIPosture = computeAIPosture({
+        aiPhase,
+        heatTier,
+        myHexes: myHexCount,
+        rivalHexCounts: [...rivalHexCounts, playerHexCount],
+        myRank,
+        moneyRunway,
+        atWar: atWarNow,
+        recentCapoLosses: _recentCapoLosses,
+        hqAssaultedRecently: _hqAssaultedRecently,
+        victoryGap,
+        basePersonality,
+        dynamicMood,
+        strategicOverride,
+      });
+      oppAny.posture = posture;
+      const policy = posturePolicy(posture);
+
       // Heat-tier boost to the existing Lay Low fire chance
       const heatBoost = heatTier === 'critical' ? 0.40 : heatTier === 'hot' ? 0.20 : heatTier === 'warm' ? 0.05 : 0;
 
