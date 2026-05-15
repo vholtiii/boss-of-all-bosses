@@ -95,6 +95,7 @@ import {
   difficultySoftmaxTemperature, difficultyMoodSensitivity,
   type FamilyId, type AIPersonality, type DynamicMood,
 } from '@/lib/ai-strategy';
+import { computeAIPosture, posturePolicy, rankByTerritory, type AIPosture } from '@/lib/ai-posture';
 
 // ============ SEEDED PRNG (Mulberry32) ============
 function mulberry32(seed: number): () => number {
