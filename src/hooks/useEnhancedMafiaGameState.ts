@@ -5708,10 +5708,12 @@ export const useEnhancedMafiaGameState = (
       // Skip when overriding (AI is willing to push toward RICO for strategic gain).
       const bribeOnCD = (oppAny.bribeCooldownUntil || 0) > state.turn;
       if (!strategicOverride && !bribeOnCD) {
-        const spendChance = heatTier === 'critical' || heatTier === 'rico' ? 0.95
+        let spendChance = heatTier === 'critical' || heatTier === 'rico' ? 0.95
           : heatTier === 'hot' ? Math.min(0.95, 0.40 * personalityMult)
           : heatTier === 'warm' ? Math.min(0.95, 0.20 * personalityMult)
           : 0;
+        // Posture override: COOL_OFF forces an aggressive bribe even at low heat.
+        if (policy.forceBribe && aiHeat >= 30) spendChance = Math.max(spendChance, 0.9);
         const heatDrop = heatTier === 'rico' || heatTier === 'critical' ? 18 : heatTier === 'hot' ? 15 : 12;
         if (spendChance > 0 && Math.random() < spendChance) {
           aiSpendOnHeatReduction(state, fam, heatDrop, turnReport);
@@ -5723,8 +5725,18 @@ export const useEnhancedMafiaGameState = (
         oppAny.layLowCooldownUntil = state.turn + 7;
         if (turnReport) turnReport.aiActions.push({ family: fam, action: 'lay_low', detail: `Forced stand-down (heat ${aiHeat})` });
       }
+      // Posture COOL_OFF: also prefer lay-low even before heat hits critical.
+      const layLowOnCDNow = (oppAny.layLowCooldownUntil || 0) > state.turn;
+      if (policy.preferLayLow && !strategicOverride && !isAILayingLow(opponent, state.turn) && !layLowOnCDNow && Math.random() < 0.7) {
+        oppAny.layLowActiveUntil = state.turn + 2;
+        oppAny.layLowCooldownUntil = state.turn + 7;
+        if (turnReport) turnReport.aiActions.push({ family: fam, action: 'lay_low', detail: `Posture cool-off stand-down` });
+      }
       const aiHeatRicoFreeze = heatTier === 'rico' && !strategicOverride;
-      const aiOffenseDisabled = isAILayingLow(opponent, state.turn) || isAIAtMattresses(opponent, state.turn) || aiHeatRicoFreeze;
+      // Posture-driven offense suppression: prevents the "always in heat trouble" loop
+      // by stopping new offense once heat crosses the posture's ceiling.
+      const postureBlocksOffense = !strategicOverride && (policy.suppressOffense || aiHeat >= policy.heatCeiling);
+      const aiOffenseDisabled = isAILayingLow(opponent, state.turn) || isAIAtMattresses(opponent, state.turn) || aiHeatRicoFreeze || postureBlocksOffense;
 
       // Reset per-turn move budget for this AI family's units (mirror player reset).
       // Mattresses locks AI units' movement (parity with player).
