@@ -114,4 +114,77 @@ describe("plan_hit — two-turn contract", () => {
     );
     expect(warn).toBeTruthy();
   });
+
+  it("cancel_planned_hit during Tactical clears plannedHit without refunding the tactical action", () => {
+    const { result } = setupGame();
+    act(() => result.current.advancePhase()); // deploy → tactical/move
+
+    act(() => {
+      const s: any = result.current.gameState;
+      s.turnPhase = "move";
+      s.plannedHit = {
+        q: 0, r: 0, s: 0,
+        targetFamily: "lucchese",
+        targetUnitId: "fake-target",
+        plannerUnitId: "fake-planner",
+        plannedOnTurn: s.turn,
+        expiresOnTurn: s.turn + 3,
+      };
+      s.tacticalActionsRemaining = 2;
+    });
+
+    const tacticalBefore = result.current.gameState.tacticalActionsRemaining;
+    act(() => result.current.performAction({ type: "cancel_planned_hit" }));
+
+    const after: any = result.current.gameState;
+    expect(after.plannedHit).toBeNull();
+    expect(after.tacticalActionsRemaining).toBe(tacticalBefore);
+    const note = (after.pendingNotifications || []).find((n: any) =>
+      /Plan Hit Cancelled/i.test(n.title || "")
+    );
+    expect(note).toBeTruthy();
+  });
+
+  it("cancel_planned_hit with no active plan warns and is a no-op", () => {
+    const { result } = setupGame();
+    act(() => result.current.advancePhase());
+    act(() => {
+      const s: any = result.current.gameState;
+      s.turnPhase = "move";
+      s.plannedHit = null;
+    });
+
+    act(() => result.current.performAction({ type: "cancel_planned_hit" }));
+    const after: any = result.current.gameState;
+    expect(after.plannedHit).toBeNull();
+    const warn = (after.pendingNotifications || []).find((n: any) =>
+      /No Plan Active/i.test(n.title || "")
+    );
+    expect(warn).toBeTruthy();
+  });
+
+  it("cancel_planned_hit outside Tactical is rejected and keeps the plan", () => {
+    const { result } = setupGame();
+    act(() => {
+      const s: any = result.current.gameState;
+      s.turnPhase = "action";
+      s.plannedHit = {
+        q: 0, r: 0, s: 0,
+        targetFamily: "lucchese",
+        targetUnitId: "fake-target",
+        plannerUnitId: "fake-planner",
+        plannedOnTurn: s.turn,
+        expiresOnTurn: s.turn + 3,
+      };
+    });
+
+    act(() => result.current.performAction({ type: "cancel_planned_hit" }));
+    const after: any = result.current.gameState;
+    expect(after.plannedHit).toBeTruthy();
+    const warn = (after.pendingNotifications || []).find((n: any) =>
+      /Wrong Phase/i.test(n.title || "")
+    );
+    expect(warn).toBeTruthy();
+  });
 });
+
