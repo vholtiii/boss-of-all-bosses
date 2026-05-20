@@ -133,11 +133,11 @@ const CorruptionPanel: React.FC<CorruptionPanelProps> = ({
                     size="sm"
                     variant="outline"
                     className="h-7 text-xs"
-                    disabled={!canAfford || alreadyActive || !phaseIsAction || actionsRemaining <= 0}
-                    title={!phaseIsAction ? 'Available in Action step' : actionsRemaining <= 0 ? 'No actions left' : undefined}
+                    disabled={!canAfford || alreadyActive || !phaseIsTactical || actionsRemaining <= 0}
+                    title={!phaseIsTactical ? 'Available in Tactical step' : actionsRemaining <= 0 ? 'No tactical actions left' : undefined}
                     onClick={() => onBribe(config.tier, needsTarget ? selectedTarget : undefined)}
                   >
-                    {alreadyActive ? 'Active' : !phaseIsAction ? 'Action step' : actionsRemaining <= 0 ? 'No actions' : 'Bribe'}
+                    {alreadyActive ? 'Active' : !phaseIsTactical ? 'Tactical step' : actionsRemaining <= 0 ? 'No actions' : 'Bribe'}
                   </Button>
                 )}
               </div>
