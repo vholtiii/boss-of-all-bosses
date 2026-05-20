@@ -857,21 +857,17 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               onToggle={() => toggle('corruption')}
               phaseLocked={corruptionLocked}
             >
-              {corruptionLocked ? (
-                <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Tactical step</p>
-              ) : (
-                <CorruptionPanel
-                  money={resources.money}
-                  activeBribes={gameState.activeBribes}
-                  rivalFamilies={gameState.aiOpponents.map(o => o.family)}
-                  reputation={gameState.reputation.reputation}
-                  heat={gameState.policeHeat.level}
-                  gamePhase={(gameState as any).gamePhase || 1}
-                  actionsRemaining={gameState.tacticalActionsRemaining}
-                  phaseIsTactical={phase === 'move'}
-                  onBribe={(tier, targetFamily) => onAction({ type: 'bribe_corruption', tier, targetFamily })}
-                />
-              )}
+              <CorruptionPanel
+                money={resources.money}
+                activeBribes={gameState.activeBribes}
+                rivalFamilies={gameState.aiOpponents.map(o => o.family)}
+                reputation={gameState.reputation.reputation}
+                heat={gameState.policeHeat.level}
+                gamePhase={(gameState as any).gamePhase || 1}
+                actionsRemaining={gameState.tacticalActionsRemaining}
+                phaseIsTactical={phase === 'move'}
+                onBribe={(tier, targetFamily) => onAction({ type: 'bribe_corruption', tier, targetFamily })}
+              />
             </CollapsibleSection>
           );
         })()}
