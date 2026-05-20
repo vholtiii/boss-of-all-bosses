@@ -3035,6 +3035,7 @@ export const useEnhancedMafiaGameState = (
   // ============ END TURN ============
   const endTurn = useCallback(() => {
     setGameState(prev => {
+     try {
       const newState = cloneStateForMutation(prev);
       // Defensive guards for arrays that may be undefined (e.g. from older saved state)
       newState.hiddenUnits = newState.hiddenUnits || [];
