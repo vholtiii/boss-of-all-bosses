@@ -7800,7 +7800,7 @@ export const useEnhancedMafiaGameState = (
       const discount = bonuses.recruitmentDiscount / 100;
       
       // Actions that consume the action budget
-      const actionPhaseActions = ['hit_territory', 'extort_territory', 'sabotage_hex', 'claim_territory', 'negotiate', 'recruit_soldiers', 'recruit_local_soldier', 'launder_money', 'launder', 'bribe_corruption', 'hire_hitman'];
+      const actionPhaseActions = ['hit_territory', 'extort_territory', 'sabotage_hex', 'claim_territory', 'negotiate', 'recruit_soldiers', 'recruit_local_soldier', 'launder_money', 'launder', 'hire_hitman'];
       if (actionPhaseActions.includes(action.type) && newState.actionsRemaining <= 0) {
         newState.pendingNotifications = [...newState.pendingNotifications, {
           type: 'warning' as const, title: '⚠️ No Actions Remaining',
@@ -8367,6 +8367,11 @@ export const useEnhancedMafiaGameState = (
           return newState;
         case 'bribe_corruption': {
           const tier = action.tier as BribeTier;
+          // Tactical-step budget guard (Corruption is a tactical-step spend)
+          if (newState.tacticalActionsRemaining <= 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ No Tactical Actions', message: 'You have used all your tactical actions this turn.' });
+            return newState;
+          }
           // Phase gate: Patrol Officer requires Phase 2, Captain+ requires Phase 3
           if (tier === 'patrol_officer' && (newState.gamePhase || 1) < 2) {
             newState.pendingNotifications.push({ type: 'warning', title: '🔒 Phase Locked', message: 'Patrol Officer bribes unlock in Phase 2: Establishing Territory.' });
@@ -8391,7 +8396,7 @@ export const useEnhancedMafiaGameState = (
           successChance = Math.max(5, Math.min(95, successChance));
           
           newState.resources.money -= config.cost;
-          newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
+          newState.tacticalActionsRemaining = Math.max(0, newState.tacticalActionsRemaining - 1);
           
           if (Math.random() * 100 < successChance) {
             const contract: BribeContract = {

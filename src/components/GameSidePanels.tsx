@@ -846,30 +846,35 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           </div>
         </CollapsibleSection>
 
-        {/* ── CORRUPTION (4-tier bribe system) ── */}
-        <CollapsibleSection
-          title="Corruption"
-          icon={<Gavel className="h-4 w-4" />}
-          isOpen={openSections.has('corruption')}
-          onToggle={() => toggle('corruption')}
-          phaseLocked={actionsLocked}
-        >
-          {actionsLocked ? (
-             <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Action step</p>
-          ) : (
-            <CorruptionPanel
-              money={resources.money}
-              activeBribes={gameState.activeBribes}
-              rivalFamilies={gameState.aiOpponents.map(o => o.family)}
-              reputation={gameState.reputation.reputation}
-              heat={gameState.policeHeat.level}
-              gamePhase={(gameState as any).gamePhase || 1}
-              actionsRemaining={gameState.actionsRemaining}
-              phaseIsAction={phase === 'action'}
-              onBribe={(tier, targetFamily) => onAction({ type: 'bribe_corruption', tier, targetFamily })}
-            />
-          )}
-        </CollapsibleSection>
+        {/* ── CORRUPTION (4-tier bribe system) — tactical step ── */}
+        {(() => {
+          const corruptionLocked = phase !== 'move';
+          return (
+            <CollapsibleSection
+              title="Corruption"
+              icon={<Gavel className="h-4 w-4" />}
+              isOpen={openSections.has('corruption')}
+              onToggle={() => toggle('corruption')}
+              phaseLocked={corruptionLocked}
+            >
+              {corruptionLocked ? (
+                <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Tactical step</p>
+              ) : (
+                <CorruptionPanel
+                  money={resources.money}
+                  activeBribes={gameState.activeBribes}
+                  rivalFamilies={gameState.aiOpponents.map(o => o.family)}
+                  reputation={gameState.reputation.reputation}
+                  heat={gameState.policeHeat.level}
+                  gamePhase={(gameState as any).gamePhase || 1}
+                  actionsRemaining={gameState.tacticalActionsRemaining}
+                  phaseIsTactical={phase === 'move'}
+                  onBribe={(tier, targetFamily) => onAction({ type: 'bribe_corruption', tier, targetFamily })}
+                />
+              )}
+            </CollapsibleSection>
+          );
+        })()}
 
         {/* ── HITMAN CONTRACT SYSTEM ── */}
         <CollapsibleSection
