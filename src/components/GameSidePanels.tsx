@@ -52,6 +52,36 @@ interface GameSidePanelProps {
 
 // ─── LEFT PANEL: Resources + Actions ──────────────────────────────────
 
+const CancelPlanHitButton: React.FC<{ onCancel: () => void }> = ({ onCancel }) => {
+  const [confirming, setConfirming] = useState(false);
+  React.useEffect(() => {
+    if (!confirming) return;
+    const t = setTimeout(() => setConfirming(false), 3000);
+    return () => clearTimeout(t);
+  }, [confirming]);
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!confirming) { setConfirming(true); return; }
+        setConfirming(false);
+        onCancel();
+      }}
+      className={cn(
+        "mt-1 self-start px-2 py-1 rounded text-[11px] font-semibold transition-colors border",
+        confirming
+          ? "bg-destructive text-destructive-foreground border-destructive hover:bg-destructive/90"
+          : "bg-transparent border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
+      )}
+      title="Cancel the marked Plan Hit. The tactical action spent on marking is not refunded."
+    >
+      {confirming ? '⚠️ Click again to confirm cancel' : '✕ Cancel mark'}
+    </button>
+  );
+};
+
+
+
 export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onAction: (action: any) => void; turnPhase?: string; onSelectUnit?: (unitType: string, hex: { q: number; r: number; s: number }) => void }> = ({
   gameState,
   onAction,
