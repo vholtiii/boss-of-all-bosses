@@ -5008,6 +5008,16 @@ export const useEnhancedMafiaGameState = (
       });
       
       return newState;
+     } catch (err) {
+      console.error('[endTurn] crashed — rolling back turn', err);
+      return {
+        ...prev,
+        pendingNotifications: [
+          ...(prev.pendingNotifications || []),
+          { type: 'error' as const, title: '⚠️ Turn rolled back', message: 'An error occurred during end-of-turn processing. The turn was reverted to keep the game stable.' },
+        ],
+      };
+     }
     });
   }, []);
 
