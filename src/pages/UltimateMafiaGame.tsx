@@ -2171,6 +2171,14 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
           if (!tile) return null;
           const defenders = (gameState.deployedUnits || []).filter((u: any) => u.q === toQ && u.r === toR && u.s === toS && u.family === tile.controllingFamily);
           const isScouted = (gameState.scoutedHexes || []).some((s: any) => s.q === toQ && s.r === toR && s.s === toS);
+          const ph = (gameState as any).plannedHit;
+          const planMatchesHere = !!(ph && ph.q === toQ && ph.r === toR && ph.s === toS);
+          let planRelocatedHere = false;
+          if (ph && !planMatchesHere) {
+            const target = (gameState.deployedUnits || []).find((u: any) => u.id === ph.targetUnitId);
+            planRelocatedHere = !!(target && target.q === toQ && target.r === toR && target.s === toS);
+          }
+          const planTurnsRemaining = ph ? Math.max(0, ph.expiresOnTurn - (gameState.turn || 0)) : undefined;
           return {
             district: tile.district || 'Unknown',
             controllingFamily: tile.controllingFamily || 'neutral',
@@ -2179,6 +2187,9 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
             businessType: tile.business?.type,
             isLegal: tile.business?.isLegal,
             isScouted,
+            planMatchesHere,
+            planRelocatedHere,
+            planTurnsRemaining,
           };
         })()}
         playerMoney={gameState.resources.money}
