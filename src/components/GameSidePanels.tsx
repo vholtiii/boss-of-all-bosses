@@ -614,7 +614,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                   ? '🔒 Unlocks Phase 2'
                   : gameState.turn < (gameState.planHitCooldownUntil || 0)
                   ? `⏳ Cooldown: ${(gameState.planHitCooldownUntil || 0) - gameState.turn} turn(s)`
-                  : `🎯 +${PLAN_HIT_BONUS}% bonus · 1 tactical · ${PLAN_HIT_DURATION}t`
+                  : `🎯 Mark target — execute next Action step · +${PLAN_HIT_BONUS}% · ${PLAN_HIT_DURATION}t`
               }
               disabled={
                 (gameState as any).gamePhase < 2 ||
