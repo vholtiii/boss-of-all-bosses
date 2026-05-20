@@ -20,6 +20,7 @@ import AlertsLogPanel from '@/components/AlertsLogPanel';
 import TurnSummaryModal from '@/components/TurnSummaryModal';
 import CommissionVoteModal from '@/components/CommissionVoteModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
+import { GameErrorBoundary } from '@/components/GameErrorBoundary';
 import { Button } from '@/components/ui/button';
 import { 
   Play, 
