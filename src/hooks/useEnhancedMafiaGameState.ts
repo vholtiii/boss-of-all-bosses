@@ -2558,7 +2558,30 @@ export const useEnhancedMafiaGameState = (
       }
 
       if (action === 'plan_hit') {
-        // Use existing hit logic with _executingPlan flag for plan hit bonuses
+        // Two-turn flow: a plannedHit must already exist (marked in a prior Tactical step).
+        // Validate the marked hex matches the targeted hex, or the marked target has relocated here.
+        const ph = newState.plannedHit;
+        const matchesOriginal = !!(ph && ph.q === toQ && ph.r === toR && ph.s === toS);
+        let matchesRelocated = false;
+        if (ph && !matchesOriginal) {
+          const tgt = newState.deployedUnits.find((u: any) => u.id === ph.targetUnitId);
+          matchesRelocated = !!(tgt && tgt.q === toQ && tgt.r === toR && tgt.s === toS);
+        }
+        if (!ph || (!matchesOriginal && !matchesRelocated)) {
+          // Restore the soldier to origin and warn the player.
+          newState.deployedUnits[unitIdx] = {
+            ...newState.deployedUnits[unitIdx],
+            q: fromQ, r: fromR, s: fromS,
+            movesRemaining: (newState.deployedUnits[unitIdx].movesRemaining || 0) + 1,
+          };
+          newState.pendingNotifications = [...(newState.pendingNotifications || []), {
+            type: 'warning' as const, title: '⚠️ No Active Plan',
+            message: 'Plan Hit is a two-step move. Mark a target during the Tactical step, then execute next turn.',
+          }];
+          syncLegacyUnits(newState);
+          return newState;
+        }
+        // Valid execute: use existing hit logic with _executingPlan flag for plan hit bonuses
         const hitAction = { type: 'hit_territory', targetQ: toQ, targetR: toR, targetS: toS, _executingPlan: true };
         const result = processTerritoryHit(newState, hitAction);
         result.pendingNotifications = result.pendingNotifications || [];

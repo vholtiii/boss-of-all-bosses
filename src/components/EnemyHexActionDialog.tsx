@@ -14,6 +14,12 @@ interface EnemyHexActionProps {
     businessType?: string;
     isLegal?: boolean;
     isScouted?: boolean;
+    /** True when this hex matches an active plannedHit (target still on original hex). */
+    planMatchesHere?: boolean;
+    /** True when an active plannedHit exists but the target has relocated to this hex. */
+    planRelocatedHere?: boolean;
+    /** Turns remaining before plannedHit expires. */
+    planTurnsRemaining?: number;
   } | null;
   playerMoney: number;
   gamePhase: number;
@@ -26,7 +32,9 @@ const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({ open, targetInfo,
   if (!open || !targetInfo) return null;
 
   const canSabotage = targetInfo.hasBusiness && playerMoney >= SABOTAGE_COST;
-  const canPlanHit = gamePhase >= 2 && targetInfo.isScouted;
+  // "Plan Hit" is now a two-turn flow: MARK in Tactical step, EXECUTE in Action step.
+  // The dialog only surfaces the EXECUTE option when a plannedHit already exists for this hex.
+  const canExecutePlan = !!(targetInfo.planMatchesHere || targetInfo.planRelocatedHere);
   const familyName = targetInfo.controllingFamily.charAt(0).toUpperCase() + targetInfo.controllingFamily.slice(1);
 
   // Defender status message
@@ -95,6 +103,27 @@ const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({ open, targetInfo,
             </p>
 
             <div className="space-y-2">
+              {canExecutePlan && (
+                <Button
+                  className="w-full justify-start gap-3"
+                  variant="default"
+                  onClick={() => onAction('plan_hit')}
+                >
+                  <Target className="h-4 w-4" />
+                  <div className="text-left">
+                    <div className="text-sm font-semibold">
+                      {targetInfo.planMatchesHere ? 'Execute Plan Hit' : 'Execute Plan Hit (Relocated)'}
+                    </div>
+                    <div className="text-xs opacity-80">
+                      {targetInfo.planMatchesHere
+                        ? '+20% bonus · 0 casualties on success'
+                        : '+10% bonus · +5 heat · cooldown'}
+                      {typeof targetInfo.planTurnsRemaining === 'number' && ` · ${targetInfo.planTurnsRemaining}t left`}
+                    </div>
+                  </div>
+                </Button>
+              )}
+
               <Button
                 className="w-full justify-start gap-3"
                 variant="destructive"
@@ -106,20 +135,6 @@ const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({ open, targetInfo,
                   <div className="text-xs opacity-80">Combat for control · +10 heat</div>
                 </div>
               </Button>
-
-              {canPlanHit && (
-                <Button
-                  className="w-full justify-start gap-3"
-                  variant="default"
-                  onClick={() => onAction('plan_hit')}
-                >
-                  <Target className="h-4 w-4" />
-                  <div className="text-left">
-                    <div className="text-sm font-semibold">Plan Hit</div>
-                    <div className="text-xs opacity-80">Surgical strike · +35% bonus · 0 casualties on success</div>
-                  </div>
-                </Button>
-              )}
 
               <Button
                 className="w-full justify-start gap-3"
@@ -139,6 +154,15 @@ const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({ open, targetInfo,
                   </div>
                 </div>
               </Button>
+
+              {!canExecutePlan && gamePhase >= 2 && targetInfo.isScouted && (
+                <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground flex items-start gap-2">
+                  <Target className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 opacity-70" />
+                  <span>
+                    To Plan Hit this target, mark it in the <strong className="text-foreground">Tactical step</strong>, then execute next turn's Action.
+                  </span>
+                </div>
+              )}
 
               <Button
                 className="w-full"
