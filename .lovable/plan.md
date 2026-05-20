@@ -1,36 +1,48 @@
-# Move Bribe Police / Corruption to the Tactical Step
+# Tune AI + Sim Harness After Bribes Moved to Tactical
 
-Reclassify the 4-tier Corruption bribes (Patrol Officer, Police Captain, Police Chief, Mayor) from an **Action**-step spend to a **Tactical**-step spend. Players will be able to grease palms during the prep step and then act in the same turn with reduced heat — directly addressing AI/player heat pressure without adding new mechanics.
+The Corruption bribe is now a Tactical-step spend that consumes a tactical action (3/turn) instead of an Action token. Two things drift out of balance from that move:
 
-Out of scope: bribe costs, success formulas, phase-unlock gates (Patrol = Phase 2, Captain+ = Phase 3), duration/effects, AI bribe behavior (AI already spends outside the player action budget), and the legacy `bribe_official` / event-choice `bribe` options.
+1. **Strategy simulations** — all 3 sim policies still issue `bribe_corruption` from the Action branch, where the handler now early-returns with a "No Tactical Actions" warning. Sims report misleading heat numbers because the player effectively never bribes.
+2. **AI vs player parity** — the player gained a "free" heat cleanup (no longer competes with claim/extort for Action tokens). The AI's heat reduction (`aiSpendOnHeatReduction`) is a separate, budget-free spend with a 2-turn cooldown and a low warm-tier trigger chance. Without a small bump the AI will fall behind the player on heat management.
 
-## What changes for the player
+Out of scope: bribe costs/effects, success formulas, phase gates, the 4-tier intel system, AI-action-budget refactor, new posture types.
 
-- The Corruption panel becomes usable during the **Tactical** step instead of the Action step.
-- Bribing now consumes **1 tactical action** (same budget as Scout, Fortify, Safehouse, family powers) instead of 1 action.
-- Lock/unlock copy updates: button now reads "Tactical step" when in Deploy or Action, "No tactical actions" when the tactical budget is empty.
-- Target-selection, tier list, success %, costs, and active-contract display are unchanged.
+## Tuning changes
 
-## Technical changes
+### 1. `src/hooks/__tests__/strategy-simulation.test.ts`
 
-1. **`src/components/GameSidePanels.tsx`** — at the `CorruptionPanel` mount (~line 860):
-   - Replace `phaseIsAction={phase === 'action'}` with a new `phaseIsTactical={phase === 'move'}` prop.
-   - Replace `actionsRemaining={gameState.actionsRemaining}` with `actionsRemaining={gameState.tacticalActionsRemaining}`.
+Move each `bribe_corruption` call from the `else` (action) branch into the `else if (phase === "tactical")` branch, after `autoResolveEvents`, and guard on `s.tacticalActionsRemaining > 0`:
 
-2. **`src/components/CorruptionPanel.tsx`**:
-   - Rename prop `phaseIsAction` → `phaseIsTactical` (keep default `true` for safety).
-   - Update disabled-button title/label copy: "Available in Tactical step" / "Tactical step" instead of Action variants.
-   - No layout or styling changes.
+- Conqueror: bribe when `heat >= 60 && phase >= 2`.
+- Tycoon: bribe when `heat > 30 && phase >= 2 && money > 5000`.
+- Diplomat: bribe when `heat >= 50 && phase >= 2`.
 
-3. **`src/hooks/useEnhancedMafiaGameState.ts`** — `bribe_corruption` handler (~lines 7803 and 8368–8429):
-   - Remove `'bribe_corruption'` from the `actionPhaseActions` array (line 7803) so it no longer requires `actionsRemaining`.
-   - Add a tactical-budget guard at the top of the `bribe_corruption` case: if `tacticalActionsRemaining <= 0`, push a "No Tactical Actions" notification and return.
-   - Replace `newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1)` (line 8394) with `newState.tacticalActionsRemaining = Math.max(0, newState.tacticalActionsRemaining - 1)`.
-   - Keep the existing phase-gate checks, cost deduction, success roll, and effects exactly as-is. The spend must occur whether the bribe succeeds or fails (matches current behavior).
+No other policy logic changes.
 
-4. **Memory update** — append a one-liner to `mem://gameplay/turn-structure` (or add a new memory) noting that Corruption bribes are a tactical-step spend, so future work doesn't regress this.
+### 2. `src/hooks/useEnhancedMafiaGameState.ts` — AI heat-spend tuning
 
-## Verification
+In the AI heat-precaution block (~lines 5707–5721):
 
-- `bunx vitest run src/hooks/__tests__/strategy-simulation.test.ts` — confirm sims still complete and that the Conqueror/Tycoon AI heat profile shifts (bribes no longer compete with claim/extort for ACTION slots).
-- Manually: in Tactical step, open Corruption panel → bribe works and decrements tactical counter; in Deploy/Action steps, buttons show locked state; Action step still has full budget after bribing.
+- Bump `warm`-tier spend chance from `0.20 * personalityMult` to `0.30 * personalityMult`.
+- Bump `hot`-tier spend chance from `0.40 * personalityMult` to `0.55 * personalityMult`.
+- Drop bribe cooldown from 2 turns to 1 turn for `warm`/`hot` tiers; keep 2 turns for `critical`/`rico` (no runaway free spend). Done by passing the cooldown as a parameter to `aiSpendOnHeatReduction` or setting `bribeCooldownUntil` after the call site based on tier.
+
+Rationale: player now bribes ~1 turn earlier on average (no Action-slot tradeoff). These three numbers restore parity without changing the AI's posture decision tree.
+
+### 3. `src/hooks/__tests__/ai-posture.test.ts` — regression coverage
+
+Add two focused cases:
+
+- **Tactical budget contract**: dispatch `bribe_corruption` while `tacticalActionsRemaining = 0` → expect a "No Tactical Actions" notification, no money spent, no contract added.
+- **AI warm-tier cleanup**: seed an AI opponent with `heat = 50`, run 3 AI turns at fixed RNG, assert `heat` strictly decreases at least once (proves the bumped warm-tier chance fires under normal play).
+
+### 4. Validation
+
+- `bunx vitest run src/hooks/__tests__/ai-posture.test.ts src/hooks/__tests__/strategy-simulation.test.ts`
+- Re-read `/mnt/documents/strategy-sim-summary.md` and confirm: bribes registering (active contracts > 0 across turns), average heat in each sim shifts down vs the previous run, no new errors or stuck phases.
+
+## Technical notes
+
+- AI does NOT consume the player's `tacticalActionsRemaining`. `aiSpendOnHeatReduction` stays free-spend by design — the tactical step is a player-side construct.
+- The strategy sims drive the player hook; the AI runs inside `endTurn` and is unaffected by where the sim issues its bribe call.
+- No UI changes; the Corruption panel and CorruptionPanel component already reflect the tactical step from the prior change.
