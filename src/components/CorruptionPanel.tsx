@@ -26,7 +26,7 @@ const tierIcons: Record<BribeTier, React.ReactNode> = {
 };
 
 const CorruptionPanel: React.FC<CorruptionPanelProps> = ({
-  money, activeBribes, rivalFamilies, reputation, heat, gamePhase, actionsRemaining = 1, phaseIsAction = true, onBribe
+  money, activeBribes, rivalFamilies, reputation, heat, gamePhase, actionsRemaining = 1, phaseIsTactical = true, onBribe
 }) => {
   const [selectedTarget, setSelectedTarget] = useState<string>(rivalFamilies[0] || '');
 
