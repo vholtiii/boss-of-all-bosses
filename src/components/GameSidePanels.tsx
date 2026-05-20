@@ -677,6 +677,9 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                       {targetOnOriginalHex ? '⚔️ Execute Plan' : targetRelocated ? '⚔️ Execute (Redirected)' : '❌ Target Lost'}
                     </button>
                   )}
+                  {isTacticalStep && (
+                    <CancelPlanHitButton onCancel={() => onAction({ type: 'cancel_planned_hit' })} />
+                  )}
                 </div>
               );
             })()}
