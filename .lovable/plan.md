@@ -1,59 +1,61 @@
-# Refresh Corruption HUD and UX
+# Split Plan Hit into Tactical "Mark" + Action "Execute"
 
-Goal: make the 4-tier bribe system easier to read at a glance, clearer about phase/budget gating, and visible from the main status area — without changing any underlying mechanic, cost, success formula, or AI behavior.
+## Goal
 
-## Scope
+Make Plan Hit a true two-turn flow:
 
-- Visual + interaction refresh of `CorruptionPanel.tsx` (the collapsible sidebar card body).
-- Small status indicator added to the existing top status strip (above the Heat Tier indicator) so active bribes are visible while the Corruption section is collapsed.
-- No changes to `useEnhancedMafiaGameState.ts` reducer logic, no changes to `BRIBE_TIERS`, costs, success math, duration, or the `bribe_corruption` action handler.
+1. **Turn N — Tactical step:** *Mark target* (costs 1 tactical action, no combat).
+2. **Turn N+1 (within expiry) — Action step:** *Execute Plan Hit* (costs 1 action, applies the +20% bonus / 0-casualty mechanics).
 
-## CorruptionPanel refresh
+Today the data layer already supports this (`gameState.plannedHit` with `expiresOnTurn`, +20% auto-bonus on a normal Hit against the marked target). What needs to change is the UX: a separate "Plan Hit" button still shortcuts both steps into a single Action click via `EnemyHexActionDialog`.
 
-Replace the current flat list with a tighter, board-game styled card layout.
+## What changes
 
-1. **Header strip** at top of the panel:
-   - Left: small "Tactical · 1 action" pill (uses `phaseIsTactical` + `actionsRemaining`).
-   - Right: `{activeBribes.length}/4 contracts` badge.
-   - When `!phaseIsTactical`: full strip greyed with a single line "Available in Tactical step" (replaces the current outer lock paragraph from `GameSidePanels`).
+### 1. `EnemyHexActionDialog.tsx` — repurpose the Plan Hit button
 
-2. **Tier rows** (one per tier, always rendered, including locked):
-   - Row left: tier icon in a circular chip tinted per state (locked = muted, available = card, active = primary, unaffordable = destructive border).
-   - Row mid: tier label + one-line effect; second line shows cost, duration, success% with the existing color bands.
-   - Row right: state-aware control
-     - Locked → "🔒 Phase 2/3" chip (same gating logic as today).
-     - Active → ring progress + `{turnsRemaining}t` label; target family shown as a small chip if any.
-     - Available → primary action button (Bribe) with the same disabled logic and tooltip messages as today.
-   - Affordability is shown by tinting the cost number red when `money < cost` (already partially there, applied uniformly).
+- Remove the "instant" Plan Hit option that fires `onAction('plan_hit')` on any scouted enemy hex.
+- Replace it with an **Execute Plan Hit** button that only renders when the targeted hex matches the player's active `plannedHit` (or holds the marked target unit after relocation).
+- Button states:
+  - **Ready:** "Execute Plan Hit · +20% bonus · 0 casualties on success"
+  - **Relocated target:** "Execute Plan Hit (relocated) · +10% bonus · +5 heat"
+  - Otherwise hidden — only Hit / Sabotage / Retreat remain.
+- Pass a new `plannedHit` prop (and `targetUnitId`) from `UltimateMafiaGame.tsx` into the dialog so it can decide which variant to render.
 
-3. **Target selector** only renders when the user is about to act on a tier that needs a target (captain/chief/mayor) AND that tier is available and not already active. Otherwise hidden. Default selection unchanged.
+### 2. `useEnhancedMafiaGameState.ts` — wire Execute through normal Hit
 
-4. **Empty / all-active state**: when all 4 tiers are active, replace the action area with a single "All channels engaged" footer line.
+- In `resolveEnemyHexAction`, change the `'plan_hit'` branch so it requires `prev.plannedHit` to match the target hex (or the marked target's current hex if relocated). If validation fails, surface a notification and abort.
+- Keep using the existing `processTerritoryHit` with `_executingPlan: true` — bonus, zero-casualty, relocation heat, cooldown and `plannedHit` consumption already work there.
+- Block accidental re-execution if no `plannedHit` is set (no behaviour change for AI).
 
-5. Keep the same component props and `onBribe` signature; this is purely a presentation refactor.
+### 3. Surface the active mark during Action step
 
-## Status HUD addition
+- In `GameSidePanels.tsx`, keep the Tactical "Plan Hit" button (already correctly gated to Tactical + 1 tactical action). Reword its sublabel to: "Mark target — execute next Action step".
+- Add a small **Active Plan Hit** card visible in both Tactical and Action steps, showing planner, target, turns remaining, "Target on original hex" vs "Target moved", and a one-click "Jump to target" CTA that pans the map to the marked hex. This already partially exists at line 639; extend it so the Action step also shows it and add the pan/select CTA.
+- In `EnhancedMafiaHexGrid.tsx`, when a `plannedHit` exists, render a pulsing target ring on the marked hex during Action step so the player can find it visually.
 
-In `GameSidePanels.tsx`, in the existing status block that already renders the Heat Tier indicator (around the heat tier lines), add — directly above the heat tier — a compact Corruption HUD line:
+### 4. Phase HUD / banner
 
-- Hidden when `activeBribes` is empty.
-- Otherwise renders one chip per active bribe: tier icon + `{turnsRemaining}t`, color-tinted to match the panel's active-tier color.
-- Soonest-expiring chip pulses (CSS animation already in the theme) when `turnsRemaining <= 1`.
-- Clicking the strip opens the Corruption collapsible section (`toggle('corruption')`) and scrolls it into view.
+- When `plannedHit` exists and we're in Action step, show a small inline HUD chip near the phase banner: "🎯 Plan Hit ready · {turnsRemaining}t". Clicking it pans to the target.
 
-This gives players a persistent at-a-glance read on bribe coverage without expanding the section every turn.
+### 5. Tests
+
+- Add a regression test in `src/hooks/__tests__/` (`plan-hit-two-turn.test.ts`) covering:
+  - Mark during Tactical decrements `tacticalActionsRemaining`, sets `plannedHit`, does NOT spend an action token.
+  - Execute during Action against the marked hex applies the +20% bonus, consumes 1 action, clears `plannedHit`.
+  - Attempting "execute" with no `plannedHit` is a no-op with a warning.
+  - Relocated-target branch still applies the +10% / +5 heat / cooldown path.
 
 ## Out of scope
 
-- No changes to mechanics, AI, costs, or formulas.
-- No changes to `bribe_corruption` action, `aiSpendOnHeatReduction`, or any test.
-- No changes to game guide copy beyond what's already correct.
+- AI Plan Hit pipeline (`AIPlannedHit`) already uses its own two-turn `turnsRemaining` and is unchanged.
+- Cooldown durations, bonus values, expiry length — all stay the same.
+- No changes to documentation files (`COMBAT_SYSTEM_GUIDE.md` etc.) in this pass.
 
-## Technical notes
+## Files touched
 
-- Files touched:
-  - `src/components/CorruptionPanel.tsx` — UI rewrite within the same component; props unchanged.
-  - `src/components/GameSidePanels.tsx` — add the small HUD strip above the heat-tier indicator inside the existing status block, and remove the now-redundant outer "Unlock in Tactical step" paragraph (lock state is handled inside the panel header).
-- Styling uses existing semantic tokens (`primary`, `muted-foreground`, `destructive`, `border`, `bg-card`) and existing tier color classes (`text-green-400`, `text-yellow-400`, `text-destructive`) already used in this file — no new tokens added.
-- Reuses existing icons from `lucide-react` (`Gavel`, `Shield`, `Eye`, `Crown`, `Timer`).
-- Ring progress for active bribes is rendered via a small inline SVG (no new dependency).
+- `src/components/EnemyHexActionDialog.tsx`
+- `src/components/GameSidePanels.tsx`
+- `src/components/EnhancedMafiaHexGrid.tsx`
+- `src/pages/UltimateMafiaGame.tsx`
+- `src/hooks/useEnhancedMafiaGameState.ts`
+- `src/hooks/__tests__/plan-hit-two-turn.test.ts` (new)
