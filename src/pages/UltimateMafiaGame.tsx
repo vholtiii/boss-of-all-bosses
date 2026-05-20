@@ -2233,7 +2233,12 @@ const UltimateMafiaGame: React.FC = () => {
 
   return (
     <NotificationProvider>
-      <GameContent config={gameConfig} onExitToMenu={() => setGameConfig(null)} />
+      <GameErrorBoundary
+        onExitToMenu={() => setGameConfig(null)}
+        onRestart={() => setGameConfig({ ...gameConfig })}
+      >
+        <GameContent config={gameConfig} onExitToMenu={() => setGameConfig(null)} />
+      </GameErrorBoundary>
     </NotificationProvider>
   );
 };
