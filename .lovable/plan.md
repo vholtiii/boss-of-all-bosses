@@ -1,61 +1,48 @@
-# Split Plan Hit into Tactical "Mark" + Action "Execute"
+# Cancel an active Plan Hit mark during Tactical
 
 ## Goal
 
-Make Plan Hit a true two-turn flow:
+Let the player abort a Plan Hit they've already marked, but only during the **Tactical step** of the same/later turn (before execution). This is purely UX + a tiny state action; combat/AI logic is unchanged.
 
-1. **Turn N — Tactical step:** *Mark target* (costs 1 tactical action, no combat).
-2. **Turn N+1 (within expiry) — Action step:** *Execute Plan Hit* (costs 1 action, applies the +20% bonus / 0-casualty mechanics).
+## Behavior
 
-Today the data layer already supports this (`gameState.plannedHit` with `expiresOnTurn`, +20% auto-bonus on a normal Hit against the marked target). What needs to change is the UX: a separate "Plan Hit" button still shortcuts both steps into a single Action click via `EnemyHexActionDialog`.
+- **When allowed:** `gameState.plannedHit` exists, current step is **Tactical**, and the plan was marked by the player (not AI). Cancelling in Action step is not allowed (player should just let it expire or execute).
+- **Effect:** Clear `gameState.plannedHit`. No tactical action refund (mirrors how scout/bribe costs aren't refunded). Emit a small notification: "Plan Hit cancelled — {targetName} no longer marked."
+- **No cooldown change**, no heat, no respect change.
+- Confirmation: lightweight inline confirm on the button (click once → button morphs to "Confirm cancel?" for ~3s, second click cancels). Avoid a modal.
 
-## What changes
+## UI changes (`src/components/GameSidePanels.tsx`)
 
-### 1. `EnemyHexActionDialog.tsx` — repurpose the Plan Hit button
+In the existing **Active Plan Hit** card (around line 639–681), add a small "✕ Cancel mark" button next to / below the existing content, visible only when `phase === 'tactical'`. Styled as a ghost/destructive-outline button, small. Two-click confirm via local `useState`.
 
-- Remove the "instant" Plan Hit option that fires `onAction('plan_hit')` on any scouted enemy hex.
-- Replace it with an **Execute Plan Hit** button that only renders when the targeted hex matches the player's active `plannedHit` (or holds the marked target unit after relocation).
-- Button states:
-  - **Ready:** "Execute Plan Hit · +20% bonus · 0 casualties on success"
-  - **Relocated target:** "Execute Plan Hit (relocated) · +10% bonus · +5 heat"
-  - Otherwise hidden — only Hit / Sabotage / Retreat remain.
-- Pass a new `plannedHit` prop (and `targetUnitId`) from `UltimateMafiaGame.tsx` into the dialog so it can decide which variant to render.
+Wire it to `onAction({ type: 'cancel_planned_hit' })`.
 
-### 2. `useEnhancedMafiaGameState.ts` — wire Execute through normal Hit
+## State action (`src/hooks/useEnhancedMafiaGameState.ts`)
 
-- In `resolveEnemyHexAction`, change the `'plan_hit'` branch so it requires `prev.plannedHit` to match the target hex (or the marked target's current hex if relocated). If validation fails, surface a notification and abort.
-- Keep using the existing `processTerritoryHit` with `_executingPlan: true` — bonus, zero-casualty, relocation heat, cooldown and `plannedHit` consumption already work there.
-- Block accidental re-execution if no `plannedHit` is set (no behaviour change for AI).
+Add a new `performAction` case `'cancel_planned_hit'`:
 
-### 3. Surface the active mark during Action step
+- Guard: require `prev.plannedHit` to exist and `prev.turnStep === 'tactical'` (whatever the field is — match existing tactical checks). Otherwise no-op + warning notification.
+- Set `newState.plannedHit = null`.
+- Push notification: title "Plan Hit Cancelled", body referencing target name when resolvable.
+- Do **not** touch `tacticalActionsRemaining`, cooldowns, heat, respect.
 
-- In `GameSidePanels.tsx`, keep the Tactical "Plan Hit" button (already correctly gated to Tactical + 1 tactical action). Reword its sublabel to: "Mark target — execute next Action step".
-- Add a small **Active Plan Hit** card visible in both Tactical and Action steps, showing planner, target, turns remaining, "Target on original hex" vs "Target moved", and a one-click "Jump to target" CTA that pans the map to the marked hex. This already partially exists at line 639; extend it so the Action step also shows it and add the pan/select CTA.
-- In `EnhancedMafiaHexGrid.tsx`, when a `plannedHit` exists, render a pulsing target ring on the marked hex during Action step so the player can find it visually.
+Also export the action type in the same union/types where other plan-hit actions live.
 
-### 4. Phase HUD / banner
+## Tests (`src/hooks/__tests__/plan-hit-two-turn.test.ts`)
 
-- When `plannedHit` exists and we're in Action step, show a small inline HUD chip near the phase banner: "🎯 Plan Hit ready · {turnsRemaining}t". Clicking it pans to the target.
+Append two cases:
 
-### 5. Tests
-
-- Add a regression test in `src/hooks/__tests__/` (`plan-hit-two-turn.test.ts`) covering:
-  - Mark during Tactical decrements `tacticalActionsRemaining`, sets `plannedHit`, does NOT spend an action token.
-  - Execute during Action against the marked hex applies the +20% bonus, consumes 1 action, clears `plannedHit`.
-  - Attempting "execute" with no `plannedHit` is a no-op with a warning.
-  - Relocated-target branch still applies the +10% / +5 heat / cooldown path.
+1. Cancelling during Tactical with an active plan clears `plannedHit` and does NOT refund the tactical action.
+2. Cancelling with no active plan, or outside Tactical, is a no-op and emits a warning.
 
 ## Out of scope
 
-- AI Plan Hit pipeline (`AIPlannedHit`) already uses its own two-turn `turnsRemaining` and is unchanged.
-- Cooldown durations, bonus values, expiry length — all stay the same.
-- No changes to documentation files (`COMBAT_SYSTEM_GUIDE.md` etc.) in this pass.
+- AI plan hits (`aiPlannedHits`) — players can't cancel those.
+- Refund mechanics, cooldown adjustments, heat changes.
+- Cancelling during Action step.
 
 ## Files touched
 
-- `src/components/EnemyHexActionDialog.tsx`
 - `src/components/GameSidePanels.tsx`
-- `src/components/EnhancedMafiaHexGrid.tsx`
-- `src/pages/UltimateMafiaGame.tsx`
 - `src/hooks/useEnhancedMafiaGameState.ts`
-- `src/hooks/__tests__/plan-hit-two-turn.test.ts` (new)
+- `src/hooks/__tests__/plan-hit-two-turn.test.ts`
