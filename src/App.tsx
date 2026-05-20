@@ -6,6 +6,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import UltimateMafiaGame from "./pages/UltimateMafiaGame";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import { installGlobalErrorReporter } from "@/lib/globalErrorReporter";
+
+installGlobalErrorReporter();
 
 const queryClient = new QueryClient();
 
