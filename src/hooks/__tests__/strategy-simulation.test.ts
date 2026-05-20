@@ -115,6 +115,10 @@ const conqueror: StrategyPolicy = {
       }
     } else if (phase === "tactical") {
       autoResolveEvents(api);
+      // Heat management (tactical-step spend)
+      if ((s.tacticalActionsRemaining ?? 0) > 0 && (s.policeHeat?.level ?? 0) >= 60 && (s.gamePhase || 1) >= 2) {
+        try { api.performAction({ type: "bribe_corruption", tier: "patrol_officer" }); } catch {}
+      }
     } else {
       // Action: claim or extort each frontier hex with our soldier on it
       const frontier = neutralFrontier(s, fam);
@@ -133,10 +137,6 @@ const conqueror: StrategyPolicy = {
       // Recruit if low on soldiers
       if ((s.resources?.soldiers ?? 0) < 4 && s.resources?.money > 8000 && s.actionsRemaining > 0) {
         try { api.performAction({ type: "recruit_local_soldier" }); } catch {}
-      }
-      // Heat management
-      if ((s.policeHeat?.level ?? 0) >= 60 && (s.gamePhase || 1) >= 2) {
-        try { api.performAction({ type: "bribe_corruption", tier: "patrol_officer" }); } catch {}
       }
     }
   },
