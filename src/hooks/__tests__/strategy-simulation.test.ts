@@ -115,6 +115,10 @@ const conqueror: StrategyPolicy = {
       }
     } else if (phase === "tactical") {
       autoResolveEvents(api);
+      // Heat management (tactical-step spend)
+      if ((s.tacticalActionsRemaining ?? 0) > 0 && (s.policeHeat?.level ?? 0) >= 60 && (s.gamePhase || 1) >= 2) {
+        try { api.performAction({ type: "bribe_corruption", tier: "patrol_officer" }); } catch {}
+      }
     } else {
       // Action: claim or extort each frontier hex with our soldier on it
       const frontier = neutralFrontier(s, fam);
@@ -133,10 +137,6 @@ const conqueror: StrategyPolicy = {
       // Recruit if low on soldiers
       if ((s.resources?.soldiers ?? 0) < 4 && s.resources?.money > 8000 && s.actionsRemaining > 0) {
         try { api.performAction({ type: "recruit_local_soldier" }); } catch {}
-      }
-      // Heat management
-      if ((s.policeHeat?.level ?? 0) >= 60 && (s.gamePhase || 1) >= 2) {
-        try { api.performAction({ type: "bribe_corruption", tier: "patrol_officer" }); } catch {}
       }
     }
   },
@@ -175,6 +175,10 @@ const tycoon: StrategyPolicy = {
           try { api.fortifyUnit(); } catch {}
         }
       }
+      // Bribe early (tactical-step spend)
+      if ((s.tacticalActionsRemaining ?? 0) > 0 && (s.gamePhase || 1) >= 2 && (s.policeHeat?.level ?? 0) > 30 && (s.resources?.money ?? 0) > 5000) {
+        try { api.performAction({ type: "bribe_corruption", tier: "patrol_officer" }); } catch {}
+      }
     } else {
       // Build businesses
       if (s.actionsRemaining > 0 && (s.resources?.money ?? 0) > 25000) {
@@ -190,12 +194,9 @@ const tycoon: StrategyPolicy = {
           } catch {}
         }
       }
-      // Hire lawyer + bribe early
+      // Hire lawyer
       if (s.actionsRemaining > 0 && (s.resources?.money ?? 0) > 10000 && (s.policeHeat?.level ?? 0) > 30) {
         try { api.performAction({ type: "hire_lawyer" }); } catch {}
-      }
-      if (s.actionsRemaining > 0 && (s.gamePhase || 1) >= 2 && (s.resources?.money ?? 0) > 5000) {
-        try { api.performAction({ type: "bribe_corruption", tier: "patrol_officer" }); } catch {}
       }
       // Claim frontier with deployed soldiers
       const frontier = neutralFrontier(s, fam);
@@ -239,6 +240,10 @@ const diplomat: StrategyPolicy = {
       for (const sd of s.incomingSitdowns || []) {
         try { api.performAction({ type: "accept_incoming_sitdown", sitdownId: sd.id }); } catch {}
       }
+      // Heat management (tactical-step spend) — diplomats avoid heat aggressively
+      if ((s.tacticalActionsRemaining ?? 0) > 0 && (s.policeHeat?.level ?? 0) >= 50 && (s.gamePhase || 1) >= 2) {
+        try { api.performAction({ type: "bribe_corruption", tier: "patrol_officer" }); } catch {}
+      }
     } else {
       // Phase 2+: call sitdowns to build alliances
       if ((s.gamePhase || 1) >= 2) {
@@ -253,10 +258,6 @@ const diplomat: StrategyPolicy = {
       // Phase 4: trigger commission vote
       if ((s.gamePhase || 1) >= 4) {
         try { api.performAction({ type: "commission_vote" }); } catch {}
-      }
-      // Heat management
-      if ((s.policeHeat?.level ?? 0) >= 50 && (s.gamePhase || 1) >= 2) {
-        try { api.performAction({ type: "bribe_corruption", tier: "patrol_officer" }); } catch {}
       }
       // Claim frontier (low aggression)
       const frontier = neutralFrontier(s, fam).slice(0, 1);

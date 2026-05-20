@@ -5472,7 +5472,7 @@ export const useEnhancedMafiaGameState = (
   };
 
   /** AI spends money on a bribe-style heat reduction (mirrors player Bribe Officers). */
-  const aiSpendOnHeatReduction = (state: EnhancedMafiaGameState, fam: string, heatDrop: number, turnReport?: TurnReport): boolean => {
+  const aiSpendOnHeatReduction = (state: EnhancedMafiaGameState, fam: string, heatDrop: number, turnReport?: TurnReport, cooldownTurns: number = 2): boolean => {
     const opp = state.aiOpponents.find(o => o.family === fam);
     if (!opp) return false;
     const costMult = state.difficultyModifiers?.eventCostMult ?? 1;
@@ -5480,7 +5480,7 @@ export const useEnhancedMafiaGameState = (
     if ((opp.resources.money || 0) < cost) return false;
     opp.resources.money -= cost;
     opp.resources.heat = Math.max(0, (opp.resources.heat || 0) - heatDrop);
-    (opp as any).bribeCooldownUntil = state.turn + 2;
+    (opp as any).bribeCooldownUntil = state.turn + cooldownTurns;
     if (turnReport) turnReport.aiActions.push({ family: fam, action: 'bribe_officers', detail: `Bribed officers ($${cost.toLocaleString()}) — heat -${heatDrop}` });
     return true;
   };
@@ -5709,14 +5709,17 @@ export const useEnhancedMafiaGameState = (
       const bribeOnCD = (oppAny.bribeCooldownUntil || 0) > state.turn;
       if (!strategicOverride && !bribeOnCD) {
         let spendChance = heatTier === 'critical' || heatTier === 'rico' ? 0.95
-          : heatTier === 'hot' ? Math.min(0.95, 0.40 * personalityMult)
-          : heatTier === 'warm' ? Math.min(0.95, 0.20 * personalityMult)
+          : heatTier === 'hot' ? Math.min(0.95, 0.55 * personalityMult)
+          : heatTier === 'warm' ? Math.min(0.95, 0.30 * personalityMult)
           : 0;
         // Posture override: COOL_OFF forces an aggressive bribe even at low heat.
         if (policy.forceBribe && aiHeat >= 30) spendChance = Math.max(spendChance, 0.9);
         const heatDrop = heatTier === 'rico' || heatTier === 'critical' ? 18 : heatTier === 'hot' ? 15 : 12;
+        // Parity tuning: warm/hot get a 1-turn cooldown (player can also bribe ~every turn via tactical step).
+        // Critical/rico keep the 2-turn cooldown to prevent runaway free spend.
+        const cdTurns = (heatTier === 'warm' || heatTier === 'hot') ? 1 : 2;
         if (spendChance > 0 && Math.random() < spendChance) {
-          aiSpendOnHeatReduction(state, fam, heatDrop, turnReport);
+          aiSpendOnHeatReduction(state, fam, heatDrop, turnReport, cdTurns);
         }
       }
       // Critical/RICO: force lay-low if not already (still respects strategicOverride).
