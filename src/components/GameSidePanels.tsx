@@ -781,6 +781,52 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               }
               return null;
             })()}
+            {/* Corruption HUD — at-a-glance active bribe chips */}
+            {(() => {
+              const active = (gameState.activeBribes || []).filter(b => b.active);
+              if (active.length === 0) return null;
+              const tierMeta: Record<string, { icon: string; cls: string; label: string }> = {
+                patrol_officer: { icon: '🛡️', cls: 'border-blue-400/40 bg-blue-500/10 text-blue-300', label: 'Patrol' },
+                police_captain: { icon: '⚖️', cls: 'border-yellow-400/40 bg-yellow-500/10 text-yellow-300', label: 'Captain' },
+                police_chief: { icon: '👁️', cls: 'border-orange-400/40 bg-orange-500/10 text-orange-300', label: 'Chief' },
+                mayor: { icon: '👑', cls: 'border-primary/50 bg-primary/10 text-primary', label: 'Mayor' },
+              };
+              const openCorruption = () => {
+                if (!openSections.has('corruption')) toggle('corruption');
+              };
+              return (
+                <button
+                  type="button"
+                  data-no-sound
+                  onClick={openCorruption}
+                  className="flex w-full flex-wrap items-center gap-1 rounded-md border border-border/60 bg-card/40 px-2 py-1 text-left hover:border-primary/40 transition-colors"
+                  title="Active bribes — click to open Corruption panel"
+                >
+                  <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground mr-1">Bribes</span>
+                  {active
+                    .slice()
+                    .sort((a, b) => a.turnsRemaining - b.turnsRemaining)
+                    .map(b => {
+                      const m = tierMeta[b.tier] || tierMeta.patrol_officer;
+                      const expiring = b.turnsRemaining <= 1;
+                      return (
+                        <span
+                          key={b.id}
+                          className={cn(
+                            'inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
+                            m.cls,
+                            expiring && 'animate-pulse'
+                          )}
+                        >
+                          <span>{m.icon}</span>
+                          <span>{m.label}</span>
+                          <span className="opacity-70">· {b.turnsRemaining}t</span>
+                        </span>
+                      );
+                    })}
+                </button>
+              );
+            })()}
             {/* Heat Tier Indicator */}
             {(() => {
               const heat = policeHeat.level;
