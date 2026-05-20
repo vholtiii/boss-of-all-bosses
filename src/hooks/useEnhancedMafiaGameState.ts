@@ -8067,6 +8067,32 @@ export const useEnhancedMafiaGameState = (
           }];
           return newState;
         }
+        case 'cancel_planned_hit': {
+          // Allow the player to abort a marked Plan Hit during the Tactical step.
+          // No refund of the tactical action spent on marking; no heat/cooldown change.
+          if (!newState.plannedHit) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚠️ No Plan Active',
+              message: 'There is no planned hit to cancel.',
+            }];
+            return newState;
+          }
+          if (newState.turnPhase !== 'move') {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚠️ Wrong Phase',
+              message: 'Plan Hit can only be cancelled during the Tactical step.',
+            }];
+            return newState;
+          }
+          const cancelTarget = newState.deployedUnits.find(u => u.id === newState.plannedHit!.targetUnitId);
+          const cancelTargetName = cancelTarget?.name || newState.plannedHit.targetUnitId?.split('-').slice(-2).join(' ') || 'target';
+          newState.plannedHit = null;
+          newState.pendingNotifications = [...newState.pendingNotifications, {
+            type: 'info' as const, title: '🚫 Plan Hit Cancelled',
+            message: `${cancelTargetName} is no longer marked. Tactical action is not refunded.`,
+          }];
+          return newState;
+        }
         case 'recruit_soldiers': {
           // Buy Mercenary — expensive, combat-ready, hurts loyalty
           if (newState.actionsRemaining <= 0) return newState;
