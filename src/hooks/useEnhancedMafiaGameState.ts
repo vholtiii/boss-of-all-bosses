@@ -1653,48 +1653,59 @@ export const useEnhancedMafiaGameState = (
   // ============ PHASE-BASED TURN SYSTEM ============
   const advancePhase = useCallback(() => {
     setGameState(prev => {
-      const phaseOrder: TurnPhase[] = ['deploy', 'move', 'action'];
-      const currentIdx = phaseOrder.indexOf(prev.turnPhase);
-      const nextPhase = currentIdx < phaseOrder.length - 1 ? phaseOrder[currentIdx + 1] : 'waiting' as TurnPhase;
-      
-      // Calculate action budget when entering action phase
-      let actionsRemaining = prev.actionsRemaining;
-      let maxActions = prev.maxActions;
-      if (nextPhase === 'action') {
-        const hasBonus = prev.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD && 
-                         prev.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
-        const manhattanAP = (prev.activeDistrictBonuses || []).some((b: any) => b.family === prev.playerFamily && b.bonusType === 'extra_ap') ? 1 : 0;
-        maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0) + manhattanAP;
-        actionsRemaining = maxActions;
-      }
-      
-      // Reset movesRemaining for all player units when entering tactical phase
-      let deployedUnits = prev.deployedUnits;
-      if (nextPhase === 'move') {
-        deployedUnits = prev.deployedUnits.map(u => {
-          if (u.family !== prev.playerFamily) return u;
-          // Mattresses: units are locked — 0 moves
-          if ((prev.mattressesState || {}).active) return { ...u, movesRemaining: 0 };
-          const baseMoves = u.type === 'capo' ? CAPO_MOVES_PER_TURN : 2;
-          return { ...u, movesRemaining: baseMoves };
-        });
-      }
+      try {
+        const phaseOrder: TurnPhase[] = ['deploy', 'move', 'action'];
+        const currentIdx = phaseOrder.indexOf(prev.turnPhase);
+        const nextPhase = currentIdx < phaseOrder.length - 1 ? phaseOrder[currentIdx + 1] : 'waiting' as TurnPhase;
 
-      return {
-        ...prev,
-        turnPhase: nextPhase,
-        movementPhase: nextPhase === 'move' || nextPhase === 'deploy',
-        selectedUnitId: null,
-        availableMoveHexes: [],
-        deployMode: null,
-        availableDeployHexes: [],
-        selectedMoveAction: 'move' as MoveAction,
-        actionsRemaining,
-        maxActions,
-        deployedUnits,
-        // Reset tactical budget when entering move (tactical) phase
-        tacticalActionsRemaining: nextPhase === 'move' ? TACTICAL_ACTIONS_PER_TURN : prev.tacticalActionsRemaining,
-      };
+        // Calculate action budget when entering action phase
+        let actionsRemaining = prev.actionsRemaining;
+        let maxActions = prev.maxActions;
+        if (nextPhase === 'action') {
+          const hasBonus = prev.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD &&
+                           prev.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
+          const manhattanAP = (prev.activeDistrictBonuses || []).some((b: any) => b.family === prev.playerFamily && b.bonusType === 'extra_ap') ? 1 : 0;
+          maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0) + manhattanAP;
+          actionsRemaining = maxActions;
+        }
+
+        // Reset movesRemaining for all player units when entering tactical phase
+        let deployedUnits = prev.deployedUnits;
+        if (nextPhase === 'move') {
+          deployedUnits = prev.deployedUnits.map(u => {
+            if (u.family !== prev.playerFamily) return u;
+            // Mattresses: units are locked — 0 moves
+            if ((prev.mattressesState || {}).active) return { ...u, movesRemaining: 0 };
+            const baseMoves = u.type === 'capo' ? CAPO_MOVES_PER_TURN : 2;
+            return { ...u, movesRemaining: baseMoves };
+          });
+        }
+
+        return {
+          ...prev,
+          turnPhase: nextPhase,
+          movementPhase: nextPhase === 'move' || nextPhase === 'deploy',
+          selectedUnitId: null,
+          availableMoveHexes: [],
+          deployMode: null,
+          availableDeployHexes: [],
+          selectedMoveAction: 'move' as MoveAction,
+          actionsRemaining,
+          maxActions,
+          deployedUnits,
+          // Reset tactical budget when entering move (tactical) phase
+          tacticalActionsRemaining: nextPhase === 'move' ? TACTICAL_ACTIONS_PER_TURN : prev.tacticalActionsRemaining,
+        };
+      } catch (err) {
+        console.error('[advancePhase] crashed — keeping previous state', err);
+        return {
+          ...prev,
+          pendingNotifications: [
+            ...(prev.pendingNotifications || []),
+            { type: 'error' as const, title: '⚠️ Phase skipped', message: 'Something went wrong advancing the phase. Try again.' },
+          ],
+        };
+      }
     });
   }, []);
 
@@ -3024,6 +3035,7 @@ export const useEnhancedMafiaGameState = (
   // ============ END TURN ============
   const endTurn = useCallback(() => {
     setGameState(prev => {
+     try {
       const newState = cloneStateForMutation(prev);
       // Defensive guards for arrays that may be undefined (e.g. from older saved state)
       newState.hiddenUnits = newState.hiddenUnits || [];
@@ -4996,6 +5008,16 @@ export const useEnhancedMafiaGameState = (
       });
       
       return newState;
+     } catch (err) {
+      console.error('[endTurn] crashed — rolling back turn', err);
+      return {
+        ...prev,
+        pendingNotifications: [
+          ...(prev.pendingNotifications || []),
+          { type: 'error' as const, title: '⚠️ Turn rolled back', message: 'An error occurred during end-of-turn processing. The turn was reverted to keep the game stable.' },
+        ],
+      };
+     }
     });
   }, []);
 
