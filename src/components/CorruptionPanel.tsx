@@ -14,7 +14,7 @@ interface CorruptionPanelProps {
   heat: number;
   gamePhase: number;
   actionsRemaining?: number;
-  phaseIsAction?: boolean;
+  phaseIsTactical?: boolean;
   onBribe: (tier: BribeTier, targetFamily?: string) => void;
 }
 
