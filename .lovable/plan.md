@@ -1,48 +1,59 @@
-# Tune AI + Sim Harness After Bribes Moved to Tactical
+# Refresh Corruption HUD and UX
 
-The Corruption bribe is now a Tactical-step spend that consumes a tactical action (3/turn) instead of an Action token. Two things drift out of balance from that move:
+Goal: make the 4-tier bribe system easier to read at a glance, clearer about phase/budget gating, and visible from the main status area — without changing any underlying mechanic, cost, success formula, or AI behavior.
 
-1. **Strategy simulations** — all 3 sim policies still issue `bribe_corruption` from the Action branch, where the handler now early-returns with a "No Tactical Actions" warning. Sims report misleading heat numbers because the player effectively never bribes.
-2. **AI vs player parity** — the player gained a "free" heat cleanup (no longer competes with claim/extort for Action tokens). The AI's heat reduction (`aiSpendOnHeatReduction`) is a separate, budget-free spend with a 2-turn cooldown and a low warm-tier trigger chance. Without a small bump the AI will fall behind the player on heat management.
+## Scope
 
-Out of scope: bribe costs/effects, success formulas, phase gates, the 4-tier intel system, AI-action-budget refactor, new posture types.
+- Visual + interaction refresh of `CorruptionPanel.tsx` (the collapsible sidebar card body).
+- Small status indicator added to the existing top status strip (above the Heat Tier indicator) so active bribes are visible while the Corruption section is collapsed.
+- No changes to `useEnhancedMafiaGameState.ts` reducer logic, no changes to `BRIBE_TIERS`, costs, success math, duration, or the `bribe_corruption` action handler.
 
-## Tuning changes
+## CorruptionPanel refresh
 
-### 1. `src/hooks/__tests__/strategy-simulation.test.ts`
+Replace the current flat list with a tighter, board-game styled card layout.
 
-Move each `bribe_corruption` call from the `else` (action) branch into the `else if (phase === "tactical")` branch, after `autoResolveEvents`, and guard on `s.tacticalActionsRemaining > 0`:
+1. **Header strip** at top of the panel:
+   - Left: small "Tactical · 1 action" pill (uses `phaseIsTactical` + `actionsRemaining`).
+   - Right: `{activeBribes.length}/4 contracts` badge.
+   - When `!phaseIsTactical`: full strip greyed with a single line "Available in Tactical step" (replaces the current outer lock paragraph from `GameSidePanels`).
 
-- Conqueror: bribe when `heat >= 60 && phase >= 2`.
-- Tycoon: bribe when `heat > 30 && phase >= 2 && money > 5000`.
-- Diplomat: bribe when `heat >= 50 && phase >= 2`.
+2. **Tier rows** (one per tier, always rendered, including locked):
+   - Row left: tier icon in a circular chip tinted per state (locked = muted, available = card, active = primary, unaffordable = destructive border).
+   - Row mid: tier label + one-line effect; second line shows cost, duration, success% with the existing color bands.
+   - Row right: state-aware control
+     - Locked → "🔒 Phase 2/3" chip (same gating logic as today).
+     - Active → ring progress + `{turnsRemaining}t` label; target family shown as a small chip if any.
+     - Available → primary action button (Bribe) with the same disabled logic and tooltip messages as today.
+   - Affordability is shown by tinting the cost number red when `money < cost` (already partially there, applied uniformly).
 
-No other policy logic changes.
+3. **Target selector** only renders when the user is about to act on a tier that needs a target (captain/chief/mayor) AND that tier is available and not already active. Otherwise hidden. Default selection unchanged.
 
-### 2. `src/hooks/useEnhancedMafiaGameState.ts` — AI heat-spend tuning
+4. **Empty / all-active state**: when all 4 tiers are active, replace the action area with a single "All channels engaged" footer line.
 
-In the AI heat-precaution block (~lines 5707–5721):
+5. Keep the same component props and `onBribe` signature; this is purely a presentation refactor.
 
-- Bump `warm`-tier spend chance from `0.20 * personalityMult` to `0.30 * personalityMult`.
-- Bump `hot`-tier spend chance from `0.40 * personalityMult` to `0.55 * personalityMult`.
-- Drop bribe cooldown from 2 turns to 1 turn for `warm`/`hot` tiers; keep 2 turns for `critical`/`rico` (no runaway free spend). Done by passing the cooldown as a parameter to `aiSpendOnHeatReduction` or setting `bribeCooldownUntil` after the call site based on tier.
+## Status HUD addition
 
-Rationale: player now bribes ~1 turn earlier on average (no Action-slot tradeoff). These three numbers restore parity without changing the AI's posture decision tree.
+In `GameSidePanels.tsx`, in the existing status block that already renders the Heat Tier indicator (around the heat tier lines), add — directly above the heat tier — a compact Corruption HUD line:
 
-### 3. `src/hooks/__tests__/ai-posture.test.ts` — regression coverage
+- Hidden when `activeBribes` is empty.
+- Otherwise renders one chip per active bribe: tier icon + `{turnsRemaining}t`, color-tinted to match the panel's active-tier color.
+- Soonest-expiring chip pulses (CSS animation already in the theme) when `turnsRemaining <= 1`.
+- Clicking the strip opens the Corruption collapsible section (`toggle('corruption')`) and scrolls it into view.
 
-Add two focused cases:
+This gives players a persistent at-a-glance read on bribe coverage without expanding the section every turn.
 
-- **Tactical budget contract**: dispatch `bribe_corruption` while `tacticalActionsRemaining = 0` → expect a "No Tactical Actions" notification, no money spent, no contract added.
-- **AI warm-tier cleanup**: seed an AI opponent with `heat = 50`, run 3 AI turns at fixed RNG, assert `heat` strictly decreases at least once (proves the bumped warm-tier chance fires under normal play).
+## Out of scope
 
-### 4. Validation
-
-- `bunx vitest run src/hooks/__tests__/ai-posture.test.ts src/hooks/__tests__/strategy-simulation.test.ts`
-- Re-read `/mnt/documents/strategy-sim-summary.md` and confirm: bribes registering (active contracts > 0 across turns), average heat in each sim shifts down vs the previous run, no new errors or stuck phases.
+- No changes to mechanics, AI, costs, or formulas.
+- No changes to `bribe_corruption` action, `aiSpendOnHeatReduction`, or any test.
+- No changes to game guide copy beyond what's already correct.
 
 ## Technical notes
 
-- AI does NOT consume the player's `tacticalActionsRemaining`. `aiSpendOnHeatReduction` stays free-spend by design — the tactical step is a player-side construct.
-- The strategy sims drive the player hook; the AI runs inside `endTurn` and is unaffected by where the sim issues its bribe call.
-- No UI changes; the Corruption panel and CorruptionPanel component already reflect the tactical step from the prior change.
+- Files touched:
+  - `src/components/CorruptionPanel.tsx` — UI rewrite within the same component; props unchanged.
+  - `src/components/GameSidePanels.tsx` — add the small HUD strip above the heat-tier indicator inside the existing status block, and remove the now-redundant outer "Unlock in Tactical step" paragraph (lock state is handled inside the panel header).
+- Styling uses existing semantic tokens (`primary`, `muted-foreground`, `destructive`, `border`, `bg-card`) and existing tier color classes (`text-green-400`, `text-yellow-400`, `text-destructive`) already used in this file — no new tokens added.
+- Reuses existing icons from `lucide-react` (`Gavel`, `Shield`, `Eye`, `Crown`, `Timer`).
+- Ring progress for active bribes is rendered via a small inline SVG (no new dependency).
