@@ -240,6 +240,10 @@ const diplomat: StrategyPolicy = {
       for (const sd of s.incomingSitdowns || []) {
         try { api.performAction({ type: "accept_incoming_sitdown", sitdownId: sd.id }); } catch {}
       }
+      // Heat management (tactical-step spend) — diplomats avoid heat aggressively
+      if ((s.tacticalActionsRemaining ?? 0) > 0 && (s.policeHeat?.level ?? 0) >= 50 && (s.gamePhase || 1) >= 2) {
+        try { api.performAction({ type: "bribe_corruption", tier: "patrol_officer" }); } catch {}
+      }
     } else {
       // Phase 2+: call sitdowns to build alliances
       if ((s.gamePhase || 1) >= 2) {
@@ -254,10 +258,6 @@ const diplomat: StrategyPolicy = {
       // Phase 4: trigger commission vote
       if ((s.gamePhase || 1) >= 4) {
         try { api.performAction({ type: "commission_vote" }); } catch {}
-      }
-      // Heat management
-      if ((s.policeHeat?.level ?? 0) >= 50 && (s.gamePhase || 1) >= 2) {
-        try { api.performAction({ type: "bribe_corruption", tier: "patrol_officer" }); } catch {}
       }
       // Claim frontier (low aggression)
       const frontier = neutralFrontier(s, fam).slice(0, 1);
