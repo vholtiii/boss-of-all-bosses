@@ -175,6 +175,10 @@ const tycoon: StrategyPolicy = {
           try { api.fortifyUnit(); } catch {}
         }
       }
+      // Bribe early (tactical-step spend)
+      if ((s.tacticalActionsRemaining ?? 0) > 0 && (s.gamePhase || 1) >= 2 && (s.policeHeat?.level ?? 0) > 30 && (s.resources?.money ?? 0) > 5000) {
+        try { api.performAction({ type: "bribe_corruption", tier: "patrol_officer" }); } catch {}
+      }
     } else {
       // Build businesses
       if (s.actionsRemaining > 0 && (s.resources?.money ?? 0) > 25000) {
@@ -190,12 +194,9 @@ const tycoon: StrategyPolicy = {
           } catch {}
         }
       }
-      // Hire lawyer + bribe early
+      // Hire lawyer
       if (s.actionsRemaining > 0 && (s.resources?.money ?? 0) > 10000 && (s.policeHeat?.level ?? 0) > 30) {
         try { api.performAction({ type: "hire_lawyer" }); } catch {}
-      }
-      if (s.actionsRemaining > 0 && (s.gamePhase || 1) >= 2 && (s.resources?.money ?? 0) > 5000) {
-        try { api.performAction({ type: "bribe_corruption", tier: "patrol_officer" }); } catch {}
       }
       // Claim frontier with deployed soldiers
       const frontier = neutralFrontier(s, fam);
