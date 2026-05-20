@@ -1706,7 +1706,7 @@ const CollapsibleSection: React.FC<{
     >
       {icon}
       <span className="flex-1">{title}</span>
-      {phaseLocked && <span className="text-[9px] text-muted-foreground font-normal italic">({title.includes('Recruit') || title.includes('Tactical') ? 'Tactical Step' : 'Action Step'})</span>}
+      {phaseLocked && <span className="text-[9px] text-muted-foreground font-normal italic">({title.includes('Recruit') || title.includes('Tactical') || title.includes('Corruption') ? 'Tactical Step' : 'Action Step'})</span>}
       {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
     </button>
     <AnimatePresence>
