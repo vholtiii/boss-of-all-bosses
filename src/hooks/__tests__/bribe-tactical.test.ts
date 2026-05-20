@@ -13,19 +13,16 @@ describe("bribe_corruption — tactical-step contract", () => {
       useEnhancedMafiaGameState("gambino", undefined, "normal", 1234, "small")
     );
 
-    // Advance to Action step so tacticalActionsRemaining has been depleted via skip.
-    act(() => result.current.advancePhase()); // deploy
-    act(() => result.current.advancePhase()); // tactical
-    act(() => result.current.advancePhase()); // action — sets tactical to 0
-    // Force phase to be 2 so the phase gate doesn't intercept first.
+    act(() => result.current.advancePhase()); // deploy → tactical
     act(() => {
+      // Drain tactical budget and unlock phase gate.
+      (result.current.gameState as any).tacticalActionsRemaining = 0;
       (result.current.gameState as any).gamePhase = 2;
     });
 
     const moneyBefore = result.current.gameState.resources.money;
     const bribesBefore = (result.current.gameState.activeBribes || []).length;
-    const tacticalBefore = result.current.gameState.tacticalActionsRemaining;
-    expect(tacticalBefore).toBe(0);
+    expect(result.current.gameState.tacticalActionsRemaining).toBe(0);
 
     act(() => {
       result.current.performAction({ type: "bribe_corruption", tier: "patrol_officer" });
