@@ -53,7 +53,7 @@ Capo defenders follow the existing Hit rule: a Push Out victory wounds enemy cap
 ## Numbers (first pass, tuneable)
 
 - Action cost: 1 action.
-- Heat: +4 if uncontested, +8 if combat. (Hit is +10–25 today.)
+- Heat: +2 if uncontested, +4 on combat win, +2 on combat loss (scouted) / +3 on combat loss (unscouted). (Hit is +10–25 today.)
 - Respect: +2 on success.
 - Fear: +2 on the targeted family.
 - Relationship / tension: same magnitude as a normal territory hit on that family — this is still aggression.
