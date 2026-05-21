@@ -5802,6 +5802,18 @@ export const useEnhancedMafiaGameState = (
         oppAny.layLowCooldownUntil = state.turn + 7;
         if (turnReport) turnReport.aiActions.push({ family: fam, action: 'lay_low', detail: `Posture cool-off stand-down` });
       }
+      // Posture TURTLE: prefer mattresses (Phase 3+, defensive hunker)
+      const mattressesOnCDNow = (oppAny.mattressesCooldownUntil || 0) > state.turn;
+      if (policy.preferMattresses && aiPhase >= 3 && !strategicOverride && !isAIAtMattresses(opponent, state.turn) && !mattressesOnCDNow && Math.random() < 0.65) {
+        oppAny.mattressesActiveUntil = state.turn + 2;
+        oppAny.mattressesCooldownUntil = state.turn + 8;
+        state.pendingNotifications.push({
+          type: 'info' as const,
+          title: '🛏️ Hit the Mattresses',
+          message: `The ${fam} family is hunkered down for 3 turns (turtle posture).`,
+        });
+        if (turnReport) turnReport.aiActions.push({ family: fam, action: 'go_to_mattresses', detail: `Posture turtle hunker-down` });
+      }
       const aiHeatRicoFreeze = heatTier === 'rico' && !strategicOverride;
       // Posture-driven offense suppression: prevents the "always in heat trouble" loop
       // by stopping new offense once heat crosses the posture's ceiling.
@@ -6253,6 +6265,9 @@ export const useEnhancedMafiaGameState = (
               mood: dynamicMood,
               jitter: turnRng() * 2 - 1,
               difficulty: state.difficulty || 'normal',
+              warTargetMul: policy.warTargetMul,
+              expandMul: posture === 'EXPAND' ? 1.4 : posture === 'CLOSE_OUT' ? 1.2 : 1,
+              economyFocusMul: policy.economyFocusMul,
             });
           });
           const pickIdx = softmaxPick(scores, turnRng, 4, difficultySoftmaxTemperature(state.difficulty || 'normal'));
@@ -6577,8 +6592,11 @@ export const useEnhancedMafiaGameState = (
       // ── AI ACTION PHASE: CLAIM & EXTORT ──
       // Phase 3+: AI claim/extort disabled — influence system handles territory
       // Lay Low / Mattresses also disable claim+extort offense
-      if (aiPhase >= 3 || aiOffenseDisabled) {
-        // Skip claim/extort — territory handled by processInfluenceSystem (or AI is hiding)
+      // Phase 3+: AI claim/extort disabled — influence system handles territory
+      // Lay Low / Mattresses also disable claim+extort offense
+      // Posture suppressExpansion (COOL_OFF / CONSOLIDATE / TURTLE / BUILD_ECONOMY) also blocks neutral grabs
+      if (aiPhase >= 3 || aiOffenseDisabled || (policy.suppressExpansion && !strategicOverride)) {
+        // Skip claim/extort — territory handled by processInfluenceSystem (or AI is hiding / conserving)
       } else {
       // Priority 1: Extort neutral hexes with completed businesses (free money + territory)
       const aiUnitsForActions = state.deployedUnits.filter(u => u.family === fam);
@@ -6765,9 +6783,12 @@ export const useEnhancedMafiaGameState = (
           state.combatLog.push(`📩 ${famLabel} requested a sitdown — proposed: ${dealLabel} (expires in 2 turns)`);
         };
         
+        // Posture acceptSitdownsForCash (CONSOLIDATE/COOL_OFF) → boost proposal odds so
+        // a struggling AI actively seeks peace/cash deals instead of waiting on personality.
+        const sitdownBoost = policy.acceptSitdownsForCash ? 2.0 : 1.0;
         // Diplomatic: ceasefire at Phase 2+, alliance at Phase 3+ if relationship > 30
         if (personality === 'diplomatic' && !hasIncoming) {
-          if (aiPhase >= 2 && !hasCeasefire && Math.random() < (cooperation / 150)) {
+          if (aiPhase >= 2 && !hasCeasefire && Math.random() < (cooperation / 150) * sitdownBoost) {
             pushSitdown('ceasefire');
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire' });
           } else if (aiPhase >= 3 && !hasAlliance && hasCeasefire && (opponent.relationships?.[state.playerFamily] || 0) > 30 && Math.random() < 0.2) {
@@ -6777,7 +6798,7 @@ export const useEnhancedMafiaGameState = (
         }
         // Defensive: ceasefire at Phase 3+
         else if (personality === 'defensive' && !hasIncoming) {
-          if (aiPhase >= 3 && !hasCeasefire && Math.random() < (cooperation / 200)) {
+          if (aiPhase >= 3 && !hasCeasefire && Math.random() < (cooperation / 200) * sitdownBoost) {
             pushSitdown('ceasefire');
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire' });
           }
@@ -6785,15 +6806,16 @@ export const useEnhancedMafiaGameState = (
         // Opportunistic: ceasefire if losing territory
         else if (personality === 'opportunistic' && !hasIncoming) {
           const aiHexCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
-          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < 6 && Math.random() < 0.3) {
+          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < 6 && Math.random() < 0.3 * sitdownBoost) {
             pushSitdown('ceasefire');
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire (losing ground)' });
           }
         }
-        // Aggressive: ceasefire only when losing badly (< 4 hexes)
+        // Aggressive: ceasefire only when losing badly (< 4 hexes) — or any time when posture forces cash-seeking
         else if (personality === 'aggressive' && !hasIncoming) {
           const aiHexCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
-          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < 4 && Math.random() < 0.2) {
+          const aggCeasefireThresh = policy.acceptSitdownsForCash ? 8 : 4;
+          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < aggCeasefireThresh && Math.random() < 0.2 * sitdownBoost) {
             pushSitdown('ceasefire');
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire (desperate)' });
           }
@@ -7107,8 +7129,10 @@ export const useEnhancedMafiaGameState = (
       const planHitChanceMultiplier = personality === 'aggressive' ? 2.0
         : personality === 'unpredictable' ? 1.5
         : 1.0; // opportunistic
-      if (hasCeasefireWithPlayer || hasAllianceWithPlayer || aiOffenseDisabled) {
-        // Skip plan hit — active pact with player or AI is laying low / mattresses
+      // Posture refuseNewWars (COOL_OFF/CONSOLIDATE/TURTLE/CLOSE_OUT-when-not-at-war/BUILD_ECONOMY) blocks new plan hits
+      const postureBlocksNewHit = policy.refuseNewWars && !strategicOverride && !atWarNow;
+      if (hasCeasefireWithPlayer || hasAllianceWithPlayer || aiOffenseDisabled || postureBlocksNewHit) {
+        // Skip plan hit — active pact, hiding, or posture refuses new aggression
       } else if (aiPhase >= 2 && planHitPersonalityAllowed && Math.random() < AI_PLAN_HIT_CHANCE * planHitChanceMultiplier) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
@@ -7161,7 +7185,12 @@ export const useEnhancedMafiaGameState = (
 
       // ── AI FAMILY POWER USAGE ──
       const aiPower = FAMILY_POWERS[fam];
-      if (aiPower && aiPhase >= 2 && aiTacticalRemaining >= aiPower.cost) {
+      // Posture gating: defensive powers (Genovese hide hex, Bonanno purge) stay open;
+      // offensive/economic powers (Gambino scout, Lucchese shakedown) are skipped when
+      // posture is CONSOLIDATE/COOL_OFF/TURTLE so AI doesn't burn cooldowns mid-crisis.
+      const conservativePosture = posture === 'CONSOLIDATE' || posture === 'COOL_OFF' || posture === 'TURTLE';
+      const offensivePowerBlocked = conservativePosture && !strategicOverride && (fam === 'gambino' || fam === 'lucchese');
+      if (aiPower && aiPhase >= 2 && aiTacticalRemaining >= aiPower.cost && !offensivePowerBlocked) {
         const aiPowerCD = (state.familyPowerCooldowns || {})[fam] || 0;
         const aiPowerUsed = aiPower.oneTimeUse && (state.familyPowerUsedForever || {})[fam];
         if (aiPowerCD <= 0 && !aiPowerUsed) {
