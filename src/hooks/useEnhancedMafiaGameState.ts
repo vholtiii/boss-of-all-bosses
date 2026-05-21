@@ -5802,6 +5802,18 @@ export const useEnhancedMafiaGameState = (
         oppAny.layLowCooldownUntil = state.turn + 7;
         if (turnReport) turnReport.aiActions.push({ family: fam, action: 'lay_low', detail: `Posture cool-off stand-down` });
       }
+      // Posture TURTLE: prefer mattresses (Phase 3+, defensive hunker)
+      const mattressesOnCDNow = (oppAny.mattressesCooldownUntil || 0) > state.turn;
+      if (policy.preferMattresses && aiPhase >= 3 && !strategicOverride && !isAIAtMattresses(opponent, state.turn) && !mattressesOnCDNow && Math.random() < 0.65) {
+        oppAny.mattressesActiveUntil = state.turn + 2;
+        oppAny.mattressesCooldownUntil = state.turn + 8;
+        state.pendingNotifications.push({
+          type: 'info' as const,
+          title: '🛏️ Hit the Mattresses',
+          message: `The ${fam} family is hunkered down for 3 turns (turtle posture).`,
+        });
+        if (turnReport) turnReport.aiActions.push({ family: fam, action: 'go_to_mattresses', detail: `Posture turtle hunker-down` });
+      }
       const aiHeatRicoFreeze = heatTier === 'rico' && !strategicOverride;
       // Posture-driven offense suppression: prevents the "always in heat trouble" loop
       // by stopping new offense once heat crosses the posture's ceiling.
