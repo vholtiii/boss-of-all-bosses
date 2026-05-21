@@ -22,7 +22,7 @@ Push Out is a single-action territory shove. Behavior depends on whether the hex
 Empty rival hex, no defenders (scouted OR unscouted)
   -> Auto-success, hex flips to NEUTRAL (player still claims next turn,
      same convention as a successful Hit). +small respect, +small fear,
-     +rival relationship hit, low heat (+4). No civilian-casualty path —
+     +rival relationship hit, low heat (+2). No civilian-casualty path —
      the hex is rival-claimed turf, not innocent ground.
 
 Empty rival hex WITH defenders, SCOUTED
