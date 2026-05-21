@@ -10651,7 +10651,7 @@ export const useEnhancedMafiaGameState = (
       if (state.reputation.familyRelationships[targetFamily] !== undefined) {
         state.reputation.familyRelationships[targetFamily] = Math.max(-100, state.reputation.familyRelationships[targetFamily] - 8);
       }
-      applyPlayerHeat(state, 8);
+      applyPlayerHeat(state, 4);
 
       // Bold Strike if outnumbered
       if (attackers < defenders) {
