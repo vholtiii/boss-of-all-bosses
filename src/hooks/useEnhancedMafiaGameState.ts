@@ -4922,22 +4922,33 @@ export const useEnhancedMafiaGameState = (
 
       if (newState.hitmanContracts && newState.hitmanContracts.length > 0) {
         const resolvedContracts: string[] = [];
+        const refundCredit = (contract: HitmanContract, amount: number) => {
+          if (contract.hiredByFamily) {
+            const opp = (newState.aiOpponents || []).find(o => o.family === contract.hiredByFamily);
+            if (opp) opp.resources.money += amount;
+          } else {
+            newState.resources.money += amount;
+          }
+        };
+        const pushNotif = (contract: HitmanContract, notif: any) => {
+          // AI-hired contracts don't notify the player unless target is player family
+          if (!contract.hiredByFamily || contract.targetFamily === newState.playerFamily) {
+            newState.pendingNotifications.push(notif);
+          }
+        };
         newState.hitmanContracts = newState.hitmanContracts.map(contract => {
           const updated = { ...contract, turnsRemaining: contract.turnsRemaining - 1 };
           if (updated.turnsRemaining <= 0) {
             resolvedContracts.push(contract.id);
-            // Resolve: find the target
             const targetUnit = newState.deployedUnits.find(u => u.id === contract.targetUnitId);
             if (!targetUnit) {
-              // Target already dead — refund
-              newState.resources.money += Math.round(contract.cost * HITMAN_REFUND_RATE);
-              newState.pendingNotifications.push({
+              refundCredit(contract, Math.round(contract.cost * HITMAN_REFUND_RATE));
+              pushNotif(contract, {
                 type: 'info' as const, title: '🎯 Hitman: Target Gone',
                 message: `Target eliminated by other means. $${Math.round(contract.cost * HITMAN_REFUND_RATE).toLocaleString()} refunded.`,
               });
               return updated;
             }
-            // Determine success rate based on target's current hex
             const tHex = newState.hexMap.find(t => t.q === targetUnit.q && t.r === targetUnit.r && t.s === targetUnit.s);
             const isAtHQ = tHex?.isHeadquarters === targetUnit.family;
             const isAtSafehouse = (newState.safehouses || []).some(s => targetUnit.q === s.q && targetUnit.r === s.r && targetUnit.s === s.s);
@@ -4948,28 +4959,32 @@ export const useEnhancedMafiaGameState = (
             else if (isFort) successRate = HITMAN_FORTIFIED_SUCCESS;
 
             if (Math.random() * 100 < successRate) {
-              // Kill the target
               newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== contract.targetUnitId);
               delete newState.soldierStats[contract.targetUnitId];
-              turnReport.events.push(`🎯 Hitman eliminated a ${contract.targetFamily} ${targetUnit.type}!`);
-              newState.pendingNotifications.push({
-                type: 'success' as const, title: '🎯 Contract Fulfilled',
-                message: `Your hitman successfully eliminated a ${contract.targetFamily} ${targetUnit.type}. No heat generated.`,
-              });
-              // Tension: hitman kills are anonymous — only global tension, no pair tension
+              const killerLabel = contract.hiredByFamily ? `the ${contract.hiredByFamily} family's` : 'Your';
+              turnReport.events.push(`🎯 ${killerLabel} hitman eliminated a ${contract.targetFamily} ${targetUnit.type}!`);
+              if (contract.targetFamily === newState.playerFamily) {
+                newState.pendingNotifications.push({
+                  type: 'error' as const, title: '🎯 Your Capo Assassinated!',
+                  message: `An anonymous hitman eliminated your ${targetUnit.type}. No witnesses, no leads.`,
+                });
+              } else {
+                pushNotif(contract, {
+                  type: 'success' as const, title: '🎯 Contract Fulfilled',
+                  message: `Your hitman successfully eliminated a ${contract.targetFamily} ${targetUnit.type}. No heat generated.`,
+                });
+              }
               if (targetUnit.type === 'capo') {
                 addGlobalTension(newState, TENSION_HITMAN_KILL_CAPO_GLOBAL);
-                // Colombo succession trigger
                 triggerColomboSuccession(newState, contract.targetFamily, targetUnit.q, targetUnit.r, targetUnit.s);
               } else {
                 addGlobalTension(newState, TENSION_HITMAN_KILL_SOLDIER_GLOBAL);
               }
             } else {
-              // Failed — refund 50%, alert target family
-              newState.resources.money += Math.round(contract.cost * HITMAN_REFUND_RATE);
+              refundCredit(contract, Math.round(contract.cost * HITMAN_REFUND_RATE));
               newState.aiAlertState[contract.targetFamily] = HITMAN_ALERT_DURATION;
               turnReport.events.push(`🎯 Hitman failed to eliminate a ${contract.targetFamily} ${targetUnit.type}.`);
-              newState.pendingNotifications.push({
+              pushNotif(contract, {
                 type: 'warning' as const, title: '🎯 Contract Failed',
                 message: `Hitman failed. $${Math.round(contract.cost * HITMAN_REFUND_RATE).toLocaleString()} refunded. ${contract.targetFamily} family is now on high alert.`,
               });
@@ -4977,17 +4992,20 @@ export const useEnhancedMafiaGameState = (
           }
           return updated;
         });
-        // Remove resolved contracts and expired ones
         newState.hitmanContracts = newState.hitmanContracts.filter(c => !resolvedContracts.includes(c.id) && (newState.turn - c.hiredOnTurn) < HITMAN_MAX_LIFETIME);
-        // Expire old contracts with refund
-        const expiredBefore = newState.hitmanContracts.length;
         newState.hitmanContracts = newState.hitmanContracts.filter(c => {
           if ((newState.turn - c.hiredOnTurn) >= HITMAN_MAX_LIFETIME) {
-            newState.resources.money += Math.round(c.cost * HITMAN_REFUND_RATE);
-            newState.pendingNotifications.push({
-              type: 'info' as const, title: '🎯 Contract Expired',
-              message: `Hitman contract expired after ${HITMAN_MAX_LIFETIME} turns. $${Math.round(c.cost * HITMAN_REFUND_RATE).toLocaleString()} refunded.`,
-            });
+            const refund = Math.round(c.cost * HITMAN_REFUND_RATE);
+            if (c.hiredByFamily) {
+              const opp = (newState.aiOpponents || []).find(o => o.family === c.hiredByFamily);
+              if (opp) opp.resources.money += refund;
+            } else {
+              newState.resources.money += refund;
+              newState.pendingNotifications.push({
+                type: 'info' as const, title: '🎯 Contract Expired',
+                message: `Hitman contract expired after ${HITMAN_MAX_LIFETIME} turns. $${refund.toLocaleString()} refunded.`,
+              });
+            }
             return false;
           }
           return true;
