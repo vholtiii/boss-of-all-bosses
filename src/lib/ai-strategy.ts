@@ -154,7 +154,8 @@ export function scoreHexForAI(i: ScoreHexInputs): number {
   // Base attraction: businesses
   add(Math.min(20, i.hexIncome / 200));
   // Weak hex bonus / strong hex penalty
-  if (i.defenderCount === 0) add(6);
+  const expandMul = i.expandMul ?? 1;
+  if (i.defenderCount === 0) add(6 * expandMul);
   else if (i.defenderCount === 1) add(1);
   else add(-4);
   // Family identity: focus districts
@@ -162,15 +163,17 @@ export function scoreHexForAI(i: ScoreHexInputs): number {
   // Don't overextend
   add(-Math.max(0, i.distanceToOwnHQ - 3) * 1.5);
   // Consolidation bonus (defensive moods love this)
+  const econMul = i.economyFocusMul ?? 1;
   if (i.isAdjacentToOwnTerritory) {
-    add(i.mood === 'desperate' || i.mood === 'cautious' ? 5 : 2);
+    const base = i.mood === 'desperate' || i.mood === 'cautious' ? 5 : 2;
+    add(base * econMul);
   }
   // Avoid fortified / safehouses without intel
   if (i.isFortified) add(-5);
   if (i.isSafehouse && !i.hasScoutIntel) add(-4);
   if (i.isSafehouse && i.hasScoutIntel) add(3); // bounty + intel target
   // War prioritization
-  if (i.isWarTarget) add(10);
+  if (i.isWarTarget) add(10 * (i.warTargetMul ?? 1));
   // Phase 4 endgame: lean toward player when winning
   if (i.phase >= 4 && i.isPlayerHex && i.mood === 'dominant') add(4);
 
