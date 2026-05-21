@@ -7911,7 +7911,7 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications.push({ type: 'warning', title: '🛏️ At the Mattresses', message: 'Your units are hunkered down and cannot attack.' });
             return newState;
           }
-          const beforeNotifCount = (newState.pendingNotifications || []).length;
+          const prevCombat = newState.lastCombatResult;
           const result = processPushOutTerritory(newState, action);
           // Only spend an action if combat actually engaged (validation rejections only add a warning)
           if (result.lastCombatResult && (!newState.lastCombatResult || result.lastCombatResult.timestamp !== (newState.lastCombatResult as any)?.timestamp)) {
