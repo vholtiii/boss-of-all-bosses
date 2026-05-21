@@ -2568,6 +2568,28 @@ export const useEnhancedMafiaGameState = (
         return result;
       }
 
+      if (action === 'push_out') {
+        const pushAction = { type: 'push_out_territory', targetQ: toQ, targetR: toR, targetS: toS, selectedUnitId: unitId };
+        const result = processPushOutTerritory(newState, pushAction);
+        // Consume an action token (same as Hit from this dialog path)
+        result.actionsRemaining = Math.max(0, (result.actionsRemaining || 0) - 1);
+        result.pendingNotifications = result.pendingNotifications || [];
+        // On failure, bounce attacker back to origin hex
+        if (result.lastCombatResult && result.lastCombatResult.success === false) {
+          const idx = result.deployedUnits.findIndex((u: any) => u.id === unitId);
+          if (idx !== -1) {
+            result.deployedUnits[idx] = {
+              ...result.deployedUnits[idx],
+              q: fromQ, r: fromR, s: fromS,
+              movesRemaining: (result.deployedUnits[idx].movesRemaining || 0) + 1,
+            };
+          }
+        }
+        syncLegacyUnits(result);
+        return result;
+      }
+
+
       if (action === 'plan_hit') {
         // Two-turn flow: a plannedHit must already exist (marked in a prior Tactical step).
         // Validate the marked hex matches the targeted hex, or the marked target has relocated here.
