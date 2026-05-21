@@ -7914,7 +7914,7 @@ export const useEnhancedMafiaGameState = (
           const prevCombat = newState.lastCombatResult;
           const result = processPushOutTerritory(newState, action);
           // Only spend an action if combat actually engaged (validation rejections only add a warning)
-          if (result.lastCombatResult && (!newState.lastCombatResult || result.lastCombatResult.timestamp !== (newState.lastCombatResult as any)?.timestamp)) {
+          if (result.lastCombatResult && result.lastCombatResult !== prevCombat) {
             result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           }
           return result;
