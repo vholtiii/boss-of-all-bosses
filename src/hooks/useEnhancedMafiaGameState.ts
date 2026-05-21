@@ -4922,22 +4922,33 @@ export const useEnhancedMafiaGameState = (
 
       if (newState.hitmanContracts && newState.hitmanContracts.length > 0) {
         const resolvedContracts: string[] = [];
+        const refundCredit = (contract: HitmanContract, amount: number) => {
+          if (contract.hiredByFamily) {
+            const opp = (newState.aiOpponents || []).find(o => o.family === contract.hiredByFamily);
+            if (opp) opp.resources.money += amount;
+          } else {
+            newState.resources.money += amount;
+          }
+        };
+        const pushNotif = (contract: HitmanContract, notif: any) => {
+          // AI-hired contracts don't notify the player unless target is player family
+          if (!contract.hiredByFamily || contract.targetFamily === newState.playerFamily) {
+            newState.pendingNotifications.push(notif);
+          }
+        };
         newState.hitmanContracts = newState.hitmanContracts.map(contract => {
           const updated = { ...contract, turnsRemaining: contract.turnsRemaining - 1 };
           if (updated.turnsRemaining <= 0) {
             resolvedContracts.push(contract.id);
-            // Resolve: find the target
             const targetUnit = newState.deployedUnits.find(u => u.id === contract.targetUnitId);
             if (!targetUnit) {
-              // Target already dead — refund
-              newState.resources.money += Math.round(contract.cost * HITMAN_REFUND_RATE);
-              newState.pendingNotifications.push({
+              refundCredit(contract, Math.round(contract.cost * HITMAN_REFUND_RATE));
+              pushNotif(contract, {
                 type: 'info' as const, title: '🎯 Hitman: Target Gone',
                 message: `Target eliminated by other means. $${Math.round(contract.cost * HITMAN_REFUND_RATE).toLocaleString()} refunded.`,
               });
               return updated;
             }
-            // Determine success rate based on target's current hex
             const tHex = newState.hexMap.find(t => t.q === targetUnit.q && t.r === targetUnit.r && t.s === targetUnit.s);
             const isAtHQ = tHex?.isHeadquarters === targetUnit.family;
             const isAtSafehouse = (newState.safehouses || []).some(s => targetUnit.q === s.q && targetUnit.r === s.r && targetUnit.s === s.s);
@@ -4948,28 +4959,32 @@ export const useEnhancedMafiaGameState = (
             else if (isFort) successRate = HITMAN_FORTIFIED_SUCCESS;
 
             if (Math.random() * 100 < successRate) {
-              // Kill the target
               newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== contract.targetUnitId);
               delete newState.soldierStats[contract.targetUnitId];
-              turnReport.events.push(`🎯 Hitman eliminated a ${contract.targetFamily} ${targetUnit.type}!`);
-              newState.pendingNotifications.push({
-                type: 'success' as const, title: '🎯 Contract Fulfilled',
-                message: `Your hitman successfully eliminated a ${contract.targetFamily} ${targetUnit.type}. No heat generated.`,
-              });
-              // Tension: hitman kills are anonymous — only global tension, no pair tension
+              const killerLabel = contract.hiredByFamily ? `the ${contract.hiredByFamily} family's` : 'Your';
+              turnReport.events.push(`🎯 ${killerLabel} hitman eliminated a ${contract.targetFamily} ${targetUnit.type}!`);
+              if (contract.targetFamily === newState.playerFamily) {
+                newState.pendingNotifications.push({
+                  type: 'error' as const, title: '🎯 Your Capo Assassinated!',
+                  message: `An anonymous hitman eliminated your ${targetUnit.type}. No witnesses, no leads.`,
+                });
+              } else {
+                pushNotif(contract, {
+                  type: 'success' as const, title: '🎯 Contract Fulfilled',
+                  message: `Your hitman successfully eliminated a ${contract.targetFamily} ${targetUnit.type}. No heat generated.`,
+                });
+              }
               if (targetUnit.type === 'capo') {
                 addGlobalTension(newState, TENSION_HITMAN_KILL_CAPO_GLOBAL);
-                // Colombo succession trigger
                 triggerColomboSuccession(newState, contract.targetFamily, targetUnit.q, targetUnit.r, targetUnit.s);
               } else {
                 addGlobalTension(newState, TENSION_HITMAN_KILL_SOLDIER_GLOBAL);
               }
             } else {
-              // Failed — refund 50%, alert target family
-              newState.resources.money += Math.round(contract.cost * HITMAN_REFUND_RATE);
+              refundCredit(contract, Math.round(contract.cost * HITMAN_REFUND_RATE));
               newState.aiAlertState[contract.targetFamily] = HITMAN_ALERT_DURATION;
               turnReport.events.push(`🎯 Hitman failed to eliminate a ${contract.targetFamily} ${targetUnit.type}.`);
-              newState.pendingNotifications.push({
+              pushNotif(contract, {
                 type: 'warning' as const, title: '🎯 Contract Failed',
                 message: `Hitman failed. $${Math.round(contract.cost * HITMAN_REFUND_RATE).toLocaleString()} refunded. ${contract.targetFamily} family is now on high alert.`,
               });
@@ -4977,17 +4992,20 @@ export const useEnhancedMafiaGameState = (
           }
           return updated;
         });
-        // Remove resolved contracts and expired ones
         newState.hitmanContracts = newState.hitmanContracts.filter(c => !resolvedContracts.includes(c.id) && (newState.turn - c.hiredOnTurn) < HITMAN_MAX_LIFETIME);
-        // Expire old contracts with refund
-        const expiredBefore = newState.hitmanContracts.length;
         newState.hitmanContracts = newState.hitmanContracts.filter(c => {
           if ((newState.turn - c.hiredOnTurn) >= HITMAN_MAX_LIFETIME) {
-            newState.resources.money += Math.round(c.cost * HITMAN_REFUND_RATE);
-            newState.pendingNotifications.push({
-              type: 'info' as const, title: '🎯 Contract Expired',
-              message: `Hitman contract expired after ${HITMAN_MAX_LIFETIME} turns. $${Math.round(c.cost * HITMAN_REFUND_RATE).toLocaleString()} refunded.`,
-            });
+            const refund = Math.round(c.cost * HITMAN_REFUND_RATE);
+            if (c.hiredByFamily) {
+              const opp = (newState.aiOpponents || []).find(o => o.family === c.hiredByFamily);
+              if (opp) opp.resources.money += refund;
+            } else {
+              newState.resources.money += refund;
+              newState.pendingNotifications.push({
+                type: 'info' as const, title: '🎯 Contract Expired',
+                message: `Hitman contract expired after ${HITMAN_MAX_LIFETIME} turns. $${refund.toLocaleString()} refunded.`,
+              });
+            }
             return false;
           }
           return true;
@@ -6507,36 +6525,47 @@ export const useEnhancedMafiaGameState = (
                     checkEncroachment(state, target.q, target.r, target.s, fam);
                   }
                 } else {
-                  // ===== AI HIT PARITY: blind capture of empty rival hex = civilian hit risk =====
+                  // ===== AI PUSH OUT vs. SEIZURE parity with player =====
                   const aiCaptureScouted = aiHasScoutIntel(state, fam, target.q, target.r, target.s);
                   // Territory freeze: skip claiming ceasefire family hexes
                   const prevOwnerCeasefire = (state.ceasefires || []).some(c => c.active && (c.family === prevOwner || (prevOwner === state.playerFamily && c.family === fam)));
+                  const isPushOutEligible = !tile.business; // empty rival hex → Push Out path (low heat, no civilians)
                   if (prevOwnerCeasefire) {
                     // Can't claim — ceasefire territory freeze
+                  } else if (isPushOutEligible && aiActionsRemaining > 0) {
+                    // ===== B2: Push Out — low-heat takeover of empty rival hex (mirrors player Push Out) =====
+                    aiActionsRemaining--;
+                    tile.controllingFamily = fam;
+                    // (Push Out keeps the AI on the hex; heat applied below.)
+                    // Uncontested Push Out heat (parity with player +2 uncontested)
+                    applyAIHeat(state, fam, 1, 'scouted'); // small heat tick via existing helper
+                    applyAIDiplomacyPenalties(state, fam, prevOwner as string, turnReport);
+                    addPairTension(state, fam, prevOwner as string, Math.max(1, Math.floor(TENSION_TERRITORY_HIT / 2)));
+                    checkSupplySabotage(state, target.q, target.r, target.s, fam);
+                    if (prevOwner === state.playerFamily && turnReport) {
+                      turnReport.aiActions.push({ family: fam, action: 'push_out', detail: `Pushed you out of ${tile.district || 'unknown territory'}` });
+                    } else if (turnReport) {
+                      turnReport.aiActions.push({ family: fam, action: 'push_out', detail: `Pushed ${prevOwner} out of ${tile.district || 'unknown territory'}` });
+                    }
                   } else if (!aiCaptureScouted && unit.type !== 'capo') {
-                    // Heat-precaution: at warm+ (no override), refuse civilian-hit blind capture.
+                    // Hex has a business but soldier is unscouted → blind seizure = civilian hit risk.
                     const cautionTier2 = (oppAny.aiHeatCaution || 'cool') as string;
                     if (cautionTier2 !== 'cool' && cautionTier2 !== 'override') {
                       unit.q = origQ; unit.r = origR; unit.s = origS;
                       if (turnReport) turnReport.aiActions.push({ family: fam, action: 'heat_caution', detail: `Aborted blind capture (heat ${aiHeat})` });
                       break;
                     }
-                    // Blind capture of empty rival hex by a soldier — same risk as player blind hit on empty rival hex.
-                    // Apply civilian-hit consequences and revert position so the soldier doesn't claim.
                     applyAICivilianHit(state, fam, unit, tile.district || 'unknown territory', turnReport);
-                    // Diplomacy + bounty (still attacked the rival family)
                     if (prevOwner && (prevOwner as string) !== 'neutral') {
                       placeBountyOnAI(state, fam, prevOwner as string, turnReport);
                       applyAIDiplomacyPenalties(state, fam, prevOwner as string, turnReport);
                       addPairTension(state, fam, prevOwner as string, TENSION_TERRITORY_HIT);
                     }
-                    // Unit was removed from board by applyAICivilianHit — exit this neighbor loop iteration
                     break;
                   } else if (aiActionsRemaining > 0) {
                     // Built business protection: requires a Capo to seize
                     const isPlayerBuiltBiz2 = prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted;
                     if (isPlayerBuiltBiz2 && unit.type !== 'capo') {
-                      // Regular soldiers can't seize player-built businesses — notify player
                       state.pendingNotifications.push({
                         type: 'info' as const,
                         title: '🛡️ Business Defended!',
@@ -6553,11 +6582,8 @@ export const useEnhancedMafiaGameState = (
                         });
                       }
                       tile.controllingFamily = fam;
-                      // ===== AI HIT PARITY: capturing rival hex incurs heat (scouted tier — capo or scouted soldier) =====
                       applyAIHeat(state, fam, 1, 'scouted');
-                      // Diplomacy: capturing pact-bound rival's hex still breaks the pact
                       applyAIDiplomacyPenalties(state, fam, prevOwner as string, turnReport);
-                      // Hole #6: AI captures enemy territory → tension
                       addPairTension(state, fam, prevOwner as string, TENSION_TERRITORY_HIT);
                       checkSupplySabotage(state, target.q, target.r, target.s, fam);
                       if (prevOwner === state.playerFamily && turnReport) {
@@ -6688,23 +6714,45 @@ export const useEnhancedMafiaGameState = (
       }
       } // end Phase 3 claim/extort else block
 
-      // ── DEPLOY CAPO ──
+      // ── DEPLOY CAPO ── (B8: posture-aware scoring — income + border presence − stacking)
       const caposAtHQ = state.deployedUnits.filter(u =>
         u.family === fam && u.type === 'capo' && u.q === hq.q && u.r === hq.r && u.s === hq.s
       );
       if (caposAtHQ.length > 0) {
         const capo = caposAtHQ[0];
-        const valuableTiles = state.hexMap.filter(t =>
+        const candidates = state.hexMap.filter(t =>
           t.controllingFamily === fam && t.business && !t.isHeadquarters &&
           !state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
         );
-        if (valuableTiles.length > 0) {
-          valuableTiles.sort((a, b) => (b.business?.income || 0) - (a.business?.income || 0));
-          const bestTile = valuableTiles[0];
+        if (candidates.length > 0) {
+          const otherCapos = state.deployedUnits.filter(u => u.family === fam && u.type === 'capo' && u.id !== capo.id);
+          const scored = candidates.map(t => {
+            const income = t.business?.income || 0;
+            const neighbors = getHexNeighbors(t.q, t.r, t.s);
+            const isBorder = neighbors.some(n => {
+              const nt = state.hexMap.find(tt => tt.q === n.q && tt.r === n.r && tt.s === n.s);
+              return nt && nt.controllingFamily && nt.controllingFamily !== fam && nt.controllingFamily !== 'neutral';
+            });
+            const nearFriendlyCapo = otherCapos.some(c => hexDistance(c, t) <= 2);
+            const distFromHQ = hexDistance(t, hq);
+            // Posture-weighted scoring:
+            // - EXPAND/WAR/CLOSE_OUT: bias toward borders for forward projection
+            // - BUILD_ECONOMY/CONSOLIDATE/TURTLE: bias toward income & away from borders
+            const borderWeight = (posture === 'EXPAND' || posture === 'WAR' || posture === 'CLOSE_OUT' || posture === 'PRESSURE_LEADER') ? 1.0
+              : (posture === 'BUILD_ECONOMY' || posture === 'CONSOLIDATE' || posture === 'TURTLE' || posture === 'COOL_OFF') ? -0.4
+              : 0.3;
+            const score = (income / 1000) * 0.6
+              + (isBorder ? borderWeight : 0)
+              + (nearFriendlyCapo ? -1.0 : 0)
+              + (distFromHQ > 6 ? -0.3 : 0);
+            return { tile: t, score };
+          }).sort((a, b) => b.score - a.score);
+          const bestTile = scored[0].tile;
           capo.q = bestTile.q;
           capo.r = bestTile.r;
           capo.s = bestTile.s;
           capo.movesRemaining = 0;
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'deploy_capo', detail: `Deployed Capo to ${bestTile.district || 'territory'}` });
         }
       }
 
@@ -7180,6 +7228,114 @@ export const useEnhancedMafiaGameState = (
               turnReport.aiActions.push({ family: fam, action: 'plan_hit', detail: `Planned a hit against a player capo` });
             }
           }
+        }
+      }
+
+      // ── B3: AI BUILD BUSINESS — instant illegal-style racket on owned empty hex with a Capo ──
+      // Mirrors the player build (requires Capo on hex, costs money, occupies an action) but
+      // bypasses the multi-turn legal construction pipeline — AI builds an extorted-style biz
+      // that immediately produces income. Gated by posture economy focus + runway.
+      const aiBuildPosture = posture === 'BUILD_ECONOMY' || posture === 'CONSOLIDATE' || posture === 'TURTLE';
+      const aiBuildRunway = opponent.resources.money / upkeepForRunway;
+      const aiBuildBudget = 12000; // store-tier cost
+      const aiHasBuildableHex = state.hexMap.some(t =>
+        t.controllingFamily === fam && !t.business && !t.isHeadquarters &&
+        state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
+      );
+      const aiBuildChance = aiBuildPosture ? 0.55 : (policy.economyFocusMul >= 1.1 ? 0.30 : 0.10);
+      if (
+        !aiOffenseDisabled === false || aiBuildPosture // permit even when offense is disabled (build is non-offensive)
+      ) {
+        if (
+          aiPhase >= 2 &&
+          aiActionsRemaining > 0 &&
+          opponent.resources.money >= aiBuildBudget &&
+          aiBuildRunway >= 5 &&
+          aiHasBuildableHex &&
+          Math.random() < aiBuildChance
+        ) {
+          const buildCandidates = state.hexMap.filter(t =>
+            t.controllingFamily === fam && !t.business && !t.isHeadquarters &&
+            state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
+          );
+          // Prefer interior hexes (away from contested borders) for build safety
+          buildCandidates.sort((a, b) => hexDistance(a, hq) - hexDistance(b, hq));
+          const buildTile = buildCandidates[0];
+          // Pick business type by money: construction $35k > restaurant $20k > store $12k
+          let bType: 'store' | 'restaurant' | 'construction' = 'store';
+          let bCost = 12000; let bIncome = 1800;
+          if (opponent.resources.money >= 35000 && aiBuildRunway >= 8) {
+            bType = 'construction'; bCost = 35000; bIncome = 5000;
+          } else if (opponent.resources.money >= 20000 && aiBuildRunway >= 6) {
+            bType = 'restaurant'; bCost = 20000; bIncome = 3000;
+          }
+          opponent.resources.money -= bCost;
+          aiActionsRemaining--;
+          buildTile.business = {
+            type: bType,
+            income: bIncome,
+            isLegal: false,
+            isExtorted: false, // built business — counts toward influence formula like player-built
+            heatLevel: 0,
+            launderingCapacity: Math.floor(bIncome * 0.7),
+          };
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'build_business', detail: `Built a ${bType} in ${buildTile.district || 'territory'} for $${bCost.toLocaleString()}` });
+        }
+      }
+
+      // ── B5: AI HIRE HITMAN — Phase 3+ aggressive/opportunistic AI contracts a hit on a player capo ──
+      const aiHitmanCount = (state.hitmanContracts || []).filter(c => c.hiredByFamily === fam).length;
+      const aiHitmanPersonalityAllowed = personality === 'aggressive' || personality === 'opportunistic' || personality === 'unpredictable';
+      const aiAtWarWithPlayer = (state.activeWars || []).some(w =>
+        (w.family1 === fam && w.family2 === state.playerFamily) || (w.family2 === fam && w.family1 === state.playerFamily)
+      );
+      const aiPlayerRel = opponent.relationships?.[state.playerFamily] ?? 0;
+      const aiHitmanRunway = opponent.resources.money / upkeepForRunway;
+      if (
+        aiPhase >= 3 &&
+        !aiOffenseDisabled &&
+        aiHitmanCount === 0 &&
+        aiHitmanPersonalityAllowed &&
+        opponent.resources.money >= HITMAN_CONTRACT_COST + 5000 &&
+        aiHitmanRunway >= 8 &&
+        (aiAtWarWithPlayer || aiPlayerRel <= -30) &&
+        !state.ceasefires.some(c => c.active && c.family === fam) &&
+        Math.random() < (aiAtWarWithPlayer ? 0.18 : 0.08)
+      ) {
+        const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
+        // Avoid double-targeting capos already under another hitman contract
+        const taken = new Set((state.hitmanContracts || []).map(c => c.targetUnitId));
+        const candidates = playerCapos.filter(c => !taken.has(c.id));
+        if (candidates.length > 0) {
+          // Prefer capos in the open (faster contract resolution = HITMAN_OPEN_TURNS)
+          const scored = candidates.map(c => {
+            const ch = state.hexMap.find(t => t.q === c.q && t.r === c.r && t.s === c.s);
+            const atHQ = ch?.isHeadquarters === c.family;
+            const atSh = (state.safehouses || []).some(s => c.q === s.q && c.r === s.r && c.s === s.s);
+            const isFort = isHexFortified(state.fortifiedHexes || [], c.q, c.r, c.s, c.family);
+            const exposure = atHQ ? 0 : atSh ? 0.3 : isFort ? 0.5 : 1.0;
+            return { capo: c, exposure };
+          }).sort((a, b) => b.exposure - a.exposure);
+          const target = scored[0].capo;
+          const tHex = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
+          const isAtHQ = tHex?.isHeadquarters === target.family;
+          const isAtSh = (state.safehouses || []).some(s => target.q === s.q && target.r === s.r && target.s === s.s);
+          const isFort2 = isHexFortified(state.fortifiedHexes || [], target.q, target.r, target.s, target.family);
+          let duration = HITMAN_OPEN_TURNS;
+          if (isAtHQ) duration = HITMAN_HQ_TURNS;
+          else if (isAtSh) duration = HITMAN_SAFEHOUSE_TURNS;
+          else if (isFort2) duration = HITMAN_FORTIFIED_TURNS;
+          opponent.resources.money -= HITMAN_CONTRACT_COST;
+          state.hitmanContracts = [...(state.hitmanContracts || []), {
+            id: `hitman-ai-${fam}-${Date.now()}-${Math.random().toString(36).substr(2,4)}`,
+            targetUnitId: target.id,
+            targetFamily: state.playerFamily,
+            turnsRemaining: duration,
+            hiredOnTurn: state.turn,
+            cost: HITMAN_CONTRACT_COST,
+            hiredByFamily: fam,
+          }];
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'hire_hitman', detail: `Contracted an anonymous hit on a player capo` });
         }
       }
 

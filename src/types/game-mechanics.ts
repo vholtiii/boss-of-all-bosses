@@ -81,6 +81,8 @@ export interface HitmanContract {
   turnsRemaining: number;
   hiredOnTurn: number;
   cost: number;
+  /** If set, this contract was hired by an AI family (not the player). Refunds/alerts route to that family. */
+  hiredByFamily?: string;
 }
 
 // ============ BRIBE / CORRUPTION SYSTEM ============
