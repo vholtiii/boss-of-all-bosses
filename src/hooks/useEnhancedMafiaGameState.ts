@@ -10683,7 +10683,7 @@ export const useEnhancedMafiaGameState = (
     return state;
   };
 
-
+  // ============ 3-STEP TAKEOVER: EXTORT (soldiers only — capos auto-extort on arrival) ============
   const processTerritoryExtortion = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
     const targetQ = action.targetQ;
     const targetR = action.targetR;
