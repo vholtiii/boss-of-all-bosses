@@ -6253,6 +6253,9 @@ export const useEnhancedMafiaGameState = (
               mood: dynamicMood,
               jitter: turnRng() * 2 - 1,
               difficulty: state.difficulty || 'normal',
+              warTargetMul: policy.warTargetMul,
+              expandMul: posture === 'EXPAND' ? 1.4 : posture === 'CLOSE_OUT' ? 1.2 : 1,
+              economyFocusMul: policy.economyFocusMul,
             });
           });
           const pickIdx = softmaxPick(scores, turnRng, 4, difficultySoftmaxTemperature(state.difficulty || 'normal'));
