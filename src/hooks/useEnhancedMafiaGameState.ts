@@ -7231,6 +7231,113 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
+      // ── B3: AI BUILD BUSINESS — instant illegal-style racket on owned empty hex with a Capo ──
+      // Mirrors the player build (requires Capo on hex, costs money, occupies an action) but
+      // bypasses the multi-turn legal construction pipeline — AI builds an extorted-style biz
+      // that immediately produces income. Gated by posture economy focus + runway.
+      const aiBuildPosture = posture === 'BUILD_ECONOMY' || posture === 'CONSOLIDATE' || posture === 'TURTLE';
+      const aiBuildRunway = opponent.resources.money / upkeepForRunway;
+      const aiBuildBudget = 12000; // store-tier cost
+      const aiHasBuildableHex = state.hexMap.some(t =>
+        t.controllingFamily === fam && !t.business && !t.isHeadquarters &&
+        state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
+      );
+      const aiBuildChance = aiBuildPosture ? 0.55 : (policy.economyFocusMul >= 1.1 ? 0.30 : 0.10);
+      if (
+        !aiOffenseDisabled === false || aiBuildPosture // permit even when offense is disabled (build is non-offensive)
+      ) {
+        if (
+          aiPhase >= 2 &&
+          aiActionsRemaining > 0 &&
+          opponent.resources.money >= aiBuildBudget &&
+          aiBuildRunway >= 5 &&
+          aiHasBuildableHex &&
+          Math.random() < aiBuildChance
+        ) {
+          const buildCandidates = state.hexMap.filter(t =>
+            t.controllingFamily === fam && !t.business && !t.isHeadquarters &&
+            state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
+          );
+          // Prefer interior hexes (away from contested borders) for build safety
+          buildCandidates.sort((a, b) => hexDistance(a, hq) - hexDistance(b, hq));
+          const buildTile = buildCandidates[0];
+          // Pick business type by money: construction $35k > restaurant $20k > store $12k
+          let bType: 'store' | 'restaurant' | 'construction' = 'store';
+          let bCost = 12000; let bIncome = 1800;
+          if (opponent.resources.money >= 35000 && aiBuildRunway >= 8) {
+            bType = 'construction'; bCost = 35000; bIncome = 5000;
+          } else if (opponent.resources.money >= 20000 && aiBuildRunway >= 6) {
+            bType = 'restaurant'; bCost = 20000; bIncome = 3000;
+          }
+          opponent.resources.money -= bCost;
+          aiActionsRemaining--;
+          buildTile.business = {
+            type: bType,
+            income: bIncome,
+            isExtorted: false, // built business — counts toward influence formula like player-built
+            heatLevel: 0,
+            launderingCapacity: Math.floor(bIncome * 0.7),
+          };
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'build_business', detail: `Built a ${bType} in ${buildTile.district || 'territory'} for $${bCost.toLocaleString()}` });
+        }
+      }
+
+      // ── B5: AI HIRE HITMAN — Phase 3+ aggressive/opportunistic AI contracts a hit on a player capo ──
+      const aiHitmanCount = (state.hitmanContracts || []).filter(c => c.hiredByFamily === fam).length;
+      const aiHitmanPersonalityAllowed = personality === 'aggressive' || personality === 'opportunistic' || personality === 'unpredictable';
+      const aiAtWarWithPlayer = (state.activeWars || []).some(w =>
+        (w.family1 === fam && w.family2 === state.playerFamily) || (w.family2 === fam && w.family1 === state.playerFamily)
+      );
+      const aiPlayerRel = opponent.relationships?.[state.playerFamily] ?? 0;
+      const aiHitmanRunway = opponent.resources.money / upkeepForRunway;
+      if (
+        aiPhase >= 3 &&
+        !aiOffenseDisabled &&
+        aiHitmanCount === 0 &&
+        aiHitmanPersonalityAllowed &&
+        opponent.resources.money >= HITMAN_CONTRACT_COST + 5000 &&
+        aiHitmanRunway >= 8 &&
+        (aiAtWarWithPlayer || aiPlayerRel <= -30) &&
+        !state.ceasefires.some(c => c.active && c.family === fam) &&
+        Math.random() < (aiAtWarWithPlayer ? 0.18 : 0.08)
+      ) {
+        const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
+        // Avoid double-targeting capos already under another hitman contract
+        const taken = new Set((state.hitmanContracts || []).map(c => c.targetUnitId));
+        const candidates = playerCapos.filter(c => !taken.has(c.id));
+        if (candidates.length > 0) {
+          // Prefer capos in the open (faster contract resolution = HITMAN_OPEN_TURNS)
+          const scored = candidates.map(c => {
+            const ch = state.hexMap.find(t => t.q === c.q && t.r === c.r && t.s === c.s);
+            const atHQ = ch?.isHeadquarters === c.family;
+            const atSh = (state.safehouses || []).some(s => c.q === s.q && c.r === s.r && c.s === s.s);
+            const isFort = isHexFortified(state.fortifiedHexes || [], c.q, c.r, c.s, c.family);
+            const exposure = atHQ ? 0 : atSh ? 0.3 : isFort ? 0.5 : 1.0;
+            return { capo: c, exposure };
+          }).sort((a, b) => b.exposure - a.exposure);
+          const target = scored[0].capo;
+          const tHex = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
+          const isAtHQ = tHex?.isHeadquarters === target.family;
+          const isAtSh = (state.safehouses || []).some(s => target.q === s.q && target.r === s.r && target.s === s.s);
+          const isFort2 = isHexFortified(state.fortifiedHexes || [], target.q, target.r, target.s, target.family);
+          let duration = HITMAN_OPEN_TURNS;
+          if (isAtHQ) duration = HITMAN_HQ_TURNS;
+          else if (isAtSh) duration = HITMAN_SAFEHOUSE_TURNS;
+          else if (isFort2) duration = HITMAN_FORTIFIED_TURNS;
+          opponent.resources.money -= HITMAN_CONTRACT_COST;
+          state.hitmanContracts = [...(state.hitmanContracts || []), {
+            id: `hitman-ai-${fam}-${Date.now()}-${Math.random().toString(36).substr(2,4)}`,
+            targetUnitId: target.id,
+            targetFamily: state.playerFamily,
+            turnsRemaining: duration,
+            hiredOnTurn: state.turn,
+            cost: HITMAN_CONTRACT_COST,
+            hiredByFamily: fam,
+          }];
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'hire_hitman', detail: `Contracted an anonymous hit on a player capo` });
+        }
+      }
+
       // ── AI FAMILY POWER USAGE ──
       const aiPower = FAMILY_POWERS[fam];
       // Posture gating: defensive powers (Genovese hide hex, Bonanno purge) stay open;
