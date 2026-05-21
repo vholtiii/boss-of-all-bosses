@@ -135,8 +135,8 @@ const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({ open, targetInfo,
                     <div className="text-sm font-semibold">👊 Push Out</div>
                     <div className="text-xs opacity-80">
                       {targetInfo.defendersCount > 0
-                        ? `Light combat · +8 heat${targetInfo.isScouted ? '' : ' · unknown defenders'}`
-                        : 'Auto-success · +4 heat · no civilian risk'}
+                        ? `Light combat · +4 heat${targetInfo.isScouted ? '' : ' · unknown defenders'}`
+                        : 'Auto-success · +2 heat · no civilian risk'}
                     </div>
                   </div>
                 </Button>

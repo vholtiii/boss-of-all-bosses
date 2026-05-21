@@ -10564,7 +10564,7 @@ export const useEnhancedMafiaGameState = (
       if (state.reputation.familyRelationships[targetFamily] !== undefined) {
         state.reputation.familyRelationships[targetFamily] = Math.max(-100, state.reputation.familyRelationships[targetFamily] - 8);
       }
-      applyPlayerHeat(state, 4);
+      applyPlayerHeat(state, 2);
 
       playerUnits.forEach(u => {
         if (state.soldierStats[u.id]) {
@@ -10651,7 +10651,7 @@ export const useEnhancedMafiaGameState = (
       if (state.reputation.familyRelationships[targetFamily] !== undefined) {
         state.reputation.familyRelationships[targetFamily] = Math.max(-100, state.reputation.familyRelationships[targetFamily] - 8);
       }
-      applyPlayerHeat(state, 8);
+      applyPlayerHeat(state, 4);
 
       // Bold Strike if outnumbered
       if (attackers < defenders) {
@@ -10687,7 +10687,7 @@ export const useEnhancedMafiaGameState = (
       state.combatLog = [...(state.combatLog || []), `👊 Pushed ${targetFamily} out of ${tile.district} (combat)`];
     } else {
       // ============ PUSH OUT DEFEAT — no kills, heat + small morale hit ============
-      applyPlayerHeat(state, isScouted ? 4 : 6);
+      applyPlayerHeat(state, isScouted ? 2 : 3);
       playerUnits.forEach(u => {
         if (state.soldierStats[u.id]) {
           state.soldierStats[u.id].loyalty = Math.max(0, state.soldierStats[u.id].loyalty - LOYALTY_FAILED_ACTION_PENALTY);
