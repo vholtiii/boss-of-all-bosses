@@ -6536,7 +6536,7 @@ export const useEnhancedMafiaGameState = (
                     // ===== B2: Push Out — low-heat takeover of empty rival hex (mirrors player Push Out) =====
                     aiActionsRemaining--;
                     tile.controllingFamily = fam;
-                    applyPlayerHeat as any; // (no-op marker)
+                    // (Push Out keeps the AI on the hex; heat applied below.)
                     // Uncontested Push Out heat (parity with player +2 uncontested)
                     applyAIHeat(state, fam, 1, 'scouted'); // small heat tick via existing helper
                     applyAIDiplomacyPenalties(state, fam, prevOwner as string, turnReport);
