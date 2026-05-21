@@ -7884,6 +7884,17 @@ export const useEnhancedMafiaGameState = (
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
         }
+        case 'push_out_territory': {
+          if ((newState.mattressesState || {}).active) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🛏️ At the Mattresses', message: 'Your units are hunkered down and cannot attack.' });
+            return newState;
+          }
+          const result = processPushOutTerritory(newState, action);
+          // Only consume action if validation passed and the processor actually engaged
+          if (result.lastCombatResult && result.lastCombatResult.timestamp && Date.now() - result.lastCombatResult.timestamp < 5000) {
+            result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          }
+          return result;
         case 'execute_planned_hit': {
           // Execute a planned hit — follows the target to their current location
           if (!newState.plannedHit) {
