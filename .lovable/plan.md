@@ -22,7 +22,7 @@ Push Out is a single-action territory shove. Behavior depends on whether the hex
 Empty rival hex, no defenders (scouted OR unscouted)
   -> Auto-success, hex flips to NEUTRAL (player still claims next turn,
      same convention as a successful Hit). +small respect, +small fear,
-     +rival relationship hit, low heat (+4). No civilian-casualty path —
+     +rival relationship hit, low heat (+2). No civilian-casualty path —
      the hex is rival-claimed turf, not innocent ground.
 
 Empty rival hex WITH defenders, SCOUTED
@@ -31,9 +31,9 @@ Empty rival hex WITH defenders, SCOUTED
      +5% scout intel bonus (fresh) or +2% (stale) on top of base.
      Success: defenders routed (soldiers killed, capos wounded per
      normal Hit rules), hex -> NEUTRAL, +respect/+fear, tension hit,
-     moderate heat (+8). Outnumbered win still grants Bold Strike +2.
+     moderate heat (+4). Outnumbered win still grants Bold Strike +2.
      Failure: attacker bounces back to origin hex (movesRemaining +1),
-     no spoils, +4 heat, no unit loss.
+     no spoils, +2 heat, no unit loss.
 
 Empty rival hex WITH defenders, UNSCOUTED
   -> Dialog warns "Unknown defenders — proceed at risk". Player can
@@ -44,7 +44,7 @@ Empty rival hex WITH defenders, UNSCOUTED
      Success: same as scouted-success branch above.
      Failure: same bounce-back, plus the initiating soldier gains
      the "suspicious" flag for 1 turn (botched op draws police
-     attention to that unit) and heat is +6 instead of +4 to
+     attention to that unit) and heat is +3 instead of +2 to
      reflect the messier operation.
 ```
 
@@ -53,7 +53,7 @@ Capo defenders follow the existing Hit rule: a Push Out victory wounds enemy cap
 ## Numbers (first pass, tuneable)
 
 - Action cost: 1 action.
-- Heat: +4 if uncontested, +8 if combat. (Hit is +10–25 today.)
+- Heat: +2 if uncontested, +4 on combat win, +2 on combat loss (scouted) / +3 on combat loss (unscouted). (Hit is +10–25 today.)
 - Respect: +2 on success.
 - Fear: +2 on the targeted family.
 - Relationship / tension: same magnitude as a normal territory hit on that family — this is still aggression.
@@ -102,7 +102,7 @@ Files to touch:
 - `src/pages/UltimateMafiaGame.tsx`
   - Add a `'push_out'` case to the enemy-hex-dialog dispatcher that calls `resolveEnemyHexAction('push_out')`.
 - `src/hooks/__tests__/push-out.test.ts` (new)
-  - Empty rival hex, no defenders -> hex becomes neutral, +respect, +fear, action consumed, low heat.
+  - Empty rival hex, no defenders -> hex becomes neutral, +respect, +fear, action consumed, +2 heat.
   - Empty rival hex with defenders -> combat path; success neutralizes, failure bounces attacker.
   - Push Out on a business hex is rejected (action menu/dispatcher both block it).
   - Push Out on HQ is rejected.
