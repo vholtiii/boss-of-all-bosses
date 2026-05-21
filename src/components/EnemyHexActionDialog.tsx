@@ -23,7 +23,7 @@ interface EnemyHexActionProps {
   } | null;
   playerMoney: number;
   gamePhase: number;
-  onAction: (action: 'hit' | 'sabotage' | 'cancel' | 'plan_hit') => void;
+  onAction: (action: 'hit' | 'sabotage' | 'cancel' | 'plan_hit' | 'push_out') => void;
 }
 
 const SABOTAGE_COST = 12000;
@@ -124,17 +124,35 @@ const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({ open, targetInfo,
                 </Button>
               )}
 
-              <Button
-                className="w-full justify-start gap-3"
-                variant="destructive"
-                onClick={() => onAction('hit')}
-              >
-                <Swords className="h-4 w-4" />
-                <div className="text-left">
-                  <div className="text-sm font-semibold">Hit Territory</div>
-                  <div className="text-xs opacity-80">Combat for control · +10 heat</div>
-                </div>
-              </Button>
+              {!targetInfo.hasBusiness ? (
+                <Button
+                  className="w-full justify-start gap-3"
+                  variant="destructive"
+                  onClick={() => onAction('push_out')}
+                >
+                  <Swords className="h-4 w-4" />
+                  <div className="text-left">
+                    <div className="text-sm font-semibold">👊 Push Out</div>
+                    <div className="text-xs opacity-80">
+                      {targetInfo.defendersCount > 0
+                        ? `Light combat · +8 heat${targetInfo.isScouted ? '' : ' · unknown defenders'}`
+                        : 'Auto-success · +4 heat · no civilian risk'}
+                    </div>
+                  </div>
+                </Button>
+              ) : (
+                <Button
+                  className="w-full justify-start gap-3"
+                  variant="destructive"
+                  onClick={() => onAction('hit')}
+                >
+                  <Swords className="h-4 w-4" />
+                  <div className="text-left">
+                    <div className="text-sm font-semibold">Hit Territory</div>
+                    <div className="text-xs opacity-80">Combat for control · +10 heat</div>
+                  </div>
+                </Button>
+              )}
 
               <Button
                 className="w-full justify-start gap-3"

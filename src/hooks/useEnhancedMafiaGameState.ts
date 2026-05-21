@@ -2529,7 +2529,7 @@ export const useEnhancedMafiaGameState = (
   }, []);
 
   // ============ RESOLVE ENEMY HEX ACTION (Phase 2+) ============
-  const resolveEnemyHexAction = useCallback((action: 'hit' | 'sabotage' | 'cancel' | 'plan_hit') => {
+  const resolveEnemyHexAction = useCallback((action: 'hit' | 'sabotage' | 'cancel' | 'plan_hit' | 'push_out') => {
     setGameState(prev => {
       if (!prev.pendingEnemyHexAction) return prev;
       const { unitId, fromQ, fromR, fromS, toQ, toR, toS } = prev.pendingEnemyHexAction;
@@ -2567,6 +2567,28 @@ export const useEnhancedMafiaGameState = (
         syncLegacyUnits(result);
         return result;
       }
+
+      if (action === 'push_out') {
+        const pushAction = { type: 'push_out_territory', targetQ: toQ, targetR: toR, targetS: toS, selectedUnitId: unitId };
+        const result = processPushOutTerritory(newState, pushAction);
+        // Consume an action token (same as Hit from this dialog path)
+        result.actionsRemaining = Math.max(0, (result.actionsRemaining || 0) - 1);
+        result.pendingNotifications = result.pendingNotifications || [];
+        // On failure, bounce attacker back to origin hex
+        if (result.lastCombatResult && result.lastCombatResult.success === false) {
+          const idx = result.deployedUnits.findIndex((u: any) => u.id === unitId);
+          if (idx !== -1) {
+            result.deployedUnits[idx] = {
+              ...result.deployedUnits[idx],
+              q: fromQ, r: fromR, s: fromS,
+              movesRemaining: (result.deployedUnits[idx].movesRemaining || 0) + 1,
+            };
+          }
+        }
+        syncLegacyUnits(result);
+        return result;
+      }
+
 
       if (action === 'plan_hit') {
         // Two-turn flow: a plannedHit must already exist (marked in a prior Tactical step).
@@ -7848,7 +7870,7 @@ export const useEnhancedMafiaGameState = (
       const discount = bonuses.recruitmentDiscount / 100;
       
       // Actions that consume the action budget
-      const actionPhaseActions = ['hit_territory', 'extort_territory', 'sabotage_hex', 'claim_territory', 'negotiate', 'recruit_soldiers', 'recruit_local_soldier', 'launder_money', 'launder', 'hire_hitman'];
+      const actionPhaseActions = ['hit_territory', 'push_out_territory', 'extort_territory', 'sabotage_hex', 'claim_territory', 'negotiate', 'recruit_soldiers', 'recruit_local_soldier', 'launder_money', 'launder', 'hire_hitman'];
       if (actionPhaseActions.includes(action.type) && newState.actionsRemaining <= 0) {
         newState.pendingNotifications = [...newState.pendingNotifications, {
           type: 'warning' as const, title: '⚠️ No Actions Remaining',
@@ -7859,7 +7881,7 @@ export const useEnhancedMafiaGameState = (
 
       // ---- Lay Low: block all offensive actions AND recruitment while active ----
       const layLowBlockedActions = new Set([
-        'hit_territory', 'execute_planned_hit', 'extort_territory',
+        'hit_territory', 'push_out_territory', 'execute_planned_hit', 'extort_territory',
         'sabotage_hex', 'claim_territory', 'assault_hq', 'flip_soldier',
         'plan_hit', 'hire_hitman',
         'recruit_soldiers', 'recruit_local_soldier',
@@ -7882,6 +7904,19 @@ export const useEnhancedMafiaGameState = (
           }
           const result = processTerritoryHit(newState, action);
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          return result;
+        }
+        case 'push_out_territory': {
+          if ((newState.mattressesState || {}).active) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🛏️ At the Mattresses', message: 'Your units are hunkered down and cannot attack.' });
+            return newState;
+          }
+          const prevCombat = newState.lastCombatResult;
+          const result = processPushOutTerritory(newState, action);
+          // Only spend an action if combat actually engaged (validation rejections only add a warning)
+          if (result.lastCombatResult && result.lastCombatResult !== prevCombat) {
+            result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
+          }
           return result;
         }
         case 'execute_planned_hit': {
@@ -10418,6 +10453,267 @@ export const useEnhancedMafiaGameState = (
       applyPlayerHeat(state, heatGain);
     }
     
+    syncLegacyUnits(state);
+    return state;
+  };
+
+  // ============ PUSH OUT: hit a rival hex that has no business ============
+  // Lower-stakes territory shove. Auto-success when undefended (no civilian
+  // casualty path since the hex is rival-claimed). Light combat when defended.
+  const processPushOutTerritory = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
+    const targetQ = action.targetQ;
+    const targetR = action.targetR;
+    const targetS = action.targetS;
+    if (targetQ === undefined) return state;
+    const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
+    if (!tile) return state;
+
+    // ---- Validation ----
+    if (tile.isHeadquarters) {
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'warning' as const, title: '⚠️ Cannot Push Out HQ',
+        message: 'Headquarters require an HQ Assault, not a Push Out.',
+      }];
+      return state;
+    }
+    if (tile.controllingFamily === state.playerFamily || tile.controllingFamily === 'neutral') {
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'warning' as const, title: '⚠️ Not a Rival Hex',
+        message: 'Push Out only works on rival-controlled territory.',
+      }];
+      return state;
+    }
+    if (tile.business) {
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'warning' as const, title: '⚠️ Has a Business',
+        message: 'Use Hit or Sabotage on hexes with a business.',
+      }];
+      return state;
+    }
+
+    const targetFamily = tile.controllingFamily as string;
+
+    // Ceasefire / alliance / safe-passage gates (same as Hit)
+    if (state.ceasefires.some(c => c.active && c.family === targetFamily)) {
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'warning' as const, title: '🤝 Ceasefire Active',
+        message: `You have an active ceasefire with the ${targetFamily} family.`,
+      }];
+      return state;
+    }
+    if (state.alliances.some(a => a.active && a.alliedFamily === targetFamily)) {
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'warning' as const, title: '🤝 Alliance Active',
+        message: `You have an alliance with the ${targetFamily} family.`,
+      }];
+      return state;
+    }
+    const hasSafePassage = (state.safePassagePacts || []).some(
+      (p: SafePassagePact) => p.active && p.targetFamily === targetFamily
+    );
+    if (hasSafePassage) {
+      // Same handling as Hit: break safe passage & take rep hit, but allow the push out
+      state.safePassagePacts = (state.safePassagePacts || []).map((p: SafePassagePact) =>
+        p.active && p.targetFamily === targetFamily ? { ...p, active: false } : p
+      ).filter((p: SafePassagePact) => p.active);
+      syncRespect(state, Math.max(0, state.reputation.respect - 15));
+      state.reputation.reputation = Math.max(0, state.reputation.reputation - 10);
+      if (state.reputation.familyRelationships[targetFamily] !== undefined) {
+        state.reputation.familyRelationships[targetFamily] -= 25;
+      }
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'error' as const, title: '🛤️ Safe Passage Violated!',
+        message: `You attacked during safe passage! -15 respect, -10 reputation.`,
+      }];
+    }
+
+    // ---- Gather participants ----
+    const selectedUnitId = action.selectedUnitId;
+    const playerUnitsOnHex = state.deployedUnits.filter(u =>
+      u.family === state.playerFamily && u.q === targetQ && u.r === targetR && u.s === targetS
+    );
+    const selectedUnit = state.deployedUnits.find(u => u.id === selectedUnitId);
+    const playerUnits: typeof playerUnitsOnHex = [];
+    if (selectedUnit && selectedUnit.family === state.playerFamily && !playerUnitsOnHex.some(u => u.id === selectedUnit.id)) {
+      playerUnits.push(selectedUnit);
+    }
+    playerUnits.push(...playerUnitsOnHex);
+    if (playerUnits.length === 0) {
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'warning' as const, title: '⚠️ No Attacker',
+        message: 'Select a soldier or capo to push out the rival.',
+      }];
+      return state;
+    }
+
+    const enemyUnits = state.deployedUnits.filter(u =>
+      u.family === targetFamily && u.q === targetQ && u.r === targetR && u.s === targetS
+    );
+    const isScouted = state.scoutedHexes.some(s => s.q === targetQ && s.r === targetR && s.s === targetS);
+
+    // ---- BRANCH A: Undefended — auto-success ----
+    if (enemyUnits.length === 0) {
+      tile.controllingFamily = 'neutral';
+      (tile as any).pendingClaim = undefined;
+      state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === targetQ && f.r === targetR && f.s === targetS));
+      addPairTension(state, state.playerFamily, targetFamily, TENSION_TERRITORY_HIT);
+      checkSupplySabotage(state, targetQ, targetR, targetS, state.playerFamily);
+
+      syncRespect(state, Math.min(100, (state.reputation.respect || 0) + 2));
+      state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + 2);
+      if (state.reputation.familyRelationships[targetFamily] !== undefined) {
+        state.reputation.familyRelationships[targetFamily] = Math.max(-100, state.reputation.familyRelationships[targetFamily] - 8);
+      }
+      applyPlayerHeat(state, 4);
+
+      playerUnits.forEach(u => {
+        if (state.soldierStats[u.id]) {
+          state.soldierStats[u.id].loyalty = Math.min(
+            u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
+            state.soldierStats[u.id].loyalty + LOYALTY_ACTION_BONUS
+          );
+          state.soldierStats[u.id].actedThisTurn = true;
+          state.soldierStats[u.id].turnsIdle = 0;
+        }
+      });
+
+      state.lastCombatResult = {
+        q: targetQ, r: targetR, s: targetS,
+        success: true, type: 'hit',
+        title: '👊 PUSHED OUT!',
+        details: `Rival evicted from ${tile.district}. +2 respect, +2 fear.`,
+        timestamp: Date.now(),
+      };
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'success' as const, title: '👊 Pushed Out!',
+        message: `You shoved the ${targetFamily} off ${tile.district}. Territory is now neutral — claim it next turn.`,
+      }];
+      state.combatLog = [...(state.combatLog || []), `👊 Pushed ${targetFamily} out of ${tile.district}`];
+
+      syncLegacyUnits(state);
+      return state;
+    }
+
+    // ---- BRANCH B: Defended — light combat ----
+    const attackers = playerUnits.length;
+    const defenders = enemyUnits.length;
+    let chance = 0.5 + (attackers - defenders) * 0.15;
+    chance += 0.05; // Push Out modifier (softer than business-hex Hit)
+    // No blind-hit penalty for push out
+    if (isScouted) {
+      const scoutInfo = state.scoutedHexes.find(s => s.q === tile.q && s.r === tile.r && s.s === tile.s);
+      if (scoutInfo && state.turn <= (scoutInfo as any).freshUntilTurn) {
+        chance += SCOUT_INTEL_BONUS / 100;
+      } else {
+        chance += SCOUT_STALE_BONUS / 100;
+      }
+    }
+    // Fortify defense
+    const defenderHexFortified = isHexFortified(state.fortifiedHexes || [], targetQ, targetR, targetS, targetFamily);
+    if (defenderHexFortified) chance -= FORTIFY_DEFENSE_BONUS / 100;
+    // Safehouse defense
+    if (state.safehouses.some(s => s.q === targetQ && s.r === targetR && s.s === targetS)) {
+      chance -= SAFEHOUSE_DEFENSE_BONUS / 100;
+    }
+    // Family + difficulty modifiers (same baseline as Hit)
+    chance += state.familyBonuses.combatBonus / 100;
+    chance += state.difficultyModifiers?.hitSuccessBonus ?? 0;
+    chance = Math.max(0.05, Math.min(0.95, chance));
+
+    if (Math.random() < chance) {
+      // ============ PUSH OUT VICTORY ============
+      enemyUnits.forEach(eu => {
+        if (eu.type === 'capo') {
+          // Wound capos (same rule as scouted Hit — only Plan Hit/Hitman kill capos)
+          if (state.soldierStats[eu.id]) {
+            state.soldierStats[eu.id].loyalty = Math.max(0, state.soldierStats[eu.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
+          }
+          eu.woundedTurnsRemaining = CAPO_WOUND_DURATION;
+          eu.maxMoves = Math.max(1, (eu.maxMoves || 2) - CAPO_WOUND_MOVE_PENALTY);
+          state.pendingNotifications = [...state.pendingNotifications, {
+            type: 'warning' as const, title: '🩸 Enemy Capo Wounded',
+            message: `Pushed back a ${eu.family} capo — they survive but are weakened for ${CAPO_WOUND_DURATION} turns.`,
+          }];
+          return;
+        }
+        const idx = state.deployedUnits.indexOf(eu);
+        if (idx !== -1) state.deployedUnits.splice(idx, 1);
+      });
+
+      tile.controllingFamily = 'neutral';
+      (tile as any).pendingClaim = undefined;
+      state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === targetQ && f.r === targetR && f.s === targetS));
+      addPairTension(state, state.playerFamily, targetFamily, TENSION_TERRITORY_HIT);
+      checkSupplySabotage(state, targetQ, targetR, targetS, state.playerFamily);
+
+      syncRespect(state, Math.min(100, (state.reputation.respect || 0) + 2));
+      state.reputation.fear = Math.min(100, (state.reputation.fear || 0) + 2);
+      if (state.reputation.familyRelationships[targetFamily] !== undefined) {
+        state.reputation.familyRelationships[targetFamily] = Math.max(-100, state.reputation.familyRelationships[targetFamily] - 8);
+      }
+      applyPlayerHeat(state, 8);
+
+      // Bold Strike if outnumbered
+      if (attackers < defenders) {
+        awardBoldRespect(state, state.playerFamily, 2, 'outnumbered_strike',
+          `Pushed out outnumbered (${attackers} vs ${defenders}) at ${tile.district}`);
+      }
+
+      playerUnits.forEach(u => {
+        if (state.soldierStats[u.id]) {
+          state.soldierStats[u.id].hits += 1;
+          state.soldierStats[u.id].victories = Math.min(5, state.soldierStats[u.id].victories + 1);
+          state.soldierStats[u.id].toughness = Math.min(5, state.soldierStats[u.id].toughness + 1);
+          state.soldierStats[u.id].loyalty = Math.min(
+            u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP,
+            state.soldierStats[u.id].loyalty + LOYALTY_ACTION_BONUS + LOYALTY_COMBAT_BONUS
+          );
+          state.soldierStats[u.id].actedThisTurn = true;
+          state.soldierStats[u.id].turnsIdle = 0;
+        }
+      });
+
+      state.lastCombatResult = {
+        q: targetQ, r: targetR, s: targetS,
+        success: true, type: 'hit',
+        title: '👊 PUSHED OUT!',
+        details: `Defenders routed at ${tile.district}. +2 respect, +2 fear.`,
+        timestamp: Date.now(),
+      };
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'success' as const, title: '👊 Pushed Out!',
+        message: `You routed the ${targetFamily} defenders at ${tile.district}. Territory is now neutral.`,
+      }];
+      state.combatLog = [...(state.combatLog || []), `👊 Pushed ${targetFamily} out of ${tile.district} (combat)`];
+    } else {
+      // ============ PUSH OUT DEFEAT — no kills, heat + small morale hit ============
+      applyPlayerHeat(state, isScouted ? 4 : 6);
+      playerUnits.forEach(u => {
+        if (state.soldierStats[u.id]) {
+          state.soldierStats[u.id].loyalty = Math.max(0, state.soldierStats[u.id].loyalty - LOYALTY_FAILED_ACTION_PENALTY);
+          state.soldierStats[u.id].actedThisTurn = true;
+          state.soldierStats[u.id].turnsIdle = 0;
+          if (!isScouted) {
+            // Botched unscouted op draws attention
+            state.soldierStats[u.id].suspicious = true;
+            state.soldierStats[u.id].suspiciousTurns = Math.max(state.soldierStats[u.id].suspiciousTurns || 0, 1);
+          }
+        }
+      });
+      state.lastCombatResult = {
+        q: targetQ, r: targetR, s: targetS,
+        success: false, type: 'hit',
+        title: 'PUSH OUT FAILED',
+        details: `Defenders held ${tile.district}.`,
+        timestamp: Date.now(),
+      };
+      state.pendingNotifications = [...state.pendingNotifications, {
+        type: 'error' as const, title: 'Push Out Failed',
+        message: `The ${targetFamily} defenders held ${tile.district}. Your unit is shaken but alive.`,
+      }];
+      state.combatLog = [...(state.combatLog || []), `❌ Push out on ${tile.district} repelled`];
+    }
+
     syncLegacyUnits(state);
     return state;
   };
