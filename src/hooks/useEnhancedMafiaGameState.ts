@@ -7859,7 +7859,7 @@ export const useEnhancedMafiaGameState = (
 
       // ---- Lay Low: block all offensive actions AND recruitment while active ----
       const layLowBlockedActions = new Set([
-        'hit_territory', 'execute_planned_hit', 'extort_territory',
+        'hit_territory', 'push_out_territory', 'execute_planned_hit', 'extort_territory',
         'sabotage_hex', 'claim_territory', 'assault_hq', 'flip_soldier',
         'plan_hit', 'hire_hitman',
         'recruit_soldiers', 'recruit_local_soldier',
