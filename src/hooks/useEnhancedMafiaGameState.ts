@@ -7895,6 +7895,7 @@ export const useEnhancedMafiaGameState = (
             result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           }
           return result;
+        }
         case 'execute_planned_hit': {
           // Execute a planned hit — follows the target to their current location
           if (!newState.plannedHit) {
