@@ -1,88 +1,105 @@
-# Stabilize the game: stop crashes that kick the player back to the select screen
+# Push Out — Hit empty rival territories
 
-## What's actually happening
+A new dedicated action for striking rival hexes that have no business on them. Distinct from Hit (heavy combat, business hexes) and Sabotage (business destruction). Push Out is a lower-heat, faster way to roll back a rival's empty footprint and gain a small respect/fear bump.
 
-There is **no React error boundary** anywhere in the app. When any render-time exception is thrown inside `GameContent` (state-update glitch, undefined map lookup, malformed save, AI logic crash, etc.) React tears the whole tree down. In dev/preview, Vite then remounts the root; in production the page goes blank. Either way the in-memory `gameConfig` in `UltimateMafiaGame` is lost, so the next mount falls through to the family-select screen. That's the "crash back to select" the user sees.
+## When it appears
 
-Right now we have:
-- No error boundary
-- No window-level `error` / `unhandledrejection` handler
-- An existing autosave (`useGameSaveLoad.autoSave`) that we can lean on for recovery
-- A `gameConfig` held in component state, so any unmount = back to select
+Push Out shows up on the hex action menu (and in the EnemyHexActionDialog when entering an empty rival hex) only when ALL of these are true:
 
-## Fix in three layers
+- Target hex belongs to a rival family (not neutral, not player, not an HQ).
+- Target hex has no business (built or extorted). Hexes with a business stay on the Hit / Sabotage path.
+- Selected unit is a Soldier or Capo of the player's family, and adjacent to or on the target hex.
+- Action phase, player has ≥ 1 action remaining.
+- No ceasefire / alliance / safe-passage protecting that family (same gating as Hit).
 
-### 1. Catch render errors instead of unmounting
+If the hex has a business, Push Out is hidden and the normal Hit / Sabotage menu is shown unchanged.
 
-Add `src/components/GameErrorBoundary.tsx` — a small class component that:
+## What it does
 
-- Catches errors via `getDerivedStateFromError` + `componentDidCatch`.
-- Records `error`, `errorInfo.componentStack`, `timestamp`, and the last known game-state snapshot (via a `getSnapshot` prop) into `localStorage` under `lastCrashReport` (keep only the most recent).
-- Renders a recovery UI when in error state:
-  - Headline: "The game hit an unexpected error."
-  - Buttons:
-    - **Recover from last autosave** (only shown when an autosave exists for the current family)
-    - **Restart same family** (re-init with the same `gameConfig`, same map seed)
-    - **Return to main menu** (calls `onExitToMenu`)
-  - Collapsible "Technical details" with the error message + first ~30 lines of the component stack.
-- Exposes `reset()` which bumps an internal key so the wrapped tree fully remounts after recovery.
+Push Out is a single-action territory shove with two possible flows depending on defenders:
 
-Wrap `GameContent` in `UltimateMafiaGame`:
+```text
+Empty rival hex, no defenders
+  -> Auto-success, hex flips to NEUTRAL (player still claims next turn,
+     same convention as a successful Hit). +small respect, +small fear,
+     +rival relationship hit, low heat.
 
-```tsx
-<GameErrorBoundary
-  config={gameConfig}
-  onExitToMenu={() => setGameConfig(null)}
-  onRestart={() => setGameConfig({ ...gameConfig })}
->
-  <GameContent config={gameConfig} onExitToMenu={() => setGameConfig(null)} />
-</GameErrorBoundary>
+Empty rival hex, with defenders
+  -> Light combat roll (same combat math as Hit but with a Push Out
+     modifier). On success: defenders routed/wounded, hex -> NEUTRAL,
+     +respect/fear, +rival relationship hit, moderate heat.
+     On failure: attacker bounces back to origin, no spoils,
+     small heat, no civilian-casualty path.
 ```
 
-Because `gameConfig` stays alive on the parent, the player no longer gets dumped to the select screen on an error.
+Key difference vs. Hit: Push Out never triggers the civilian-casualty branch, because the target is rival-claimed turf with no business to misidentify. Unscouted Push Out is allowed and safe (just no scout combat bonus).
 
-### 2. Catch async errors that would otherwise bubble up later
+## Numbers (first pass, tuneable)
 
-Add a tiny `src/lib/globalErrorReporter.ts` that, mounted once from `App.tsx`:
+- Action cost: 1 action.
+- Heat: +4 if uncontested, +8 if combat. (Hit is +10–25 today.)
+- Respect: +2 on success.
+- Fear: +2 on the targeted family.
+- Relationship / tension: same magnitude as a normal territory hit on that family — this is still aggression.
+- Combat (defended case):
+  - Base success = same `0.5 + (attackers - defenders) * 0.15` formula as Hit.
+  - +5% Push Out modifier (it's a softer target than a defended business hex).
+  - Fortify / safehouse defense bonuses still apply.
+  - No scout bonus required, no blind-hit penalty.
+- Bold-move respect: Outnumbered Push Out victory still grants the existing Bold Strike +2.
+- Cannot Push Out an enemy HQ hex (those use HQ Assault, Phase 4).
 
-- Subscribes to `window.addEventListener('error', ...)` and `'unhandledrejection'`.
-- Throttles to at most one toast per 5s (`sonner.toast.error("Background error — game state preserved.")`).
-- Appends each entry (timestamp + message + stack) to a ring buffer in `localStorage` (`recentBackgroundErrors`, cap 20).
+## UX
 
-This means an exception in an AI timer or async save no longer poisons future renders silently.
+- Hex action menu: when canPushOut is true and canHit would have been the only enemy option, show "👊 Push Out" instead of "⚔️ Hit". Tooltip: "Shove a rival off an empty hex. Low heat, no civilian risk."
+- EnemyHexActionDialog (entering an empty rival hex in Phase 2+): the "Hit Territory" button is replaced by "Push Out" with the same visual weight; Sabotage is hidden (no business); Retreat stays.
+- Action chip cost: 1 ⚔.
+- On success, the existing combat-flash + floating-text feedback fires with a `push_out` variant ("PUSHED OUT").
+- Turn summary: new line entry "Pushed Out — {District}".
 
-### 3. Harden the two hottest crash surfaces
+## Phase gating
 
-These are the realistic sources of "occasional" crashes based on what we already saw in the codebase. Keep changes surgical.
+- Available from Phase 2 (same gate as today's enemy-hex entry dialog).
+- Phase 3+ does NOT lock Push Out — manual claim is still locked at Phase 3, but combat-style actions remain enabled, matching how Hit behaves today.
 
-**a. Turn advancement in `useEnhancedMafiaGameState.ts`** — wrap the body of `advancePhase` and the AI-turn block in a `try` that, on throw:
-- Logs the error and the action it was processing.
-- Returns `prev` unchanged (so React never sees a half-updated state).
-- Pushes a `pendingNotifications` entry: "AI turn stumbled — turn skipped to keep the game stable."
+## Technical section
 
-This stops a single bad AI calculation from killing the whole React tree. (Scope: wrap, don't refactor logic.)
+Files to touch:
 
-**b. Save deserialization in `useGameSaveLoad.ts`** — wrap `JSON.parse` + `migrateState` calls in try/catch and reject the load with a clear toast instead of throwing into React.
+- `src/hooks/useEnhancedMafiaGameState.ts`
+  - New action type `push_out_territory` registered in `actionPhaseActions`.
+  - New `processPushOutTerritory(state, action)`:
+    - Validates rival ownership, no business, no HQ, ceasefire/alliance/safe-passage checks (lift from `processTerritoryHit`).
+    - Branches on `enemyUnits.length === 0`:
+      - Zero defenders: skip combat, mark tile `controllingFamily = 'neutral'`, drop pendingClaim, run tension/relationship/heat/respect/fear deltas, push success notification.
+      - With defenders: reuse the combat-resolution block from `processTerritoryHit` with `_isPushOut = true` to skip civilian-risk + plan-hit branches and use Push Out modifiers.
+    - Calls `checkSupplySabotage` on success (a rival node may have been there).
+    - Removes any fortification on the captured hex.
+  - `resolveEnemyHexAction` gains a `'push_out'` action that calls the new processor, mirroring the `'hit'` branch.
+- `src/components/EnemyHexActionDialog.tsx`
+  - Add `canPushOut` derived from `!targetInfo.hasBusiness && !isHQ`.
+  - When `canPushOut`, render the "Push Out" button in place of "Hit Territory". Hide Sabotage (no business). Plan Hit execute branch stays untouched.
+- `src/components/EnhancedMafiaHexGrid.tsx`
+  - Add `canPushOut = isEnemy && !tile.business && !tile.isHeadquarters && (isSoldier || isCapo)` and a matching disabled-reason entry.
+  - Render a "👊 Push Out" button in the action menu, mutually exclusive with "Hit" (Hit is only shown when the hex has a business or defenders justify a heavier action — or always show both? See open question below).
+  - Wire its onClick to `onAction({ type: 'push_out_territory', targetQ, targetR, targetS, selectedUnitId })`.
+- `src/pages/UltimateMafiaGame.tsx`
+  - Add a `'push_out'` case to the enemy-hex-dialog dispatcher that calls `resolveEnemyHexAction('push_out')`.
+- `src/hooks/__tests__/push-out.test.ts` (new)
+  - Empty rival hex, no defenders -> hex becomes neutral, +respect, +fear, action consumed, low heat.
+  - Empty rival hex with defenders -> combat path; success neutralizes, failure bounces attacker.
+  - Push Out on a business hex is rejected (action menu/dispatcher both block it).
+  - Push Out on HQ is rejected.
+  - Push Out respects ceasefire/alliance/safe-passage (no-op + warning).
 
-## Tests
+Memory updates (after build): add `mem://gameplay/combat-mechanics/push-out` describing the rule, and reference it in `mem://index.md` under Memories.
 
-Add `src/components/__tests__/GameErrorBoundary.test.tsx`:
+## Open question worth flagging
 
-- Renders a child that throws on first render; asserts the recovery UI shows, `gameConfig` is preserved, and `reset()` allows the child to render successfully on the second attempt.
-- Asserts a `lastCrashReport` entry is written to `localStorage`.
+When the target rival hex has defenders but still no business, should Push Out coexist with Hit (player picks the flavor), or should Push Out fully replace Hit for business-less hexes? The plan above assumes "Push Out replaces Hit on no-business hexes" — simplest UX, one obvious choice per hex. We can revisit during implementation if you'd rather keep both available.
 
 ## Out of scope
 
-- Refactoring the actual logic inside `useEnhancedMafiaGameState` to find the root cause of any specific crash. That's a separate investigation; this pass is about **containment + recovery** so a single crash stops being a session-ender.
-- Server-side telemetry. We only persist crash info to `localStorage` for now.
-- Visual redesign of the recovery screen beyond a clean, themed card.
-
-## Files touched
-
-- `src/components/GameErrorBoundary.tsx` (new)
-- `src/lib/globalErrorReporter.ts` (new)
-- `src/pages/UltimateMafiaGame.tsx` (wrap `GameContent`, add restart handler)
-- `src/App.tsx` (mount global error reporter once)
-- `src/hooks/useEnhancedMafiaGameState.ts` (try/catch around turn advance + AI block)
-- `src/hooks/useGameSaveLoad.ts` (try/catch around parse/migrate)
-- `src/components/__tests__/GameErrorBoundary.test.tsx` (new)
+- No AI usage of Push Out in this pass. AI keeps using Hit; we can add AI Push Out behavior in a follow-up once the player-facing mechanic is tuned.
+- No new bold-move respect category — uses existing Bold Strike when outnumbered.
+- No changes to Hit, Sabotage, Plan Hit, or HQ Assault.
