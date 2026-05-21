@@ -31,9 +31,9 @@ Empty rival hex WITH defenders, SCOUTED
      +5% scout intel bonus (fresh) or +2% (stale) on top of base.
      Success: defenders routed (soldiers killed, capos wounded per
      normal Hit rules), hex -> NEUTRAL, +respect/+fear, tension hit,
-     moderate heat (+8). Outnumbered win still grants Bold Strike +2.
+     moderate heat (+4). Outnumbered win still grants Bold Strike +2.
      Failure: attacker bounces back to origin hex (movesRemaining +1),
-     no spoils, +4 heat, no unit loss.
+     no spoils, +2 heat, no unit loss.
 
 Empty rival hex WITH defenders, UNSCOUTED
   -> Dialog warns "Unknown defenders — proceed at risk". Player can
