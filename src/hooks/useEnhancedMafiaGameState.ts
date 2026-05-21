@@ -6783,9 +6783,12 @@ export const useEnhancedMafiaGameState = (
           state.combatLog.push(`📩 ${famLabel} requested a sitdown — proposed: ${dealLabel} (expires in 2 turns)`);
         };
         
+        // Posture acceptSitdownsForCash (CONSOLIDATE/COOL_OFF) → boost proposal odds so
+        // a struggling AI actively seeks peace/cash deals instead of waiting on personality.
+        const sitdownBoost = policy.acceptSitdownsForCash ? 2.0 : 1.0;
         // Diplomatic: ceasefire at Phase 2+, alliance at Phase 3+ if relationship > 30
         if (personality === 'diplomatic' && !hasIncoming) {
-          if (aiPhase >= 2 && !hasCeasefire && Math.random() < (cooperation / 150)) {
+          if (aiPhase >= 2 && !hasCeasefire && Math.random() < (cooperation / 150) * sitdownBoost) {
             pushSitdown('ceasefire');
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire' });
           } else if (aiPhase >= 3 && !hasAlliance && hasCeasefire && (opponent.relationships?.[state.playerFamily] || 0) > 30 && Math.random() < 0.2) {
@@ -6795,7 +6798,7 @@ export const useEnhancedMafiaGameState = (
         }
         // Defensive: ceasefire at Phase 3+
         else if (personality === 'defensive' && !hasIncoming) {
-          if (aiPhase >= 3 && !hasCeasefire && Math.random() < (cooperation / 200)) {
+          if (aiPhase >= 3 && !hasCeasefire && Math.random() < (cooperation / 200) * sitdownBoost) {
             pushSitdown('ceasefire');
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire' });
           }
@@ -6803,15 +6806,16 @@ export const useEnhancedMafiaGameState = (
         // Opportunistic: ceasefire if losing territory
         else if (personality === 'opportunistic' && !hasIncoming) {
           const aiHexCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
-          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < 6 && Math.random() < 0.3) {
+          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < 6 && Math.random() < 0.3 * sitdownBoost) {
             pushSitdown('ceasefire');
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire (losing ground)' });
           }
         }
-        // Aggressive: ceasefire only when losing badly (< 4 hexes)
+        // Aggressive: ceasefire only when losing badly (< 4 hexes) — or any time when posture forces cash-seeking
         else if (personality === 'aggressive' && !hasIncoming) {
           const aiHexCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
-          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < 4 && Math.random() < 0.2) {
+          const aggCeasefireThresh = policy.acceptSitdownsForCash ? 8 : 4;
+          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < aggCeasefireThresh && Math.random() < 0.2 * sitdownBoost) {
             pushSitdown('ceasefire');
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire (desperate)' });
           }
