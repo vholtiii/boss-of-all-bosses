@@ -23,7 +23,7 @@ interface EnemyHexActionProps {
   } | null;
   playerMoney: number;
   gamePhase: number;
-  onAction: (action: 'hit' | 'sabotage' | 'cancel' | 'plan_hit') => void;
+  onAction: (action: 'hit' | 'sabotage' | 'cancel' | 'plan_hit' | 'push_out') => void;
 }
 
 const SABOTAGE_COST = 12000;
