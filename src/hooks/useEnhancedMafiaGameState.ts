@@ -7185,7 +7185,12 @@ export const useEnhancedMafiaGameState = (
 
       // ── AI FAMILY POWER USAGE ──
       const aiPower = FAMILY_POWERS[fam];
-      if (aiPower && aiPhase >= 2 && aiTacticalRemaining >= aiPower.cost) {
+      // Posture gating: defensive powers (Genovese hide hex, Bonanno purge) stay open;
+      // offensive/economic powers (Gambino scout, Lucchese shakedown) are skipped when
+      // posture is CONSOLIDATE/COOL_OFF/TURTLE so AI doesn't burn cooldowns mid-crisis.
+      const conservativePosture = posture === 'CONSOLIDATE' || posture === 'COOL_OFF' || posture === 'TURTLE';
+      const offensivePowerBlocked = conservativePosture && !strategicOverride && (fam === 'gambino' || fam === 'lucchese');
+      if (aiPower && aiPhase >= 2 && aiTacticalRemaining >= aiPower.cost && !offensivePowerBlocked) {
         const aiPowerCD = (state.familyPowerCooldowns || {})[fam] || 0;
         const aiPowerUsed = aiPower.oneTimeUse && (state.familyPowerUsedForever || {})[fam];
         if (aiPowerCD <= 0 && !aiPowerUsed) {
