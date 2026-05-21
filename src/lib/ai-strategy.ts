@@ -137,6 +137,12 @@ export interface ScoreHexInputs {
   jitter: number;
   /** Game difficulty — scales scoring sharpness. Defaults to 'normal' if omitted. */
   difficulty?: AIDifficulty;
+  /** Posture-driven multiplier on war-target weight (WAR/PRESSURE_LEADER ≥1.5). Default 1. */
+  warTargetMul?: number;
+  /** Posture-driven multiplier on the "weak hex" (defenderCount===0) bonus (EXPAND >1). Default 1. */
+  expandMul?: number;
+  /** Posture-driven multiplier on owned-adjacency consolidation bonus (BUILD_ECONOMY/CONSOLIDATE >1). Default 1. */
+  economyFocusMul?: number;
 }
 
 export function scoreHexForAI(i: ScoreHexInputs): number {
