@@ -7274,6 +7274,7 @@ export const useEnhancedMafiaGameState = (
           buildTile.business = {
             type: bType,
             income: bIncome,
+            isLegal: false,
             isExtorted: false, // built business — counts toward influence formula like player-built
             heatLevel: 0,
             launderingCapacity: Math.floor(bIncome * 0.7),
