@@ -10564,7 +10564,7 @@ export const useEnhancedMafiaGameState = (
       if (state.reputation.familyRelationships[targetFamily] !== undefined) {
         state.reputation.familyRelationships[targetFamily] = Math.max(-100, state.reputation.familyRelationships[targetFamily] - 8);
       }
-      applyPlayerHeat(state, 4);
+      applyPlayerHeat(state, 2);
 
       playerUnits.forEach(u => {
         if (state.soldierStats[u.id]) {
