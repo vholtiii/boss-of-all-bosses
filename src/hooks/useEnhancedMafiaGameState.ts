@@ -7125,8 +7125,10 @@ export const useEnhancedMafiaGameState = (
       const planHitChanceMultiplier = personality === 'aggressive' ? 2.0
         : personality === 'unpredictable' ? 1.5
         : 1.0; // opportunistic
-      if (hasCeasefireWithPlayer || hasAllianceWithPlayer || aiOffenseDisabled) {
-        // Skip plan hit — active pact with player or AI is laying low / mattresses
+      // Posture refuseNewWars (COOL_OFF/CONSOLIDATE/TURTLE/CLOSE_OUT-when-not-at-war/BUILD_ECONOMY) blocks new plan hits
+      const postureBlocksNewHit = policy.refuseNewWars && !strategicOverride && !atWarNow;
+      if (hasCeasefireWithPlayer || hasAllianceWithPlayer || aiOffenseDisabled || postureBlocksNewHit) {
+        // Skip plan hit — active pact, hiding, or posture refuses new aggression
       } else if (aiPhase >= 2 && planHitPersonalityAllowed && Math.random() < AI_PLAN_HIT_CHANCE * planHitChanceMultiplier) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
