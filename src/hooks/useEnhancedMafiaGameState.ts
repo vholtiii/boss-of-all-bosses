@@ -6714,23 +6714,45 @@ export const useEnhancedMafiaGameState = (
       }
       } // end Phase 3 claim/extort else block
 
-      // ── DEPLOY CAPO ──
+      // ── DEPLOY CAPO ── (B8: posture-aware scoring — income + border presence − stacking)
       const caposAtHQ = state.deployedUnits.filter(u =>
         u.family === fam && u.type === 'capo' && u.q === hq.q && u.r === hq.r && u.s === hq.s
       );
       if (caposAtHQ.length > 0) {
         const capo = caposAtHQ[0];
-        const valuableTiles = state.hexMap.filter(t =>
+        const candidates = state.hexMap.filter(t =>
           t.controllingFamily === fam && t.business && !t.isHeadquarters &&
           !state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
         );
-        if (valuableTiles.length > 0) {
-          valuableTiles.sort((a, b) => (b.business?.income || 0) - (a.business?.income || 0));
-          const bestTile = valuableTiles[0];
+        if (candidates.length > 0) {
+          const otherCapos = state.deployedUnits.filter(u => u.family === fam && u.type === 'capo' && u.id !== capo.id);
+          const scored = candidates.map(t => {
+            const income = t.business?.income || 0;
+            const neighbors = getHexNeighbors(t.q, t.r, t.s);
+            const isBorder = neighbors.some(n => {
+              const nt = state.hexMap.find(tt => tt.q === n.q && tt.r === n.r && tt.s === n.s);
+              return nt && nt.controllingFamily && nt.controllingFamily !== fam && nt.controllingFamily !== 'neutral';
+            });
+            const nearFriendlyCapo = otherCapos.some(c => hexDistance(c, t) <= 2);
+            const distFromHQ = hexDistance(t, hq);
+            // Posture-weighted scoring:
+            // - EXPAND/WAR/CLOSE_OUT: bias toward borders for forward projection
+            // - BUILD_ECONOMY/CONSOLIDATE/TURTLE: bias toward income & away from borders
+            const borderWeight = (posture === 'EXPAND' || posture === 'WAR' || posture === 'CLOSE_OUT' || posture === 'PRESSURE_LEADER') ? 1.0
+              : (posture === 'BUILD_ECONOMY' || posture === 'CONSOLIDATE' || posture === 'TURTLE' || posture === 'COOL_OFF') ? -0.4
+              : 0.3;
+            const score = (income / 1000) * 0.6
+              + (isBorder ? borderWeight : 0)
+              + (nearFriendlyCapo ? -1.0 : 0)
+              + (distFromHQ > 6 ? -0.3 : 0);
+            return { tile: t, score };
+          }).sort((a, b) => b.score - a.score);
+          const bestTile = scored[0].tile;
           capo.q = bestTile.q;
           capo.r = bestTile.r;
           capo.s = bestTile.s;
           capo.movesRemaining = 0;
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'deploy_capo', detail: `Deployed Capo to ${bestTile.district || 'territory'}` });
         }
       }
 
