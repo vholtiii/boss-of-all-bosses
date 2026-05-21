@@ -16,23 +16,39 @@ If the hex has a business, Push Out is hidden and the normal Hit / Sabotage menu
 
 ## What it does
 
-Push Out is a single-action territory shove with two possible flows depending on defenders:
+Push Out is a single-action territory shove. Behavior depends on whether the hex is defended and whether the player has scouted it.
 
 ```text
-Empty rival hex, no defenders
+Empty rival hex, no defenders (scouted OR unscouted)
   -> Auto-success, hex flips to NEUTRAL (player still claims next turn,
      same convention as a successful Hit). +small respect, +small fear,
-     +rival relationship hit, low heat.
+     +rival relationship hit, low heat (+4). No civilian-casualty path —
+     the hex is rival-claimed turf, not innocent ground.
 
-Empty rival hex, with defenders
-  -> Light combat roll (same combat math as Hit but with a Push Out
-     modifier). On success: defenders routed/wounded, hex -> NEUTRAL,
-     +respect/fear, +rival relationship hit, moderate heat.
-     On failure: attacker bounces back to origin, no spoils,
-     small heat, no civilian-casualty path.
+Empty rival hex WITH defenders, SCOUTED
+  -> Player sees defender count in the dialog before committing.
+     Light combat roll using Push Out modifiers (see Numbers).
+     +5% scout intel bonus (fresh) or +2% (stale) on top of base.
+     Success: defenders routed (soldiers killed, capos wounded per
+     normal Hit rules), hex -> NEUTRAL, +respect/+fear, tension hit,
+     moderate heat (+8). Outnumbered win still grants Bold Strike +2.
+     Failure: attacker bounces back to origin hex (movesRemaining +1),
+     no spoils, +4 heat, no unit loss.
+
+Empty rival hex WITH defenders, UNSCOUTED
+  -> Dialog warns "Unknown defenders — proceed at risk". Player can
+     still commit. Combat roll uses base Push Out math with NO scout
+     bonus (but also no blind-hit penalty — unlike Hit, Push Out
+     never triggers the civilian branch because the hex is
+     rival-owned and business-less).
+     Success: same as scouted-success branch above.
+     Failure: same bounce-back, plus the initiating soldier gains
+     the "suspicious" flag for 1 turn (botched op draws police
+     attention to that unit) and heat is +6 instead of +4 to
+     reflect the messier operation.
 ```
 
-Key difference vs. Hit: Push Out never triggers the civilian-casualty branch, because the target is rival-claimed turf with no business to misidentify. Unscouted Push Out is allowed and safe (just no scout combat bonus).
+Capo defenders follow the existing Hit rule: a Push Out victory wounds enemy capos (2-turn debuff) rather than killing them. Plan Hit / Hitman remain the only ways to kill capos outright.
 
 ## Numbers (first pass, tuneable)
 
