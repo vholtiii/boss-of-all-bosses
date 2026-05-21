@@ -44,7 +44,7 @@ Empty rival hex WITH defenders, UNSCOUTED
      Success: same as scouted-success branch above.
      Failure: same bounce-back, plus the initiating soldier gains
      the "suspicious" flag for 1 turn (botched op draws police
-     attention to that unit) and heat is +6 instead of +4 to
+     attention to that unit) and heat is +3 instead of +2 to
      reflect the messier operation.
 ```
 
