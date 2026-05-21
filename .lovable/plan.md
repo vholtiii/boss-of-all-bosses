@@ -1,121 +1,109 @@
-# Push Out — Hit empty rival territories
+# AI Behavior & Code — Improvement Plan
 
-A new dedicated action for striking rival hexes that have no business on them. Distinct from Hit (heavy combat, business hexes) and Sabotage (business destruction). Push Out is a lower-heat, faster way to roll back a rival's empty footprint and gain a small respect/fear bump.
+A review of `processAITurn` (~2,100 lines in `useEnhancedMafiaGameState.ts`) plus the `ai-posture.ts` / `ai-strategy.ts` helpers turned up a clear set of issues. Grouped into **Behavior gaps** (things the AI should do but doesn't, or does poorly) and **Code health** (things that make the AI hard to tune and debug). Each item is rated **High / Med / Low** by impact.
 
-## When it appears
+## Behavior gaps
 
-Push Out shows up on the hex action menu (and in the EnemyHexActionDialog when entering an empty rival hex) only when ALL of these are true:
+### B1. Strategic posture is half-wired (High)
+`computeAIPosture` produces 8 postures and `posturePolicy` exposes 9 knobs (`heatCeiling`, `suppressOffense`, `suppressExpansion`, `forceBribe`, `preferLayLow`, `preferMattresses`, `acceptSitdownsForCash`, `refuseNewWars`, `warTargetMul`, `economyFocusMul`). Only 4 are actually read in `processAITurn`:
+- `forceBribe`, `preferLayLow`, `heatCeiling`, `suppressOffense` → used
+- `suppressExpansion`, `preferMattresses`, `acceptSitdownsForCash`, `refuseNewWars`, `warTargetMul`, `economyFocusMul` → **defined but never read**
 
-- Target hex belongs to a rival family (not neutral, not player, not an HQ).
-- Target hex has no business (built or extorted). Hexes with a business stay on the Hit / Sabotage path.
-- Selected unit is a Soldier or Capo of the player's family, and adjacent to or on the target hex.
-- Action phase, player has ≥ 1 action remaining.
-- No ceasefire / alliance / safe-passage protecting that family (same gating as Hit).
+So a CONSOLIDATE family that should refuse new wars and grab any cash sitdown still proposes ceasefires randomly and ignores incoming deals; a TURTLE family that should prefer Mattresses isn't pushed toward it; an EXPAND family doesn't get a movement weight boost on neutrals.
 
-If the hex has a business, Push Out is hidden and the normal Hit / Sabotage menu is shown unchanged.
+**Fix:** wire the remaining policy fields into the existing branches (no new mechanics, just hook the knobs):
+- `suppressExpansion` → skip the "claim neutral hex" priority and the "extort neutral biz" priority, but keep defense.
+- `preferMattresses` → mirror the existing `preferLayLow` block at Phase 3+.
+- `acceptSitdownsForCash` → in the diplomacy block, when an AI has an incoming sitdown from the player and posture is CONSOLIDATE / COOL_OFF, auto-accept cash-positive deals (supply deals, ceasefire when at war).
+- `refuseNewWars` → gate the AI Plan Hit roll and the "blind attack on player" branch.
+- `warTargetMul` / `economyFocusMul` → multiply into `scoreHexForAI` via two new optional inputs.
 
-## What it does
+### B2. AI never uses Push Out (High)
+The new `push_out_territory` action only resolves through `resolveEnemyHexAction` for the player. AI movement falls through into the heavy combat branch on every empty rival hex it enters, taking +heavier heat instead of the low-heat Push Out path. Mirror the player rule: empty rival hex + no business → run the Push Out branch (`+2/+4` heat) instead of the full Hit path.
 
-Push Out is a single-action territory shove. Behavior depends on whether the hex is defended and whether the player has scouted it.
+### B3. AI never builds businesses (High)
+Players construct businesses on owned empty hexes; the AI only extorts pre-existing neutral businesses and captures via combat. That's why `policy.economyFocusMul` was designed but couldn't be wired — there's nothing to bias toward.
+Add a simple build path used in BUILD_ECONOMY / CONSOLIDATE / TURTLE postures: on AI families with money runway > 6 and ≥1 owned empty hex adjacent to a connected supply node, build a district-appropriate business (use existing affinities). Cost / construction-turn budget = same as player.
 
+### B4. AI never abandons empty hexes (Med)
+Player has Abandon Territory to drop empty hexes and cut community upkeep ($150/hex/turn). AI pays this forever, which compounds when CONSOLIDATE / COOL_OFF fires. Add: in those two postures, if `aiCommunityHexCount > 8` and runway < 5, abandon the lowest-value empty hex furthest from HQ.
+
+### B5. AI never hires hitmen (Med)
+Phase 3 hitman contract ($30k) is player-only. At Phase 3+, an aggressive/opportunistic AI with money runway ≥ 8 and an outstanding war / very-low relationship with the player should occasionally contract a hit on a player capo instead of relying solely on the existing Plan Hit. Use existing `processHitmanContract` machinery; no new mechanic.
+
+### B6. RNG determinism inconsistency (Med)
+A per-turn seeded `turnRng = mulberry32(mapSeed + turn * 31 + fam)` is created in line 5656 but only used inside `scoreHexForAI`'s jitter. Every other AI decision — Lay Low rolls, bribe rolls, diplomacy proposals, family-power triggers, combat willingness, fortify chance, plan-hit roll, commission-vote roll — uses raw `Math.random()`. Means same map seed produces different AI behavior across reloads, breaking save scumming protection and making regressions hard to reproduce.
+**Fix:** swap all `Math.random()` calls inside `processAITurn` for `turnRng()`. Pure mechanical change.
+
+### B7. AI movement scoring doesn't see posture (Med)
+`scoreHexForAI` knows personality and mood but not posture. EXPAND / WAR / PRESSURE_LEADER should bias the scoring; currently posture only gates whether the function runs (`suppressOffense`). Add two optional inputs: `warTargetMul` (applied to the `isWarTarget` weight) and `expandMul` (applied to the "weak hex" bonus). Defaults preserve existing behavior.
+
+### B8. Capo deploy is naive (Low)
+The "deploy capo from HQ" block (line 6677) picks the highest-income owned tile regardless of threat, distance from front, or whether another capo already covers it. Replace with a small score: `income * 0.6 + 0.4 * (1 if border hex else 0) − 1.0 if another friendly capo within 2 hexes`.
+
+### B9. Family-power triggers ignore posture (Low)
+Bonanno Purge fires regardless of money/runway; Gambino Network fires regardless of heat. Tighten with `posture !== 'CONSOLIDATE' && posture !== 'COOL_OFF'` for offensive powers; allow defensive ones (Genovese hide hex) freely.
+
+## Code health
+
+### C1. `processAITurn` is a 2,100-line monolith (High)
+Single inner `forEach(opponent ⇒ ...)` body covers: mood, posture, heat tier, lay-low/mattresses, bribes, income, recruit, deploy, movement+combat, claim, extort, capo deploy, promote, diplomacy proposals, supply deals, safehouse, plan hit, family powers, respect/influence, flip soldier, HQ assault, phase transition, commission vote, heat lifecycle. Nothing is extracted, almost no helpers. Hard to test, hard to reason about, hard to PR-review.
+
+**Fix:** extract pure-ish stage helpers into `src/lib/ai/` (one file per stage), called sequentially from a slim `processAITurn`. Each takes `(state, opponent, ctx)` where `ctx` carries the once-per-AI computed bundle (posture, policy, personality, turnRng, heatTier, etc.). Suggested split:
 ```text
-Empty rival hex, no defenders (scouted OR unscouted)
-  -> Auto-success, hex flips to NEUTRAL (player still claims next turn,
-     same convention as a successful Hit). +small respect, +small fear,
-     +rival relationship hit, low heat (+2). No civilian-casualty path —
-     the hex is rival-claimed turf, not innocent ground.
-
-Empty rival hex WITH defenders, SCOUTED
-  -> Player sees defender count in the dialog before committing.
-     Light combat roll using Push Out modifiers (see Numbers).
-     +5% scout intel bonus (fresh) or +2% (stale) on top of base.
-     Success: defenders routed (soldiers killed, capos wounded per
-     normal Hit rules), hex -> NEUTRAL, +respect/+fear, tension hit,
-     moderate heat (+4). Outnumbered win still grants Bold Strike +2.
-     Failure: attacker bounces back to origin hex (movesRemaining +1),
-     no spoils, +2 heat, no unit loss.
-
-Empty rival hex WITH defenders, UNSCOUTED
-  -> Dialog warns "Unknown defenders — proceed at risk". Player can
-     still commit. Combat roll uses base Push Out math with NO scout
-     bonus (but also no blind-hit penalty — unlike Hit, Push Out
-     never triggers the civilian branch because the hex is
-     rival-owned and business-less).
-     Success: same as scouted-success branch above.
-     Failure: same bounce-back, plus the initiating soldier gains
-     the "suspicious" flag for 1 turn (botched op draws police
-     attention to that unit) and heat is +3 instead of +2 to
-     reflect the messier operation.
+src/lib/ai/
+  ai-context.ts          (build the per-AI ctx bundle: mood, posture, heat tier, rng, hex counts)
+  ai-precautions.ts      (lay-low, mattresses, bribes, RICO timer)
+  ai-economy.ts          (income, recruit, build-business, extort-neutral, abandon)
+  ai-deploy.ts           (soldier + capo deploy)
+  ai-movement.ts         (move loop, target scoring, fortify-on-the-way)
+  ai-combat.ts           (combat resolution, push-out branch, capture, safehouse loot)
+  ai-diplomacy.ts        (ceasefires, alliances, supply deals, sitdown auto-accept)
+  ai-strategic.ts        (plan hit, hitman, family power, HQ assault, commission vote)
+  ai-bookkeeping.ts      (respect/influence, phase transitions, heat lifecycle)
 ```
+Move the existing inline code as-is in the first pass — no behavior change. Posture-wiring (B1) and Push Out (B2) follow afterward against the smaller modules.
 
-Capo defenders follow the existing Hit rule: a Push Out victory wounds enemy capos (2-turn debuff) rather than killing them. Plan Hit / Hitman remain the only ways to kill capos outright.
+### C2. Repeated `state.hexMap.filter` / `state.deployedUnits.filter` (Med)
+Per AI turn, the player-hex count and the AI's own hex count are recomputed 5–6 times each (`myHexCount`, `myTerritoryNow`, `aiHexCount`, `aiFamHexes`, `aiHexes`, `aiCommunityHexCount`). Compute once in the ctx bundle.
 
-## Numbers (first pass, tuneable)
+### C3. Magic numbers scattered everywhere (Med)
+`0.5` base lay-low chance, `0.95` cap, `0.85` war-target bias, `0.7` safehouse bias, `0.30/0.25/0.40/0.50` per-family-power roll chances, etc. Lift to a single `AI_TUNING` constant block at the top of the module (or into `ai-context.ts`) so they're tunable in one place.
 
-- Action cost: 1 action.
-- Heat: +2 if uncontested, +4 on combat win, +2 on combat loss (scouted) / +3 on combat loss (unscouted). (Hit is +10–25 today.)
-- Respect: +2 on success.
-- Fear: +2 on the targeted family.
-- Relationship / tension: same magnitude as a normal territory hit on that family — this is still aggression.
-- Combat (defended case):
-  - Base success = same `0.5 + (attackers - defenders) * 0.15` formula as Hit.
-  - +5% Push Out modifier (it's a softer target than a defended business hex).
-  - Fortify / safehouse defense bonuses still apply.
-  - No scout bonus required, no blind-hit penalty.
-- Bold-move respect: Outnumbered Push Out victory still grants the existing Bold Strike +2.
-- Cannot Push Out an enemy HQ hex (those use HQ Assault, Phase 4).
+### C4. No structured AI decision log (Med)
+`turnReport.aiActions` is `{family, action, detail}` strings — fine for the post-turn modal, useless for debugging "why did Genovese pick that hex". Add an optional `aiDecisions` debug channel (off in prod, on behind a `localStorage.AI_TRACE` flag) that records per-AI `{posture, mood, heatTier, moneyRunway, chosenAction, alternativesScored}`. Pure additive.
 
-## UX
+### C5. Combat target selection bypasses `scoreHexForAI` (Low)
+Movement uses the scoring system, but the per-personality `combatWillingness` branch (line 6299-6306) and the contested-defense pick (line 6044) use ad-hoc numbers. Reuse the same scoring with a `combatMode: true` flag.
 
-- Hex action menu: when canPushOut is true and canHit would have been the only enemy option, show "👊 Push Out" instead of "⚔️ Hit". Tooltip: "Shove a rival off an empty hex. Low heat, no civilian risk."
-- EnemyHexActionDialog (entering an empty rival hex in Phase 2+): the "Hit Territory" button is replaced by "Push Out" with the same visual weight; Sabotage is hidden (no business); Retreat stays.
-- Action chip cost: 1 ⚔.
-- On success, the existing combat-flash + floating-text feedback fires with a `push_out` variant ("PUSHED OUT").
-- Turn summary: new line entry "Pushed Out — {District}".
+### C6. AI scoring inputs lose info (Low)
+`scoreHexForAI` doesn't get `isPushOutTarget` (empty rival hex, low heat) or `hasConnectedSupply` (which would bias extortion/build choices). Small additions during B2/B3 wiring.
 
-## Phase gating
+### C7. Test coverage gaps (Med)
+`ai-posture.test.ts` and friends cover the pure helpers. No tests for the integrated turn (e.g. "AI in CONSOLIDATE posture accepts a cash sitdown", "AI uses Push Out on empty rival hex", "AI doesn't propose new wars when policy.refuseNewWars=true"). Add a small `processAITurn.behavior.test.ts` that builds a minimal state and asserts post-turn invariants for each posture.
 
-- Available from Phase 2 (same gate as today's enemy-hex entry dialog).
-- Phase 3+ does NOT lock Push Out — manual claim is still locked at Phase 3, but combat-style actions remain enabled, matching how Hit behaves today.
+## Suggested order of execution
 
-## Technical section
+1. **C1 extraction first** (mechanical, no behavior change, makes the rest reviewable).
+2. **C2 / C3** as part of the extraction (one-time cleanup).
+3. **B6 RNG determinism** swept across the new modules.
+4. **B1 wire remaining policy fields** — biggest behavior win, smallest risk.
+5. **B2 Push Out** integration in `ai-combat.ts`.
+6. **B7 scoring posture inputs**, then **B8 / B9** polishes.
+7. **B3 build path** + **B4 abandon** + **B5 hitman** — these are net-new AI capabilities, more design-sensitive, save for last.
+8. **C4 trace log** + **C7 behavior tests** alongside the new features so we lock in the wins.
 
-Files to touch:
-
-- `src/hooks/useEnhancedMafiaGameState.ts`
-  - New action type `push_out_territory` registered in `actionPhaseActions`.
-  - New `processPushOutTerritory(state, action)`:
-    - Validates rival ownership, no business, no HQ, ceasefire/alliance/safe-passage checks (lift from `processTerritoryHit`).
-    - Branches on `enemyUnits.length === 0`:
-      - Zero defenders: skip combat, mark tile `controllingFamily = 'neutral'`, drop pendingClaim, run tension/relationship/heat/respect/fear deltas, push success notification.
-      - With defenders: reuse the combat-resolution block from `processTerritoryHit` with `_isPushOut = true` to skip civilian-risk + plan-hit branches and use Push Out modifiers.
-    - Calls `checkSupplySabotage` on success (a rival node may have been there).
-    - Removes any fortification on the captured hex.
-  - `resolveEnemyHexAction` gains a `'push_out'` action that calls the new processor, mirroring the `'hit'` branch.
-- `src/components/EnemyHexActionDialog.tsx`
-  - Add `canPushOut` derived from `!targetInfo.hasBusiness && !isHQ`.
-  - When `canPushOut`, render the "Push Out" button in place of "Hit Territory". Hide Sabotage (no business). Plan Hit execute branch stays untouched.
-- `src/components/EnhancedMafiaHexGrid.tsx`
-  - Add `canPushOut = isEnemy && !tile.business && !tile.isHeadquarters && (isSoldier || isCapo)` and a matching disabled-reason entry.
-  - Render a "👊 Push Out" button in the action menu, mutually exclusive with "Hit" (Hit is only shown when the hex has a business or defenders justify a heavier action — or always show both? See open question below).
-  - Wire its onClick to `onAction({ type: 'push_out_territory', targetQ, targetR, targetS, selectedUnitId })`.
-- `src/pages/UltimateMafiaGame.tsx`
-  - Add a `'push_out'` case to the enemy-hex-dialog dispatcher that calls `resolveEnemyHexAction('push_out')`.
-- `src/hooks/__tests__/push-out.test.ts` (new)
-  - Empty rival hex, no defenders -> hex becomes neutral, +respect, +fear, action consumed, +2 heat.
-  - Empty rival hex with defenders -> combat path; success neutralizes, failure bounces attacker.
-  - Push Out on a business hex is rejected (action menu/dispatcher both block it).
-  - Push Out on HQ is rejected.
-  - Push Out respects ceasefire/alliance/safe-passage (no-op + warning).
-
-Memory updates (after build): add `mem://gameplay/combat-mechanics/push-out` describing the rule, and reference it in `mem://index.md` under Memories.
-
-## Open question worth flagging
-
-When the target rival hex has defenders but still no business, should Push Out coexist with Hit (player picks the flavor), or should Push Out fully replace Hit for business-less hexes? The plan above assumes "Push Out replaces Hit on no-business hexes" — simplest UX, one obvious choice per hex. We can revisit during implementation if you'd rather keep both available.
+Each step ships independently — no chained dependencies beyond the C1 extraction at the start.
 
 ## Out of scope
 
-- No AI usage of Push Out in this pass. AI keeps using Hit; we can add AI Push Out behavior in a follow-up once the player-facing mechanic is tuned.
-- No new bold-move respect category — uses existing Bold Strike when outnumbered.
-- No changes to Hit, Sabotage, Plan Hit, or HQ Assault.
+- No changes to player-facing controls.
+- No new AI personalities or postures (the existing 5 + 8 are enough).
+- No machine-learning / external decision service — staying in pure TS.
+- No changes to map gen, supply lines, diplomacy data model, or save format.
+
+## Open questions
+
+1. **Build-business path priority** — should AI prefer cash-positive illegal builds (faster ROI, higher heat) or legal builds (slower, no heat, contributes to respect/influence)? Default proposal: personality drives it (aggressive/opportunistic → illegal first, defensive/diplomatic/Gambino-Bonanno → legal first).
+2. **Sitdown auto-accept thresholds** — what cash floor should CONSOLIDATE consider "worth taking"? Default proposal: any supply deal ≥ $5k, any ceasefire while at war.
+3. **Hitman frequency** — once per game per AI? Once per Phase 3+ war? Default proposal: max 1 active hitman contract per AI at a time, 8-turn cooldown after success.
