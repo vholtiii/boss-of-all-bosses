@@ -102,7 +102,7 @@ Files to touch:
 - `src/pages/UltimateMafiaGame.tsx`
   - Add a `'push_out'` case to the enemy-hex-dialog dispatcher that calls `resolveEnemyHexAction('push_out')`.
 - `src/hooks/__tests__/push-out.test.ts` (new)
-  - Empty rival hex, no defenders -> hex becomes neutral, +respect, +fear, action consumed, low heat.
+  - Empty rival hex, no defenders -> hex becomes neutral, +respect, +fear, action consumed, +2 heat.
   - Empty rival hex with defenders -> combat path; success neutralizes, failure bounces attacker.
   - Push Out on a business hex is rejected (action menu/dispatcher both block it).
   - Push Out on HQ is rejected.
