@@ -2529,7 +2529,7 @@ export const useEnhancedMafiaGameState = (
   }, []);
 
   // ============ RESOLVE ENEMY HEX ACTION (Phase 2+) ============
-  const resolveEnemyHexAction = useCallback((action: 'hit' | 'sabotage' | 'cancel' | 'plan_hit') => {
+  const resolveEnemyHexAction = useCallback((action: 'hit' | 'sabotage' | 'cancel' | 'plan_hit' | 'push_out') => {
     setGameState(prev => {
       if (!prev.pendingEnemyHexAction) return prev;
       const { unitId, fromQ, fromR, fromS, toQ, toR, toS } = prev.pendingEnemyHexAction;
