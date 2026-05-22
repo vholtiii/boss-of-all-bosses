@@ -144,7 +144,7 @@ export function posturePolicy(p: AIPosture): PosturePolicy {
     case 'BUILD_ECONOMY':
     default:
       return {
-        heatCeiling: 45, suppressOffense: false, suppressExpansion: true,
+        heatCeiling: 45, suppressOffense: false, suppressExpansion: false,
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: false, refuseNewWars: true,
         warTargetMul: 0.5, economyFocusMul: 1.8,
