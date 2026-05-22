@@ -53,8 +53,12 @@ describe('computeAIPosture', () => {
     expect(computeAIPosture({ ...baseInputs, aiPhase: 2, heatTier: 'cool', moneyRunway: 10 })).toBe('EXPAND');
   });
 
-  it('BUILD_ECONOMY by default in Phase 1', () => {
-    expect(computeAIPosture({ ...baseInputs, aiPhase: 1 })).toBe('BUILD_ECONOMY');
+  it('EXPAND in Phase 1 with cool heat and healthy treasury (early-game growth)', () => {
+    expect(computeAIPosture({ ...baseInputs, aiPhase: 1, heatTier: 'cool', moneyRunway: 10 })).toBe('EXPAND');
+  });
+
+  it('BUILD_ECONOMY when runway is tight (cannot afford to expand)', () => {
+    expect(computeAIPosture({ ...baseInputs, aiPhase: 1, heatTier: 'cool', moneyRunway: 3.5 })).toBe('BUILD_ECONOMY');
   });
 
   it('BUILD_ECONOMY when warm heat blocks EXPAND', () => {
@@ -74,10 +78,11 @@ describe('posturePolicy', () => {
     expect(posturePolicy('EXPAND').heatCeiling).toBeLessThanOrEqual(50);
   });
 
-  it('BUILD_ECONOMY suppresses expansion but allows defense', () => {
+  it('BUILD_ECONOMY allows expansion and defense but stays low-risk', () => {
     const p = posturePolicy('BUILD_ECONOMY');
-    expect(p.suppressExpansion).toBe(true);
+    expect(p.suppressExpansion).toBe(false);
     expect(p.suppressOffense).toBe(false);
+    expect(p.economyFocusMul).toBeGreaterThan(1);
   });
 
   it('WAR allows higher heat and weights war targets', () => {
