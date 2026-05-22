@@ -10,7 +10,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import {
   RotateCcw, DollarSign, Map, Crosshair, Users, Building2,
-  Handshake, Shield, Siren, Layers, Zap, Trophy, Search, BookOpen
+  Handshake, Shield, Siren, Layers, Zap, Trophy, Search, BookOpen,
+  AlertTriangle
 } from 'lucide-react';
 
 interface GuideSection {
@@ -149,6 +150,52 @@ const sections: GuideSection[] = [
       </div>
     ),
   },
+
+  {
+    id: 'edge-cases',
+    title: 'Edge Cases & Rules of Thumb',
+    icon: <AlertTriangle className="h-4 w-4" />,
+    keywords: ['edge case', 'hq', 'headquarters', 'scout', 'stale', 'undefended', 'defended', 'fortified', 'ceasefire', 'stacking', 'built business', 'extorted'],
+    content: (
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <p className="text-xs font-semibold">🏛️ HQ Hexes</p>
+          <Stat label="Claim / Push Out / Extort" value="Not allowed on any HQ" color="text-red-400" />
+          <Stat label="Movement" value="Units cannot move onto a rival HQ" color="text-red-400" />
+          <Stat label="Elimination" value="Only HQ Assault (Phase 4) takes an HQ down" color="text-yellow-400" />
+          <Stat label="Stacking" value="HQ tile is the only hex exempt from the 2-unit cap" />
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs font-semibold">🔍 Scout / Intel States</p>
+          <Stat label="No intel" value="Attacking = Blind Hit (40-60%), seizing biz risks civilians" color="text-red-400" />
+          <Stat label="Fresh intel" value="Scouted Hit (60-80%) + combat bonus, no civilian risk on capture" color="text-green-400" />
+          <Stat label="Stale intel" value="Counts as scouted for hit-type, but combat bonus drops off" color="text-yellow-400" />
+          <Stat label="Bribe-only intel" value="Reveals units & fortification — does NOT reveal safehouses" />
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs font-semibold">⚔️ Undefended vs Defended</p>
+          <Stat label="0 defenders, no biz" value="Push Out: auto-success, +2 heat" color="text-green-400" />
+          <Stat label="0 defenders, with biz" value="Seize tile (Capo required for built businesses)" color="text-yellow-400" />
+          <Stat label="1+ defenders" value="Hit action — Blind/Scouted/Planned rates apply" color="text-red-400" />
+          <Stat label="Fortified hex" value="Defender gets combat bonus; abandonment counter triggers if held" />
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs font-semibold">🛡️ Other Gotchas</p>
+          <Stat label="Built business takeover" value="Capo only — soldier attempts are repelled" color="text-yellow-400" />
+          <Stat label="Extorted business" value="Any unit can take it (still costs an action)" />
+          <Stat label="Ceasefire/Pact freeze" value="Cannot claim, push out, or hit pact-family hexes" color="text-blue-400" />
+          <Stat label="Hex stacking" value="Max 2 friendly units per non-HQ hex" />
+        </div>
+
+        <Tip>If a target hex has no business AND no defenders, always Push Out — it's cheaper heat and never triggers civilian casualties.</Tip>
+        <Tip>Re-scout before a major attack: stale intel keeps the hit-type bonus but loses the combat modifier.</Tip>
+      </div>
+    ),
+  },
+
 
   {
     id: 'units',
