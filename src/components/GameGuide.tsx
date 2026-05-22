@@ -10,7 +10,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import {
   RotateCcw, DollarSign, Map, Crosshair, Users, Building2,
-  Handshake, Shield, Siren, Layers, Zap, Trophy, Search, BookOpen
+  Handshake, Shield, Siren, Layers, Zap, Trophy, Search, BookOpen,
+  AlertTriangle
 } from 'lucide-react';
 
 interface GuideSection {
