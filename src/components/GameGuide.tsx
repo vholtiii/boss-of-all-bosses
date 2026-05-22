@@ -123,24 +123,33 @@ const sections: GuideSection[] = [
     id: 'combat',
     title: 'Combat',
     icon: <Crosshair className="h-4 w-4" />,
-    keywords: ['hit', 'attack', 'blind', 'scouted', 'planned', 'combat', 'heat', 'kill'],
+    keywords: ['hit', 'attack', 'blind', 'scouted', 'planned', 'combat', 'heat', 'kill', 'push out', 'empty hex', 'evict'],
     content: (
       <div className="space-y-3">
         <div className="space-y-1">
           <p className="text-xs font-semibold">Hit Types & Success Rates:</p>
-          <Stat label="🎲 Blind Hit (unscouted)" value="40-60% success, +15 heat" color="text-red-400" />
-          <Stat label="🔍 Scouted Hit" value="60-80% success, +10 heat" color="text-yellow-400" />
-          <Stat label="🎯 Planned Hit (Phase 2+)" value="85-95% success, +5 heat" color="text-green-400" />
+          <Stat label="🎲 Blind Hit (unscouted)" value="40-60% success, +12-18 heat" color="text-red-400" />
+          <Stat label="🔍 Scouted Hit" value="60-80% success, +5-8 heat" color="text-yellow-400" />
+          <Stat label="🎯 Planned Hit (Phase 2+)" value="85-95% success, +8-12 heat" color="text-green-400" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-xs font-semibold">👊 Push Out (empty rival hex):</p>
+          <Stat label="Uncontested" value="Auto-success, +2 heat, no civilian risk" color="text-green-400" />
+          <Stat label="Contested" value="Light combat, +4 heat, unknown defenders if unscouted" color="text-yellow-400" />
+          <Stat label="Eligible Hexes" value="Rival hexes with no business and no HQ" />
         </div>
         <div className="space-y-1">
           <p className="text-xs font-semibold">Rewards:</p>
           <Stat label="Blind Hit Bonus" value="+20 Respect, +20 Fear, +5 Influence" />
           <Stat label="Planned Hit Bonus" value="+10 Respect, +10 Fear, 0 casualties" />
         </div>
+        <Tip>Heat scales with the number of units involved on both sides — small skirmishes cost less heat than full brawls.</Tip>
         <Tip>Planned Hits cost more time but guarantee zero attacker casualties on success.</Tip>
+        <Tip>Prefer Push Out over Blind Hit on empty tiles — it's the low-heat way to evict rivals and never triggers civilian casualties.</Tip>
       </div>
     ),
   },
+
   {
     id: 'units',
     title: 'Units',
