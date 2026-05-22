@@ -82,7 +82,9 @@ export function computeAIPosture(i: PostureInputs): AIPosture {
   if (i.aiPhase >= 3 && i.myRank === 1) return 'PRESSURE_LEADER';
 
   // 7. Phase 2+, cool heat, healthy treasury → expand
-  if (i.aiPhase >= 2 && i.heatTier === 'cool' && i.moneyRunway > 6) return 'EXPAND';
+  // EXPAND from Phase 1+: in early game, AI must grow to hit Phase 2 hex thresholds.
+  // Phase 1 AIs have smaller treasuries, so runway threshold is lower.
+  if (i.heatTier === 'cool' && i.moneyRunway > 4) return 'EXPAND';
 
   // 8. Default: build economy, low-risk only
   return 'BUILD_ECONOMY';
