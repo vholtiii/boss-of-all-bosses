@@ -96,6 +96,7 @@ import {
   type FamilyId, type AIPersonality, type DynamicMood,
 } from '@/lib/ai-strategy';
 import { computeAIPosture, posturePolicy, rankByTerritory, type AIPosture } from '@/lib/ai-posture';
+import { computeSupplyDealPrice } from '@/lib/negotiation-odds';
 
 // ============ SEEDED PRNG (Mulberry32) ============
 function mulberry32(seed: number): () => number {
