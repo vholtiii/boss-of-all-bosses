@@ -12,6 +12,7 @@ interface SitdownsPanelProps {
   onOpenOutgoing: (p: PendingNegotiation) => void;
   onAcceptIncoming: (s: IncomingSitdown) => void;
   onDeclineIncoming: (s: IncomingSitdown) => void;
+  onCounterIncoming?: (s: IncomingSitdown, counterPrice: number) => void;
   onFocusHex?: (q: number, r: number, s: number) => void;
 }
 
