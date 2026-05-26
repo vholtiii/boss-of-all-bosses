@@ -869,6 +869,12 @@ export interface IncomingSitdown {
   // Family-scope (Boss-to-Boss) fields
   fromBossName?: string;
   proposedDuration?: number; // for supply_deal etc.
+  // ── Supply-deal flavor flags (cosmetic + AI counter-logic hints) ──
+  isDesperate?: boolean;    // severance-triggered emergency offer (premium price)
+  isRenewal?: boolean;      // proposer is extending an expiring deal
+  isCounterOffer?: boolean; // AI is re-countering the player's counter
+  originalPrice?: number;   // baseline price (before counter rounds)
+  counterRound?: number;    // 0 = original ask, 1 = AI re-counter
 }
 
 // ============ INFLUENCE EROSION & PASSIVE EXPANSION (Phase 3+) ============

@@ -376,6 +376,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const handleDeclineIncomingSitdown = useCallback((s: any) => {
     performAction({ type: 'decline_incoming_sitdown', sitdownId: s.id });
   }, [performAction]);
+  const handleCounterIncomingSitdown = useCallback((s: any, counterPrice: number) => {
+    performAction({ type: 'counter_supply_sitdown', sitdownId: s.id, counterPrice });
+  }, [performAction]);
 
   const mobileTabs = [
     {
@@ -433,7 +436,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       id: 'intel',
       label: 'Intel',
       icon: <Eye className="h-4 w-4" />,
-      content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} onHighlightFamily={setHighlightedFamily} highlightedFamily={highlightedFamily} onSelectUnit={selectUnit} onOpenOutgoingSitdown={handleOpenOutgoingSitdown} onAcceptIncomingSitdown={handleAcceptIncomingSitdown} onDeclineIncomingSitdown={handleDeclineIncomingSitdown} />
+      content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} onHighlightFamily={setHighlightedFamily} highlightedFamily={highlightedFamily} onSelectUnit={selectUnit} onOpenOutgoingSitdown={handleOpenOutgoingSitdown} onAcceptIncomingSitdown={handleAcceptIncomingSitdown} onDeclineIncomingSitdown={handleDeclineIncomingSitdown} onCounterIncomingSitdown={handleCounterIncomingSitdown} />
     },
   ];
 
@@ -734,6 +737,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       onOpenOutgoingSitdown={handleOpenOutgoingSitdown}
       onAcceptIncomingSitdown={handleAcceptIncomingSitdown}
       onDeclineIncomingSitdown={handleDeclineIncomingSitdown}
+      onCounterIncomingSitdown={handleCounterIncomingSitdown}
     />
   );
 
