@@ -9124,6 +9124,81 @@ export const useEnhancedMafiaGameState = (
           });
           return newState;
         }
+        case 'counter_supply_sitdown': {
+          // Player counters an incoming supply_deal sitdown with a new price.
+          // Resolves the AI's response synchronously: accept / reject / re-counter (1 round max).
+          const sitdown = (newState.incomingSitdowns || []).find(s => s.id === action.sitdownId);
+          if (!sitdown || sitdown.proposedDeal !== 'supply_deal') return newState;
+          const counterPrice = Math.max(2000, Math.floor(Number(action.counterPrice) || 0));
+          const original = sitdown.originalPrice || sitdown.proposedAmount || 7500;
+          const famLabel = sitdown.fromFamily.charAt(0).toUpperCase() + sitdown.fromFamily.slice(1);
+          const round = sitdown.counterRound || 0;
+
+          // Remove the current sitdown — we'll either close it or replace it with a re-counter.
+          newState.incomingSitdowns = (newState.incomingSitdowns || []).filter(s => s.id !== action.sitdownId);
+
+          const ratio = counterPrice / original;
+          if (ratio >= 0.85) {
+            // AI accepts the counter outright — strike the deal immediately at counterPrice.
+            const duration = sitdown.proposedDuration || 6;
+            const supplierOpp = newState.aiOpponents.find(o => o.family === sitdown.fromFamily);
+            // Player IS the buyer here (they accepted/countered the AI's offer as buyer)
+            // Wait: the AI offered to BUY supply from the player. So player is supplier, AI is buyer.
+            // counter price is what AI must pay player.
+            if (supplierOpp && supplierOpp.resources.money >= counterPrice) {
+              supplierOpp.resources.money -= counterPrice;
+              newState.resources.money += counterPrice;
+              newState.supplyDealPacts = [...(newState.supplyDealPacts || []), {
+                id: `supply-deal-counter-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                buyerFamily: sitdown.fromFamily,
+                targetFamily: newState.playerFamily,
+                turnsRemaining: duration,
+                turnFormed: newState.turn,
+                active: true,
+              }];
+              addPairTension(newState, newState.playerFamily, sitdown.fromFamily, -TENSION_REDUCE_SUPPLY_DEAL);
+              newState.tensionCooldowns[getTensionPairKey(newState.playerFamily, sitdown.fromFamily)] = 1;
+              newState.pendingNotifications.push({
+                type: 'success' as const,
+                title: '✅ Counter Accepted!',
+                message: `${famLabel} accepted your counter of $${counterPrice.toLocaleString()} for ${duration} turns of supply access.`,
+              });
+            } else {
+              newState.pendingNotifications.push({
+                type: 'warning' as const,
+                title: '💸 They Can\'t Pay',
+                message: `${famLabel} agreed in principle but can't afford $${counterPrice.toLocaleString()} right now.`,
+              });
+            }
+          } else if (ratio < 0.6 || round >= 1) {
+            // Reject outright — too low or already had a re-counter round.
+            addPairTension(newState, newState.playerFamily, sitdown.fromFamily, 5);
+            newState.pendingNotifications.push({
+              type: 'warning' as const,
+              title: '🚫 Counter Rejected',
+              message: `${famLabel} walked away from the table. Tension +5.`,
+            });
+          } else {
+            // Re-counter at the midpoint between counterPrice and original (rounded to nearest $500).
+            const mid = Math.round(((counterPrice + original) / 2) / 500) * 500;
+            newState.incomingSitdowns.push({
+              ...sitdown,
+              id: `incoming-supply-counter-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              proposedAmount: mid,
+              turnRequested: newState.turn,
+              expiresOnTurn: newState.turn + 2,
+              successBonus: sitdown.successBonus,
+              isCounterOffer: true,
+              counterRound: 1,
+              originalPrice: original,
+            });
+            newState.pendingNotifications.push({
+              type: 'info' as const,
+              title: '↩️ Counter-Counter',
+              message: `${famLabel} pushed back: "We'll do it for $${mid.toLocaleString()}, final offer."`,
+            });
+          }
+          return newState;
         case 'assault_hq': {
           // Phase gate: Phase 4+
           if ((newState.gamePhase || 1) < 4) {
