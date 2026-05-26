@@ -7107,7 +7107,7 @@ export const useEnhancedMafiaGameState = (
               if (playerOpt) supplier = playerOpt;
             }
 
-            const supplierAtWar = (state.activeWars || []).some(w => w.families.includes(supplier.family));
+            const supplierAtWar = (state.activeWars || []).some(w => w.family1 === supplier.family || w.family2 === supplier.family);
             const pairKey = getTensionPairKey(fam, supplier.family);
             const friendlyRelationship = (state.tensionCooldowns[pairKey] || 0) > 0;
             const price = computeSupplyDealPrice({
