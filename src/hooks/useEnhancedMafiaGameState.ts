@@ -9126,7 +9126,8 @@ export const useEnhancedMafiaGameState = (
         }
         case 'counter_supply_sitdown': {
           // Player counters an incoming supply_deal sitdown with a new price.
-          // Resolves the AI's response synchronously: accept / reject / re-counter (1 round max).
+          // AI responds inline: accept (sitdown stays open at new price), reject (sitdown removed),
+          // or re-counter at the midpoint (one round max).
           const sitdown = (newState.incomingSitdowns || []).find(s => s.id === action.sitdownId);
           if (!sitdown || sitdown.proposedDeal !== 'supply_deal') return newState;
           const counterPrice = Math.max(2000, Math.floor(Number(action.counterPrice) || 0));
@@ -9134,44 +9135,33 @@ export const useEnhancedMafiaGameState = (
           const famLabel = sitdown.fromFamily.charAt(0).toUpperCase() + sitdown.fromFamily.slice(1);
           const round = sitdown.counterRound || 0;
 
-          // Remove the current sitdown — we'll either close it or replace it with a re-counter.
+          // Remove the current sitdown — we'll either close it or replace it.
           newState.incomingSitdowns = (newState.incomingSitdowns || []).filter(s => s.id !== action.sitdownId);
 
-          const ratio = counterPrice / original;
-          if (ratio >= 0.85) {
-            // AI accepts the counter outright — strike the deal immediately at counterPrice.
-            const duration = sitdown.proposedDuration || 6;
-            const supplierOpp = newState.aiOpponents.find(o => o.family === sitdown.fromFamily);
-            // Player IS the buyer here (they accepted/countered the AI's offer as buyer)
-            // Wait: the AI offered to BUY supply from the player. So player is supplier, AI is buyer.
-            // counter price is what AI must pay player.
-            if (supplierOpp && supplierOpp.resources.money >= counterPrice) {
-              supplierOpp.resources.money -= counterPrice;
-              newState.resources.money += counterPrice;
-              newState.supplyDealPacts = [...(newState.supplyDealPacts || []), {
-                id: `supply-deal-counter-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                buyerFamily: sitdown.fromFamily,
-                targetFamily: newState.playerFamily,
-                turnsRemaining: duration,
-                turnFormed: newState.turn,
-                active: true,
-              }];
-              addPairTension(newState, newState.playerFamily, sitdown.fromFamily, -TENSION_REDUCE_SUPPLY_DEAL);
-              newState.tensionCooldowns[getTensionPairKey(newState.playerFamily, sitdown.fromFamily)] = 1;
-              newState.pendingNotifications.push({
-                type: 'success' as const,
-                title: '✅ Counter Accepted!',
-                message: `${famLabel} accepted your counter of $${counterPrice.toLocaleString()} for ${duration} turns of supply access.`,
-              });
-            } else {
-              newState.pendingNotifications.push({
-                type: 'warning' as const,
-                title: '💸 They Can\'t Pay',
-                message: `${famLabel} agreed in principle but can't afford $${counterPrice.toLocaleString()} right now.`,
-              });
-            }
-          } else if (ratio < 0.6 || round >= 1) {
-            // Reject outright — too low or already had a re-counter round.
+          // Ratio of counter to original. >1 means player asked more; <1 means asked less.
+          // AI prefers paying less when buying, getting more when selling.
+          // For both directions, we treat anything within 15% of original as "acceptable",
+          // 40%+ swing as "walks away", anything between as a re-counter at midpoint.
+          const swing = Math.abs(counterPrice - original) / original;
+          if (swing <= 0.15) {
+            // AI accepts — refresh the sitdown with the new price so the player can click Accept.
+            newState.incomingSitdowns.push({
+              ...sitdown,
+              id: `incoming-supply-accepted-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              proposedAmount: counterPrice,
+              turnRequested: newState.turn,
+              expiresOnTurn: newState.turn + 2,
+              isCounterOffer: false,
+              counterRound: 0,
+              originalPrice: counterPrice,
+            });
+            newState.pendingNotifications.push({
+              type: 'success' as const,
+              title: '✅ Counter Accepted',
+              message: `${famLabel} agreed to $${counterPrice.toLocaleString()}. Open the Sitdowns panel to finalize.`,
+            });
+          } else if (swing >= 0.4 || round >= 1) {
+            // Reject outright — too greedy or already had a round.
             addPairTension(newState, newState.playerFamily, sitdown.fromFamily, 5);
             newState.pendingNotifications.push({
               type: 'warning' as const,
@@ -9180,21 +9170,20 @@ export const useEnhancedMafiaGameState = (
             });
           } else {
             // Re-counter at the midpoint between counterPrice and original (rounded to nearest $500).
-            const mid = Math.round(((counterPrice + original) / 2) / 500) * 500;
+            const mid = Math.max(2000, Math.round(((counterPrice + original) / 2) / 500) * 500);
             newState.incomingSitdowns.push({
               ...sitdown,
-              id: `incoming-supply-counter-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              id: `incoming-supply-recounter-${Date.now()}-${Math.random().toString(36).slice(2)}`,
               proposedAmount: mid,
               turnRequested: newState.turn,
               expiresOnTurn: newState.turn + 2,
-              successBonus: sitdown.successBonus,
               isCounterOffer: true,
               counterRound: 1,
               originalPrice: original,
             });
             newState.pendingNotifications.push({
               type: 'info' as const,
-              title: '↩️ Counter-Counter',
+              title: '↩️ They Counter Back',
               message: `${famLabel} pushed back: "We'll do it for $${mid.toLocaleString()}, final offer."`,
             });
           }
