@@ -1,57 +1,84 @@
-## Diagnosis
+# Make Supply-Line Negotiations Feel Active
 
-After replaying the AI turn pipeline, the cause of "rivals barely do anything" is a single posture interaction in early game:
+## Why this needs fixing
 
-1. `computeAIPosture()` in `src/lib/ai-posture.ts` only returns `EXPAND` when **all** of these hold: `aiPhase >= 2`, `heatTier === 'cool'`, and `moneyRunway > 6`. Everything else in early game falls through to the default `BUILD_ECONOMY`.
-2. `posturePolicy('BUILD_ECONOMY')` sets `suppressExpansion: true` with a low `heatCeiling: 45`.
-3. In `processAITurn()` (`useEnhancedMafiaGameState.ts`, ~line 6622) the entire claim/extort action block is gated by:
-   ```
-   if (aiPhase >= 3 || aiOffenseDisabled || (policy.suppressExpansion && !strategicOverride)) { /* skip */ }
-   ```
-   So in Phase 1, AI **never** runs the action-phase claim/extort step.
-4. Phase 1 also has no capos yet (capo promotion unlocks at Phase 2), and soldiers don't auto-claim on deploy — only capos do. Result: AI hexes barely grow.
-5. Phase 2 requires 18 hexes + 40 respect. Because step 4 starves them of hexes, they stay in Phase 1 — which keeps `BUILD_ECONOMY` active — which keeps them stuck. Catch-22, matching the screenshot (turn 17, tiny rival pockets).
+Supply deals exist but rarely surface during play. Today:
 
-## Fix
+- AI only proposes once per "disconnected" episode (20%/turn) and never follows up.
+- Price is hardcoded at $7,500 regardless of how badly the buyer needs it or how much leverage the supplier has.
+- Deals expire silently — no renewal pressure, no renegotiation moment.
+- The player has no incentive to cut a rival's lines because nothing dramatic happens when they do.
+- There is no counter-offer flow — the player can only accept/decline a flat offer.
 
-Two surgical changes in `src/lib/ai-posture.ts`, plus a test update. No gameplay-system rewrites, no changes to `useEnhancedMafiaGameState.ts`.
+Result: supply lines feel like background plumbing, not a diplomatic lever.
 
-### 1. Let early game enter EXPAND
+## Goal
 
-In `computeAIPosture()`, broaden the EXPAND gate so Phase 1 with cool heat and a healthy treasury expands instead of turtling:
+Turn supply lines into a recurring negotiation surface. Cutting/holding a supply node should produce **desperate offers**, expiring deals should produce **renewal offers**, and prices should reflect leverage.
 
-- Allow EXPAND from Phase 1+ (drop the `aiPhase >= 2` requirement)
-- Lower the runway threshold from `> 6` to `> 4` (Phase 1 AIs naturally have less cash)
-- Keep `heatTier === 'cool'` requirement so it still respects heat
+## Changes
 
-This keeps all existing posture priorities (heat emergency, cash crisis, turtle, war, close-out, pressure leader) above EXPAND, so the only behavior that changes is "healthy early-game AI now expands instead of camping HQ."
+### 1. Severance-triggered desperation offers (new)
+When an AI family **loses connection** to a supply node it had last turn (player or rival cut their chain, or they lost a key hex), it should immediately attempt a supply-deal sitdown — at a premium price.
 
-### 2. Make BUILD_ECONOMY not zero-out expansion
+- Detection: per-AI snapshot of `connectedSupplyNodeTypes` each turn; on loss, fire offer next AI turn.
+- Price: `basePrice * (1.5 + 0.25 × nodesLost)` capped at 3×.
+- Targeting: prefers the player if the player controls the lost node ("you cut us, now pay us back" framing). Otherwise picks the AI rival currently connected.
+- Bypasses the 20% roll — desperation always tries.
+- Notification framing: "🚨 Desperate Offer — the Genovese boss is offering $14,000 for emergency access…"
 
-`BUILD_ECONOMY` is meant to be "build businesses, low-risk only," not "do nothing." Change its policy so it still favors economy but doesn't completely suppress neutral grabs:
+### 2. Renewal offers on expiry (new)
+When a supply deal is in its final turn (`turnsRemaining === 1`):
+- The supplier (if AI) auto-proposes a renewal sitdown to the buyer (player or AI), priced based on how much income the buyer earned during the deal.
+- If the buyer is the player → boss-level sitdown.
+- Notification: "🔁 Renewal Offered — Lucchese will extend supply access another 5 turns for $9,000."
+- If declined/expired, normal +5 tension penalty still applies, plus a one-turn cooldown before a new deal can be struck (so it feels like burned bridges).
 
-- `suppressExpansion: false` (was `true`)
-- `heatCeiling: 45` stays (still pulls back if heat rises)
-- `economyFocusMul` stays high so scoring still prefers building over fighting
+### 3. Dynamic pricing (replace flat $7,500)
+New helper `computeSupplyDealPrice(state, buyerFam, supplierFam, context)`:
+- Base: $5,000.
+- + `$1,500 × number of node types granted`.
+- + `25%` if supplier is at war with anyone (premium for risk).
+- + `50%` if buyer is in "desperation" state (lost lines this turn or last).
+- × `0.85` if buyer/supplier currently have positive tension reduction cooldown (relationship discount).
+- Round to nearest $500.
 
-Net effect: a defensive/early AI will still prefer to consolidate, but it will take adjacent neutral hexes when they're cheap — which is what the player observes is missing.
+Used everywhere a supply deal price is set: AI↔AI, AI→player sitdowns, player→AI initiation in `NegotiationDialog`, and renewals.
 
-### 3. Update one posture test
+### 4. Player counter-offer flow (sitdowns panel)
+In `SitdownsPanel` / dialog for an incoming `supply_deal` sitdown, add a **Counter** button alongside Accept/Decline:
+- Opens a small price input (default = proposed price × 0.7, min $2,000).
+- Submitting creates a counter-sitdown back to the AI; AI decides next turn:
+  - Accept if `counter >= computedPrice × 0.85` (or relationship is friendly).
+  - Reject and withdraw if `< 0.6×`.
+  - Otherwise counter back once with the midpoint.
+- One round of back-and-forth max to avoid loops.
 
-`src/hooks/__tests__/ai-posture.test.ts`:
-- `'BUILD_ECONOMY by default in Phase 1'` — with the new EXPAND gate, Phase 1 + cool heat + healthy runway now returns `EXPAND`. Change the test to use a tighter `moneyRunway` (e.g. 3) so it still exercises the BUILD_ECONOMY fallback.
-- `'BUILD_ECONOMY suppresses expansion but allows defense'` — flip the assertion: `suppressExpansion` is now `false`. Keep the `suppressOffense === false` assertion.
+### 5. AI proposes more often when relevant
+- Lower the gate from "20% if disconnected" to "60% if disconnected OR if a current deal expires in ≤2 turns".
+- Drop the `phase >= 2 && money >= 7500` floor to `phase >= 1 && money >= computedPrice`.
+- Keeps the existing "only one active deal per buyer" guard.
 
-All other posture tests (COOL_OFF, CONSOLIDATE, TURTLE, WAR, CLOSE_OUT, PRESSURE_LEADER, EXPAND heat ceiling, WAR heat ceiling) remain valid.
+### 6. Notifications & turn-summary surfacing
+- Pipe new offers, counters, renewals, and severance triggers into `pendingNotifications` with clear icons.
+- Add an entry to `turnReport.aiActions` for each new offer type so post-turn summary shows the diplomatic activity.
+
+## Files touched
+
+- `src/hooks/useEnhancedMafiaGameState.ts` — AI supply-deal block (~7026-7123), pact expiry block (~11608), supply-deal acceptance block (~11279).
+- `src/lib/negotiation-odds.ts` — add `computeSupplyDealPrice` + export.
+- `src/components/SitdownsPanel.tsx` and/or `src/components/NegotiationDialog.tsx` — Counter button + price input UI.
+- `src/types/game-mechanics.ts` — extend `IncomingSitdown` (optional `isCounterOffer`, `isRenewal`, `isDesperate` flags; `originalPrice` for counter rounds).
+- Tests: extend `src/hooks/__tests__/strategy-simulation.test.ts` or add a focused `supply-deals.test.ts` covering: severance triggers offer, renewal fires on last turn, counter-offer round-trip, dynamic pricing math.
 
 ## Out of scope
 
-- No changes to scoring, recruitment, movement budget, heat/bribe handling, or Phase thresholds.
-- No changes to `useEnhancedMafiaGameState.ts`.
-- No new tuning of difficulty modifiers (they already scale aggression and recruit cap separately).
+- Multi-buyer bidding wars (could be a follow-up).
+- Supply-line UI overhaul on the map.
+- AI personality flavoring of offers (use existing personalities; no new fields).
 
-## Verification
+## Technical notes
 
-- Run `bunx vitest run src/hooks/__tests__/ai-posture.test.ts` — all posture tests pass with the updated two assertions.
-- Run `bunx vitest run` to confirm no other test (especially `strategy-simulation` and `simulation`) regresses.
-- Manual: start a new game and watch turns 1–10. AIs should now expand into neutral hexes adjacent to their HQ within the first few turns instead of sitting on 1–4 hexes.
+- Per-AI snapshot of last-turn supply node connectivity stored on `state.aiOpponents[i].resources` as a non-persistent transient field, or on a top-level `state._aiSupplyConnectivitySnapshot` map cleared each turn. Choose transient map to avoid save-migration churn.
+- Counter-offer state lives on the sitdown record itself; no new top-level state needed.
+- All price math centralized in `negotiation-odds.ts` so dialog and AI agree.
