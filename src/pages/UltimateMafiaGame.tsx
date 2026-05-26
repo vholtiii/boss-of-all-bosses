@@ -376,6 +376,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const handleDeclineIncomingSitdown = useCallback((s: any) => {
     performAction({ type: 'decline_incoming_sitdown', sitdownId: s.id });
   }, [performAction]);
+  const handleCounterIncomingSitdown = useCallback((s: any, counterPrice: number) => {
+    performAction({ type: 'counter_supply_sitdown', sitdownId: s.id, counterPrice });
+  }, [performAction]);
 
   const mobileTabs = [
     {
