@@ -22,7 +22,7 @@ const dealLabel = (deal: NegotiationType | string): { label: string; icon: strin
 };
 
 const SitdownsPanel: React.FC<SitdownsPanelProps> = ({
-  gameState, onOpenOutgoing, onAcceptIncoming, onDeclineIncoming, onFocusHex,
+  gameState, onOpenOutgoing, onAcceptIncoming, onDeclineIncoming, onCounterIncoming, onFocusHex,
 }) => {
   const pending: PendingNegotiation[] = (gameState as any).pendingNegotiations || [];
   const incoming: IncomingSitdown[] = (gameState as any).incomingSitdowns || [];
