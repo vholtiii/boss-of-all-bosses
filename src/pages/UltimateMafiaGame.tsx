@@ -737,6 +737,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       onOpenOutgoingSitdown={handleOpenOutgoingSitdown}
       onAcceptIncomingSitdown={handleAcceptIncomingSitdown}
       onDeclineIncomingSitdown={handleDeclineIncomingSitdown}
+      onCounterIncomingSitdown={handleCounterIncomingSitdown}
     />
   );
 
