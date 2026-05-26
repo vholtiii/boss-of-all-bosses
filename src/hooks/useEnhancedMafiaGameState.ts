@@ -9199,6 +9199,7 @@ export const useEnhancedMafiaGameState = (
             });
           }
           return newState;
+        }
         case 'assault_hq': {
           // Phase gate: Phase 4+
           if ((newState.gamePhase || 1) < 4) {
