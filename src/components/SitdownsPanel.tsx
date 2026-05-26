@@ -83,93 +83,31 @@ const SitdownsPanel: React.FC<SitdownsPanelProps> = ({
               const isUrgent = turnsLeft <= 1;
               const fam = s.fromFamily.charAt(0).toUpperCase() + s.fromFamily.slice(1);
               const dl = dealLabel(s.proposedDeal);
+              const canCounter = !!onCounterIncoming && isBoss && s.proposedDeal === 'supply_deal' && (s.counterRound || 0) < 1;
+              const isDesperate = !!s.isDesperate;
+              const isRenewal = !!s.isRenewal;
+              const isCounterBack = !!s.isCounterOffer;
               return (
-                <div
+                <CounterableSitdownCard
                   key={s.id}
-                  className={cn(
-                    'rounded-md border-2 p-2 text-xs space-y-1.5 transition-colors',
-                    isBoss
-                      ? (isUrgent
-                          ? 'bg-red-500/10 border-red-500/60 hover:bg-red-500/15'
-                          : 'bg-mafia-gold/15 border-mafia-gold hover:bg-mafia-gold/20')
-                      : (isUrgent
-                          ? 'bg-red-500/10 border-red-500/50 hover:bg-red-500/15 cursor-pointer'
-                          : 'bg-mafia-gold/10 border-mafia-gold/40 hover:bg-mafia-gold/15 cursor-pointer'),
-                  )}
-                  onClick={() => !isBoss && s.targetQ !== undefined && onFocusHex?.(s.targetQ, s.targetR!, s.targetS!)}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold capitalize truncate">
-                        {dl.icon} {dl.label}
-                      </div>
-                      <div className="text-muted-foreground text-[11px]">
-                        From{' '}
-                        {isBoss ? (
-                          <span className="text-foreground capitalize font-semibold">
-                            {s.fromBossName || `${fam} Boss`}
-                          </span>
-                        ) : (
-                          <>
-                            <span className="text-foreground capitalize font-semibold">{fam}</span>
-                            {s.fromCapoName && (<> · capo <span className="text-foreground">{s.fromCapoName}</span></>)}
-                          </>
-                        )}
-                      </div>
-                      {!isBoss && s.targetQ !== undefined && (
-                        <div className="text-[10px] text-muted-foreground">
-                          Hex ({s.targetQ}, {s.targetR})
-                        </div>
-                      )}
-                      {isBoss && typeof s.proposedDuration === 'number' && (
-                        <div className="text-[10px] text-muted-foreground">
-                          Duration: {s.proposedDuration} turns
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      {typeof s.proposedAmount === 'number' && (
-                        <Badge variant="outline" className="text-[10px] h-4 text-green-400 border-green-400/40">
-                          ${s.proposedAmount.toLocaleString()}
-                        </Badge>
-                      )}
-                      <Badge className="text-[9px] h-4 bg-emerald-600/80">+{s.successBonus}%</Badge>
-                    </div>
-                  </div>
-                  <div
-                    className={cn(
-                      'flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-semibold',
-                      isUrgent
-                        ? 'bg-red-500/15 text-red-300 border border-red-400/40 animate-pulse'
-                        : 'bg-muted/40 text-muted-foreground border border-border/60'
-                    )}
-                  >
-                    <Clock className="h-3 w-3" />
-                    {turnsLeft <= 0
-                      ? 'Expires this turn'
-                      : `Expires in ${turnsLeft} turn${turnsLeft === 1 ? '' : 's'}`}
-                  </div>
-                  <div className="flex gap-1.5 pt-1">
-                    <Button
-                      size="sm"
-                      className="h-6 text-[10px] flex-1"
-                      onClick={(e) => { e.stopPropagation(); onAcceptIncoming(s); }}
-                    >
-                      Accept
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      className="h-6 text-[10px] px-2"
-                      onClick={(e) => { e.stopPropagation(); onDeclineIncoming(s); }}
-                      title="Decline — costs +5 tension"
-                    >
-                      Decline
-                    </Button>
-                  </div>
-                </div>
+                  s={s}
+                  isBoss={isBoss}
+                  isUrgent={isUrgent}
+                  isDesperate={isDesperate}
+                  isRenewal={isRenewal}
+                  isCounterBack={isCounterBack}
+                  fam={fam}
+                  dl={dl}
+                  turnsLeft={turnsLeft}
+                  canCounter={canCounter}
+                  onAccept={() => onAcceptIncoming(s)}
+                  onDecline={() => onDeclineIncoming(s)}
+                  onCounter={onCounterIncoming ? (price) => onCounterIncoming(s, price) : undefined}
+                  onFocusHex={onFocusHex}
+                />
               );
             };
+
 
             return (
               <>
