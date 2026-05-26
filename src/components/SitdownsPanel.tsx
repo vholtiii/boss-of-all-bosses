@@ -3,9 +3,177 @@ import { ChevronDown, ChevronRight, Handshake, Inbox, Hourglass, Crown, Clock } 
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { EnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { PendingNegotiation, IncomingSitdown, NEGOTIATION_TYPES, NegotiationType } from '@/types/game-mechanics';
 import { getNegotiationSuccessChance, getNegotiationCost } from '@/lib/negotiation-odds';
+
+// ─── Counterable Sitdown Card (extracted so it can hold local counter-input state) ───
+const CounterableSitdownCard: React.FC<{
+  s: IncomingSitdown;
+  isBoss: boolean;
+  isUrgent: boolean;
+  isDesperate: boolean;
+  isRenewal: boolean;
+  isCounterBack: boolean;
+  fam: string;
+  dl: { label: string; icon: string };
+  turnsLeft: number;
+  canCounter: boolean;
+  onAccept: () => void;
+  onDecline: () => void;
+  onCounter?: (price: number) => void;
+  onFocusHex?: (q: number, r: number, s: number) => void;
+}> = ({ s, isBoss, isUrgent, isDesperate, isRenewal, isCounterBack, fam, dl, turnsLeft, canCounter, onAccept, onDecline, onCounter, onFocusHex }) => {
+  const [counterOpen, setCounterOpen] = React.useState(false);
+  const defaultCounter = Math.max(2000, Math.round(((s.proposedAmount || 7500) * 0.7) / 500) * 500);
+  const [counterValue, setCounterValue] = React.useState<number>(defaultCounter);
+
+  const flavorTag = isDesperate
+    ? { text: 'DESPERATE', cls: 'bg-red-600/90 text-white animate-pulse' }
+    : isRenewal
+      ? { text: 'RENEWAL', cls: 'bg-blue-600/80 text-white' }
+      : isCounterBack
+        ? { text: 'FINAL OFFER', cls: 'bg-amber-600/80 text-white' }
+        : null;
+
+  return (
+    <div
+      className={cn(
+        'rounded-md border-2 p-2 text-xs space-y-1.5 transition-colors',
+        isBoss
+          ? (isDesperate
+              ? 'bg-red-500/15 border-red-500/70 hover:bg-red-500/20'
+              : isUrgent
+                ? 'bg-red-500/10 border-red-500/60 hover:bg-red-500/15'
+                : 'bg-mafia-gold/15 border-mafia-gold hover:bg-mafia-gold/20')
+          : (isUrgent
+              ? 'bg-red-500/10 border-red-500/50 hover:bg-red-500/15 cursor-pointer'
+              : 'bg-mafia-gold/10 border-mafia-gold/40 hover:bg-mafia-gold/15 cursor-pointer'),
+      )}
+      onClick={() => !isBoss && s.targetQ !== undefined && onFocusHex?.(s.targetQ, s.targetR!, s.targetS!)}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="font-bold capitalize flex items-center gap-1 flex-wrap">
+            <span className="truncate">{dl.icon} {dl.label}</span>
+            {flavorTag && (
+              <Badge className={cn('text-[8px] h-3.5 px-1', flavorTag.cls)}>{flavorTag.text}</Badge>
+            )}
+          </div>
+          <div className="text-muted-foreground text-[11px]">
+            From{' '}
+            {isBoss ? (
+              <span className="text-foreground capitalize font-semibold">
+                {s.fromBossName || `${fam} Boss`}
+              </span>
+            ) : (
+              <>
+                <span className="text-foreground capitalize font-semibold">{fam}</span>
+                {s.fromCapoName && (<> · capo <span className="text-foreground">{s.fromCapoName}</span></>)}
+              </>
+            )}
+          </div>
+          {!isBoss && s.targetQ !== undefined && (
+            <div className="text-[10px] text-muted-foreground">
+              Hex ({s.targetQ}, {s.targetR})
+            </div>
+          )}
+          {isBoss && typeof s.proposedDuration === 'number' && (
+            <div className="text-[10px] text-muted-foreground">
+              Duration: {s.proposedDuration} turns
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          {typeof s.proposedAmount === 'number' && (
+            <Badge variant="outline" className="text-[10px] h-4 text-green-400 border-green-400/40">
+              ${s.proposedAmount.toLocaleString()}
+            </Badge>
+          )}
+          <Badge className="text-[9px] h-4 bg-emerald-600/80">+{s.successBonus}%</Badge>
+        </div>
+      </div>
+      <div
+        className={cn(
+          'flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-semibold',
+          isUrgent
+            ? 'bg-red-500/15 text-red-300 border border-red-400/40 animate-pulse'
+            : 'bg-muted/40 text-muted-foreground border border-border/60'
+        )}
+      >
+        <Clock className="h-3 w-3" />
+        {turnsLeft <= 0
+          ? 'Expires this turn'
+          : `Expires in ${turnsLeft} turn${turnsLeft === 1 ? '' : 's'}`}
+      </div>
+
+      {counterOpen ? (
+        <div className="space-y-1.5 pt-1" onClick={(e) => e.stopPropagation()}>
+          <div className="text-[10px] text-muted-foreground">
+            Counter with your price (within ±15% likely accepted):
+          </div>
+          <div className="flex gap-1">
+            <Input
+              type="number"
+              min={2000}
+              step={500}
+              value={counterValue}
+              onChange={(e) => setCounterValue(Math.max(2000, Math.floor(Number(e.target.value) || 0)))}
+              className="h-7 text-[11px]"
+            />
+            <Button
+              size="sm"
+              className="h-7 text-[10px] px-2 bg-amber-500 hover:bg-amber-400 text-black"
+              onClick={() => { onCounter?.(counterValue); setCounterOpen(false); }}
+            >
+              Send
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-[10px] px-2"
+              onClick={() => setCounterOpen(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-1.5 pt-1">
+          <Button
+            size="sm"
+            className="h-6 text-[10px] flex-1"
+            onClick={(e) => { e.stopPropagation(); onAccept(); }}
+          >
+            Accept
+          </Button>
+          {canCounter && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 text-[10px] px-2 border-amber-500/60 text-amber-400 hover:bg-amber-500/10"
+              onClick={(e) => { e.stopPropagation(); setCounterOpen(true); }}
+              title="Counter-offer at a different price"
+            >
+              Counter
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="destructive"
+            className="h-6 text-[10px] px-2"
+            onClick={(e) => { e.stopPropagation(); onDecline(); }}
+            title="Decline — costs +5 tension"
+          >
+            Decline
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 interface SitdownsPanelProps {
   gameState: EnhancedMafiaGameState;
