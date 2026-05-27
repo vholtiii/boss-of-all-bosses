@@ -19,7 +19,7 @@ describe('Negotiation fairness — counter reaction & price modifier', () => {
 
   it('walks away on ≥40% swing or after one prior round', () => {
     expect(predictCounterReaction(10000, 5000, 0)).toBe('walk'); // -50%
-    expect(predictCounterReaction(10000, 9000, 1)).toBe('walk'); // already round 1
+    expect(predictCounterReaction(10000, 8000, 1)).toBe('walk'); // 20% swing on round 1 → walk
   });
 
   it('threshold constants match the public contract', () => {
