@@ -239,27 +239,20 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
             {filteredTypes.map(config => {
               const chance = getSuccessChance(config.type);
               const cost = getCost(config.type);
+              const defaultCost = getDefaultCost(config.type);
               const canAfford = playerMoney >= cost;
+              const editable = isPriceEditable(config.type);
+              const diffPct = defaultCost > 0 ? Math.round(((cost / defaultCost) - 1) * 100) : 0;
               return (
-                <motion.button
+                <div
                   key={config.type}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    if (config.type === 'alliance') {
-                      setSelectedType('alliance');
-                    } else {
-                      handleRoll(config.type);
-                    }
-                  }}
-                  disabled={!canAfford}
-                  className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                  className={`w-full p-3 rounded-lg border transition-colors ${
                     canAfford
-                      ? 'border-primary/30 hover:border-primary/60 bg-background/50 hover:bg-background/80'
-                      : 'border-muted/20 bg-muted/10 opacity-50 cursor-not-allowed'
+                      ? 'border-primary/30 hover:border-primary/60 bg-background/50'
+                      : 'border-muted/20 bg-muted/10 opacity-60'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-1">
                     <span className="font-bold text-sm">
                       {config.icon} {config.label}
                       <Badge variant="outline" className="text-[9px] ml-2 h-4">
@@ -267,14 +260,59 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
                       </Badge>
                     </span>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">{chance}% chance</Badge>
-                      <Badge variant="outline" className="text-xs text-green-400">${cost.toLocaleString()}</Badge>
+                      <Badge variant="secondary" className={`text-xs transition-colors ${diffPct > 5 ? 'bg-green-600/30 text-green-300' : diffPct < -5 ? 'bg-red-600/30 text-red-300' : ''}`}>
+                        {chance}% chance
+                      </Badge>
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">{config.description}</p>
-                  <p className="text-[10px] text-muted-foreground/70 mt-0.5 italic">
-                    50% refund on failure
+                  <p className="text-xs text-muted-foreground mb-2">{config.description}</p>
+
+                  {editable ? (
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[10px] text-muted-foreground shrink-0">Your offer:</span>
+                      <Input
+                        type="number"
+                        min={2000}
+                        step={500}
+                        value={cost}
+                        onChange={(e) => {
+                          const v = Math.max(2000, Math.floor(Number(e.target.value) || 0));
+                          setCustomOffers(prev => ({ ...prev, [config.type]: v }));
+                        }}
+                        className="h-7 text-[11px] w-28"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <span className={`text-[10px] ${diffPct > 0 ? 'text-green-400' : diffPct < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
+                        {diffPct > 0 ? `+${diffPct}% vs fair` : diffPct < 0 ? `${diffPct}% vs fair` : 'fair price'}
+                      </span>
+                      {diffPct < -15 && (
+                        <span className="text-[9px] text-amber-400 italic">may counter</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mb-2">
+                      <Badge variant="outline" className="text-xs text-green-400">Locked at ${cost.toLocaleString()}</Badge>
+                    </div>
+                  )}
+
+                  <motion.button
+                    whileHover={canAfford ? { scale: 1.01 } : {}}
+                    whileTap={canAfford ? { scale: 0.99 } : {}}
+                    disabled={!canAfford}
+                    onClick={() => {
+                      if (config.type === 'alliance') setSelectedType('alliance');
+                      else handleRoll(config.type);
+                    }}
+                    className={`w-full text-xs font-semibold py-1.5 rounded ${
+                      canAfford ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted/30 cursor-not-allowed'
+                    }`}
+                  >
+                    {config.type === 'alliance' ? 'Choose Terms →' : `Offer $${cost.toLocaleString()} & Roll`}
+                  </motion.button>
+                  <p className="text-[10px] text-muted-foreground/70 mt-1 italic text-center">
+                    {proposerLabel ? 'They asked for this — no payment if it falls apart.' : '50% refund on failure.'}
                   </p>
+
                   {scope === 'territory' && personalityBonuses[config.type] > 0 && (
                     <p className="text-xs text-primary mt-1">
                       {personalityInfo.icon} +{personalityBonuses[config.type]}% from {personalityInfo.label}
