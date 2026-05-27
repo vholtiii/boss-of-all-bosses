@@ -89,3 +89,44 @@ export function computeSupplyDealPrice(input: SupplyDealPriceInput): number {
   return Math.max(2000, Math.round(cost / 500) * 500);
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// PRICE-ADJUSTED SUCCESS CHANCE
+// Used by NegotiationDialog so the displayed odds react live as the player
+// edits the offered amount. Higher bid → better odds, lowball → worse.
+// ────────────────────────────────────────────────────────────────────────────
+export interface PriceAdjustedOddsInput extends OddsInput {
+  basePrice: number;
+  offeredPrice: number;
+}
+
+export function getPriceAdjustedSuccessChance(input: PriceAdjustedOddsInput): number {
+  const baseChance = getNegotiationSuccessChance(input);
+  const base = Math.max(1, input.basePrice);
+  const ratio = input.offeredPrice / base - 1; // -1..+∞
+  const modifier = Math.max(-25, Math.min(25, Math.round(ratio * 20)));
+  return Math.max(5, Math.min(95, baseChance + modifier));
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// COUNTER REACTION PREDICTION
+// Shared swing-based model — used by both the SitdownsPanel preview hint and
+// the reducer that resolves `counter_supply_sitdown`. Keep these in sync.
+// ────────────────────────────────────────────────────────────────────────────
+export type CounterReaction = 'accept' | 'recounter' | 'walk';
+
+export const COUNTER_ACCEPT_SWING = 0.15;
+export const COUNTER_WALK_SWING = 0.40;
+
+export function predictCounterReaction(
+  originalPrice: number,
+  counterPrice: number,
+  round: number = 0,
+): CounterReaction {
+  if (originalPrice <= 0) return 'walk';
+  const swing = Math.abs(counterPrice - originalPrice) / originalPrice;
+  if (swing <= COUNTER_ACCEPT_SWING) return 'accept';
+  if (swing >= COUNTER_WALK_SWING || round >= 1) return 'walk';
+  return 'recounter';
+}
+
+
