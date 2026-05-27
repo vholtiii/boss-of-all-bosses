@@ -3,15 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   NegotiationType, NegotiationConfig, NEGOTIATION_TYPES, PERSONALITY_BONUSES, PERSONALITY_LABELS,
   CapoPersonality, AllianceCondition, NegotiationScope, NEGOTIATION_REFUND_RATE,
 } from '@/types/game-mechanics';
 
+
 interface NegotiationDialogProps {
   open: boolean;
   onClose: () => void;
-  onNegotiate: (type: NegotiationType, extraData?: any) => void;
+  onNegotiate: (type: NegotiationType, extraData?: any, offeredPrice?: number) => void;
+
   scope: NegotiationScope;
   capoName?: string;
   capoPersonality?: CapoPersonality;
@@ -46,6 +49,9 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   const [displayNumber, setDisplayNumber] = useState(50);
   const [allianceCondition, setAllianceCondition] = useState<AllianceCondition['type']>('no_attack_family');
   const [selectedTargetFamily, setSelectedTargetFamily] = useState<string>(enemyFamily);
+  // Per-type custom offer (player can sweeten or lowball). Keyed by NegotiationType.
+  const [customOffers, setCustomOffers] = useState<Partial<Record<NegotiationType, number>>>({});
+  const [lastOfferedPrice, setLastOfferedPrice] = useState<number | undefined>(undefined);
 
   const personality = capoPersonality || 'diplomat';
   const personalityInfo = PERSONALITY_LABELS[personality];
@@ -56,30 +62,11 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
     ? NEGOTIATION_TYPES.filter(n => n.type === lockedDealType)
     : NEGOTIATION_TYPES.filter(n => n.scope === scope);
 
+
   const treacheryDebuff = (treacheryTurnsRemaining || 0) > 0 ? 20 : 0;
 
-  const getSuccessChance = useCallback((type: NegotiationType) => {
-    const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
-    let chance = config.baseSuccess;
-    if (scope === 'territory') {
-      chance += personalityBonuses[type] || 0;
-      chance += personalityBonuses.all || 0;
-      chance += Math.floor(playerReputation / 5);
-    } else {
-      // Boss-level: respect & influence carry the family's clout
-      chance += Math.floor(playerReputation / 4);
-      chance += Math.floor(playerInfluence / 5);
-    }
-    if (type === 'supply_deal') {
-      chance += Math.floor((playerFear || 0) / 5);
-    }
-    if (type === 'bribe_territory') chance -= enemyStrength * 5;
-    chance += successBonus;
-    chance -= treacheryDebuff;
-    return Math.max(5, Math.min(95, chance));
-  }, [personalityBonuses, playerReputation, playerInfluence, playerFear, enemyStrength, scope, successBonus, treacheryDebuff]);
-
-  const getCost = useCallback((type: NegotiationType) => {
+  // Fair / default price for a given type (what the AI considers reasonable)
+  const getDefaultCost = useCallback((type: NegotiationType) => {
     if (typeof proposedAmount === 'number') return proposedAmount;
     const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
     let cost = config.baseCost;
@@ -89,9 +76,55 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
     return cost;
   }, [enemyStrength, hexIncome, proposedAmount]);
 
+  // Effective price the player will pay (custom override or default)
+  const getCost = useCallback((type: NegotiationType) => {
+    const override = customOffers[type];
+    if (typeof override === 'number' && override >= 2000) return override;
+    return getDefaultCost(type);
+  }, [customOffers, getDefaultCost]);
+
+  // Price is locked when the dialog is showing an AI-initiated sitdown
+  // (proposedAmount was passed in), or when the deal is one we don't price.
+  const isPriceEditable = (type: NegotiationType) => {
+    if (typeof proposedAmount === 'number') return false;
+    // Currently only price-bearing deals — ceasefire/alliance/safe_passage are flat-priced
+    // but we still allow tweaking to let players signal generosity.
+    return true;
+  };
+
+  const getSuccessChance = useCallback((type: NegotiationType) => {
+    const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
+    let chance = config.baseSuccess;
+    if (scope === 'territory') {
+      chance += personalityBonuses[type] || 0;
+      chance += personalityBonuses.all || 0;
+      chance += Math.floor(playerReputation / 5);
+    } else {
+      chance += Math.floor(playerReputation / 4);
+      chance += Math.floor(playerInfluence / 5);
+    }
+    if (type === 'supply_deal') {
+      chance += Math.floor((playerFear || 0) / 5);
+    }
+    if (type === 'bribe_territory') chance -= enemyStrength * 5;
+    chance += successBonus;
+    chance -= treacheryDebuff;
+    // Price modifier — matches reducer formula in processNegotiation
+    const defaultCost = getDefaultCost(type);
+    const offered = getCost(type);
+    if (defaultCost > 0 && offered !== defaultCost) {
+      const mod = Math.max(-25, Math.min(25, Math.round(((offered / defaultCost) - 1) * 20)));
+      chance += mod;
+    }
+    return Math.max(5, Math.min(95, chance));
+  }, [personalityBonuses, playerReputation, playerInfluence, playerFear, enemyStrength, scope, successBonus, treacheryDebuff, getDefaultCost, getCost]);
+
+
   const handleRoll = useCallback((type: NegotiationType) => {
     const chance = getSuccessChance(type);
+    const offered = getCost(type);
     setSelectedType(type);
+    setLastOfferedPrice(offered);
     setRolling(true);
     setRollResult(null);
 
@@ -107,7 +140,7 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
         setRollResult({ success: roll <= chance, roll, needed: chance });
       }
     }, 80);
-  }, [getSuccessChance]);
+  }, [getSuccessChance, getCost]);
 
   const handleConfirm = useCallback(() => {
     if (!rollResult || !selectedType) return;
@@ -115,10 +148,12 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
     if (selectedType === 'alliance') {
       extraData.condition = { type: allianceCondition, target: selectedTargetFamily, violated: false };
     }
-    // Always call onNegotiate — backend handles success/failure
-    onNegotiate(selectedType, extraData);
+    // Pass the offered price so the reducer can apply price modifier + lowball-counter logic
+    const priceToSend = typeof proposedAmount === 'number' ? undefined : lastOfferedPrice;
+    onNegotiate(selectedType, extraData, priceToSend);
     onClose();
-  }, [rollResult, selectedType, allianceCondition, selectedTargetFamily, onNegotiate, onClose]);
+  }, [rollResult, selectedType, allianceCondition, selectedTargetFamily, onNegotiate, onClose, lastOfferedPrice, proposedAmount]);
+
 
   useEffect(() => {
     if (open) {
@@ -204,27 +239,20 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
             {filteredTypes.map(config => {
               const chance = getSuccessChance(config.type);
               const cost = getCost(config.type);
+              const defaultCost = getDefaultCost(config.type);
               const canAfford = playerMoney >= cost;
+              const editable = isPriceEditable(config.type);
+              const diffPct = defaultCost > 0 ? Math.round(((cost / defaultCost) - 1) * 100) : 0;
               return (
-                <motion.button
+                <div
                   key={config.type}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    if (config.type === 'alliance') {
-                      setSelectedType('alliance');
-                    } else {
-                      handleRoll(config.type);
-                    }
-                  }}
-                  disabled={!canAfford}
-                  className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                  className={`w-full p-3 rounded-lg border transition-colors ${
                     canAfford
-                      ? 'border-primary/30 hover:border-primary/60 bg-background/50 hover:bg-background/80'
-                      : 'border-muted/20 bg-muted/10 opacity-50 cursor-not-allowed'
+                      ? 'border-primary/30 hover:border-primary/60 bg-background/50'
+                      : 'border-muted/20 bg-muted/10 opacity-60'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-1">
                     <span className="font-bold text-sm">
                       {config.icon} {config.label}
                       <Badge variant="outline" className="text-[9px] ml-2 h-4">
@@ -232,14 +260,59 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
                       </Badge>
                     </span>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">{chance}% chance</Badge>
-                      <Badge variant="outline" className="text-xs text-green-400">${cost.toLocaleString()}</Badge>
+                      <Badge variant="secondary" className={`text-xs transition-colors ${diffPct > 5 ? 'bg-green-600/30 text-green-300' : diffPct < -5 ? 'bg-red-600/30 text-red-300' : ''}`}>
+                        {chance}% chance
+                      </Badge>
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">{config.description}</p>
-                  <p className="text-[10px] text-muted-foreground/70 mt-0.5 italic">
-                    50% refund on failure
+                  <p className="text-xs text-muted-foreground mb-2">{config.description}</p>
+
+                  {editable ? (
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[10px] text-muted-foreground shrink-0">Your offer:</span>
+                      <Input
+                        type="number"
+                        min={2000}
+                        step={500}
+                        value={cost}
+                        onChange={(e) => {
+                          const v = Math.max(2000, Math.floor(Number(e.target.value) || 0));
+                          setCustomOffers(prev => ({ ...prev, [config.type]: v }));
+                        }}
+                        className="h-7 text-[11px] w-28"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <span className={`text-[10px] ${diffPct > 0 ? 'text-green-400' : diffPct < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
+                        {diffPct > 0 ? `+${diffPct}% vs fair` : diffPct < 0 ? `${diffPct}% vs fair` : 'fair price'}
+                      </span>
+                      {diffPct < -15 && (
+                        <span className="text-[9px] text-amber-400 italic">may counter</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mb-2">
+                      <Badge variant="outline" className="text-xs text-green-400">Locked at ${cost.toLocaleString()}</Badge>
+                    </div>
+                  )}
+
+                  <motion.button
+                    whileHover={canAfford ? { scale: 1.01 } : {}}
+                    whileTap={canAfford ? { scale: 0.99 } : {}}
+                    disabled={!canAfford}
+                    onClick={() => {
+                      if (config.type === 'alliance') setSelectedType('alliance');
+                      else handleRoll(config.type);
+                    }}
+                    className={`w-full text-xs font-semibold py-1.5 rounded ${
+                      canAfford ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted/30 cursor-not-allowed'
+                    }`}
+                  >
+                    {config.type === 'alliance' ? 'Choose Terms →' : `Offer $${cost.toLocaleString()} & Roll`}
+                  </motion.button>
+                  <p className="text-[10px] text-muted-foreground/70 mt-1 italic text-center">
+                    {proposerLabel ? 'They asked for this — no payment if it falls apart.' : '50% refund on failure.'}
                   </p>
+
                   {scope === 'territory' && personalityBonuses[config.type] > 0 && (
                     <p className="text-xs text-primary mt-1">
                       {personalityInfo.icon} +{personalityBonuses[config.type]}% from {personalityInfo.label}
@@ -270,7 +343,8 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
                       😈 +{Math.floor((playerFear || 0) / 5)}% from Fear ({playerFear})
                     </p>
                   )}
-                </motion.button>
+                </div>
+
               );
             })}
           </div>

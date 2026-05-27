@@ -9083,6 +9083,7 @@ export const useEnhancedMafiaGameState = (
               ...action,
               type: 'negotiate',
               isBossNegotiation: false,
+              aiInitiated: true,
               negotiationType: sitdown.proposedDeal,
               targetQ: sitdown.targetQ,
               targetR: sitdown.targetR,
@@ -9102,6 +9103,7 @@ export const useEnhancedMafiaGameState = (
             ...action,
             type: 'boss_negotiate',
             isBossNegotiation: true,
+            aiInitiated: true,
             negotiationType: sitdown.proposedDeal,
             targetFamily: sitdown.fromFamily,
             successBonus: sitdown.successBonus,
@@ -9111,6 +9113,7 @@ export const useEnhancedMafiaGameState = (
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
         }
+
         case 'decline_incoming_sitdown': {
           const sitdown = (newState.incomingSitdowns || []).find(s => s.id === action.sitdownId);
           if (!sitdown) return newState;
@@ -9125,15 +9128,16 @@ export const useEnhancedMafiaGameState = (
           return newState;
         }
         case 'counter_supply_sitdown': {
-          // Player counters an incoming supply_deal sitdown with a new price.
-          // AI responds inline: accept (sitdown stays open at new price), reject (sitdown removed),
-          // or re-counter at the midpoint (one round max).
+          // Generalized counter-offer flow. Works for any incoming sitdown that
+          // has a proposedAmount (price-based deal). AI either accepts the new
+          // price, re-counters at the midpoint, or walks away.
           const sitdown = (newState.incomingSitdowns || []).find(s => s.id === action.sitdownId);
-          if (!sitdown || sitdown.proposedDeal !== 'supply_deal') return newState;
+          if (!sitdown || typeof sitdown.proposedAmount !== 'number') return newState;
           const counterPrice = Math.max(2000, Math.floor(Number(action.counterPrice) || 0));
           const original = sitdown.originalPrice || sitdown.proposedAmount || 7500;
           const famLabel = sitdown.fromFamily.charAt(0).toUpperCase() + sitdown.fromFamily.slice(1);
           const round = sitdown.counterRound || 0;
+
 
           // Remove the current sitdown — we'll either close it or replace it.
           newState.incomingSitdowns = (newState.incomingSitdowns || []).filter(s => s.id !== action.sitdownId);
@@ -11185,23 +11189,25 @@ export const useEnhancedMafiaGameState = (
 
   // ============ NEGOTIATION HANDLER ============
   const processNegotiation = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
-    const { negotiationType, targetQ, targetR, targetS, capoId, extraData, isBossNegotiation, targetFamily: actionTargetFamily } = action;
+    const { negotiationType, targetQ, targetR, targetS, capoId, extraData, isBossNegotiation, targetFamily: actionTargetFamily, aiInitiated } = action;
 
-    // Separate cooldowns for Boss and Capo
+    // Separate cooldowns for Boss and Capo (player-initiated only — AI asked for THIS meeting)
     const isFamily = isBossNegotiation;
-    if (isFamily && (state.bossNegotiationCooldown || 0) > 0) {
-      state.pendingNotifications = [...state.pendingNotifications, {
-        type: 'warning', title: '⏳ Boss Negotiation Cooldown',
-        message: `The Boss must wait ${state.bossNegotiationCooldown} more turn(s) before negotiating again.`,
-      }];
-      return state;
-    }
-    if (!isFamily && (state.capoNegotiationCooldown || 0) > 0) {
-      state.pendingNotifications = [...state.pendingNotifications, {
-        type: 'warning', title: '⏳ Capo Negotiation Cooldown',
-        message: `A Capo must wait ${state.capoNegotiationCooldown} more turn(s) before negotiating again.`,
-      }];
-      return state;
+    if (!aiInitiated) {
+      if (isFamily && (state.bossNegotiationCooldown || 0) > 0) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'warning', title: '⏳ Boss Negotiation Cooldown',
+          message: `The Boss must wait ${state.bossNegotiationCooldown} more turn(s) before negotiating again.`,
+        }];
+        return state;
+      }
+      if (!isFamily && (state.capoNegotiationCooldown || 0) > 0) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'warning', title: '⏳ Capo Negotiation Cooldown',
+          message: `A Capo must wait ${state.capoNegotiationCooldown} more turn(s) before negotiating again.`,
+        }];
+        return state;
+      }
     }
 
     const config = NEGOTIATION_TYPES.find(n => n.type === negotiationType);
@@ -11211,37 +11217,82 @@ export const useEnhancedMafiaGameState = (
     let tile: any = null;
 
     if (isBossNegotiation) {
-      // Boss (family-level) — no hex needed
       if (config.scope !== 'family') return state;
       enemyFamily = actionTargetFamily;
       if (!enemyFamily || enemyFamily === state.playerFamily) return state;
     } else {
-      // Capo (territory-level)
       if (config.scope !== 'territory') return state;
       tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
       if (!tile || tile.controllingFamily === state.playerFamily || tile.controllingFamily === 'neutral') return state;
-
       const capo = state.deployedUnits.find(u => u.id === capoId);
       if (!capo || capo.type !== 'capo' || capo.family !== state.playerFamily) return state;
       enemyFamily = tile.controllingFamily;
     }
 
-    // D1: when accepting an AI territory sitdown, snap cost to the offered amount so the player isn't surprised
+    // Fair baseline — what the deal "should" cost
+    const defaultCost = config.baseCost + (negotiationType === 'bribe_territory' && tile
+      ? (state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS).length * 2000 + (tile.business?.income || 0))
+      : 0);
+
+    // What the player actually offered. Precedence:
+    //   AI sitdown locked amount → exact match
+    //   Player-supplied offeredPrice (from live price input) → use it
+    //   Otherwise → defaultCost
     const cost = (typeof action.proposedAmountOverride === 'number')
       ? action.proposedAmountOverride
-      : config.baseCost + (negotiationType === 'bribe_territory' && tile ? (state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS).length * 2000 + (tile.business?.income || 0)) : 0);
+      : (typeof action.offeredPrice === 'number' && action.offeredPrice >= 2000)
+        ? Math.floor(action.offeredPrice)
+        : defaultCost;
     if (state.resources.money < cost) return state;
 
-    state.resources.money -= cost;
-    if (isFamily) {
-      state.bossNegotiationCooldown = 2;
-    } else {
-      state.capoNegotiationCooldown = 2;
+    // ─── AI COUNTER-OFFER: if player lowballs, AI counters instead of resolving ───
+    // Only when the player initiated, used a custom price below 85% of fair, and
+    // we haven't already counter-offered them this turn.
+    if (
+      !aiInitiated &&
+      typeof action.offeredPrice === 'number' &&
+      cost < defaultCost * 0.85 &&
+      defaultCost > 0
+    ) {
+      const counterKey = `${enemyFamily}:${negotiationType}:${state.turn}`;
+      const counterTracker = ((state as any)._aiCounterOffersThisTurn ||= {}) as Record<string, boolean>;
+      if (!counterTracker[counterKey]) {
+        counterTracker[counterKey] = true;
+
+        const midpoint = Math.max(2000, Math.round(((cost + defaultCost) / 2) / 500) * 500);
+        state.incomingSitdowns = state.incomingSitdowns || [];
+        state.incomingSitdowns.push({
+          id: `incoming-aicounter-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          fromFamily: enemyFamily,
+          proposedDeal: negotiationType,
+          turnRequested: state.turn,
+          expiresOnTurn: state.turn + 2,
+          successBonus: 10,
+          scope: isFamily ? 'family' : 'territory',
+          targetQ: tile?.q, targetR: tile?.r, targetS: tile?.s,
+          proposedAmount: midpoint,
+          originalPrice: defaultCost,
+          isCounterOffer: true,
+          counterRound: 1,
+        });
+        const famLabel = enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1);
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'info', title: '↩️ They Counter Back',
+          message: `${famLabel} laughed off $${cost.toLocaleString()}: "Our number is $${midpoint.toLocaleString()}." Check the Sitdowns panel.`,
+        }];
+        // No money lost, no cooldown set — they're still talking.
+        syncLegacyUnits(state);
+        return state;
+      }
     }
 
-    // Reputation cost
-    if (config.reputationCost > 0) {
-      syncRespect(state, Math.max(0, state.reputation.respect - config.reputationCost));
+    state.resources.money -= cost;
+    if (!aiInitiated) {
+      if (isFamily) state.bossNegotiationCooldown = 2;
+      else state.capoNegotiationCooldown = 2;
+      if (config.reputationCost > 0) {
+        syncRespect(state, Math.max(0, state.reputation.respect - config.reputationCost));
+      }
     }
 
     // ── SUCCESS ROLL ──
@@ -11254,38 +11305,50 @@ export const useEnhancedMafiaGameState = (
     }
     totalChance += (state.resources.influence / 100) * 10;
     totalChance += Math.floor(state.reputation.respect / 5);
-    // Fear bonus for supply deals
     if (negotiationType === 'supply_deal') {
       totalChance += Math.floor((state.reputation.fear || 0) / 5);
     }
-    // Treachery debuff reduces negotiation success
     if (state.treacheryDebuff && state.treacheryDebuff.turnsRemaining > 0) {
       totalChance -= TREACHERY_NEGOTIATION_PENALTY;
     }
-    // Incoming sitdown bonus (AI asked for this meeting)
-    if (action.successBonus) {
-      totalChance += action.successBonus;
+    if (action.successBonus) totalChance += action.successBonus;
+    // Price modifier — pay more, succeed more (and vice versa)
+    if (defaultCost > 0 && cost !== defaultCost) {
+      const priceMod = Math.max(-25, Math.min(25, Math.round(((cost / defaultCost) - 1) * 20)));
+      totalChance += priceMod;
     }
     totalChance = Math.max(5, Math.min(95, totalChance));
     const roll = Math.random() * 100;
 
     if (roll > totalChance) {
-      // Negotiation FAILED — 50% refund
-      const refund = Math.floor(cost * NEGOTIATION_REFUND_RATE);
-      state.resources.money += refund;
-      state.pendingNotifications = [...state.pendingNotifications, {
-        type: 'error', title: `❌ ${config.label} Failed!`,
-        message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} rejected the offer. $${refund.toLocaleString()} refunded (50%). (${Math.round(totalChance)}% chance)`,
-      }];
+      // FAILURE
+      if (aiInitiated) {
+        // They asked for the sitdown — no payment lost, no cooldown burned.
+        state.resources.money += cost;
+        addPairTension(state, state.playerFamily, enemyFamily, 3);
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'warning', title: `🤷 ${config.label} Fell Apart`,
+          message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} couldn't agree on terms. You owe nothing. Tension +3. (${Math.round(totalChance)}% chance)`,
+        }];
+      } else {
+        const refund = Math.floor(cost * NEGOTIATION_REFUND_RATE);
+        state.resources.money += refund;
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'error', title: `❌ ${config.label} Failed!`,
+          message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} rejected the offer. $${refund.toLocaleString()} refunded (50%). (${Math.round(totalChance)}% chance)`,
+        }];
+      }
       syncLegacyUnits(state);
       return state;
     }
 
-    // Check diplomatic lockout — warring families cannot negotiate
+    // Diplomatic lockout
     if (areFamiliesAtWar(state, state.playerFamily, enemyFamily)) {
       state.resources.money += cost; // refund
-      if (isFamily) state.bossNegotiationCooldown = 0;
-      else state.capoNegotiationCooldown = 0;
+      if (!aiInitiated) {
+        if (isFamily) state.bossNegotiationCooldown = 0;
+        else state.capoNegotiationCooldown = 0;
+      }
       state.pendingNotifications = [...state.pendingNotifications, {
         type: 'error', title: '⚔️ Diplomatic Lockout',
         message: `Cannot negotiate with the ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} family — you are at war!`,
@@ -11293,6 +11356,7 @@ export const useEnhancedMafiaGameState = (
       syncLegacyUnits(state);
       return state;
     }
+
 
     switch (negotiationType as NegotiationType) {
       case 'ceasefire': {

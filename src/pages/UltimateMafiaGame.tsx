@@ -1917,7 +1917,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               onClose={() => setNegotiationState(null)}
               scope="territory"
               negotiationUsedThisTurn={((gameState as any).capoNegotiationCooldown || 0) > 0}
-              onNegotiate={(type, extraData) => {
+              onNegotiate={(type, extraData, offeredPrice) => {
                 if (incomingSitdownId) {
                   performAction({
                     type: 'accept_incoming_sitdown',
@@ -1934,11 +1934,13 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
                     targetS: negotiationState.targetS,
                     capoId: negotiationState.capoId,
                     pendingNegotiationId: (negotiationState as any).pendingNegotiationId,
+                    offeredPrice,
                     extraData,
                   });
                 }
                 setNegotiationState(null);
               }}
+
               capoName={capoName}
               capoPersonality={capoPersonality}
               enemyFamily={enemyFamily}
@@ -1965,7 +1967,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               onClose={() => setNegotiationState(null)}
               scope="family"
               negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
-              onNegotiate={(type, extraData) => {
+              onNegotiate={(type, extraData, offeredPrice) => {
                 if (incomingSitdownId) {
                   performAction({
                     type: 'accept_incoming_sitdown',
@@ -1979,11 +1981,13 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
                     type: 'boss_negotiate',
                     negotiationType: type,
                     targetFamily: targetFam,
+                    offeredPrice,
                     extraData,
                   });
                 }
                 setNegotiationState(null);
               }}
+
               enemyFamily={targetFam}
               playerReputation={gameState.reputation.respect}
               playerInfluence={gameState.resources.influence || 0}

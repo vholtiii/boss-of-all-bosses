@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { PendingNegotiation, IncomingSitdown, NEGOTIATION_TYPES, NegotiationType } from '@/types/game-mechanics';
-import { getNegotiationSuccessChance, getNegotiationCost } from '@/lib/negotiation-odds';
+import { getNegotiationSuccessChance, getNegotiationCost, predictCounterReaction } from '@/lib/negotiation-odds';
 
 // ─── Counterable Sitdown Card (extracted so it can hold local counter-input state) ───
 const CounterableSitdownCard: React.FC<{
@@ -138,7 +138,19 @@ const CounterableSitdownCard: React.FC<{
               Cancel
             </Button>
           </div>
+          {(() => {
+            const original = s.originalPrice || s.proposedAmount || 0;
+            const reaction = predictCounterReaction(original, counterValue, s.counterRound || 0);
+            const map = {
+              accept: { txt: '✅ They will likely accept', cls: 'text-green-400' },
+              recounter: { txt: '↩️ They will probably counter back', cls: 'text-amber-400' },
+              walk: { txt: '🚪 They will walk away (+5 tension)', cls: 'text-red-400' },
+            } as const;
+            const r = map[reaction];
+            return <div className={cn('text-[10px] font-semibold', r.cls)}>{r.txt}</div>;
+          })()}
         </div>
+
       ) : (
         <div className="flex gap-1.5 pt-1">
           <Button
@@ -251,7 +263,7 @@ const SitdownsPanel: React.FC<SitdownsPanelProps> = ({
               const isUrgent = turnsLeft <= 1;
               const fam = s.fromFamily.charAt(0).toUpperCase() + s.fromFamily.slice(1);
               const dl = dealLabel(s.proposedDeal);
-              const canCounter = !!onCounterIncoming && isBoss && s.proposedDeal === 'supply_deal' && (s.counterRound || 0) < 1;
+              const canCounter = !!onCounterIncoming && typeof s.proposedAmount === 'number' && (s.counterRound || 0) < 1;
               const isDesperate = !!s.isDesperate;
               const isRenewal = !!s.isRenewal;
               const isCounterBack = !!s.isCounterOffer;
