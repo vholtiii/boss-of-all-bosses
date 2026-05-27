@@ -65,6 +65,33 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
 
   const treacheryDebuff = (treacheryTurnsRemaining || 0) > 0 ? 20 : 0;
 
+  // Fair / default price for a given type (what the AI considers reasonable)
+  const getDefaultCost = useCallback((type: NegotiationType) => {
+    if (typeof proposedAmount === 'number') return proposedAmount;
+    const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
+    let cost = config.baseCost;
+    if (type === 'bribe_territory') {
+      cost += enemyStrength * 2000 + hexIncome;
+    }
+    return cost;
+  }, [enemyStrength, hexIncome, proposedAmount]);
+
+  // Effective price the player will pay (custom override or default)
+  const getCost = useCallback((type: NegotiationType) => {
+    const override = customOffers[type];
+    if (typeof override === 'number' && override >= 2000) return override;
+    return getDefaultCost(type);
+  }, [customOffers, getDefaultCost]);
+
+  // Price is locked when the dialog is showing an AI-initiated sitdown
+  // (proposedAmount was passed in), or when the deal is one we don't price.
+  const isPriceEditable = (type: NegotiationType) => {
+    if (typeof proposedAmount === 'number') return false;
+    // Currently only price-bearing deals — ceasefire/alliance/safe_passage are flat-priced
+    // but we still allow tweaking to let players signal generosity.
+    return true;
+  };
+
   const getSuccessChance = useCallback((type: NegotiationType) => {
     const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
     let chance = config.baseSuccess;
@@ -73,7 +100,6 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
       chance += personalityBonuses.all || 0;
       chance += Math.floor(playerReputation / 5);
     } else {
-      // Boss-level: respect & influence carry the family's clout
       chance += Math.floor(playerReputation / 4);
       chance += Math.floor(playerInfluence / 5);
     }
@@ -83,18 +109,16 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
     if (type === 'bribe_territory') chance -= enemyStrength * 5;
     chance += successBonus;
     chance -= treacheryDebuff;
-    return Math.max(5, Math.min(95, chance));
-  }, [personalityBonuses, playerReputation, playerInfluence, playerFear, enemyStrength, scope, successBonus, treacheryDebuff]);
-
-  const getCost = useCallback((type: NegotiationType) => {
-    if (typeof proposedAmount === 'number') return proposedAmount;
-    const config = NEGOTIATION_TYPES.find(n => n.type === type)!;
-    let cost = config.baseCost;
-    if (type === 'bribe_territory') {
-      cost += enemyStrength * 2000 + hexIncome;
+    // Price modifier — matches reducer formula in processNegotiation
+    const defaultCost = getDefaultCost(type);
+    const offered = getCost(type);
+    if (defaultCost > 0 && offered !== defaultCost) {
+      const mod = Math.max(-25, Math.min(25, Math.round(((offered / defaultCost) - 1) * 20)));
+      chance += mod;
     }
-    return cost;
-  }, [enemyStrength, hexIncome, proposedAmount]);
+    return Math.max(5, Math.min(95, chance));
+  }, [personalityBonuses, playerReputation, playerInfluence, playerFear, enemyStrength, scope, successBonus, treacheryDebuff, getDefaultCost, getCost]);
+
 
   const handleRoll = useCallback((type: NegotiationType) => {
     const chance = getSuccessChance(type);
