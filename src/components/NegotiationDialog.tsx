@@ -49,6 +49,9 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   const [displayNumber, setDisplayNumber] = useState(50);
   const [allianceCondition, setAllianceCondition] = useState<AllianceCondition['type']>('no_attack_family');
   const [selectedTargetFamily, setSelectedTargetFamily] = useState<string>(enemyFamily);
+  // Per-type custom offer (player can sweeten or lowball). Keyed by NegotiationType.
+  const [customOffers, setCustomOffers] = useState<Partial<Record<NegotiationType, number>>>({});
+  const [lastOfferedPrice, setLastOfferedPrice] = useState<number | undefined>(undefined);
 
   const personality = capoPersonality || 'diplomat';
   const personalityInfo = PERSONALITY_LABELS[personality];
@@ -58,6 +61,7 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   const filteredTypes = lockedDealType
     ? NEGOTIATION_TYPES.filter(n => n.type === lockedDealType)
     : NEGOTIATION_TYPES.filter(n => n.scope === scope);
+
 
   const treacheryDebuff = (treacheryTurnsRemaining || 0) > 0 ? 20 : 0;
 
