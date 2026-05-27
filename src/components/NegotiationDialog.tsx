@@ -343,7 +343,8 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
                       😈 +{Math.floor((playerFear || 0) / 5)}% from Fear ({playerFear})
                     </p>
                   )}
-                </motion.button>
+                </div>
+
               );
             })}
           </div>
