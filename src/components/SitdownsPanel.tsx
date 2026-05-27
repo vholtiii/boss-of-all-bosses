@@ -263,7 +263,7 @@ const SitdownsPanel: React.FC<SitdownsPanelProps> = ({
               const isUrgent = turnsLeft <= 1;
               const fam = s.fromFamily.charAt(0).toUpperCase() + s.fromFamily.slice(1);
               const dl = dealLabel(s.proposedDeal);
-              const canCounter = !!onCounterIncoming && isBoss && s.proposedDeal === 'supply_deal' && (s.counterRound || 0) < 1;
+              const canCounter = !!onCounterIncoming && typeof s.proposedAmount === 'number' && (s.counterRound || 0) < 1;
               const isDesperate = !!s.isDesperate;
               const isRenewal = !!s.isRenewal;
               const isCounterBack = !!s.isCounterOffer;
