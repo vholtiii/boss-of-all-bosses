@@ -9128,15 +9128,16 @@ export const useEnhancedMafiaGameState = (
           return newState;
         }
         case 'counter_supply_sitdown': {
-          // Player counters an incoming supply_deal sitdown with a new price.
-          // AI responds inline: accept (sitdown stays open at new price), reject (sitdown removed),
-          // or re-counter at the midpoint (one round max).
+          // Generalized counter-offer flow. Works for any incoming sitdown that
+          // has a proposedAmount (price-based deal). AI either accepts the new
+          // price, re-counters at the midpoint, or walks away.
           const sitdown = (newState.incomingSitdowns || []).find(s => s.id === action.sitdownId);
-          if (!sitdown || sitdown.proposedDeal !== 'supply_deal') return newState;
+          if (!sitdown || typeof sitdown.proposedAmount !== 'number') return newState;
           const counterPrice = Math.max(2000, Math.floor(Number(action.counterPrice) || 0));
           const original = sitdown.originalPrice || sitdown.proposedAmount || 7500;
           const famLabel = sitdown.fromFamily.charAt(0).toUpperCase() + sitdown.fromFamily.slice(1);
           const round = sitdown.counterRound || 0;
+
 
           // Remove the current sitdown — we'll either close it or replace it.
           newState.incomingSitdowns = (newState.incomingSitdowns || []).filter(s => s.id !== action.sitdownId);
