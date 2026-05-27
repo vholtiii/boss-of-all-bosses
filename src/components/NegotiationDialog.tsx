@@ -122,7 +122,9 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
 
   const handleRoll = useCallback((type: NegotiationType) => {
     const chance = getSuccessChance(type);
+    const offered = getCost(type);
     setSelectedType(type);
+    setLastOfferedPrice(offered);
     setRolling(true);
     setRollResult(null);
 
@@ -138,7 +140,7 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
         setRollResult({ success: roll <= chance, roll, needed: chance });
       }
     }, 80);
-  }, [getSuccessChance]);
+  }, [getSuccessChance, getCost]);
 
   const handleConfirm = useCallback(() => {
     if (!rollResult || !selectedType) return;
@@ -146,10 +148,12 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
     if (selectedType === 'alliance') {
       extraData.condition = { type: allianceCondition, target: selectedTargetFamily, violated: false };
     }
-    // Always call onNegotiate — backend handles success/failure
-    onNegotiate(selectedType, extraData);
+    // Pass the offered price so the reducer can apply price modifier + lowball-counter logic
+    const priceToSend = typeof proposedAmount === 'number' ? undefined : lastOfferedPrice;
+    onNegotiate(selectedType, extraData, priceToSend);
     onClose();
-  }, [rollResult, selectedType, allianceCondition, selectedTargetFamily, onNegotiate, onClose]);
+  }, [rollResult, selectedType, allianceCondition, selectedTargetFamily, onNegotiate, onClose, lastOfferedPrice, proposedAmount]);
+
 
   useEffect(() => {
     if (open) {
