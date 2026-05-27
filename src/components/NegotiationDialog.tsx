@@ -13,7 +13,8 @@ import {
 interface NegotiationDialogProps {
   open: boolean;
   onClose: () => void;
-  onNegotiate: (type: NegotiationType, extraData?: any) => void;
+  onNegotiate: (type: NegotiationType, extraData?: any, offeredPrice?: number) => void;
+
   scope: NegotiationScope;
   capoName?: string;
   capoPersonality?: CapoPersonality;
