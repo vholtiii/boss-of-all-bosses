@@ -9083,6 +9083,7 @@ export const useEnhancedMafiaGameState = (
               ...action,
               type: 'negotiate',
               isBossNegotiation: false,
+              aiInitiated: true,
               negotiationType: sitdown.proposedDeal,
               targetQ: sitdown.targetQ,
               targetR: sitdown.targetR,
@@ -9102,6 +9103,7 @@ export const useEnhancedMafiaGameState = (
             ...action,
             type: 'boss_negotiate',
             isBossNegotiation: true,
+            aiInitiated: true,
             negotiationType: sitdown.proposedDeal,
             targetFamily: sitdown.fromFamily,
             successBonus: sitdown.successBonus,
@@ -9111,6 +9113,7 @@ export const useEnhancedMafiaGameState = (
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
           return result;
         }
+
         case 'decline_incoming_sitdown': {
           const sitdown = (newState.incomingSitdowns || []).find(s => s.id === action.sitdownId);
           if (!sitdown) return newState;
