@@ -1,84 +1,76 @@
-# Make Supply-Line Negotiations Feel Active
-
-## Why this needs fixing
-
-Supply deals exist but rarely surface during play. Today:
-
-- AI only proposes once per "disconnected" episode (20%/turn) and never follows up.
-- Price is hardcoded at $7,500 regardless of how badly the buyer needs it or how much leverage the supplier has.
-- Deals expire silently — no renewal pressure, no renegotiation moment.
-- The player has no incentive to cut a rival's lines because nothing dramatic happens when they do.
-- There is no counter-offer flow — the player can only accept/decline a flat offer.
-
-Result: supply lines feel like background plumbing, not a diplomatic lever.
-
 ## Goal
 
-Turn supply lines into a recurring negotiation surface. Cutting/holding a supply node should produce **desperate offers**, expiring deals should produce **renewal offers**, and prices should reflect leverage.
+Make negotiations feel fair and interactive: AI-initiated sitdowns shouldn't punish the player on failure, and both sides should be able to counter any offer with the success chance updating in real time as the price moves.
+
+## Problems today
+
+1. When you **accept an AI-initiated sitdown** and the roll fails, `processNegotiation` still:
+   - Deducts the full cost (refunds only 50%)
+   - Applies the 2-turn Boss/Capo diplomacy cooldown
+   That's wrong — you didn't ask for the meeting; they did.
+2. Counter-offers only exist for `supply_deal`. Other deal types (ceasefire, alliance, share_profits, bribe_territory, non_aggression) have no counter UI.
+3. When **you** initiate a sitdown, the AI never counters — it just accepts or rejects via the dice roll.
+4. The dialog shows a static success chance; tweaking the offered price doesn't change the displayed odds.
 
 ## Changes
 
-### 1. Severance-triggered desperation offers (new)
-When an AI family **loses connection** to a supply node it had last turn (player or rival cut their chain, or they lost a key hex), it should immediately attempt a supply-deal sitdown — at a premium price.
+### 1. Fair handling of AI-initiated sitdowns (`useEnhancedMafiaGameState.ts`)
 
-- Detection: per-AI snapshot of `connectedSupplyNodeTypes` each turn; on loss, fire offer next AI turn.
-- Price: `basePrice * (1.5 + 0.25 × nodesLost)` capped at 3×.
-- Targeting: prefers the player if the player controls the lost node ("you cut us, now pay us back" framing). Otherwise picks the AI rival currently connected.
-- Bypasses the 20% roll — desperation always tries.
-- Notification framing: "🚨 Desperate Offer — the Genovese boss is offering $14,000 for emergency access…"
+- Tag the `processNegotiation` call inside `accept_incoming_sitdown` with `aiInitiated: true` (pass through `action`).
+- In `processNegotiation`, when `action.aiInitiated`:
+  - **Skip the cooldown check** at the top.
+  - **Do not set** `bossNegotiationCooldown` / `capoNegotiationCooldown`.
+  - **On failure**: full refund of `cost` (not 50%), no respect cost, tension +3 only. Notification: "They walked — you owe nothing."
+  - **On success**: pay full agreed cost as today (you got the deal you accepted).
+- Player-initiated paths (`negotiate`, `boss_negotiate`) keep current behavior (50% refund, cooldown, respect cost).
 
-### 2. Renewal offers on expiry (new)
-When a supply deal is in its final turn (`turnsRemaining === 1`):
-- The supplier (if AI) auto-proposes a renewal sitdown to the buyer (player or AI), priced based on how much income the buyer earned during the deal.
-- If the buyer is the player → boss-level sitdown.
-- Notification: "🔁 Renewal Offered — Lucchese will extend supply access another 5 turns for $9,000."
-- If declined/expired, normal +5 tension penalty still applies, plus a one-turn cooldown before a new deal can be struck (so it feels like burned bridges).
+### 2. Universal counter-offer action
 
-### 3. Dynamic pricing (replace flat $7,500)
-New helper `computeSupplyDealPrice(state, buyerFam, supplierFam, context)`:
-- Base: $5,000.
-- + `$1,500 × number of node types granted`.
-- + `25%` if supplier is at war with anyone (premium for risk).
-- + `50%` if buyer is in "desperation" state (lost lines this turn or last).
-- × `0.85` if buyer/supplier currently have positive tension reduction cooldown (relationship discount).
-- Round to nearest $500.
+- Generalize `counter_supply_sitdown` → **`counter_incoming_sitdown`** that works for any `proposedDeal`.
+- Same AI response model already used for supply deals:
+  - swing ≤ 15% of original → AI accepts, sitdown refreshed at counter price.
+  - swing ≥ 40% or `counterRound ≥ 1` → AI walks, tension +5.
+  - else → AI re-counters at the midpoint, `counterRound = 1`, marked "final offer".
+- For non-priced deals (ceasefire, alliance), counter targets the **duration** instead of price (1–6 turns), reusing the same swing math against `proposedDuration`. `bribe_territory` and `share_profits` use price.
+- Keep `counter_supply_sitdown` as a thin alias for save-file compatibility.
 
-Used everywhere a supply deal price is set: AI↔AI, AI→player sitdowns, player→AI initiation in `NegotiationDialog`, and renewals.
+### 3. AI counters when the player initiates
 
-### 4. Player counter-offer flow (sitdowns panel)
-In `SitdownsPanel` / dialog for an incoming `supply_deal` sitdown, add a **Counter** button alongside Accept/Decline:
-- Opens a small price input (default = proposed price × 0.7, min $2,000).
-- Submitting creates a counter-sitdown back to the AI; AI decides next turn:
-  - Accept if `counter >= computedPrice × 0.85` (or relationship is friendly).
-  - Reject and withdraw if `< 0.6×`.
-  - Otherwise counter back once with the midpoint.
-- One round of back-and-forth max to avoid loops.
+- After a player `negotiate` / `boss_negotiate` action where the **roll succeeds but the player's price is "low"** (cost < 0.85× a fair baseline computed the same way as `computeSupplyDealPrice`, generalized per deal type), instead of immediate success, inject a new `IncomingSitdown` with `isCounterOffer: true`, `proposedAmount = midpoint`, and refund the player's payment.
+- Player sees it appear in the Sitdowns panel and can Accept / Counter / Decline. This keeps the existing dice-roll UX for fair offers and only triggers a counter when the player lowballs.
+- Guarded by a per-turn flag so the AI counters at most once per player-initiated negotiation.
 
-### 5. AI proposes more often when relevant
-- Lower the gate from "20% if disconnected" to "60% if disconnected OR if a current deal expires in ≤2 turns".
-- Drop the `phase >= 2 && money >= 7500` floor to `phase >= 1 && money >= computedPrice`.
-- Keeps the existing "only one active deal per buyer" guard.
+### 4. Live success-chance preview in dialogs
 
-### 6. Notifications & turn-summary surfacing
-- Pipe new offers, counters, renewals, and severance triggers into `pendingNotifications` with clear icons.
-- Add an entry to `turnReport.aiActions` for each new offer type so post-turn summary shows the diplomatic activity.
+- **`NegotiationDialog.tsx`** (player-initiated): add an editable price `Input` next to each deal option (default = computed cost). Wire its `onChange` to a `useMemo` that re-runs `getSuccessChance` with a price-based modifier:
+  - `priceModifier = clamp(round((price / baseCost - 1) * 20), -25, +25)` — higher bid → better odds, lowball → worse.
+- The displayed `{chance}% chance` badge updates live as the user types. Roll uses the same modifier.
+- **`SitdownsPanel.tsx`** (AI-initiated, `CounterableSitdownCard`): expand the existing counter input from supply-only to all deal types. Show a live "If you counter at $X: ~Y% they accept" hint computed from the swing thresholds in change #2 (≤15% → "likely accept", 15–40% → "they'll re-counter", ≥40% → "they'll walk").
 
-## Files touched
+### 5. Types & helpers
 
-- `src/hooks/useEnhancedMafiaGameState.ts` — AI supply-deal block (~7026-7123), pact expiry block (~11608), supply-deal acceptance block (~11279).
-- `src/lib/negotiation-odds.ts` — add `computeSupplyDealPrice` + export.
-- `src/components/SitdownsPanel.tsx` and/or `src/components/NegotiationDialog.tsx` — Counter button + price input UI.
-- `src/types/game-mechanics.ts` — extend `IncomingSitdown` (optional `isCounterOffer`, `isRenewal`, `isDesperate` flags; `originalPrice` for counter rounds).
-- Tests: extend `src/hooks/__tests__/strategy-simulation.test.ts` or add a focused `supply-deals.test.ts` covering: severance triggers offer, renewal fires on last turn, counter-offer round-trip, dynamic pricing math.
+- `src/types/game-mechanics.ts`: add `aiInitiated?: boolean` to the negotiation action type; extend `IncomingSitdown.counterRound` doc to cover non-supply deals; add `proposedDuration` to the counter payload.
+- `src/lib/negotiation-odds.ts`: add `getPriceAdjustedSuccessChance({ basePrice, offeredPrice, ...oddsInput })` and `predictCounterReaction(originalPrice, counterPrice, round)` returning `'accept' | 'recounter' | 'walk'` so dialog + reducer share one source of truth.
+
+### 6. Tests
+
+- Extend `ai-territory-sitdown.test.ts` (or new `negotiation-fairness.test.ts`):
+  - AI-initiated failure → money unchanged, no cooldown set.
+  - Player-initiated failure → 50% refund + cooldown as today.
+  - `counter_incoming_sitdown` accepts/recounters/walks at the documented thresholds for both `supply_deal` and `ceasefire`.
+  - `predictCounterReaction` matches the reducer outcome for sampled prices.
 
 ## Out of scope
 
-- Multi-buyer bidding wars (could be a follow-up).
-- Supply-line UI overhaul on the map.
-- AI personality flavoring of offers (use existing personalities; no new fields).
+- Multi-round haggling beyond 1 counter per side.
+- New deal types or rebalancing baseline costs.
+- AI ↔ AI counter-offers (only player ↔ AI).
 
-## Technical notes
+## Files touched
 
-- Per-AI snapshot of last-turn supply node connectivity stored on `state.aiOpponents[i].resources` as a non-persistent transient field, or on a top-level `state._aiSupplyConnectivitySnapshot` map cleared each turn. Choose transient map to avoid save-migration churn.
-- Counter-offer state lives on the sitdown record itself; no new top-level state needed.
-- All price math centralized in `negotiation-odds.ts` so dialog and AI agree.
+- `src/hooks/useEnhancedMafiaGameState.ts`
+- `src/lib/negotiation-odds.ts`
+- `src/types/game-mechanics.ts`
+- `src/components/NegotiationDialog.tsx`
+- `src/components/SitdownsPanel.tsx`
+- `src/hooks/__tests__/` (new/extended test file)
