@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { PendingNegotiation, IncomingSitdown, NEGOTIATION_TYPES, NegotiationType } from '@/types/game-mechanics';
-import { getNegotiationSuccessChance, getNegotiationCost } from '@/lib/negotiation-odds';
+import { getNegotiationSuccessChance, getNegotiationCost, predictCounterReaction } from '@/lib/negotiation-odds';
 
 // ─── Counterable Sitdown Card (extracted so it can hold local counter-input state) ───
 const CounterableSitdownCard: React.FC<{
