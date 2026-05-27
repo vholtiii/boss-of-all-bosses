@@ -11251,9 +11251,10 @@ export const useEnhancedMafiaGameState = (
       defaultCost > 0
     ) {
       const counterKey = `${enemyFamily}:${negotiationType}:${state.turn}`;
-      state._aiCounterOffersThisTurn = state._aiCounterOffersThisTurn || {};
-      if (!state._aiCounterOffersThisTurn[counterKey]) {
-        state._aiCounterOffersThisTurn[counterKey] = true;
+      const counterTracker = ((state as any)._aiCounterOffersThisTurn ||= {}) as Record<string, boolean>;
+      if (!counterTracker[counterKey]) {
+        counterTracker[counterKey] = true;
+
         const midpoint = Math.max(2000, Math.round(((cost + defaultCost) / 2) / 500) * 500);
         state.incomingSitdowns = state.incomingSitdowns || [];
         state.incomingSitdowns.push({
