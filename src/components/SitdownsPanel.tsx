@@ -138,7 +138,19 @@ const CounterableSitdownCard: React.FC<{
               Cancel
             </Button>
           </div>
+          {(() => {
+            const original = s.originalPrice || s.proposedAmount || 0;
+            const reaction = predictCounterReaction(original, counterValue, s.counterRound || 0);
+            const map = {
+              accept: { txt: '✅ They will likely accept', cls: 'text-green-400' },
+              recounter: { txt: '↩️ They will probably counter back', cls: 'text-amber-400' },
+              walk: { txt: '🚪 They will walk away (+5 tension)', cls: 'text-red-400' },
+            } as const;
+            const r = map[reaction];
+            return <div className={cn('text-[10px] font-semibold', r.cls)}>{r.txt}</div>;
+          })()}
         </div>
+
       ) : (
         <div className="flex gap-1.5 pt-1">
           <Button
