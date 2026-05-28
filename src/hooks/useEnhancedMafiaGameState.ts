@@ -5850,6 +5850,7 @@ export const useEnhancedMafiaGameState = (
 
       // ── INCOME (difficulty-scaled) ──
       let aiIncome = 0;
+      let aiSupplyDependentIncome = 0; // for royalty diversion
       // Compute AI family's connected supply nodes via BFS
       const aiConnectedHexes = getConnectedTerritory(state.hexMap, fam);
       const aiConnectedNodeTypes = new Set<SupplyNodeType>();
@@ -5904,6 +5905,9 @@ export const useEnhancedMafiaGameState = (
             tileInc = Math.floor(tileInc * (1 - aiWarPenalty));
           }
           aiIncome += tileInc;
+          if (SUPPLY_DEPENDENCIES[tile.business.type]?.length) {
+            aiSupplyDependentIncome += tileInc;
+          }
         }
       });
       // District control bonus: Manhattan +25% income for AI
@@ -5935,11 +5939,38 @@ export const useEnhancedMafiaGameState = (
       opponent.resources.money = Math.max(0, opponent.resources.money + aiNetIncome);
       opponent.resources.lastTurnIncome = aiNetIncome; // Track for phase calculation
 
+      // ── SUPPLY ROYALTY DIVERSION ──
+      // For each active supply pact where this AI is the buyer and the player
+      // is the supplier, divert royaltyRate * supply-dependent income to the
+      // player out of the AI's freshly-credited treasury.
+      let aiRoyaltyPaidToPlayer = 0;
+      (state.supplyDealPacts || []).forEach(p => {
+        if (!p.active) return;
+        if (p.buyerFamily !== fam) return;
+        if (p.targetFamily !== state.playerFamily) return;
+        const rate = p.royaltyRate || 0;
+        if (rate <= 0 || aiSupplyDependentIncome <= 0) return;
+        const owed = Math.floor(aiSupplyDependentIncome * rate);
+        const paid = Math.min(owed, opponent.resources.money);
+        if (paid <= 0) return;
+        opponent.resources.money -= paid;
+        state.resources.money += paid;
+        aiRoyaltyPaidToPlayer += paid;
+      });
+      if (aiRoyaltyPaidToPlayer > 0) {
+        state.pendingNotifications.push({
+          type: 'info' as const,
+          title: '💵 Supply Royalty',
+          message: `${fam.charAt(0).toUpperCase() + fam.slice(1)} paid you $${aiRoyaltyPaidToPlayer.toLocaleString()} this turn from your supply deal.`,
+        });
+      }
+
       if (turnReport) {
         const parts: string[] = [`Earned $${aiIncome.toLocaleString()} gross`];
         if (aiHeatPenalty > 0) parts.push(`-$${aiHeatPenalty.toLocaleString()} heat`);
         if (aiSoldierMaintenance > 0) parts.push(`-$${aiSoldierMaintenance.toLocaleString()} soldier upkeep`);
         if (aiCommunityUpkeep > 0) parts.push(`-$${aiCommunityUpkeep.toLocaleString()} community upkeep`);
+        if (aiRoyaltyPaidToPlayer > 0) parts.push(`-$${aiRoyaltyPaidToPlayer.toLocaleString()} supply royalty to player`);
         parts.push(`= $${aiNetIncome.toLocaleString()} net`);
         turnReport.aiActions.push({ family: fam, action: 'income', detail: parts.join(' ') });
       }
@@ -7126,10 +7157,16 @@ export const useEnhancedMafiaGameState = (
 
               if (supplier.isPlayer) {
                 // ── BOSS-LEVEL SITDOWN REQUEST (does not auto-commit) ──
+                // The PLAYER owns the supply here — the AI is the buyer.
+                // Money flows TO the player (lump sum + ongoing royalty).
                 const alreadyPending = (state.incomingSitdowns || []).some(
                   s => s.fromFamily === fam && s.proposedDeal === 'supply_deal' && s.scope !== 'territory'
                 );
                 if (!alreadyPending) {
+                  // Royalty: base 15%, +5% desperate, -2% renewal, clamped 10–30%, rounded to 5%.
+                  let rawRoyalty = 0.15 + (isDesperate ? 0.05 : 0) + (renewalSoon && existingDeal ? -0.02 : 0);
+                  rawRoyalty = Math.max(0.10, Math.min(0.30, rawRoyalty));
+                  const royaltyRate = Math.round(rawRoyalty * 20) / 20; // nearest 5%
                   state.incomingSitdowns = state.incomingSitdowns || [];
                   state.incomingSitdowns.push({
                     id: `incoming-supply-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -7146,19 +7183,22 @@ export const useEnhancedMafiaGameState = (
                     isRenewal: renewalSoon && !!existingDeal,
                     originalPrice: price,
                     counterRound: 0,
+                    playerIsSupplier: true,
+                    royaltyRate,
                   });
-                  const titleIcon = isDesperate ? '🚨 Desperate Offer' : (renewalSoon ? '🔁 Renewal Offered' : '🏛️ Boss Sitdown');
+                  const titleIcon = isDesperate ? '🚨 Desperate Buyer' : (renewalSoon ? '🔁 Renewal Offered' : '💰 Buyer at the Table');
+                  const royaltyPct = Math.round(royaltyRate * 100);
                   const flavor = isDesperate
-                    ? `EMERGENCY — ${famLabel} just lost supply access and is offering $${price.toLocaleString()} for ${duration} turns. Counter or accept fast.`
+                    ? `EMERGENCY — ${famLabel} just lost supply access and is offering $${price.toLocaleString()} up front + ${royaltyPct}% of their take for ${duration} turns. Counter or accept fast.`
                     : (renewalSoon
-                        ? `${famLabel} wants to extend supply access ${duration} more turns for $${price.toLocaleString()}.`
-                        : `${famLabel} boss is offering $${price.toLocaleString()} for ${duration} turns of supply access.`);
+                        ? `${famLabel} wants to extend supply access ${duration} more turns: $${price.toLocaleString()} up front + ${royaltyPct}% royalty.`
+                        : `${famLabel} boss wants supply access: $${price.toLocaleString()} up front + ${royaltyPct}% of their supply-dependent take for ${duration} turns.`);
                   state.pendingNotifications.push({
                     type: 'info' as const,
                     title: titleIcon,
                     message: flavor,
                   });
-                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: `${isDesperate ? 'Desperate ' : renewalSoon ? 'Renewal ' : ''}supply-deal sitdown requested ($${price.toLocaleString()})` });
+                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: `${isDesperate ? 'Desperate ' : renewalSoon ? 'Renewal ' : ''}supply-deal offer to player ($${price.toLocaleString()} + ${royaltyPct}% royalty)` });
                 }
               } else {
                 // AI ↔ AI auto-resolve
@@ -9062,6 +9102,47 @@ export const useEnhancedMafiaGameState = (
           if (!sitdown) return newState;
           // Remove the incoming sitdown entry
           newState.incomingSitdowns = newState.incomingSitdowns.filter(s => s.id !== action.sitdownId);
+
+          // ── PLAYER-AS-SUPPLIER SHORT CIRCUIT ──
+          // The AI is the buyer asking the player for supply. No success roll,
+          // no cost to the player — money flows IN. Pay-out comes from the AI's
+          // own treasury (clamped at 0).
+          if (
+            sitdown.proposedDeal === 'supply_deal' &&
+            sitdown.playerIsSupplier &&
+            typeof sitdown.proposedAmount === 'number'
+          ) {
+            const buyerFam = sitdown.fromFamily;
+            const lump = Math.max(0, sitdown.proposedAmount);
+            const royaltyRate = sitdown.royaltyRate ?? 0;
+            const duration = sitdown.proposedDuration ?? 5;
+            const buyerOpp = newState.aiOpponents.find(o => o.family === buyerFam);
+            const paid = buyerOpp ? Math.min(lump, buyerOpp.resources.money) : lump;
+            if (buyerOpp) buyerOpp.resources.money = Math.max(0, buyerOpp.resources.money - paid);
+            newState.resources.money += paid;
+            newState.supplyDealPacts = [...(newState.supplyDealPacts || []), {
+              id: `supply-deal-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              buyerFamily: buyerFam,
+              targetFamily: newState.playerFamily,
+              turnsRemaining: duration,
+              turnFormed: newState.turn,
+              active: true,
+              royaltyRate,
+              lumpSum: paid,
+            }];
+            addPairTension(newState, newState.playerFamily, buyerFam, -1);
+            newState.tensionCooldowns[getTensionPairKey(newState.playerFamily, buyerFam)] = 1;
+            const famLabel = buyerFam.charAt(0).toUpperCase() + buyerFam.slice(1);
+            newState.pendingNotifications.push({
+              type: 'success' as const,
+              title: '💰 Supply Deal Signed',
+              message: `${famLabel} paid $${paid.toLocaleString()} up front and owes you ${Math.round(royaltyRate * 100)}% of their supply-dependent take for ${duration} turns.`,
+            });
+            newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
+            syncLegacyUnits(newState);
+            return newState;
+          }
+
 
           // D1: territory-scope incoming → route through territory negotiation
           if (sitdown.scope === 'territory' && sitdown.targetQ !== undefined) {

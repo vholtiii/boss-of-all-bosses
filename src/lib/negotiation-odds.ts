@@ -121,6 +121,11 @@ export function predictCounterReaction(
   originalPrice: number,
   counterPrice: number,
   round: number = 0,
+  // Reserved for future asymmetric tuning. Direction-specific UI copy lives in
+  // the panel; the magnitude-based bands below intentionally stay symmetric so
+  // both buyer and supplier flows feel consistent.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _playerIsSupplier: boolean = false,
 ): CounterReaction {
   if (originalPrice <= 0) return 'walk';
   const swing = Math.abs(counterPrice - originalPrice) / originalPrice;

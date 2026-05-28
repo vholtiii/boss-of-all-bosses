@@ -378,6 +378,11 @@ export interface SupplyDealPact {
   turnsRemaining: number;
   turnFormed: number;
   active: boolean;
+  /** Optional ongoing royalty rate (0..1). Supplier gets this fraction of the
+   *  buyer's supply-dependent business income each turn while the pact is active. */
+  royaltyRate?: number;
+  /** Lump sum paid up front (recorded for history / post-game summary). */
+  lumpSum?: number;
 }
 
 export interface SafePassagePact {
@@ -875,6 +880,12 @@ export interface IncomingSitdown {
   isCounterOffer?: boolean; // AI is re-countering the player's counter
   originalPrice?: number;   // baseline price (before counter rounds)
   counterRound?: number;    // 0 = original ask, 1 = AI re-counter
+  /** When true on a supply_deal sitdown, the AI is the BUYER asking the player
+   *  (the supplier) for access. Money flows TO the player, and an optional
+   *  royaltyRate diverts a share of the buyer's supply-dependent income. */
+  playerIsSupplier?: boolean;
+  /** Proposed royalty rate (0..1) for supplier-direction supply deals. */
+  royaltyRate?: number;
 }
 
 // ============ INFLUENCE EROSION & PASSIVE EXPANSION (Phase 3+) ============

@@ -87,8 +87,19 @@ const CounterableSitdownCard: React.FC<{
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
           {typeof s.proposedAmount === 'number' && (
-            <Badge variant="outline" className="text-[10px] h-4 text-green-400 border-green-400/40">
-              ${s.proposedAmount.toLocaleString()}
+            s.playerIsSupplier ? (
+              <Badge className="text-[10px] h-4 bg-emerald-600/90 text-white">
+                +${s.proposedAmount.toLocaleString()} up front
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px] h-4 text-green-400 border-green-400/40">
+                ${s.proposedAmount.toLocaleString()}
+              </Badge>
+            )
+          )}
+          {s.playerIsSupplier && typeof s.royaltyRate === 'number' && s.royaltyRate > 0 && (
+            <Badge className="text-[10px] h-4 bg-emerald-700/80 text-white">
+              +{Math.round(s.royaltyRate * 100)}% royalty / turn
             </Badge>
           )}
           <Badge className="text-[9px] h-4 bg-emerald-600/80">+{s.successBonus}%</Badge>
@@ -111,7 +122,9 @@ const CounterableSitdownCard: React.FC<{
       {counterOpen ? (
         <div className="space-y-1.5 pt-1" onClick={(e) => e.stopPropagation()}>
           <div className="text-[10px] text-muted-foreground">
-            Counter with your price (within ±15% likely accepted):
+            {s.playerIsSupplier
+              ? 'Counter — ask for a larger lump sum (within ±15% likely accepted):'
+              : 'Counter with your price (within ±15% likely accepted):'}
           </div>
           <div className="flex gap-1">
             <Input
@@ -140,7 +153,7 @@ const CounterableSitdownCard: React.FC<{
           </div>
           {(() => {
             const original = s.originalPrice || s.proposedAmount || 0;
-            const reaction = predictCounterReaction(original, counterValue, s.counterRound || 0);
+            const reaction = predictCounterReaction(original, counterValue, s.counterRound || 0, !!s.playerIsSupplier);
             const map = {
               accept: { txt: '✅ They will likely accept', cls: 'text-green-400' },
               recounter: { txt: '↩️ They will probably counter back', cls: 'text-amber-400' },
