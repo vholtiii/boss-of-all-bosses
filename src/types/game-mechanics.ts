@@ -378,6 +378,11 @@ export interface SupplyDealPact {
   turnsRemaining: number;
   turnFormed: number;
   active: boolean;
+  /** Optional ongoing royalty rate (0..1). Supplier gets this fraction of the
+   *  buyer's supply-dependent business income each turn while the pact is active. */
+  royaltyRate?: number;
+  /** Lump sum paid up front (recorded for history / post-game summary). */
+  lumpSum?: number;
 }
 
 export interface SafePassagePact {
