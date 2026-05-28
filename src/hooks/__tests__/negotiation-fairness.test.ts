@@ -41,4 +41,9 @@ describe('Negotiation fairness — counter reaction & price modifier', () => {
     expect(sweet).toBeGreaterThan(fair);
     expect(lowball).toBeLessThan(fair);
   });
+  it('supplier-direction counters: small ask accepted, big ask walks', () => {
+    // Player is supplier; original $10k. Asking +10% ($11k) is acceptable, +50% walks.
+    expect(predictCounterReaction(10000, 11000, 0, true)).toBe('accept');
+    expect(predictCounterReaction(10000, 15000, 0, true)).toBe('walk');
+  });
 });
