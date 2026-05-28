@@ -5905,6 +5905,9 @@ export const useEnhancedMafiaGameState = (
             tileInc = Math.floor(tileInc * (1 - aiWarPenalty));
           }
           aiIncome += tileInc;
+          if (SUPPLY_DEPENDENCIES[tile.business.type]?.length) {
+            aiSupplyDependentIncome += tileInc;
+          }
         }
       });
       // District control bonus: Manhattan +25% income for AI
