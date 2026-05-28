@@ -7126,10 +7126,16 @@ export const useEnhancedMafiaGameState = (
 
               if (supplier.isPlayer) {
                 // ── BOSS-LEVEL SITDOWN REQUEST (does not auto-commit) ──
+                // The PLAYER owns the supply here — the AI is the buyer.
+                // Money flows TO the player (lump sum + ongoing royalty).
                 const alreadyPending = (state.incomingSitdowns || []).some(
                   s => s.fromFamily === fam && s.proposedDeal === 'supply_deal' && s.scope !== 'territory'
                 );
                 if (!alreadyPending) {
+                  // Royalty: base 15%, +5% desperate, -2% renewal, clamped 10–30%, rounded to 5%.
+                  let rawRoyalty = 0.15 + (isDesperate ? 0.05 : 0) + (renewalSoon && existingDeal ? -0.02 : 0);
+                  rawRoyalty = Math.max(0.10, Math.min(0.30, rawRoyalty));
+                  const royaltyRate = Math.round(rawRoyalty * 20) / 20; // nearest 5%
                   state.incomingSitdowns = state.incomingSitdowns || [];
                   state.incomingSitdowns.push({
                     id: `incoming-supply-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -7146,19 +7152,22 @@ export const useEnhancedMafiaGameState = (
                     isRenewal: renewalSoon && !!existingDeal,
                     originalPrice: price,
                     counterRound: 0,
+                    playerIsSupplier: true,
+                    royaltyRate,
                   });
-                  const titleIcon = isDesperate ? '🚨 Desperate Offer' : (renewalSoon ? '🔁 Renewal Offered' : '🏛️ Boss Sitdown');
+                  const titleIcon = isDesperate ? '🚨 Desperate Buyer' : (renewalSoon ? '🔁 Renewal Offered' : '💰 Buyer at the Table');
+                  const royaltyPct = Math.round(royaltyRate * 100);
                   const flavor = isDesperate
-                    ? `EMERGENCY — ${famLabel} just lost supply access and is offering $${price.toLocaleString()} for ${duration} turns. Counter or accept fast.`
+                    ? `EMERGENCY — ${famLabel} just lost supply access and is offering $${price.toLocaleString()} up front + ${royaltyPct}% of their take for ${duration} turns. Counter or accept fast.`
                     : (renewalSoon
-                        ? `${famLabel} wants to extend supply access ${duration} more turns for $${price.toLocaleString()}.`
-                        : `${famLabel} boss is offering $${price.toLocaleString()} for ${duration} turns of supply access.`);
+                        ? `${famLabel} wants to extend supply access ${duration} more turns: $${price.toLocaleString()} up front + ${royaltyPct}% royalty.`
+                        : `${famLabel} boss wants supply access: $${price.toLocaleString()} up front + ${royaltyPct}% of their supply-dependent take for ${duration} turns.`);
                   state.pendingNotifications.push({
                     type: 'info' as const,
                     title: titleIcon,
                     message: flavor,
                   });
-                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: `${isDesperate ? 'Desperate ' : renewalSoon ? 'Renewal ' : ''}supply-deal sitdown requested ($${price.toLocaleString()})` });
+                  if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: `${isDesperate ? 'Desperate ' : renewalSoon ? 'Renewal ' : ''}supply-deal offer to player ($${price.toLocaleString()} + ${royaltyPct}% royalty)` });
                 }
               } else {
                 // AI ↔ AI auto-resolve
