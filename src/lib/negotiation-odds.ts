@@ -124,20 +124,18 @@ export function predictCounterReaction(
   playerIsSupplier: boolean = false,
 ): CounterReaction {
   if (originalPrice <= 0) return 'walk';
-  // Signed delta from the AI's perspective. If the player is the SUPPLIER, the
-  // AI is the buyer — asking for MORE money is the costly direction. If the
-  // player is the BUYER (default), offering LESS money is the costly direction.
-  const signed = playerIsSupplier
-    ? (counterPrice - originalPrice) / originalPrice    // + = bad for AI
-    : (originalPrice - counterPrice) / originalPrice;   // + = bad for AI
-  // Asymmetric: a generous counter (signed < 0) is always accepted;
-  // a costly counter walks past the walk threshold.
-  if (signed <= COUNTER_ACCEPT_SWING) {
-    // generous, neutral, or only mildly costly within ±15%
-    if (Math.abs(signed) <= COUNTER_ACCEPT_SWING) return 'accept';
-    return 'accept';
-  }
-  if (signed >= COUNTER_WALK_SWING || round >= 1) return 'walk';
+  // Magnitude of the swing — used for both directions.
+  const magnitude = Math.abs(counterPrice - originalPrice) / originalPrice;
+  // Signed cost from the AI's perspective. Positive = costly for AI.
+  //  - Player is BUYER (default): paying LESS is costly for the AI seller.
+  //  - Player is SUPPLIER: asking MORE is costly for the AI buyer.
+  const signedCost = playerIsSupplier
+    ? (counterPrice - originalPrice) / originalPrice
+    : (originalPrice - counterPrice) / originalPrice;
+  // A clearly generous counter (>15% in AI's favor) is always accepted.
+  if (signedCost <= -COUNTER_ACCEPT_SWING) return 'accept';
+  if (magnitude <= COUNTER_ACCEPT_SWING) return 'accept';
+  if (magnitude >= COUNTER_WALK_SWING || round >= 1) return 'walk';
   return 'recounter';
 }
 
