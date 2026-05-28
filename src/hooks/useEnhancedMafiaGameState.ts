@@ -5850,6 +5850,7 @@ export const useEnhancedMafiaGameState = (
 
       // ── INCOME (difficulty-scaled) ──
       let aiIncome = 0;
+      let aiSupplyDependentIncome = 0; // for royalty diversion
       // Compute AI family's connected supply nodes via BFS
       const aiConnectedHexes = getConnectedTerritory(state.hexMap, fam);
       const aiConnectedNodeTypes = new Set<SupplyNodeType>();
