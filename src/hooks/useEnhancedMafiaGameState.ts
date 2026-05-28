@@ -5939,11 +5939,38 @@ export const useEnhancedMafiaGameState = (
       opponent.resources.money = Math.max(0, opponent.resources.money + aiNetIncome);
       opponent.resources.lastTurnIncome = aiNetIncome; // Track for phase calculation
 
+      // ── SUPPLY ROYALTY DIVERSION ──
+      // For each active supply pact where this AI is the buyer and the player
+      // is the supplier, divert royaltyRate * supply-dependent income to the
+      // player out of the AI's freshly-credited treasury.
+      let aiRoyaltyPaidToPlayer = 0;
+      (state.supplyDealPacts || []).forEach(p => {
+        if (!p.active) return;
+        if (p.buyerFamily !== fam) return;
+        if (p.targetFamily !== state.playerFamily) return;
+        const rate = p.royaltyRate || 0;
+        if (rate <= 0 || aiSupplyDependentIncome <= 0) return;
+        const owed = Math.floor(aiSupplyDependentIncome * rate);
+        const paid = Math.min(owed, opponent.resources.money);
+        if (paid <= 0) return;
+        opponent.resources.money -= paid;
+        state.resources.money += paid;
+        aiRoyaltyPaidToPlayer += paid;
+      });
+      if (aiRoyaltyPaidToPlayer > 0) {
+        state.pendingNotifications.push({
+          type: 'info' as const,
+          title: '💵 Supply Royalty',
+          message: `${fam.charAt(0).toUpperCase() + fam.slice(1)} paid you $${aiRoyaltyPaidToPlayer.toLocaleString()} this turn from your supply deal.`,
+        });
+      }
+
       if (turnReport) {
         const parts: string[] = [`Earned $${aiIncome.toLocaleString()} gross`];
         if (aiHeatPenalty > 0) parts.push(`-$${aiHeatPenalty.toLocaleString()} heat`);
         if (aiSoldierMaintenance > 0) parts.push(`-$${aiSoldierMaintenance.toLocaleString()} soldier upkeep`);
         if (aiCommunityUpkeep > 0) parts.push(`-$${aiCommunityUpkeep.toLocaleString()} community upkeep`);
+        if (aiRoyaltyPaidToPlayer > 0) parts.push(`-$${aiRoyaltyPaidToPlayer.toLocaleString()} supply royalty to player`);
         parts.push(`= $${aiNetIncome.toLocaleString()} net`);
         turnReport.aiActions.push({ family: fam, action: 'income', detail: parts.join(' ') });
       }
