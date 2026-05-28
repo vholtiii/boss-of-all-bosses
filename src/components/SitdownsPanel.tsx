@@ -87,8 +87,19 @@ const CounterableSitdownCard: React.FC<{
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
           {typeof s.proposedAmount === 'number' && (
-            <Badge variant="outline" className="text-[10px] h-4 text-green-400 border-green-400/40">
-              ${s.proposedAmount.toLocaleString()}
+            s.playerIsSupplier ? (
+              <Badge className="text-[10px] h-4 bg-emerald-600/90 text-white">
+                +${s.proposedAmount.toLocaleString()} up front
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px] h-4 text-green-400 border-green-400/40">
+                ${s.proposedAmount.toLocaleString()}
+              </Badge>
+            )
+          )}
+          {s.playerIsSupplier && typeof s.royaltyRate === 'number' && s.royaltyRate > 0 && (
+            <Badge className="text-[10px] h-4 bg-emerald-700/80 text-white">
+              +{Math.round(s.royaltyRate * 100)}% royalty / turn
             </Badge>
           )}
           <Badge className="text-[9px] h-4 bg-emerald-600/80">+{s.successBonus}%</Badge>
