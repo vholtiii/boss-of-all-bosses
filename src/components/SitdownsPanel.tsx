@@ -122,7 +122,9 @@ const CounterableSitdownCard: React.FC<{
       {counterOpen ? (
         <div className="space-y-1.5 pt-1" onClick={(e) => e.stopPropagation()}>
           <div className="text-[10px] text-muted-foreground">
-            Counter with your price (within ±15% likely accepted):
+            {s.playerIsSupplier
+              ? 'Counter — ask for a larger lump sum (within ±15% likely accepted):'
+              : 'Counter with your price (within ±15% likely accepted):'}
           </div>
           <div className="flex gap-1">
             <Input
