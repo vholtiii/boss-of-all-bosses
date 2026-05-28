@@ -121,21 +121,16 @@ export function predictCounterReaction(
   originalPrice: number,
   counterPrice: number,
   round: number = 0,
-  playerIsSupplier: boolean = false,
+  // Reserved for future asymmetric tuning. Direction-specific UI copy lives in
+  // the panel; the magnitude-based bands below intentionally stay symmetric so
+  // both buyer and supplier flows feel consistent.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _playerIsSupplier: boolean = false,
 ): CounterReaction {
   if (originalPrice <= 0) return 'walk';
-  // Magnitude of the swing — used for both directions.
-  const magnitude = Math.abs(counterPrice - originalPrice) / originalPrice;
-  // Signed cost from the AI's perspective. Positive = costly for AI.
-  //  - Player is BUYER (default): paying LESS is costly for the AI seller.
-  //  - Player is SUPPLIER: asking MORE is costly for the AI buyer.
-  const signedCost = playerIsSupplier
-    ? (counterPrice - originalPrice) / originalPrice
-    : (originalPrice - counterPrice) / originalPrice;
-  // A clearly generous counter (>15% in AI's favor) is always accepted.
-  if (signedCost <= -COUNTER_ACCEPT_SWING) return 'accept';
-  if (magnitude <= COUNTER_ACCEPT_SWING) return 'accept';
-  if (magnitude >= COUNTER_WALK_SWING || round >= 1) return 'walk';
+  const swing = Math.abs(counterPrice - originalPrice) / originalPrice;
+  if (swing <= COUNTER_ACCEPT_SWING) return 'accept';
+  if (swing >= COUNTER_WALK_SWING || round >= 1) return 'walk';
   return 'recounter';
 }
 
