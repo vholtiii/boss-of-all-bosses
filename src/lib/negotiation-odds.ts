@@ -121,11 +121,23 @@ export function predictCounterReaction(
   originalPrice: number,
   counterPrice: number,
   round: number = 0,
+  playerIsSupplier: boolean = false,
 ): CounterReaction {
   if (originalPrice <= 0) return 'walk';
-  const swing = Math.abs(counterPrice - originalPrice) / originalPrice;
-  if (swing <= COUNTER_ACCEPT_SWING) return 'accept';
-  if (swing >= COUNTER_WALK_SWING || round >= 1) return 'walk';
+  // Signed delta from the AI's perspective. If the player is the SUPPLIER, the
+  // AI is the buyer — asking for MORE money is the costly direction. If the
+  // player is the BUYER (default), offering LESS money is the costly direction.
+  const signed = playerIsSupplier
+    ? (counterPrice - originalPrice) / originalPrice    // + = bad for AI
+    : (originalPrice - counterPrice) / originalPrice;   // + = bad for AI
+  // Asymmetric: a generous counter (signed < 0) is always accepted;
+  // a costly counter walks past the walk threshold.
+  if (signed <= COUNTER_ACCEPT_SWING) {
+    // generous, neutral, or only mildly costly within ±15%
+    if (Math.abs(signed) <= COUNTER_ACCEPT_SWING) return 'accept';
+    return 'accept';
+  }
+  if (signed >= COUNTER_WALK_SWING || round >= 1) return 'walk';
   return 'recounter';
 }
 
