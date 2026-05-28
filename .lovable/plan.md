@@ -1,76 +1,59 @@
-## Goal
+## The bug
 
-Make negotiations feel fair and interactive: AI-initiated sitdowns shouldn't punish the player on failure, and both sides should be able to counter any offer with the success chance updating in real time as the price moves.
+Today every supply-deal sitdown the AI sends the player is built as if the *player* is the buyer:
 
-## Problems today
+- `incomingSitdowns.push({ proposedDeal: 'supply_deal', proposedAmount: price, ... })` (useEnhancedMafiaGameState.ts ~7134)
+- On accept, the `supply_deal` reducer always does `state.resources.money -= cost` and `targetOpp.resources.money += cost` (lines 11289 + 11480–11505) and creates a pact with `buyerFamily: state.playerFamily`.
 
-1. When you **accept an AI-initiated sitdown** and the roll fails, `processNegotiation` still:
-   - Deducts the full cost (refunds only 50%)
-   - Applies the 2-turn Boss/Capo diplomacy cooldown
-   That's wrong — you didn't ask for the meeting; they did.
-2. Counter-offers only exist for `supply_deal`. Other deal types (ceasefire, alliance, share_profits, bribe_territory, non_aggression) have no counter UI.
-3. When **you** initiate a sitdown, the AI never counters — it just accepts or rejects via the dice roll.
-4. The dialog shows a static success chance; tweaking the offered price doesn't change the displayed odds.
+So even though narratively the AI family lost their docks and is begging the player for access, the UI tells the player to pay them. The user is right — when the player owns the supply, money should flow *to* the player, plus a cut of the rival's businesses that benefit from the line.
 
-## Changes
+## What we'll change
 
-### 1. Fair handling of AI-initiated sitdowns (`useEnhancedMafiaGameState.ts`)
+### 1. Model the direction on the sitdown
+Extend `IncomingSitdown` and `SupplyDealPact` in `src/types/game-mechanics.ts`:
+- `IncomingSitdown.playerIsSupplier?: boolean` — true when the AI is the buyer asking the player for access.
+- `IncomingSitdown.royaltyRate?: number` — proposed % of buyer's qualifying business income that flows to the supplier (e.g. 0.15).
+- `SupplyDealPact.royaltyRate?: number` — persisted on the active pact.
+- `SupplyDealPact.lumpSum?: number` — record the upfront paid (for the post-game log / counters).
 
-- Tag the `processNegotiation` call inside `accept_incoming_sitdown` with `aiInitiated: true` (pass through `action`).
-- In `processNegotiation`, when `action.aiInitiated`:
-  - **Skip the cooldown check** at the top.
-  - **Do not set** `bossNegotiationCooldown` / `capoNegotiationCooldown`.
-  - **On failure**: full refund of `cost` (not 50%), no respect cost, tension +3 only. Notification: "They walked — you owe nothing."
-  - **On success**: pay full agreed cost as today (you got the deal you accepted).
-- Player-initiated paths (`negotiate`, `boss_negotiate`) keep current behavior (50% refund, cooldown, respect cost).
+### 2. Build AI-initiated offers as "buy from player"
+In the boss-level branch at lines 7127–7162:
+- Set `playerIsSupplier: true`.
+- Compute lump sum via existing `computeSupplyDealPrice(...)` (smaller — it's just the upfront).
+- Add a royalty: base 15%, +5% when `isDesperate`, −2% when `isRenewal` (cap 10–30%). Round to 5% steps.
+- Update notification copy: "Castellano boss wants supply access — offering $X up front + Y% of their take for D turns."
 
-### 2. Universal counter-offer action
+### 3. Accept reducer pays the player when they're the supplier
+In `accept_incoming_sitdown` (~9101) and the family-scope `supply_deal` case (11480):
+- If `aiInitiated && sitdown.playerIsSupplier`, take a new branch:
+  - `state.resources.money += lumpSum` (no deduction, no cooldown, no respect cost — already handled by the `aiInitiated` fairness path).
+  - Push pact with `buyerFamily: enemyFamily`, `targetFamily: state.playerFamily`, plus `royaltyRate` and `lumpSum`.
+  - Pay the AI buyer out of their own treasury (subtract lump sum from `targetOpp.resources.money`, clamped ≥ 0).
+- Existing player-initiated path (player asks to buy) stays unchanged.
 
-- Generalize `counter_supply_sitdown` → **`counter_incoming_sitdown`** that works for any `proposedDeal`.
-- Same AI response model already used for supply deals:
-  - swing ≤ 15% of original → AI accepts, sitdown refreshed at counter price.
-  - swing ≥ 40% or `counterRound ≥ 1` → AI walks, tension +5.
-  - else → AI re-counters at the midpoint, `counterRound = 1`, marked "final offer".
-- For non-priced deals (ceasefire, alliance), counter targets the **duration** instead of price (1–6 turns), reusing the same swing math against `proposedDuration`. `bribe_territory` and `share_profits` use price.
-- Keep `counter_supply_sitdown` as a thin alias for save-file compatibility.
+### 4. Pay the royalty each turn
+Where `supplyDealPacts` are walked for income/decay (the loop near 3837 and the upkeep tick near 3109/11809):
+- For each active pact with `royaltyRate > 0`, compute the buyer family's income from businesses that actually use the supply this turn (re-use the existing "famPacts" filter that already gates supply-dependent income).
+- Transfer `royaltyRate * eligibleIncome` from the buyer's treasury to the supplier's treasury (player resources when `targetFamily === playerFamily`, otherwise the matching `aiOpponents` entry).
+- Emit a small turn-summary line ("Supply royalty from Castellano: $1,200") so the player feels the inflow.
 
-### 3. AI counters when the player initiates
+### 5. Counter-offer semantics flip when player is supplier
+`counter_supply_sitdown` reducer (9130) and `predictCounterReaction` in `src/lib/negotiation-odds.ts`:
+- Add an optional `playerIsSupplier` arg. When true, asking for *more* is the costly direction (AI pushes back on high counters, accepts low ones). When false, current behavior.
+- Keep the ±15% accept / ≥40% walk / mid-counter bands, just measured against the price direction the AI cares about.
 
-- After a player `negotiate` / `boss_negotiate` action where the **roll succeeds but the player's price is "low"** (cost < 0.85× a fair baseline computed the same way as `computeSupplyDealPrice`, generalized per deal type), instead of immediate success, inject a new `IncomingSitdown` with `isCounterOffer: true`, `proposedAmount = midpoint`, and refund the player's payment.
-- Player sees it appear in the Sitdowns panel and can Accept / Counter / Decline. This keeps the existing dice-roll UX for fair offers and only triggers a counter when the player lowballs.
-- Guarded by a per-turn flag so the AI counters at most once per player-initiated negotiation.
+### 6. UI surface
+`src/components/SitdownsPanel.tsx` / `CounterableSitdownCard`:
+- When `s.playerIsSupplier`, render the price chip as green inflow ("+$X up front") and add a second chip "+Y% royalty / turn".
+- Swap the helper copy on the counter input ("Counter — ask for a higher cut").
+- Decline copy unchanged.
 
-### 4. Live success-chance preview in dialogs
-
-- **`NegotiationDialog.tsx`** (player-initiated): add an editable price `Input` next to each deal option (default = computed cost). Wire its `onChange` to a `useMemo` that re-runs `getSuccessChance` with a price-based modifier:
-  - `priceModifier = clamp(round((price / baseCost - 1) * 20), -25, +25)` — higher bid → better odds, lowball → worse.
-- The displayed `{chance}% chance` badge updates live as the user types. Roll uses the same modifier.
-- **`SitdownsPanel.tsx`** (AI-initiated, `CounterableSitdownCard`): expand the existing counter input from supply-only to all deal types. Show a live "If you counter at $X: ~Y% they accept" hint computed from the swing thresholds in change #2 (≤15% → "likely accept", 15–40% → "they'll re-counter", ≥40% → "they'll walk").
-
-### 5. Types & helpers
-
-- `src/types/game-mechanics.ts`: add `aiInitiated?: boolean` to the negotiation action type; extend `IncomingSitdown.counterRound` doc to cover non-supply deals; add `proposedDuration` to the counter payload.
-- `src/lib/negotiation-odds.ts`: add `getPriceAdjustedSuccessChance({ basePrice, offeredPrice, ...oddsInput })` and `predictCounterReaction(originalPrice, counterPrice, round)` returning `'accept' | 'recounter' | 'walk'` so dialog + reducer share one source of truth.
-
-### 6. Tests
-
-- Extend `ai-territory-sitdown.test.ts` (or new `negotiation-fairness.test.ts`):
-  - AI-initiated failure → money unchanged, no cooldown set.
-  - Player-initiated failure → 50% refund + cooldown as today.
-  - `counter_incoming_sitdown` accepts/recounters/walks at the documented thresholds for both `supply_deal` and `ceasefire`.
-  - `predictCounterReaction` matches the reducer outcome for sampled prices.
+### 7. Tests
+Extend `src/hooks/__tests__/negotiation-fairness.test.ts`:
+- Accepting a `playerIsSupplier` supply sitdown increases `state.resources.money` and creates a pact with `targetFamily === playerFamily`.
+- Each turn the pact is active, the player's money grows by ~`royaltyRate * buyer eligible income` and the buyer's money drops by the same amount.
+- Counter direction: a +10% counter is "accept", +50% is "walk".
 
 ## Out of scope
-
-- Multi-round haggling beyond 1 counter per side.
-- New deal types or rebalancing baseline costs.
-- AI ↔ AI counter-offers (only player ↔ AI).
-
-## Files touched
-
-- `src/hooks/useEnhancedMafiaGameState.ts`
-- `src/lib/negotiation-odds.ts`
-- `src/types/game-mechanics.ts`
-- `src/components/NegotiationDialog.tsx`
-- `src/components/SitdownsPanel.tsx`
-- `src/hooks/__tests__/` (new/extended test file)
+- A new player-initiated *"sell supply to X"* outgoing flow. We're only fixing the existing incoming sitdowns so they make sense.
+- AI ↔ AI royalty: AI-to-AI deals stay as flat lump sums for now (royalty is a player-facing affordance).
