@@ -9072,6 +9072,47 @@ export const useEnhancedMafiaGameState = (
           // Remove the incoming sitdown entry
           newState.incomingSitdowns = newState.incomingSitdowns.filter(s => s.id !== action.sitdownId);
 
+          // ── PLAYER-AS-SUPPLIER SHORT CIRCUIT ──
+          // The AI is the buyer asking the player for supply. No success roll,
+          // no cost to the player — money flows IN. Pay-out comes from the AI's
+          // own treasury (clamped at 0).
+          if (
+            sitdown.proposedDeal === 'supply_deal' &&
+            sitdown.playerIsSupplier &&
+            typeof sitdown.proposedAmount === 'number'
+          ) {
+            const buyerFam = sitdown.fromFamily;
+            const lump = Math.max(0, sitdown.proposedAmount);
+            const royaltyRate = sitdown.royaltyRate ?? 0;
+            const duration = sitdown.proposedDuration ?? 5;
+            const buyerOpp = newState.aiOpponents.find(o => o.family === buyerFam);
+            const paid = buyerOpp ? Math.min(lump, buyerOpp.resources.money) : lump;
+            if (buyerOpp) buyerOpp.resources.money = Math.max(0, buyerOpp.resources.money - paid);
+            newState.resources.money += paid;
+            newState.supplyDealPacts = [...(newState.supplyDealPacts || []), {
+              id: `supply-deal-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              buyerFamily: buyerFam,
+              targetFamily: newState.playerFamily,
+              turnsRemaining: duration,
+              turnFormed: newState.turn,
+              active: true,
+              royaltyRate,
+              lumpSum: paid,
+            }];
+            addPairTension(newState, newState.playerFamily, buyerFam, -1);
+            newState.tensionCooldowns[getTensionPairKey(newState.playerFamily, buyerFam)] = 1;
+            const famLabel = buyerFam.charAt(0).toUpperCase() + buyerFam.slice(1);
+            newState.pendingNotifications.push({
+              type: 'success' as const,
+              title: '💰 Supply Deal Signed',
+              message: `${famLabel} paid $${paid.toLocaleString()} up front and owes you ${Math.round(royaltyRate * 100)}% of their supply-dependent take for ${duration} turns.`,
+            });
+            newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
+            syncLegacyUnits(newState);
+            return newState;
+          }
+
+
           // D1: territory-scope incoming → route through territory negotiation
           if (sitdown.scope === 'territory' && sitdown.targetQ !== undefined) {
             // Use the player's nearest capo as the negotiator (or any capo) so processNegotiation passes its capo check
