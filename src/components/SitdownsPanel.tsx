@@ -153,7 +153,7 @@ const CounterableSitdownCard: React.FC<{
           </div>
           {(() => {
             const original = s.originalPrice || s.proposedAmount || 0;
-            const reaction = predictCounterReaction(original, counterValue, s.counterRound || 0);
+            const reaction = predictCounterReaction(original, counterValue, s.counterRound || 0, !!s.playerIsSupplier);
             const map = {
               accept: { txt: '✅ They will likely accept', cls: 'text-green-400' },
               recounter: { txt: '↩️ They will probably counter back', cls: 'text-amber-400' },
