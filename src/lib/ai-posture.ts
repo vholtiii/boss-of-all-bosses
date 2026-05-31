@@ -58,6 +58,8 @@ export interface PosturePolicy {
   warTargetMul: number;
   /** Multiplier on building businesses on owned hexes (vs. expanding). */
   economyFocusMul: number;
+  /** Multiplier on scoring bonus for reachable rival supply nodes. Higher = more eager to cut supply lines. */
+  supplyNodeMul: number;
 }
 
 export function computeAIPosture(i: PostureInputs): AIPosture {
@@ -83,8 +85,9 @@ export function computeAIPosture(i: PostureInputs): AIPosture {
 
   // 7. Phase 2+, cool heat, healthy treasury → expand
   // EXPAND from Phase 1+: in early game, AI must grow to hit Phase 2 hex thresholds.
-  // Phase 1 AIs have smaller treasuries, so runway threshold is lower.
-  if (i.heatTier === 'cool' && i.moneyRunway > 4) return 'EXPAND';
+  // Loosened runway gate (>2.5) lets AI EXPAND on a moderate treasury instead of
+  // defaulting to BUILD_ECONOMY (which used to silently block plan hits & hitmen).
+  if (i.heatTier === 'cool' && i.moneyRunway > 2.5) return 'EXPAND';
 
   // 8. Default: build economy, low-risk only
   return 'BUILD_ECONOMY';
@@ -97,57 +100,60 @@ export function posturePolicy(p: AIPosture): PosturePolicy {
         heatCeiling: 35, suppressOffense: true, suppressExpansion: true,
         forceBribe: true, preferLayLow: true, preferMattresses: false,
         acceptSitdownsForCash: true, refuseNewWars: true,
-        warTargetMul: 0, economyFocusMul: 1.5,
+        warTargetMul: 0, economyFocusMul: 1.5, supplyNodeMul: 0,
       };
     case 'CONSOLIDATE':
       return {
         heatCeiling: 40, suppressOffense: true, suppressExpansion: true,
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: true, refuseNewWars: true,
-        warTargetMul: 0, economyFocusMul: 2.0,
+        warTargetMul: 0, economyFocusMul: 2.0, supplyNodeMul: 0,
       };
     case 'TURTLE':
       return {
         heatCeiling: 50, suppressOffense: true, suppressExpansion: true,
         forceBribe: false, preferLayLow: false, preferMattresses: true,
         acceptSitdownsForCash: false, refuseNewWars: true,
-        warTargetMul: 0, economyFocusMul: 1.2,
+        warTargetMul: 0, economyFocusMul: 1.2, supplyNodeMul: 0,
       };
     case 'WAR':
       return {
         heatCeiling: 80, suppressOffense: false, suppressExpansion: true,
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: false, refuseNewWars: false,
-        warTargetMul: 2.0, economyFocusMul: 0.5,
+        warTargetMul: 2.0, economyFocusMul: 0.5, supplyNodeMul: 1.5,
       };
     case 'CLOSE_OUT':
       return {
         heatCeiling: 85, suppressOffense: false, suppressExpansion: false,
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: false, refuseNewWars: true,
-        warTargetMul: 1.0, economyFocusMul: 0.8,
+        warTargetMul: 1.0, economyFocusMul: 0.8, supplyNodeMul: 1.3,
       };
     case 'PRESSURE_LEADER':
       return {
         heatCeiling: 55, suppressOffense: false, suppressExpansion: true,
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: false, refuseNewWars: false,
-        warTargetMul: 1.5, economyFocusMul: 1.0,
+        warTargetMul: 1.5, economyFocusMul: 1.0, supplyNodeMul: 1.4,
       };
     case 'EXPAND':
       return {
         heatCeiling: 50, suppressOffense: false, suppressExpansion: false,
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: false, refuseNewWars: false,
-        warTargetMul: 1.0, economyFocusMul: 1.0,
+        warTargetMul: 1.0, economyFocusMul: 1.0, supplyNodeMul: 1.0,
       };
     case 'BUILD_ECONOMY':
     default:
       return {
+        // refuseNewWars: false — was true, which silently blocked Plan Hit & Hitman
+        // for every AI in the default posture. Aggressive personalities can now
+        // still initiate offensive actions while building economy.
         heatCeiling: 45, suppressOffense: false, suppressExpansion: false,
         forceBribe: false, preferLayLow: false, preferMattresses: false,
-        acceptSitdownsForCash: false, refuseNewWars: true,
-        warTargetMul: 0.5, economyFocusMul: 1.8,
+        acceptSitdownsForCash: false, refuseNewWars: false,
+        warTargetMul: 0.5, economyFocusMul: 1.8, supplyNodeMul: 0.7,
       };
   }
 }

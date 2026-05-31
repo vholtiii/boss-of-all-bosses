@@ -96,6 +96,10 @@ import {
   type FamilyId, type AIPersonality, type DynamicMood,
 } from '@/lib/ai-strategy';
 import { computeAIPosture, posturePolicy, rankByTerritory, type AIPosture } from '@/lib/ai-posture';
+import {
+  getAggressionScale, getHQAssaultBase, getPlanHitBase, getHitmanChance,
+  getSupplyNodeScoreBonus, getSupplyNodeRoutingChance, getSupplyStrikeRadius,
+} from '@/lib/ai-difficulty';
 import { computeSupplyDealPrice } from '@/lib/negotiation-odds';
 
 // ============ SEEDED PRNG (Mulberry32) ============
@@ -5850,6 +5854,45 @@ export const useEnhancedMafiaGameState = (
       const postureBlocksOffense = !strategicOverride && (policy.suppressOffense || aiHeat >= policy.heatCeiling);
       const aiOffenseDisabled = isAILayingLow(opponent, state.turn) || isAIAtMattresses(opponent, state.turn) || aiHeatRicoFreeze || postureBlocksOffense;
 
+      // ── DIFFICULTY-SCALED OFFENSIVE AGGRESSION ──
+      // Single source of truth for "how aggressive should new AI offensive trees feel?"
+      const aggressionScale = getAggressionScale(state.difficulty);
+
+      // ── SUPPLY-LINE TARGETING: detect reachable rival supply nodes ──
+      // A node is "reachable" if within SUPPLY_STRIKE_RADIUS of this AI's HQ,
+      // or within 3 hexes of any of its safehouses (forward operating bases extend reach).
+      const supplyStrikeRadius = getSupplyStrikeRadius(state.mapSize);
+      const ownSafehouses = (state.safehouses || []).filter(s => {
+        const t = state.hexMap.find(tt => tt.q === s.q && tt.r === s.r && tt.s === s.s);
+        return t?.controllingFamily === fam;
+      });
+      const reachableSupplyNodeKeys = new Set<string>();
+      (state.supplyNodes || []).forEach(node => {
+        const nodeTile = state.hexMap.find(t => t.q === node.q && t.r === node.r && t.s === node.s);
+        const controller = nodeTile?.controllingFamily;
+        // Only target nodes controlled by a *rival* family (not neutral, not own)
+        if (!controller || controller === fam || controller === 'neutral') return;
+        const distFromHQ = hexDistance(node, hq);
+        const nearSafehouse = ownSafehouses.some(s => hexDistance(node, s) <= 3);
+        if (distFromHQ <= supplyStrikeRadius || nearSafehouse) {
+          reachableSupplyNodeKeys.add(`${node.q},${node.r},${node.s}`);
+        }
+      });
+
+      // ── VULNERABLE RIVAL DETECTION (opportunistic pile-on flag) ──
+      // A rival is "vulnerable" if they've taken ≥2 recent unit losses or are at critical/RICO heat.
+      const vulnerableFamilies = new Set<string>();
+      (state.aiOpponents || []).forEach(o => {
+        if (o.family === fam) return;
+        if ((state.eliminatedFamilies || []).includes(o.family)) return;
+        const oa = o as any;
+        const losses = (oa.recentSoldierLosses || 0) + (oa.recentCapoLosses || 0) * 2;
+        const heat = o.resources.heat || 0;
+        if (losses >= 2 || heat >= 80) vulnerableFamilies.add(o.family);
+      });
+      // Defensive/diplomatic personalities don't pile on (keeps Normal sane).
+      const willPileOn = personality !== 'defensive' && personality !== 'diplomatic';
+
       // Reset per-turn move budget for this AI family's units (mirror player reset).
       // Mattresses locks AI units' movement (parity with player).
       state.deployedUnits = state.deployedUnits.map(u => {
@@ -6197,9 +6240,21 @@ export const useEnhancedMafiaGameState = (
             !state.hexMap.some(t => t.q === n.q && t.r === n.r && t.s === n.s && t.controllingFamily === fam)
           );
 
+          // ── SUPPLY-LINE TARGETING: reachable rival supply nodes in striking distance ──
+          const supplyNodeHexes = validMoves.filter(n =>
+            reachableSupplyNodeKeys.has(`${n.q},${n.r},${n.s}`)
+          );
+          // Aggressive/opportunistic/unpredictable will route to supply nodes proactively.
+          // Defensive/diplomatic only get the scoring bonus (no pool override).
+          const supplyRouteOK = personality === 'aggressive' || personality === 'opportunistic' || personality === 'unpredictable';
+          const supplyRoutingChance = getSupplyNodeRoutingChance(state.difficulty) * aggressionScale;
+
           if (warTargetHexes.length > 0 && Math.random() < 0.85) {
             // War: heavily prioritize attacking the war target
             targetPool = warTargetHexes;
+          } else if (supplyNodeHexes.length > 0 && supplyRouteOK && policy.supplyNodeMul > 0.5 && Math.random() < supplyRoutingChance) {
+            // Supply-line strike: cut the rival's supply nodes
+            targetPool = supplyNodeHexes;
           } else if (safehouseHexes.length > 0 && Math.random() < 0.7) {
             targetPool = safehouseHexes;
           } else if ((hasBounty || isAlerted) && playerHexes.length > 0) {
@@ -6309,6 +6364,15 @@ export const useEnhancedMafiaGameState = (
               const nt = state.hexMap.find(t => t.q === nn.q && t.r === nn.r && t.s === nn.s);
               return nt && nt.controllingFamily === fam;
             });
+            const hexKey = `${n.q},${n.r},${n.s}`;
+            const isSupplyTarget = reachableSupplyNodeKeys.has(hexKey);
+            // Check whether this supply node feeds a business in the AI's focus districts
+            const supplyInFocus = isSupplyTarget && !!(tile?.district && focusSet.has(tile.district));
+            // Check whether the rival owning this node has an active supply deal with the player
+            const supplyFeedsPlayerDeal = isSupplyTarget && (state.supplyDealPacts || []).some(p =>
+              p.active && p.targetFamily === tile?.controllingFamily && p.buyerFamily === state.playerFamily
+            );
+            const isVulnerable = willPileOn && !!tile?.controllingFamily && vulnerableFamilies.has(tile.controllingFamily);
             return scoreHexForAI({
               hexIncome: tile?.business?.income || 0,
               defenderCount,
@@ -6329,6 +6393,12 @@ export const useEnhancedMafiaGameState = (
               warTargetMul: policy.warTargetMul,
               expandMul: posture === 'EXPAND' ? 1.4 : posture === 'CLOSE_OUT' ? 1.2 : 1,
               economyFocusMul: policy.economyFocusMul,
+              isSupplyNodeTarget: isSupplyTarget,
+              supplyNodeMul: policy.supplyNodeMul,
+              supplyNodeBonus: getSupplyNodeScoreBonus(state.difficulty),
+              supplyNodeInFocusDistrict: supplyInFocus,
+              supplyNodeFeedsPlayerDeal: supplyFeedsPlayerDeal,
+              isVulnerableRivalHex: isVulnerable,
             });
           });
           const pickIdx = softmaxPick(scores, turnRng, 4, difficultySoftmaxTemperature(state.difficulty || 'normal'));
@@ -6386,8 +6456,14 @@ export const useEnhancedMafiaGameState = (
                 const isAIScoutedHit = aiHasScoutIntel(state, fam, target.q, target.r, target.s);
                 const aiHitType: 'scouted' | 'blind' = isAIScoutedHit ? 'scouted' : 'blind';
                 // Heat-precaution: at warm+ (no override), refuse blind hits — skip rather than swing reckless.
+                // Exception: aggressive/unpredictable AIs in WAR or PRESSURE_LEADER posture
+                // will push through warm heat (matches the new offensive-posture profile).
                 const cautionTier = (oppAny.aiHeatCaution || 'cool') as string;
-                if (aiHitType === 'blind' && cautionTier !== 'cool' && cautionTier !== 'override') {
+                const warPostureAllowsBlind =
+                  cautionTier === 'warm' &&
+                  (posture === 'WAR' || posture === 'PRESSURE_LEADER') &&
+                  (personality === 'aggressive' || personality === 'unpredictable');
+                if (aiHitType === 'blind' && cautionTier !== 'cool' && cautionTier !== 'override' && !warPostureAllowsBlind) {
                   if (turnReport) turnReport.aiActions.push({ family: fam, action: 'heat_caution', detail: `Held off blind hit (heat ${aiHeat})` });
                   break;
                 }
@@ -7304,7 +7380,7 @@ export const useEnhancedMafiaGameState = (
       const postureBlocksNewHit = policy.refuseNewWars && !strategicOverride && !atWarNow;
       if (hasCeasefireWithPlayer || hasAllianceWithPlayer || aiOffenseDisabled || postureBlocksNewHit) {
         // Skip plan hit — active pact, hiding, or posture refuses new aggression
-      } else if (aiPhase >= 2 && planHitPersonalityAllowed && Math.random() < AI_PLAN_HIT_CHANCE * planHitChanceMultiplier) {
+      } else if (aiPhase >= 2 && planHitPersonalityAllowed && Math.random() < getPlanHitBase(state.difficulty) * planHitChanceMultiplier * aggressionScale) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
         const availableTargets = playerCapos.filter(c => !alreadyTargeted.has(c.id));
@@ -7423,7 +7499,7 @@ export const useEnhancedMafiaGameState = (
         aiHitmanRunway >= 8 &&
         (aiAtWarWithPlayer || aiPlayerRel <= -30) &&
         !state.ceasefires.some(c => c.active && c.family === fam) &&
-        Math.random() < (aiAtWarWithPlayer ? 0.18 : 0.08)
+        Math.random() < getHitmanChance(state.difficulty, aiAtWarWithPlayer) * aggressionScale
       ) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         // Avoid double-targeting capos already under another hitman contract
@@ -7629,10 +7705,10 @@ export const useEnhancedMafiaGameState = (
       // ── AI HQ ASSAULT (Phase 4 only, personality-gated) ──
       // Defensive and diplomatic families NEVER attempt HQ assaults
       const hqAssaultAllowed = personality !== 'defensive' && personality !== 'diplomatic';
-      const hqAssaultChance = personality === 'aggressive' ? 0.15
+      const hqAssaultChance = (personality === 'aggressive' ? 0.15
         : personality === 'unpredictable' ? 0.12
         : personality === 'opportunistic' ? ((state.flippedSoldiers || []).length >= 2 ? 0.08 : 0)
-        : 0.10;
+        : 0.10) * aggressionScale;
       if (!aiOffenseDisabled && aiPhase >= 4 && hqAssaultAllowed && Math.random() < hqAssaultChance) {
         // Find enemy HQs adjacent to AI soldiers with high toughness
         const aiSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
@@ -7659,7 +7735,7 @@ export const useEnhancedMafiaGameState = (
             // CAP defense at +60%
             defensePenalty = Math.min(0.60, defensePenalty);
 
-            let chance = HQ_ASSAULT_BASE_CHANCE - defensePenalty;
+            let chance = getHQAssaultBase(state.difficulty) - defensePenalty;
             const adjFriendly = state.deployedUnits.filter(u => u.family === fam && u.id !== soldier.id && neighbors.some(nb => nb.q === u.q && nb.r === u.r && nb.s === u.s));
             chance += adjFriendly.length * 0.05;
             // Flipped soldier bonus

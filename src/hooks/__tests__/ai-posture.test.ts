@@ -58,7 +58,7 @@ describe('computeAIPosture', () => {
   });
 
   it('BUILD_ECONOMY when runway is tight (cannot afford to expand)', () => {
-    expect(computeAIPosture({ ...baseInputs, aiPhase: 1, heatTier: 'cool', moneyRunway: 3.5 })).toBe('BUILD_ECONOMY');
+    expect(computeAIPosture({ ...baseInputs, aiPhase: 1, heatTier: 'cool', moneyRunway: 2.6 })).toBe('BUILD_ECONOMY');
   });
 
   it('BUILD_ECONOMY when warm heat blocks EXPAND', () => {
