@@ -1489,21 +1489,48 @@ export const RightSidePanel: React.FC<{
                         return connTypes;
                       })();
                       return (
-                        <div key={deal.id} className="rounded border border-amber-500/30 bg-amber-500/5 p-2">
+                        <div key={deal.id} className={cn(
+                          'rounded border p-2',
+                          isPlayerBuyer ? 'border-amber-500/30 bg-amber-500/5' : 'border-emerald-500/40 bg-emerald-500/5',
+                        )}>
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-amber-400">
-                              🚚 {otherFamLabel}
+                            <span className={cn(
+                              'text-xs font-semibold',
+                              isPlayerBuyer ? 'text-amber-400' : 'text-emerald-300',
+                            )}>
+                              🚚 {isPlayerBuyer ? '→' : '←'} {otherFamLabel}
                             </span>
-                            <Badge variant="outline" className="text-[9px] h-4 border-amber-500/50 text-amber-400">
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'text-[9px] h-4',
+                                isPlayerBuyer
+                                  ? 'border-amber-500/50 text-amber-400'
+                                  : 'border-emerald-500/60 text-emerald-300',
+                              )}
+                            >
                               {deal.turnsRemaining}t · {isPlayerBuyer ? 'Buying' : 'Selling'}
                             </Badge>
                           </div>
+                          {isPlayerBuyer ? (
+                            <div className="text-[10px] text-amber-300/80 mt-0.5">
+                              💸 You bought supply access{typeof deal.lumpSum === 'number' && deal.lumpSum > 0 ? ` — $${deal.lumpSum.toLocaleString()} paid` : ''}
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-emerald-300/90 mt-0.5">
+                              💵{typeof deal.lumpSum === 'number' && deal.lumpSum > 0 ? ` +$${deal.lumpSum.toLocaleString()} up front` : ''}
+                              {typeof deal.royaltyRate === 'number' && deal.royaltyRate > 0 ? ` · +${Math.round(deal.royaltyRate * 100)}% royalty / turn` : ''}
+                            </div>
+                          )}
                           {partnerConnected.size > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {Array.from(partnerConnected).map((nodeType: string) => {
                                 const cfg = SUPPLY_NODE_CONFIG[nodeType as SupplyNodeType];
                                 return cfg ? (
-                                  <span key={nodeType} className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300">
+                                  <span key={nodeType} className={cn(
+                                    'text-[9px] px-1.5 py-0.5 rounded',
+                                    isPlayerBuyer ? 'bg-amber-500/10 text-amber-300' : 'bg-emerald-500/10 text-emerald-300',
+                                  )}>
                                     {cfg.icon} {cfg.label}
                                   </span>
                                 ) : null;
