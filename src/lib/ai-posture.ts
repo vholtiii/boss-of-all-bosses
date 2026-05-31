@@ -58,6 +58,8 @@ export interface PosturePolicy {
   warTargetMul: number;
   /** Multiplier on building businesses on owned hexes (vs. expanding). */
   economyFocusMul: number;
+  /** Multiplier on scoring bonus for reachable rival supply nodes. Higher = more eager to cut supply lines. */
+  supplyNodeMul: number;
 }
 
 export function computeAIPosture(i: PostureInputs): AIPosture {
