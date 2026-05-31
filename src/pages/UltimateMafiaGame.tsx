@@ -844,7 +844,11 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           ((gameState as any).supplyDealPacts || []).filter((p: any) => p.active && p.turnsRemaining <= 1).forEach((p: any) => {
             const isPlayerBuyer = p.buyerFamily === gameState.playerFamily;
             const otherFam = isPlayerBuyer ? p.targetFamily : p.buyerFamily;
-            expiringPacts.push({ label: `Supply Deal w/ ${otherFam.charAt(0).toUpperCase() + otherFam.slice(1)}`, emoji: '🚚' });
+            const famLabel = otherFam.charAt(0).toUpperCase() + otherFam.slice(1);
+            expiringPacts.push({
+              label: isPlayerBuyer ? `Buying from ${famLabel}` : `Supplying ${famLabel}`,
+              emoji: '🚚',
+            });
           });
 
           const deployedCount = (gameState.deployedUnits || []).filter((u: any) => u.family === gameState.playerFamily && u.type === 'soldier').length;
