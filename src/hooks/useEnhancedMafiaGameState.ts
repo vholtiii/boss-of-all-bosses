@@ -96,6 +96,10 @@ import {
   type FamilyId, type AIPersonality, type DynamicMood,
 } from '@/lib/ai-strategy';
 import { computeAIPosture, posturePolicy, rankByTerritory, type AIPosture } from '@/lib/ai-posture';
+import {
+  getAggressionScale, getHQAssaultBase, getPlanHitBase, getHitmanChance,
+  getSupplyNodeScoreBonus, getSupplyNodeRoutingChance, getSupplyStrikeRadius,
+} from '@/lib/ai-difficulty';
 import { computeSupplyDealPrice } from '@/lib/negotiation-odds';
 
 // ============ SEEDED PRNG (Mulberry32) ============
