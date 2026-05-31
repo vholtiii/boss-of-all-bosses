@@ -143,6 +143,18 @@ export interface ScoreHexInputs {
   expandMul?: number;
   /** Posture-driven multiplier on owned-adjacency consolidation bonus (BUILD_ECONOMY/CONSOLIDATE >1). Default 1. */
   economyFocusMul?: number;
+  /** True if this hex contains a rival supply node within striking distance of own HQ/safehouse. */
+  isSupplyNodeTarget?: boolean;
+  /** Posture-driven multiplier on the supply-node bonus (WAR/PRESSURE_LEADER >1, COOL_OFF/CONSOLIDATE 0). Default 1. */
+  supplyNodeMul?: number;
+  /** Base bonus added when isSupplyNodeTarget is true (scaled by difficulty). Default 7. */
+  supplyNodeBonus?: number;
+  /** True if the supply node feeds a business inside one of this AI's focus districts. */
+  supplyNodeInFocusDistrict?: boolean;
+  /** True if the supply node's owning rival currently has an active supply deal with the player. */
+  supplyNodeFeedsPlayerDeal?: boolean;
+  /** True if the owning family is currently flagged "vulnerable" (recent losses or critical/rico heat). */
+  isVulnerableRivalHex?: boolean;
 }
 
 export function scoreHexForAI(i: ScoreHexInputs): number {
