@@ -7380,7 +7380,7 @@ export const useEnhancedMafiaGameState = (
       const postureBlocksNewHit = policy.refuseNewWars && !strategicOverride && !atWarNow;
       if (hasCeasefireWithPlayer || hasAllianceWithPlayer || aiOffenseDisabled || postureBlocksNewHit) {
         // Skip plan hit — active pact, hiding, or posture refuses new aggression
-      } else if (aiPhase >= 2 && planHitPersonalityAllowed && Math.random() < AI_PLAN_HIT_CHANCE * planHitChanceMultiplier) {
+      } else if (aiPhase >= 2 && planHitPersonalityAllowed && Math.random() < getPlanHitBase(state.difficulty) * planHitChanceMultiplier * aggressionScale) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
         const availableTargets = playerCapos.filter(c => !alreadyTargeted.has(c.id));
@@ -7499,7 +7499,7 @@ export const useEnhancedMafiaGameState = (
         aiHitmanRunway >= 8 &&
         (aiAtWarWithPlayer || aiPlayerRel <= -30) &&
         !state.ceasefires.some(c => c.active && c.family === fam) &&
-        Math.random() < (aiAtWarWithPlayer ? 0.18 : 0.08)
+        Math.random() < getHitmanChance(state.difficulty, aiAtWarWithPlayer) * aggressionScale
       ) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         // Avoid double-targeting capos already under another hitman contract
