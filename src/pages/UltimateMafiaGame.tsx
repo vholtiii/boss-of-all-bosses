@@ -1490,9 +1490,26 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         {(gameState as any).supplyDealPacts?.filter((p: any) => p.active).map((p: any) => {
           const isPlayerBuyer = p.buyerFamily === gameState.playerFamily;
           const otherFam = isPlayerBuyer ? p.targetFamily : p.buyerFamily;
-          return (
-            <span key={p.id} className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-400">
-              🚚 {otherFam.charAt(0).toUpperCase() + otherFam.slice(1)} {isPlayerBuyer ? '(buying)' : '(selling)'} ({p.turnsRemaining}t)
+          const famLabel = otherFam.charAt(0).toUpperCase() + otherFam.slice(1);
+          const royaltyPct = typeof p.royaltyRate === 'number' ? Math.round(p.royaltyRate * 100) : 0;
+          const tip = isPlayerBuyer
+            ? `Buying supply from ${famLabel}${typeof p.lumpSum === 'number' ? ` — $${p.lumpSum.toLocaleString()} paid` : ''}`
+            : `Supplying ${famLabel}${royaltyPct > 0 ? ` — earning ${royaltyPct}% royalty / turn` : ''}`;
+          return isPlayerBuyer ? (
+            <span
+              key={p.id}
+              title={tip}
+              className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-400"
+            >
+              🚚 → {famLabel} ({p.turnsRemaining}t)
+            </span>
+          ) : (
+            <span
+              key={p.id}
+              title={tip}
+              className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300"
+            >
+              🚚 ← {famLabel}{royaltyPct > 0 ? ` +${royaltyPct}%` : ''} ({p.turnsRemaining}t)
             </span>
           );
         })}
