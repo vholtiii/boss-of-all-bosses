@@ -7705,10 +7705,10 @@ export const useEnhancedMafiaGameState = (
       // ── AI HQ ASSAULT (Phase 4 only, personality-gated) ──
       // Defensive and diplomatic families NEVER attempt HQ assaults
       const hqAssaultAllowed = personality !== 'defensive' && personality !== 'diplomatic';
-      const hqAssaultChance = personality === 'aggressive' ? 0.15
+      const hqAssaultChance = (personality === 'aggressive' ? 0.15
         : personality === 'unpredictable' ? 0.12
         : personality === 'opportunistic' ? ((state.flippedSoldiers || []).length >= 2 ? 0.08 : 0)
-        : 0.10;
+        : 0.10) * aggressionScale;
       if (!aiOffenseDisabled && aiPhase >= 4 && hqAssaultAllowed && Math.random() < hqAssaultChance) {
         // Find enemy HQs adjacent to AI soldiers with high toughness
         const aiSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
@@ -7735,7 +7735,7 @@ export const useEnhancedMafiaGameState = (
             // CAP defense at +60%
             defensePenalty = Math.min(0.60, defensePenalty);
 
-            let chance = HQ_ASSAULT_BASE_CHANCE - defensePenalty;
+            let chance = getHQAssaultBase(state.difficulty) - defensePenalty;
             const adjFriendly = state.deployedUnits.filter(u => u.family === fam && u.id !== soldier.id && neighbors.some(nb => nb.q === u.q && nb.r === u.r && nb.s === u.s));
             chance += adjFriendly.length * 0.05;
             // Flipped soldier bonus
