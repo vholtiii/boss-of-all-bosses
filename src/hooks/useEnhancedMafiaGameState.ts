@@ -11908,9 +11908,13 @@ export const useEnhancedMafiaGameState = (
         const isPlayerSeller = p.targetFamily === state.playerFamily;
         if (isPlayerBuyer || isPlayerSeller) {
           const otherFam = isPlayerBuyer ? p.targetFamily : p.buyerFamily;
+          const otherLabel = otherFam.charAt(0).toUpperCase() + otherFam.slice(1);
+          const title = isPlayerBuyer ? '🚚 Supply Access Lost' : '🚚 Royalty Stream Ended';
+          const message = isPlayerBuyer
+            ? `Lost supply access from ${otherLabel}. Tension +${TENSION_SUPPLY_DEAL_EXPIRY}.`
+            : `${otherLabel} no longer owes you royalties. Tension +${TENSION_SUPPLY_DEAL_EXPIRY}.`;
           state.pendingNotifications = [...state.pendingNotifications, {
-            type: 'warning', title: '🚚 Supply Deal Expired',
-            message: `Supply deal with ${otherFam.charAt(0).toUpperCase() + otherFam.slice(1)} has ended. Tension +${TENSION_SUPPLY_DEAL_EXPIRY}.`,
+            type: 'warning', title, message,
           }];
         }
         return { ...p, turnsRemaining: 0, active: false };
