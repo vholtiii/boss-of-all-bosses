@@ -1,59 +1,73 @@
-## The bug
+# Clarify Supply-Deal Direction Everywhere
 
-Today every supply-deal sitdown the AI sends the player is built as if the *player* is the buyer:
+Audit of every surface that mentions a supply deal so it's always obvious **who is supplying whom** and **which way money flows**. Most surfaces are already correct; a few are ambiguous.
 
-- `incomingSitdowns.push({ proposedDeal: 'supply_deal', proposedAmount: price, ... })` (useEnhancedMafiaGameState.ts ~7134)
-- On accept, the `supply_deal` reducer always does `state.resources.money -= cost` and `targetOpp.resources.money += cost` (lines 11289 + 11480–11505) and creates a pact with `buyerFamily: state.playerFamily`.
+## Current state (audit)
 
-So even though narratively the AI family lost their docks and is begging the player for access, the UI tells the player to pay them. The user is right — when the player owns the supply, money should flow *to* the player, plus a cut of the rival's businesses that benefit from the line.
+| Surface | File:Line | Direction clear? |
+|---|---|---|
+| Incoming sitdown card (rival → player) | `SitdownsPanel.tsx:88-106` | ⚠️ Money chips show `+$X` vs `$X`, but no plain-language "they want YOUR supply" header |
+| Accept-as-supplier confirmation toast | `useEnhancedMafiaGameState.ts:9138` | ✅ "X paid you $Y up front + Z% royalty" |
+| Player-initiated buyer toast | `useEnhancedMafiaGameState.ts:11583` | ✅ "Access to X's supply lines, $Y paid to X" |
+| Per-turn royalty income toast | `useEnhancedMafiaGameState.ts:5963` | ✅ "X paid you $Y this turn from your supply deal" |
+| AI ↔ AI supply deal toast | `useEnhancedMafiaGameState.ts:7226` | ✅ neutral third-party phrasing |
+| **Expiring next turn** toast | `useEnhancedMafiaGameState.ts:3113` | ❌ Doesn't say if you were buyer or seller |
+| **Expired** toast | `useEnhancedMafiaGameState.ts:11901` | ❌ Same — no direction |
+| Top-bar pact chip | `UltimateMafiaGame.tsx:1486-1494` | ⚠️ Has "(buying)/(selling)" suffix but money-flow direction not visually distinct |
+| HQ "Active Supply Deals" card | `GameSidePanels.tsx:1492-1513` | ⚠️ Shows "Buying"/"Selling" badge but no lump sum / royalty rate when player is supplier |
+| Outgoing NegotiationDialog (supply_deal) | `NegotiationDialog.tsx` | ✅ Player-as-buyer only; button says "Offer $X & Roll" |
 
-## What we'll change
+## Changes
 
-### 1. Model the direction on the sitdown
-Extend `IncomingSitdown` and `SupplyDealPact` in `src/types/game-mechanics.ts`:
-- `IncomingSitdown.playerIsSupplier?: boolean` — true when the AI is the buyer asking the player for access.
-- `IncomingSitdown.royaltyRate?: number` — proposed % of buyer's qualifying business income that flows to the supplier (e.g. 0.15).
-- `SupplyDealPact.royaltyRate?: number` — persisted on the active pact.
-- `SupplyDealPact.lumpSum?: number` — record the upfront paid (for the post-game log / counters).
+### 1. `src/components/SitdownsPanel.tsx`
+Add a one-line role banner inside the incoming card, above the deal label, when `s.proposedDeal === 'supply_deal'`:
+- `playerIsSupplier === true`: pill `"📦 They want YOUR supply"` (emerald bg)
+- otherwise: pill `"🛒 They're offering supply"` (amber bg)
 
-### 2. Build AI-initiated offers as "buy from player"
-In the boss-level branch at lines 7127–7162:
-- Set `playerIsSupplier: true`.
-- Compute lump sum via existing `computeSupplyDealPrice(...)` (smaller — it's just the upfront).
-- Add a royalty: base 15%, +5% when `isDesperate`, −2% when `isRenewal` (cap 10–30%). Round to 5% steps.
-- Update notification copy: "Castellano boss wants supply access — offering $X up front + Y% of their take for D turns."
+Also relabel the lump-sum money chip:
+- supplier: `"+$X up front (from them)"`
+- buyer: `"You pay $X"` (replaces the current bare `$X` outline badge)
 
-### 3. Accept reducer pays the player when they're the supplier
-In `accept_incoming_sitdown` (~9101) and the family-scope `supply_deal` case (11480):
-- If `aiInitiated && sitdown.playerIsSupplier`, take a new branch:
-  - `state.resources.money += lumpSum` (no deduction, no cooldown, no respect cost — already handled by the `aiInitiated` fairness path).
-  - Push pact with `buyerFamily: enemyFamily`, `targetFamily: state.playerFamily`, plus `royaltyRate` and `lumpSum`.
-  - Pay the AI buyer out of their own treasury (subtract lump sum from `targetOpp.resources.money`, clamped ≥ 0).
-- Existing player-initiated path (player asks to buy) stays unchanged.
+### 2. `src/hooks/useEnhancedMafiaGameState.ts` — expiring/expired notifications
+At lines ~3109-3117 (expiring) and ~11890-11908 (expired): branch on `isPlayerBuyer` / `isPlayerSeller` and use directional copy.
 
-### 4. Pay the royalty each turn
-Where `supplyDealPacts` are walked for income/decay (the loop near 3837 and the upkeep tick near 3109/11809):
-- For each active pact with `royaltyRate > 0`, compute the buyer family's income from businesses that actually use the supply this turn (re-use the existing "famPacts" filter that already gates supply-dependent income).
-- Transfer `royaltyRate * eligibleIncome` from the buyer's treasury to the supplier's treasury (player resources when `targetFamily === playerFamily`, otherwise the matching `aiOpponents` entry).
-- Emit a small turn-summary line ("Supply royalty from Castellano: $1,200") so the player feels the inflow.
+Expiring:
+- buyer: `"⏳ Your supply access from {Fam} expires next turn."`
+- supplier: `"⏳ {Fam}'s royalty payments to you end next turn."`
 
-### 5. Counter-offer semantics flip when player is supplier
-`counter_supply_sitdown` reducer (9130) and `predictCounterReaction` in `src/lib/negotiation-odds.ts`:
-- Add an optional `playerIsSupplier` arg. When true, asking for *more* is the costly direction (AI pushes back on high counters, accepts low ones). When false, current behavior.
-- Keep the ±15% accept / ≥40% walk / mid-counter bands, just measured against the price direction the AI cares about.
+Expired:
+- buyer: `"🚚 Lost supply access from {Fam}. Tension +N."`
+- supplier: `"🚚 {Fam} no longer owes you royalties. Tension +N."`
 
-### 6. UI surface
-`src/components/SitdownsPanel.tsx` / `CounterableSitdownCard`:
-- When `s.playerIsSupplier`, render the price chip as green inflow ("+$X up front") and add a second chip "+Y% royalty / turn".
-- Swap the helper copy on the counter input ("Counter — ask for a higher cut").
-- Decline copy unchanged.
+### 3. `src/pages/UltimateMafiaGame.tsx` — top-bar pact chip (~line 1486)
+Make money-flow direction visually obvious:
+- buyer (player pays): amber chip, arrow `→` toward the family — `🚚 → Genovese (3t)`
+- supplier (player earns): emerald chip, arrow `←` — `🚚 ← Genovese +15% (3t)` (include royalty rate when supplier)
 
-### 7. Tests
-Extend `src/hooks/__tests__/negotiation-fairness.test.ts`:
-- Accepting a `playerIsSupplier` supply sitdown increases `state.resources.money` and creates a pact with `targetFamily === playerFamily`.
-- Each turn the pact is active, the player's money grows by ~`royaltyRate * buyer eligible income` and the buyer's money drops by the same amount.
-- Counter direction: a +10% counter is "accept", +50% is "walk".
+Update the `tooltip`/`title` to say `"Buying supply from X — $Y paid"` or `"Supplying X — earning Z% royalty"`.
+
+### 4. `src/components/GameSidePanels.tsx` — HQ Active Supply Deals (~line 1492)
+When `!isPlayerBuyer` (player is supplier), append a second line under the family label:
+- `"💵 +${deal.lumpSum.toLocaleString()} up front · +{Math.round(deal.royaltyRate*100)}% royalty / turn"` (emerald text)
+
+When `isPlayerBuyer`, append:
+- `"💸 You bought supply access"` (amber text)
+
+Swap the "Buying / Selling" badge color: emerald for Selling (income), amber for Buying (expense), so colors match the money direction used elsewhere.
+
+### 5. Expiring-pact HUD list (`UltimateMafiaGame.tsx:844-848`)
+Change the `label` to reflect direction:
+- buyer: `"Buying from {Fam}"`
+- supplier: `"Supplying {Fam}"`
 
 ## Out of scope
-- A new player-initiated *"sell supply to X"* outgoing flow. We're only fixing the existing incoming sitdowns so they make sense.
-- AI ↔ AI royalty: AI-to-AI deals stay as flat lump sums for now (royalty is a player-facing affordance).
+- No new gameplay mechanics, no balance changes.
+- No changes to AI ↔ AI supply deal flow (already neutral).
+- No NegotiationDialog changes — the supplier-direction path bypasses the dialog and is handled in SitdownsPanel.
+- No new tests; existing `negotiation-fairness.test.ts` cases still pass (pure copy/UI changes).
+
+## Files touched
+- `src/components/SitdownsPanel.tsx`
+- `src/components/GameSidePanels.tsx`
+- `src/hooks/useEnhancedMafiaGameState.ts` (two notification blocks only)
+- `src/pages/UltimateMafiaGame.tsx` (pact chip + expiring-pact label)
