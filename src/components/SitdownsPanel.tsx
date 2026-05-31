@@ -53,6 +53,17 @@ const CounterableSitdownCard: React.FC<{
       )}
       onClick={() => !isBoss && s.targetQ !== undefined && onFocusHex?.(s.targetQ, s.targetR!, s.targetS!)}
     >
+      {s.proposedDeal === 'supply_deal' && (
+        s.playerIsSupplier ? (
+          <div className="rounded px-1.5 py-1 text-[10px] font-bold bg-emerald-600/20 text-emerald-300 border border-emerald-500/40">
+            📦 They want YOUR supply — you'd be the supplier
+          </div>
+        ) : (
+          <div className="rounded px-1.5 py-1 text-[10px] font-bold bg-amber-600/20 text-amber-300 border border-amber-500/40">
+            🛒 They're offering supply — you'd be the buyer
+          </div>
+        )
+      )}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="font-bold capitalize flex items-center gap-1 flex-wrap">
@@ -89,11 +100,11 @@ const CounterableSitdownCard: React.FC<{
           {typeof s.proposedAmount === 'number' && (
             s.playerIsSupplier ? (
               <Badge className="text-[10px] h-4 bg-emerald-600/90 text-white">
-                +${s.proposedAmount.toLocaleString()} up front
+                +${s.proposedAmount.toLocaleString()} up front (from them)
               </Badge>
             ) : (
-              <Badge variant="outline" className="text-[10px] h-4 text-green-400 border-green-400/40">
-                ${s.proposedAmount.toLocaleString()}
+              <Badge className="text-[10px] h-4 bg-amber-600/80 text-white">
+                You pay ${s.proposedAmount.toLocaleString()}
               </Badge>
             )
           )}
