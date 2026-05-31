@@ -180,7 +180,7 @@ export const SITDOWN_COOLDOWN = 5;
 export const SITDOWN_LOYALTY_BONUS = 5;
 export const SITDOWN_DEFENSE_PER_SOLDIER = 5;
 
-export const HQ_ASSAULT_BASE_CHANCE = 0.15;
+export const HQ_ASSAULT_BASE_CHANCE = 0.28; // Normal-difficulty baseline; difficulty scaling in ai-difficulty.ts
 export const HQ_DEFENSE_BONUS = 0.30;
 export const HQ_ASSAULT_MAX_CHANCE = 0.50;
 export const HQ_ASSAULT_MIN_TOUGHNESS = 4;
@@ -691,7 +691,7 @@ export const BUILT_BIZ_SEIZURE_FEAR_LOSS = 5;           // -5 fear for the famil
 export const BUILT_BIZ_SEIZURE_INFLUENCE_GAIN = 10;     // +10 influence for the family that seized it
 
 // ============ AI PLAN HIT SYSTEM ============
-export const AI_PLAN_HIT_CHANCE = 0.15;        // 15% chance per turn for aggressive/opportunistic AI
+export const AI_PLAN_HIT_CHANCE = 0.20;        // Normal baseline; difficulty scaling in ai-difficulty.ts
 export const AI_PLAN_HIT_SUCCESS_RATE = 0.5;   // 50% success when executing
 export const AI_PLAN_HIT_DURATION = 2;         // turns before AI executes the hit
 
