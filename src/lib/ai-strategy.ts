@@ -186,6 +186,17 @@ export function scoreHexForAI(i: ScoreHexInputs): number {
   if (i.isSafehouse && i.hasScoutIntel) add(3); // bounty + intel target
   // War prioritization
   if (i.isWarTarget) add(10 * (i.warTargetMul ?? 1));
+  // Supply-line targeting: cut rival supply nodes within striking distance of own HQ/safehouse.
+  // Posture multiplier drives intensity (WAR 1.5, PRESSURE_LEADER 1.4, COOL_OFF 0).
+  if (i.isSupplyNodeTarget) {
+    const supplyMul = i.supplyNodeMul ?? 1;
+    const supplyBase = i.supplyNodeBonus ?? 7;
+    add(supplyBase * supplyMul);
+    if (i.supplyNodeInFocusDistrict) add(4);
+    if (i.supplyNodeFeedsPlayerDeal) add(5);
+  }
+  // Vulnerable-rival pile-on: hexes belonging to a flagged-vulnerable rival get a flat bonus.
+  if (i.isVulnerableRivalHex) add(6);
   // Phase 4 endgame: lean toward player when winning
   if (i.phase >= 4 && i.isPlayerHex && i.mood === 'dominant') add(4);
 
