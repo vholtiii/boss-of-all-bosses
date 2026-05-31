@@ -6456,8 +6456,14 @@ export const useEnhancedMafiaGameState = (
                 const isAIScoutedHit = aiHasScoutIntel(state, fam, target.q, target.r, target.s);
                 const aiHitType: 'scouted' | 'blind' = isAIScoutedHit ? 'scouted' : 'blind';
                 // Heat-precaution: at warm+ (no override), refuse blind hits — skip rather than swing reckless.
+                // Exception: aggressive/unpredictable AIs in WAR or PRESSURE_LEADER posture
+                // will push through warm heat (matches the new offensive-posture profile).
                 const cautionTier = (oppAny.aiHeatCaution || 'cool') as string;
-                if (aiHitType === 'blind' && cautionTier !== 'cool' && cautionTier !== 'override') {
+                const warPostureAllowsBlind =
+                  cautionTier === 'warm' &&
+                  (posture === 'WAR' || posture === 'PRESSURE_LEADER') &&
+                  (personality === 'aggressive' || personality === 'unpredictable');
+                if (aiHitType === 'blind' && cautionTier !== 'cool' && cautionTier !== 'override' && !warPostureAllowsBlind) {
                   if (turnReport) turnReport.aiActions.push({ family: fam, action: 'heat_caution', detail: `Held off blind hit (heat ${aiHeat})` });
                   break;
                 }
