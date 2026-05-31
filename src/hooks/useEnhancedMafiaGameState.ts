@@ -3108,10 +3108,21 @@ export const useEnhancedMafiaGameState = (
       });
       (newState.supplyDealPacts || []).forEach(p => {
         if (p.active && p.turnsRemaining === 1) {
-          const other = p.buyerFamily === newState.playerFamily ? p.targetFamily : p.buyerFamily;
+          const isPlayerBuyer = p.buyerFamily === newState.playerFamily;
+          const isPlayerSeller = p.targetFamily === newState.playerFamily;
+          const other = isPlayerBuyer ? p.targetFamily : p.buyerFamily;
+          const otherLabel = famName(other);
+          let title = '⏳ Supply Deal Expiring';
+          let message = `Supply deal with ${otherLabel} expires next turn.`;
+          if (isPlayerBuyer) {
+            title = '⏳ Supply Access Expiring';
+            message = `Your supply access from ${otherLabel} expires next turn.`;
+          } else if (isPlayerSeller) {
+            title = '⏳ Royalty Income Ending';
+            message = `${otherLabel}'s royalty payments to you end next turn.`;
+          }
           newState.pendingNotifications.push({
-            type: 'warning' as const, title: '⏳ Supply Deal Expiring',
-            message: `Supply deal with ${famName(other)} expires next turn.`,
+            type: 'warning' as const, title, message,
           });
         }
       });
@@ -11897,9 +11908,13 @@ export const useEnhancedMafiaGameState = (
         const isPlayerSeller = p.targetFamily === state.playerFamily;
         if (isPlayerBuyer || isPlayerSeller) {
           const otherFam = isPlayerBuyer ? p.targetFamily : p.buyerFamily;
+          const otherLabel = otherFam.charAt(0).toUpperCase() + otherFam.slice(1);
+          const title = isPlayerBuyer ? '🚚 Supply Access Lost' : '🚚 Royalty Stream Ended';
+          const message = isPlayerBuyer
+            ? `Lost supply access from ${otherLabel}. Tension +${TENSION_SUPPLY_DEAL_EXPIRY}.`
+            : `${otherLabel} no longer owes you royalties. Tension +${TENSION_SUPPLY_DEAL_EXPIRY}.`;
           state.pendingNotifications = [...state.pendingNotifications, {
-            type: 'warning', title: '🚚 Supply Deal Expired',
-            message: `Supply deal with ${otherFam.charAt(0).toUpperCase() + otherFam.slice(1)} has ended. Tension +${TENSION_SUPPLY_DEAL_EXPIRY}.`,
+            type: 'warning', title, message,
           }];
         }
         return { ...p, turnsRemaining: 0, active: false };
