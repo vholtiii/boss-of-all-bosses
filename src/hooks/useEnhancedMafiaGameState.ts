@@ -5854,6 +5854,45 @@ export const useEnhancedMafiaGameState = (
       const postureBlocksOffense = !strategicOverride && (policy.suppressOffense || aiHeat >= policy.heatCeiling);
       const aiOffenseDisabled = isAILayingLow(opponent, state.turn) || isAIAtMattresses(opponent, state.turn) || aiHeatRicoFreeze || postureBlocksOffense;
 
+      // ── DIFFICULTY-SCALED OFFENSIVE AGGRESSION ──
+      // Single source of truth for "how aggressive should new AI offensive trees feel?"
+      const aggressionScale = getAggressionScale(state.difficulty);
+
+      // ── SUPPLY-LINE TARGETING: detect reachable rival supply nodes ──
+      // A node is "reachable" if within SUPPLY_STRIKE_RADIUS of this AI's HQ,
+      // or within 3 hexes of any of its safehouses (forward operating bases extend reach).
+      const supplyStrikeRadius = getSupplyStrikeRadius(state.mapSize);
+      const ownSafehouses = (state.safehouses || []).filter(s => {
+        const t = state.hexMap.find(tt => tt.q === s.q && tt.r === s.r && tt.s === s.s);
+        return t?.controllingFamily === fam;
+      });
+      const reachableSupplyNodeKeys = new Set<string>();
+      (state.supplyNodes || []).forEach(node => {
+        const nodeTile = state.hexMap.find(t => t.q === node.q && t.r === node.r && t.s === node.s);
+        const controller = nodeTile?.controllingFamily;
+        // Only target nodes controlled by a *rival* family (not neutral, not own)
+        if (!controller || controller === fam || controller === 'neutral') return;
+        const distFromHQ = hexDistance(node, hq);
+        const nearSafehouse = ownSafehouses.some(s => hexDistance(node, s) <= 3);
+        if (distFromHQ <= supplyStrikeRadius || nearSafehouse) {
+          reachableSupplyNodeKeys.add(`${node.q},${node.r},${node.s}`);
+        }
+      });
+
+      // ── VULNERABLE RIVAL DETECTION (opportunistic pile-on flag) ──
+      // A rival is "vulnerable" if they've taken ≥2 recent unit losses or are at critical/RICO heat.
+      const vulnerableFamilies = new Set<string>();
+      (state.aiOpponents || []).forEach(o => {
+        if (o.family === fam) return;
+        if ((state.eliminatedFamilies || []).includes(o.family)) return;
+        const oa = o as any;
+        const losses = (oa.recentSoldierLosses || 0) + (oa.recentCapoLosses || 0) * 2;
+        const heat = o.resources.heat || 0;
+        if (losses >= 2 || heat >= 80) vulnerableFamilies.add(o.family);
+      });
+      // Defensive/diplomatic personalities don't pile on (keeps Normal sane).
+      const willPileOn = personality !== 'defensive' && personality !== 'diplomatic';
+
       // Reset per-turn move budget for this AI family's units (mirror player reset).
       // Mattresses locks AI units' movement (parity with player).
       state.deployedUnits = state.deployedUnits.map(u => {
