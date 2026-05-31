@@ -6364,6 +6364,15 @@ export const useEnhancedMafiaGameState = (
               const nt = state.hexMap.find(t => t.q === nn.q && t.r === nn.r && t.s === nn.s);
               return nt && nt.controllingFamily === fam;
             });
+            const hexKey = `${n.q},${n.r},${n.s}`;
+            const isSupplyTarget = reachableSupplyNodeKeys.has(hexKey);
+            // Check whether this supply node feeds a business in the AI's focus districts
+            const supplyInFocus = isSupplyTarget && !!(tile?.district && focusSet.has(tile.district));
+            // Check whether the rival owning this node has an active supply deal with the player
+            const supplyFeedsPlayerDeal = isSupplyTarget && (state.supplyDealPacts || []).some(p =>
+              p.active && p.targetFamily === tile?.controllingFamily && p.buyerFamily === state.playerFamily
+            );
+            const isVulnerable = willPileOn && !!tile?.controllingFamily && vulnerableFamilies.has(tile.controllingFamily);
             return scoreHexForAI({
               hexIncome: tile?.business?.income || 0,
               defenderCount,
@@ -6384,6 +6393,12 @@ export const useEnhancedMafiaGameState = (
               warTargetMul: policy.warTargetMul,
               expandMul: posture === 'EXPAND' ? 1.4 : posture === 'CLOSE_OUT' ? 1.2 : 1,
               economyFocusMul: policy.economyFocusMul,
+              isSupplyNodeTarget: isSupplyTarget,
+              supplyNodeMul: policy.supplyNodeMul,
+              supplyNodeBonus: getSupplyNodeScoreBonus(state.difficulty),
+              supplyNodeInFocusDistrict: supplyInFocus,
+              supplyNodeFeedsPlayerDeal: supplyFeedsPlayerDeal,
+              isVulnerableRivalHex: isVulnerable,
             });
           });
           const pickIdx = softmaxPick(scores, turnRng, 4, difficultySoftmaxTemperature(state.difficulty || 'normal'));
