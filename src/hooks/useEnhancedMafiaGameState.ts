@@ -6240,9 +6240,21 @@ export const useEnhancedMafiaGameState = (
             !state.hexMap.some(t => t.q === n.q && t.r === n.r && t.s === n.s && t.controllingFamily === fam)
           );
 
+          // ── SUPPLY-LINE TARGETING: reachable rival supply nodes in striking distance ──
+          const supplyNodeHexes = validMoves.filter(n =>
+            reachableSupplyNodeKeys.has(`${n.q},${n.r},${n.s}`)
+          );
+          // Aggressive/opportunistic/unpredictable will route to supply nodes proactively.
+          // Defensive/diplomatic only get the scoring bonus (no pool override).
+          const supplyRouteOK = personality === 'aggressive' || personality === 'opportunistic' || personality === 'unpredictable';
+          const supplyRoutingChance = getSupplyNodeRoutingChance(state.difficulty) * aggressionScale;
+
           if (warTargetHexes.length > 0 && Math.random() < 0.85) {
             // War: heavily prioritize attacking the war target
             targetPool = warTargetHexes;
+          } else if (supplyNodeHexes.length > 0 && supplyRouteOK && policy.supplyNodeMul > 0.5 && Math.random() < supplyRoutingChance) {
+            // Supply-line strike: cut the rival's supply nodes
+            targetPool = supplyNodeHexes;
           } else if (safehouseHexes.length > 0 && Math.random() < 0.7) {
             targetPool = safehouseHexes;
           } else if ((hasBounty || isAlerted) && playerHexes.length > 0) {
