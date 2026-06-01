@@ -26,7 +26,8 @@ const CounterableSitdownCard: React.FC<{
   onFocusHex?: (q: number, r: number, s: number) => void;
 }> = ({ s, isBoss, isUrgent, isDesperate, isRenewal, isCounterBack, fam, dl, turnsLeft, canCounter, onAccept, onDecline, onCounter, onFocusHex }) => {
   const [counterOpen, setCounterOpen] = React.useState(false);
-  const defaultCounter = Math.max(2000, Math.round(((s.proposedAmount || 7500) * 0.7) / 500) * 500);
+  const counterMultiplier = s.playerIsSupplier ? 1.3 : 0.7;
+  const defaultCounter = Math.max(2000, Math.round(((s.proposedAmount || 7500) * counterMultiplier) / 500) * 500);
   const [counterValue, setCounterValue] = React.useState<number>(defaultCounter);
 
   const flavorTag = isDesperate
@@ -107,6 +108,11 @@ const CounterableSitdownCard: React.FC<{
                 You pay ${s.proposedAmount.toLocaleString()}
               </Badge>
             )
+          )}
+          {typeof s.originalPrice === 'number' && s.originalPrice !== s.proposedAmount && (
+            <span className="text-[9px] text-muted-foreground italic">
+              was ${s.originalPrice.toLocaleString()}
+            </span>
           )}
           {s.playerIsSupplier && typeof s.royaltyRate === 'number' && s.royaltyRate > 0 && (
             <Badge className="text-[10px] h-4 bg-emerald-700/80 text-white">

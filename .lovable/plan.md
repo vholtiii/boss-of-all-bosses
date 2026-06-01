@@ -1,51 +1,63 @@
 ## Problem
 
-When the player accepts an incoming **boss (family-scope) sitdown**, the negotiation dialog opens showing every possible boss-level deal (ceasefire, alliance, supply deal, etc.) instead of just the one the rival actually offered.
+When you're the supplier (the AI is buying your supply) and you click **Counter**, the input pre-fills with a value that's *lower* than the rival's offer — even though the helper text says *"Counter — ask for a larger lump sum"*. If you hit **Send** without editing, you've effectively countered with **less than the original**, the AI re-counters at the midpoint (also below original), and the new "Accept" card shows that lower number. That reads as *"the deal shows the original payment offer, not my new counter."*
 
-The territory-scope path already handles this correctly: `handleAcceptIncomingSitdown` passes `lockedDealType`/`proposedAmount`/`proposerLabel` into `negotiationState`, and `NegotiationDialog` filters down to that single deal via its existing `lockedDealType` prop (NegotiationDialog.tsx:61‑63). The bug is purely that the boss branch doesn't forward those fields.
+The pre-fill is hard-coded at 70% of the current `proposedAmount` regardless of which side of the table you're on:
+
+```ts
+// src/components/SitdownsPanel.tsx:29
+const defaultCounter = Math.max(2000, Math.round(((s.proposedAmount || 7500) * 0.7) / 500) * 500);
+```
+
+The reducer's accept branch (`counter_supply_sitdown`, useEnhancedMafiaGameState.ts:9407) does correctly overwrite `proposedAmount` with the counter you actually sent — the bug is purely the default the UI seeds, plus the missing reminder of what the rival's original number was once a new card appears.
 
 ## Fix
 
-Two small edits, both in presentation code — no reducer/logic changes.
+Two small UI-only edits in `src/components/SitdownsPanel.tsx`.
 
-### 1. `src/pages/UltimateMafiaGame.tsx` — `handleAcceptIncomingSitdown` (≈ lines 366‑374)
+### 1. Direction-aware counter default (`CounterableSitdownCard`, ~line 29)
 
-In the `else` (family-scope) branch of the accept handler, forward the proposed deal and proposer info, same as the territory branch already does:
+Seed the input on the side of the table that matches the prompt:
 
 ```ts
-const fam = String(s.fromFamily || '');
-const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
-setNegotiationState({
-  open: true,
-  scope: 'family',
-  targetFamily: s.fromFamily,
-  incomingSitdownId: s.id,
-  successBonus: s.successBonus,
-  lockedDealType: s.proposedDeal,
-  proposedAmount: s.proposedAmount,     // may be undefined for ceasefire/alliance — fine
-  proposerLabel: s.fromBossName
-    ? `${s.fromBossName} (${famLabel})`
-    : `${famLabel} Boss`,
-});
+const counterMultiplier = s.playerIsSupplier ? 1.3 : 0.7;
+const defaultCounter = Math.max(
+  2000,
+  Math.round(((s.proposedAmount || 7500) * counterMultiplier) / 500) * 500
+);
 ```
 
-### 2. `src/pages/UltimateMafiaGame.tsx` — boss `NegotiationDialog` mount (≈ lines 1979‑2016)
+- **Supplier (AI buying from you)** → defaults to **1.3×** the offer (asking for more, matching "ask for a larger lump sum").
+- **Buyer (you paying)** → keeps the existing 0.7× lowball default.
 
-Pass the new fields through to the dialog, mirroring the territory mount:
+### 2. Show the rival's previous number on the new card (~line 100–110)
+
+Once the AI accepts the counter or re-counters, the card only shows the new `proposedAmount`. Add a tiny "was $X" hint when `originalPrice` differs, so the new agreed/re-countered price is unmistakable:
 
 ```tsx
-<NegotiationDialog
-  ...existing props...
-  lockedDealType={(negotiationState as any).lockedDealType}
-  proposedAmount={(negotiationState as any).proposedAmount}
-  proposerLabel={(negotiationState as any).proposerLabel}
-/>
+{typeof s.proposedAmount === 'number' && (
+  s.playerIsSupplier ? (
+    <Badge className="text-[10px] h-4 bg-emerald-600/90 text-white">
+      +${s.proposedAmount.toLocaleString()} up front (from them)
+    </Badge>
+  ) : (
+    <Badge className="text-[10px] h-4 bg-amber-600/80 text-white">
+      You pay ${s.proposedAmount.toLocaleString()}
+    </Badge>
+  )
+)}
+{typeof s.originalPrice === 'number'
+  && s.originalPrice !== s.proposedAmount && (
+  <span className="text-[9px] text-muted-foreground italic">
+    was ${s.originalPrice.toLocaleString()}
+  </span>
+)}
 ```
 
-`availableEnemyFamilies` is already suppressed when `incomingSitdownId` is set, so the family picker stays hidden. `NegotiationDialog`'s existing `filteredTypes` logic will then render only the proposed deal, and the price/proposer header will reflect the rival's offer.
+This makes the "FINAL OFFER" re-counter case (AI pushes back at the midpoint between your counter and their original) obviously a *new* number, and confirms when the AI fully accepted your counter that the card reflects the price you asked for.
 
 ## Out of scope
 
-- No changes to the reducer, AI, or deal-resolution logic.
-- Territory-scope acceptance already works and is untouched.
-- Outgoing/manual sitdowns still show the full picker as today.
+- No reducer / AI / pricing logic changes.
+- No change to swing bands or accept/recounter/walk thresholds.
+- Buyer-direction counter UX stays identical.
