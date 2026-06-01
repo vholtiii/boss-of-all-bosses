@@ -341,6 +341,8 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     bonannoPurgeImmunity: (state.bonannoPurgeImmunity || []).map(i => ({ ...i })),
     incomingSitdowns: (state.incomingSitdowns || []).map(s => ({ ...s })),
     persicoSelectionActive: !!state.persicoSelectionActive,
+    qualifyingConditions: [...(state.qualifyingConditions || [])],
+    subjugatedFamilies: { ...(state.subjugatedFamilies || {}) },
   });
 
 // ============ UNIT TYPES ============
