@@ -68,8 +68,10 @@ export function computeAIPosture(i: PostureInputs): AIPosture {
     return 'COOL_OFF';
   }
 
-  // 2. Cash runway crisis — bankruptcy is more dangerous than rivals
-  if (i.moneyRunway < 3) return 'CONSOLIDATE';
+  // 2. Cash runway crisis — bankruptcy is more dangerous than rivals.
+  // Threshold lowered to <2.5 so that the [2.5, 3) band falls through to
+  // BUILD_ECONOMY (tight runway, no expansion) instead of full CONSOLIDATE.
+  if (i.moneyRunway < 2.5) return 'CONSOLIDATE';
 
   // 3. Just took heavy losses — turtle to recover
   if (i.hqAssaultedRecently || i.recentCapoLosses >= 2) return 'TURTLE';
