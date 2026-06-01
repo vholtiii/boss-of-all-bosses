@@ -368,7 +368,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         }}
       />
       {/* Atmospheric particles */}
-      <AtmosphericParticles />
+      <AtmosphericParticles paused={isTransitioning} />
 
       {/* Art-deco corner ornaments — framed playbill feel */}
       {([
