@@ -199,6 +199,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     targetFamily: string;
     incomingSitdownId?: string;
     successBonus?: number;
+    lockedDealType?: any;
+    proposedAmount?: number;
+    proposerLabel?: string;
   } | null>(null);
 
   // Plan Hit mode — 2-step: select soldier, then select target hex+unit
