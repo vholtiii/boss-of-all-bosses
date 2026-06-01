@@ -1004,6 +1004,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     filter: 'saturate(0.85)',
+                    willChange: 'transform, opacity, filter',
                   }}
                   initial={{ scale: 1.05, filter: 'saturate(0.95) brightness(1)' }}
                   animate={{
