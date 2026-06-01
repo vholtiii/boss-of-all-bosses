@@ -543,16 +543,9 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 {/* Header */}
                 <div className="flex items-center justify-between gap-2 mb-1 relative">
                   <div className="flex items-center gap-2">
-                    <motion.span
+                    <span
                       className="text-2xl leading-none select-none"
-                      animate={isActive ? {
-                        filter: [
-                          `drop-shadow(0 0 2px ${meta.color})`,
-                          `drop-shadow(0 0 8px ${meta.color})`,
-                          `drop-shadow(0 0 2px ${meta.color})`,
-                        ],
-                      } : {}}
-                      transition={isActive ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' } : {}}
+                      style={isActive ? { filter: `drop-shadow(0 0 6px ${meta.color})` } : undefined}
                     >
                       {meta.icon}
                     </motion.span>
