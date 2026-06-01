@@ -400,13 +400,10 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         {soundConfig.enabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
       </button>
 
-      {/* Grunge noise overlay */}
+      {/* Static grunge noise overlay (no blend-mode → no layer promotion) */}
       <div
-        className="absolute inset-0 pointer-events-none z-[1]"
-        style={{
-          backgroundImage: NOISE_BG,
-          mixBlendMode: 'overlay',
-        }}
+        className="absolute inset-0 pointer-events-none z-[1] opacity-40"
+        style={{ backgroundImage: NOISE_BG }}
       />
 
 
