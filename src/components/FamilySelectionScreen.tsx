@@ -996,45 +996,53 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
               />
             ) : (
               <>
-                {/* Zoom-in layer: the sitdown table rushes toward camera */}
+                {/* Zoom-in layer: the sitdown table rushes toward camera.
+                    Pure transform tween — no animated `filter` — so the whole
+                    push composites on the GPU and reads as one smooth glide. */}
                 <motion.div
                   className="absolute inset-0"
                   style={{
                     backgroundImage: `url(${mafiaSitdownBg})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
-                    filter: 'saturate(0.85)',
-                    willChange: 'transform, opacity, filter',
+                    filter: 'saturate(0.85) brightness(0.9)',
+                    transformOrigin: '50% 55%',
+                    willChange: 'transform',
                   }}
-                  initial={{ scale: 1.05, filter: 'saturate(0.95) brightness(1)' }}
-                  animate={{
-                    scale: [1.05, 1.18, 1.42, 1.6],
-                    filter: [
-                      'saturate(0.95) brightness(1)',
-                      'saturate(0.85) brightness(0.9)',
-                      'saturate(0.6) brightness(0.6)',
-                      'saturate(0.4) brightness(0.35)',
-                    ],
-                  }}
-                  transition={{ duration: 3.0, times: [0, 0.35, 0.75, 1], ease: [0.22, 0.61, 0.36, 1] }}
+                  initial={{ scale: 1.05 }}
+                  animate={{ scale: 1.55 }}
+                  transition={{ duration: 3.0, ease: [0.22, 0.61, 0.36, 1] }}
                 />
 
-                {/* Family-tinted vignette glow */}
+                {/* Cheap GPU-composited darkening pass replaces the old
+                    brightness() keyframes. */}
+                <motion.div
+                  className="absolute inset-0 bg-black"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.55 }}
+                  transition={{ duration: 3.0, ease: 'linear' }}
+                  style={{ willChange: 'opacity' }}
+                />
+
+                {/* Family-tinted vignette glow — single ease-out ramp */}
                 <motion.div
                   className="absolute inset-0"
                   style={{
                     background: `radial-gradient(ellipse at center, transparent 30%, ${activeFamily.color}33 65%, rgba(0,0,0,0.85) 100%)`,
+                    willChange: 'opacity',
                   }}
                   initial={{ opacity: 0 }}
-                  animate={{ opacity: [0, 0.9, 0.6] }}
-                  transition={{ duration: 3.0, times: [0, 0.5, 1], ease: 'easeOut' }}
+                  animate={{ opacity: 0.8 }}
+                  transition={{ duration: 2.4, ease: 'easeOut' }}
                 />
 
                 {/* Smoke puffs rushing forward — blur baked into the gradient,
-                    no runtime filter:blur() to keep the compositor cheap. */}
+                    no runtime filter:blur() to keep the compositor cheap.
+                    Staggered slightly later so they bloom after the image is
+                    already moving. */}
                 {[
-                  { left: '35%', top: '55%', size: 900, delay: 0.8 },
-                  { left: '65%', top: '45%', size: 800, delay: 1.0 },
+                  { left: '35%', top: '55%', size: 900, delay: 0.95 },
+                  { left: '65%', top: '45%', size: 800, delay: 1.15 },
                 ].map((p, i) => (
                   <motion.div
                     key={i}
