@@ -1586,11 +1586,19 @@ export const useEnhancedMafiaGameState = (
     // Unanimous minus one: need all minus one
     const needed = Math.max(survivingRivals.length - 1, survivingRivals.length === 2 ? 2 : survivingRivals.length - 1);
     const hasTreachery = !!(state.treacheryDebuff && state.treacheryDebuff.turnsRemaining > 0);
-    
+
     let yesVotes = 0;
     const voteResults: Array<{ family: string; vote: boolean; reason: string }> = [];
-    
+
+    // Subjugated families always vote YES for their subjugator
+    const subjMap = state.subjugatedFamilies || {};
+
     for (const rival of survivingRivals) {
+      if (subjMap[rival.family] === state.playerFamily) {
+        yesVotes++;
+        voteResults.push({ family: rival.family, vote: true, reason: 'Subjugated vassal — automatic YES' });
+        continue;
+      }
       if (hasTreachery) {
         voteResults.push({ family: rival.family, vote: false, reason: 'Treachery debuff — automatic NO' });
         continue;
@@ -1599,21 +1607,42 @@ export const useEnhancedMafiaGameState = (
       const hasAlliance = (state.alliances || []).some(a => a.active && a.alliedFamily === rival.family);
       const hasCeasefire = (state.ceasefires || []).some(c => c.active && c.family === rival.family);
       const hasPact = hasAlliance || hasCeasefire;
-      
+
       if (relationship >= COMMISSION_VOTE_RELATIONSHIP_THRESHOLD && hasPact) {
         yesVotes++;
         voteResults.push({ family: rival.family, vote: true, reason: `Relationship ${relationship} + active pact` });
       } else {
-        const reason = relationship < COMMISSION_VOTE_RELATIONSHIP_THRESHOLD 
-          ? `Relationship too low (${relationship}/${COMMISSION_VOTE_RELATIONSHIP_THRESHOLD})` 
+        const reason = relationship < COMMISSION_VOTE_RELATIONSHIP_THRESHOLD
+          ? `Relationship too low (${relationship}/${COMMISSION_VOTE_RELATIONSHIP_THRESHOLD})`
           : 'No active alliance or ceasefire';
         voteResults.push({ family: rival.family, vote: false, reason });
       }
     }
-    
+
+    // ── CORONATION QUALIFIER BUFF ──
+    // Each qualifier currently met flips one NEUTRAL rival's NO into a YES.
+    // Neutral = relationship 30–59, no pact, not treachery-blocked.
+    let qualifierBuff = Math.min((state.qualifyingConditions || []).length, CORONATION_QUALIFIER_BUFF_CAP);
+    if (qualifierBuff > 0 && !hasTreachery) {
+      const flippable = voteResults
+        .map((vr, idx) => ({ vr, idx }))
+        .filter(({ vr }) => {
+          if (vr.vote) return false;
+          if (vr.reason.startsWith('Subjugated')) return false;
+          const rel = state.reputation.familyRelationships[vr.family] || 0;
+          return rel >= 30 && rel < COMMISSION_VOTE_RELATIONSHIP_THRESHOLD;
+        });
+      for (const { idx } of flippable) {
+        if (qualifierBuff <= 0) break;
+        voteResults[idx] = { ...voteResults[idx], vote: true, reason: `Coronation buff — overwhelming power conceded` };
+        yesVotes++;
+        qualifierBuff--;
+      }
+    }
+
     // Update victory progress
     state.victoryProgress.commission = { supporting: yesVotes, needed, met: yesVotes >= needed };
-    
+
     // Store vote result for modal display
     state.commissionVoteResult = {
       callerFamily: state.playerFamily,
@@ -1624,7 +1653,7 @@ export const useEnhancedMafiaGameState = (
       yesVotes,
       totalVoters: survivingRivals.length,
     };
-    
+
     if (yesVotes >= needed) {
       state.victoryType = 'commission';
     } else {
