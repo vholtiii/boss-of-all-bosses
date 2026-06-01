@@ -707,7 +707,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
       </div>
 
       {/* Family cards — horizontal row */}
-      <div className="flex flex-wrap justify-center gap-5 max-w-6xl mx-auto mb-10 relative z-[3]" style={{ perspective: 1200 }}>
+      <div className="flex flex-wrap justify-center gap-5 max-w-6xl mx-auto mb-10 relative z-[3]">
         {FAMILIES.map((family, i) => {
           const isSelected = selectedFamily === family.id;
           const isDimmed = !!selectedFamily && !isSelected;
