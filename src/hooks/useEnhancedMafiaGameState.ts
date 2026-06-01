@@ -79,6 +79,8 @@ import {
   GamePhase, PHASE_CONFIGS,
   COMMISSION_VOTE_COST, COMMISSION_VOTE_COOLDOWN, COMMISSION_MIN_SURVIVORS,
   COMMISSION_VOTE_RELATIONSHIP_THRESHOLD, COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY,
+  CORONATION_QUALIFIER_BUFF_CAP, SUBJUGATION_RELATIONSHIP_BONUS,
+  QualifyingCondition,
   // Family Power System
   FAMILY_POWERS, FamilyPower, FrontBossHex, LuccheseBoostedDistrict, BonannoPurgeImmunity,
   IncomingSitdown,
@@ -339,6 +341,8 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     bonannoPurgeImmunity: (state.bonannoPurgeImmunity || []).map(i => ({ ...i })),
     incomingSitdowns: (state.incomingSitdowns || []).map(s => ({ ...s })),
     persicoSelectionActive: !!state.persicoSelectionActive,
+    qualifyingConditions: [...(state.qualifyingConditions || [])],
+    subjugatedFamilies: { ...(state.subjugatedFamilies || {}) },
   });
 
 // ============ UNIT TYPES ============
@@ -508,7 +512,11 @@ export interface EnhancedMafiaGameState {
   arrestedSoldiers: Array<{ unitId: string; returnTurn: number; arrestTurn?: number; source?: 'heat' | 'prosecution'; recruited?: boolean; family?: string }>;
   arrestedCapos: Array<{ unitId: string; returnTurn: number; arrestTurn?: number; name?: string; recruited?: boolean; family?: string }>;
   gameOver?: { type: 'rico' | 'federal_indictment'; turn: number } | null;
-  aiVictor?: { family: string; type: 'territory' | 'economic' | 'legacy' | 'domination'; turn: number } | null;
+  aiVictor?: { family: string; type: 'commission'; turn: number } | null;
+  /** Qualifying conditions currently met. Each grants +1 free YES vote at Coronation, capped. */
+  qualifyingConditions?: QualifyingCondition[];
+  /** Families subjugated (kept alive but ruled). They count toward survivor floor and vote YES for their subjugator. */
+  subjugatedFamilies?: Record<string, string>; // victimFamily -> subjugatorFamily
   pendingBusinessBuild?: { businessType: string; cost: number; isLegal: boolean } | null;
   
   // Blind hit system
@@ -1131,9 +1139,12 @@ export const createInitialGameState = (
       territory: { current: 0, target: mapSize === 'small' ? 40 : mapSize === 'large' ? 80 : 60, met: false },
       economic: { current: 0, target: 50000, met: false },
       legacy: { current: 0, highestRival: 0, met: false },
-      domination: { eliminated: 0, target: 4, met: false },
+      // Iron Fist: must leave at least 2 surviving rivals (survivorFloor). Target
+      // is computed from total rival count - survivorFloor; assumes 4 rivals → eliminate 2.
+      ironFist: { eliminated: 0, target: 2, survivorFloor: 2, met: false },
       commission: { supporting: 0, needed: 0, met: false },
     },
+    qualifyingConditions: [] as QualifyingCondition[],
     gamePhase: 1 as GamePhase,
     commissionVoteCooldownUntil: 0,
     commissionVoteResult: null,
@@ -1328,6 +1339,58 @@ export const useEnhancedMafiaGameState = (
     });
   };
 
+  /**
+   * Iron Fist guard. Tries to eliminate `victimFamily`; if doing so would drop
+   * the surviving rival count below the Iron Fist floor (2), the family is
+   * SUBJUGATED instead — kept alive (HQ preserved) but stripped of territory.
+   */
+  const tryEliminateOrSubjugate = (
+    state: EnhancedMafiaGameState,
+    victimFamily: string,
+    subjugatorFamily: string,
+  ): { outcome: 'eliminated' | 'subjugated' | 'noop' } => {
+    if ((state.eliminatedFamilies || []).includes(victimFamily)) return { outcome: 'noop' };
+    if ((state.subjugatedFamilies || {})[victimFamily]) return { outcome: 'noop' };
+    const floor = state.victoryProgress?.ironFist?.survivorFloor ?? 2;
+    const survivorsAfter = (state.aiOpponents || []).filter(o =>
+      o.family !== victimFamily && !(state.eliminatedFamilies || []).includes(o.family)
+    ).length + (state.gameOver ? 0 : (victimFamily === state.playerFamily ? 0 : 1));
+    if (survivorsAfter < floor) {
+      state.subjugatedFamilies = { ...(state.subjugatedFamilies || {}), [victimFamily]: subjugatorFamily };
+      state.deployedUnits = state.deployedUnits.filter(u => u.family !== victimFamily);
+      state.hexMap.forEach(t => { if (t.controllingFamily === victimFamily && !t.isHeadquarters) t.controllingFamily = subjugatorFamily as any; });
+      state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => f.family !== victimFamily);
+      const victimOpp = state.aiOpponents.find(o => o.family === victimFamily);
+      if (victimOpp) {
+        victimOpp.resources.money = 0;
+        victimOpp.resources.soldiers = 0;
+        (victimOpp as any).subjugated = true;
+        (victimOpp as any).subjugatedBy = subjugatorFamily;
+      }
+      if (subjugatorFamily === state.playerFamily) {
+        state.reputation.familyRelationships[victimFamily] = Math.min(100,
+          (state.reputation.familyRelationships[victimFamily] || 0) + SUBJUGATION_RELATIONSHIP_BONUS);
+      } else if (victimOpp) {
+        victimOpp.relationships = victimOpp.relationships || {};
+        victimOpp.relationships[subjugatorFamily] = Math.min(100,
+          (victimOpp.relationships[subjugatorFamily] || 0) + SUBJUGATION_RELATIONSHIP_BONUS);
+      }
+      state.pendingNotifications.push({
+        type: 'success' as const,
+        title: `🏳️ ${victimFamily.charAt(0).toUpperCase() + victimFamily.slice(1)} Subjugated`,
+        message: `The ${victimFamily} family bends the knee to the ${subjugatorFamily}. They keep their HQ but lost all territory — and will vote YES at Coronation.`,
+      });
+      return { outcome: 'subjugated' };
+    }
+    state.eliminatedFamilies = [...(state.eliminatedFamilies || []), victimFamily];
+    state.deployedUnits = state.deployedUnits.filter(u => u.family !== victimFamily);
+    state.hexMap.forEach(t => { if (t.controllingFamily === victimFamily && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
+    state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => f.family !== victimFamily);
+    state.aiOpponents = state.aiOpponents.filter(o => o.family !== victimFamily);
+    state.flippedSoldiers = (state.flippedSoldiers || []).filter(f => f.family !== victimFamily);
+    return { outcome: 'eliminated' };
+  };
+
   // ============ VICTORY CHECK ============
   const updateVictoryProgress = (state: EnhancedMafiaGameState) => {
     const TERRITORY_TARGET = state.mapSize === 'small' ? 40 : state.mapSize === 'large' ? 80 : 60;
@@ -1349,89 +1412,84 @@ export const useEnhancedMafiaGameState = (
 
     const legacyMet = state.turn > LEGACY_MIN_TURN && highestRival > 0 && playerRep >= highestRival * LEGACY_MARGIN;
 
-    const eliminatedCount = (state.eliminatedFamilies || []).length;
+    // Iron Fist: eliminate enough rivals to leave only `survivorFloor` (subjugated + active)
+    const totalRivals = (state.aiOpponents || []).length + (state.eliminatedFamilies || []).length;
+    const ironFistFloor = state.victoryProgress?.ironFist?.survivorFloor ?? 2;
+    const ironFistTarget = Math.max(0, totalRivals - ironFistFloor);
+    // "Eliminated" for Iron Fist includes both fully-eliminated AND subjugated families
+    const subjCount = Object.keys(state.subjugatedFamilies || {}).length;
+    const eliminatedCount = (state.eliminatedFamilies || []).length + subjCount;
+    const ironFistMet = ironFistTarget > 0 && eliminatedCount >= ironFistTarget;
+
     state.victoryProgress = {
       territory: { current: playerHexes, target: TERRITORY_TARGET, met: playerHexes >= TERRITORY_TARGET },
       economic: { current: income, target: ECONOMIC_TARGET, met: income >= ECONOMIC_TARGET },
       legacy: { current: playerRep, highestRival, met: legacyMet },
-      domination: { eliminated: eliminatedCount, target: 4, met: eliminatedCount >= 4 },
+      ironFist: { eliminated: eliminatedCount, target: ironFistTarget, survivorFloor: ironFistFloor, met: ironFistMet },
       commission: state.victoryProgress.commission || { supporting: 0, needed: 0, met: false },
     };
 
-    const prevVictory = state.victoryType;
-    if (state.victoryProgress.domination.met) state.victoryType = 'domination';
-    else if (state.victoryProgress.territory.met) state.victoryType = 'territory';
-    else if (state.victoryProgress.economic.met) state.victoryType = 'economic';
-    else if (state.victoryProgress.legacy.met) state.victoryType = 'legacy';
-    else state.victoryType = null;
+    // ── QUALIFYING CONDITIONS ──
+    // None of these end the game on their own anymore. They become Coronation buffs.
+    const prevQualifiers = new Set(state.qualifyingConditions || []);
+    const newQualifiers: QualifyingCondition[] = [];
+    if (state.victoryProgress.territory.met) newQualifiers.push('territory');
+    if (state.victoryProgress.economic.met) newQualifiers.push('economic');
+    if (state.victoryProgress.legacy.met) newQualifiers.push('legacy');
+    if (state.victoryProgress.ironFist.met) newQualifiers.push('ironFist');
+    state.qualifyingConditions = newQualifiers;
 
-    // Notify on first victory
-    if (state.victoryType && !prevVictory) {
-      const labels: Record<string, string> = {
-        domination: 'Total Domination — All rival families have been eliminated!',
-        territory: `Territory Domination — You control ${TERRITORY_TARGET}+ hexes!`,
-        economic: `Economic Empire — $${ECONOMIC_TARGET.toLocaleString()}+ monthly income achieved!`,
-        legacy: 'Legacy of Power — Your reputation surpasses all rivals by 25%!',
-      };
-      state.pendingNotifications = [...state.pendingNotifications, {
-        type: 'success' as const, title: '🏆 VICTORY!',
-        message: labels[state.victoryType] || 'You have won the game!',
-      }];
+    // Notify on newly-met qualifiers
+    const qualifierLabels: Record<QualifyingCondition, string> = {
+      territory: `Territory qualifier met — you control ${TERRITORY_TARGET}+ hexes`,
+      economic: `Economic qualifier met — $${ECONOMIC_TARGET.toLocaleString()}+ monthly income`,
+      legacy: 'Legacy qualifier met — your reputation surpasses all rivals',
+      ironFist: 'Iron Fist qualifier met — rival families broken',
+    };
+    for (const q of newQualifiers) {
+      if (!prevQualifiers.has(q)) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success' as const,
+          title: '⚖️ Coronation Buff',
+          message: `${qualifierLabels[q]}. Call a Commission Vote to claim the throne (+1 vote, max +${CORONATION_QUALIFIER_BUFF_CAP}).`,
+        }];
+      }
+    }
+    // Notify when a previously-met qualifier was lost
+    for (const q of prevQualifiers) {
+      if (!newQualifiers.includes(q as QualifyingCondition)) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'warning' as const,
+          title: '⚖️ Qualifier Lost',
+          message: `Your ${q} qualifier no longer holds — you've lost a Coronation vote buff.`,
+        }];
+      }
     }
 
+    // NOTE: state.victoryType is set ONLY by a successful Commission Vote
+    // (processCommissionVote / AI commission block). The four conditions above
+    // are now qualifiers, not auto-wins. Leave victoryType untouched here.
+
     // ============ AI VICTORY DETECTION ============
-    // Only set if player hasn't already won this turn.
+    // AI victory is also commission-only now. The qualifier-buff logic above
+    // gives a leading AI an easier vote, but they still have to call it.
+    // We DO still detect the "everyone but one family is eliminated/subjugated"
+    // catastrophe — that's an unambiguous end state.
     if (!state.victoryType && !state.aiVictor) {
       const eliminated = new Set(state.eliminatedFamilies || []);
       const survivingAIs = (state.aiOpponents || []).filter(o => !eliminated.has(o.family));
-
-      // Compute legacy "rep" for every family (player + AIs)
-      const allFamilyReps: Record<string, number> = {};
-      allFamilyReps[state.playerFamily] = playerRep;
-      survivingAIs.forEach(opp => {
-        const ht = state.hexMap.filter(t => t.controllingFamily === opp.family).length;
-        allFamilyReps[opp.family] = (ht * 3) + (opp.resources.soldiers * 2) + (opp.resources.money / 500);
-      });
-
-      type Win = { family: string; type: 'territory' | 'economic' | 'legacy' | 'domination' };
-      const candidates: Win[] = [];
-
-      // Domination: player dead + only one AI survives, OR an AI is the only non-eliminated family
       const playerDead = !!state.gameOver;
+      // Last-family-standing catastrophe: only when player is already dead AND
+      // exactly one rival remains. With Iron Fist's survivor floor, this should
+      // be rare/impossible to reach by HQ Assault — only RICO/bankruptcy gets there.
       if (playerDead && survivingAIs.length === 1) {
-        candidates.push({ family: survivingAIs[0].family, type: 'domination' });
-      }
-
-      for (const opp of survivingAIs) {
-        const oppHexes = state.hexMap.filter(t => t.controllingFamily === opp.family).length;
-        if (oppHexes >= TERRITORY_TARGET) candidates.push({ family: opp.family, type: 'territory' });
-        if ((opp.resources.lastTurnIncome || 0) >= ECONOMIC_TARGET) candidates.push({ family: opp.family, type: 'economic' });
-        if (state.turn > LEGACY_MIN_TURN) {
-          const myRep = allFamilyReps[opp.family] || 0;
-          const others = Object.entries(allFamilyReps).filter(([f]) => f !== opp.family).map(([, v]) => v);
-          const nextBest = others.length ? Math.max(...others) : 0;
-          if (myRep > 0 && nextBest > 0 && myRep >= nextBest * LEGACY_MARGIN) {
-            candidates.push({ family: opp.family, type: 'legacy' });
-          }
-        }
-      }
-
-      if (candidates.length > 0) {
-        const order = { domination: 0, territory: 1, economic: 2, legacy: 3 } as const;
-        candidates.sort((a, b) => order[a.type] - order[b.type]);
-        const winner = candidates[0];
-        state.aiVictor = { family: winner.family, type: winner.type, turn: state.turn };
+        const winner = survivingAIs[0];
+        state.aiVictor = { family: winner.family, type: 'commission', turn: state.turn };
         const famLabel = winner.family.charAt(0).toUpperCase() + winner.family.slice(1);
-        const typeLabel: Record<string, string> = {
-          territory: 'Territory Domination',
-          economic: 'Economic Empire',
-          legacy: 'Legacy of Power',
-          domination: 'Total Domination',
-        };
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'error' as const,
           title: '❌ DEFEAT',
-          message: `The ${famLabel} family has won by ${typeLabel[winner.type]}.`,
+          message: `The ${famLabel} family stands alone. By default, the Commission acclaims them Boss of All Bosses.`,
         }];
       }
     }
@@ -1582,11 +1640,19 @@ export const useEnhancedMafiaGameState = (
     // Unanimous minus one: need all minus one
     const needed = Math.max(survivingRivals.length - 1, survivingRivals.length === 2 ? 2 : survivingRivals.length - 1);
     const hasTreachery = !!(state.treacheryDebuff && state.treacheryDebuff.turnsRemaining > 0);
-    
+
     let yesVotes = 0;
     const voteResults: Array<{ family: string; vote: boolean; reason: string }> = [];
-    
+
+    // Subjugated families always vote YES for their subjugator
+    const subjMap = state.subjugatedFamilies || {};
+
     for (const rival of survivingRivals) {
+      if (subjMap[rival.family] === state.playerFamily) {
+        yesVotes++;
+        voteResults.push({ family: rival.family, vote: true, reason: 'Subjugated vassal — automatic YES' });
+        continue;
+      }
       if (hasTreachery) {
         voteResults.push({ family: rival.family, vote: false, reason: 'Treachery debuff — automatic NO' });
         continue;
@@ -1595,21 +1661,42 @@ export const useEnhancedMafiaGameState = (
       const hasAlliance = (state.alliances || []).some(a => a.active && a.alliedFamily === rival.family);
       const hasCeasefire = (state.ceasefires || []).some(c => c.active && c.family === rival.family);
       const hasPact = hasAlliance || hasCeasefire;
-      
+
       if (relationship >= COMMISSION_VOTE_RELATIONSHIP_THRESHOLD && hasPact) {
         yesVotes++;
         voteResults.push({ family: rival.family, vote: true, reason: `Relationship ${relationship} + active pact` });
       } else {
-        const reason = relationship < COMMISSION_VOTE_RELATIONSHIP_THRESHOLD 
-          ? `Relationship too low (${relationship}/${COMMISSION_VOTE_RELATIONSHIP_THRESHOLD})` 
+        const reason = relationship < COMMISSION_VOTE_RELATIONSHIP_THRESHOLD
+          ? `Relationship too low (${relationship}/${COMMISSION_VOTE_RELATIONSHIP_THRESHOLD})`
           : 'No active alliance or ceasefire';
         voteResults.push({ family: rival.family, vote: false, reason });
       }
     }
-    
+
+    // ── CORONATION QUALIFIER BUFF ──
+    // Each qualifier currently met flips one NEUTRAL rival's NO into a YES.
+    // Neutral = relationship 30–59, no pact, not treachery-blocked.
+    let qualifierBuff = Math.min((state.qualifyingConditions || []).length, CORONATION_QUALIFIER_BUFF_CAP);
+    if (qualifierBuff > 0 && !hasTreachery) {
+      const flippable = voteResults
+        .map((vr, idx) => ({ vr, idx }))
+        .filter(({ vr }) => {
+          if (vr.vote) return false;
+          if (vr.reason.startsWith('Subjugated')) return false;
+          const rel = state.reputation.familyRelationships[vr.family] || 0;
+          return rel >= 30 && rel < COMMISSION_VOTE_RELATIONSHIP_THRESHOLD;
+        });
+      for (const { idx } of flippable) {
+        if (qualifierBuff <= 0) break;
+        voteResults[idx] = { ...voteResults[idx], vote: true, reason: `Coronation buff — overwhelming power conceded` };
+        yesVotes++;
+        qualifierBuff--;
+      }
+    }
+
     // Update victory progress
     state.victoryProgress.commission = { supporting: yesVotes, needed, met: yesVotes >= needed };
-    
+
     // Store vote result for modal display
     state.commissionVoteResult = {
       callerFamily: state.playerFamily,
@@ -1620,7 +1707,7 @@ export const useEnhancedMafiaGameState = (
       yesVotes,
       totalVoters: survivingRivals.length,
     };
-    
+
     if (yesVotes >= needed) {
       state.victoryType = 'commission';
     } else {
@@ -10173,20 +10260,23 @@ export const useEnhancedMafiaGameState = (
     chance = Math.min(HQ_ASSAULT_MAX_CHANCE, Math.max(0.05, chance));
 
     if (Math.random() < chance) {
-      state.eliminatedFamilies = [...(state.eliminatedFamilies || []), targetFamily];
-      state.deployedUnits = state.deployedUnits.filter(u => u.family !== targetFamily);
-      state.hexMap.forEach(t => { if (t.controllingFamily === targetFamily && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
-      state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => f.family !== targetFamily);
-      state.aiOpponents = state.aiOpponents.filter(o => o.family !== targetFamily);
-      state.flippedSoldiers = (state.flippedSoldiers || []).filter(f => f.family !== targetFamily);
-      state.resources.money += 25000;
-      state.reputation.respect = Math.min(100, state.reputation.respect + 30);
-      state.reputation.fear = Math.min(100, state.reputation.fear + 40);
-      state.pendingNotifications = [...state.pendingNotifications, {
-        type: 'success', title: '💀 Family Eliminated!',
-        message: `The ${targetFamily.charAt(0).toUpperCase() + targetFamily.slice(1)} family has been destroyed! +$25,000, +30 Respect, +40 Fear.`,
-      }];
-      state.lastCombatResult = { q: targetQ, r: targetR, s: targetS, success: true, type: 'hit', title: `${targetFamily.toUpperCase()} ELIMINATED`, details: 'HQ Assault successful!', timestamp: Date.now() };
+      const result = tryEliminateOrSubjugate(state, targetFamily, state.playerFamily);
+      if (result.outcome === 'eliminated') {
+        state.resources.money += 25000;
+        state.reputation.respect = Math.min(100, state.reputation.respect + 30);
+        state.reputation.fear = Math.min(100, state.reputation.fear + 40);
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: '💀 Family Eliminated!',
+          message: `The ${targetFamily.charAt(0).toUpperCase() + targetFamily.slice(1)} family has been destroyed! +$25,000, +30 Respect, +40 Fear.`,
+        }];
+        state.lastCombatResult = { q: targetQ, r: targetR, s: targetS, success: true, type: 'hit', title: `${targetFamily.toUpperCase()} ELIMINATED`, details: 'HQ Assault successful!', timestamp: Date.now() };
+      } else if (result.outcome === 'subjugated') {
+        // Iron Fist guard: family bent the knee instead of dying
+        state.resources.money += 15000;
+        state.reputation.respect = Math.min(100, state.reputation.respect + 20);
+        state.reputation.fear = Math.min(100, state.reputation.fear + 30);
+        state.lastCombatResult = { q: targetQ, r: targetR, s: targetS, success: true, type: 'hit', title: `${targetFamily.toUpperCase()} SUBJUGATED`, details: 'They bent the knee — Boss of All Bosses needs subjects.', timestamp: Date.now() };
+      }
     } else {
       state.deployedUnits = state.deployedUnits.filter(u => u.id !== attacker.id);
       delete state.soldierStats[attacker.id];

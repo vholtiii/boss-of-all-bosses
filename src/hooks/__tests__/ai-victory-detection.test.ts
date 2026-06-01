@@ -24,24 +24,21 @@ function flipHexesTo(state: any, family: string, count: number) {
   }
 }
 
-describe("AI victory detection", () => {
-  it("sets aiVictor.type='territory' when an AI controls >= TERRITORY_TARGET hexes", () => {
+describe("AI victory detection (post-Coronation rework)", () => {
+  it("does NOT auto-set aiVictor when an AI controls >= TERRITORY_TARGET hexes (Commission-only now)", () => {
     const { result } = setup();
     const targetAI = result.current.gameState.aiOpponents[0].family;
 
     act(() => {
-      // Cheat: directly mutate hex map then end turn so updateVictoryProgress runs
       flipHexesTo(result.current.gameState as any, targetAI, 60);
       result.current.endTurn();
     });
 
-    const v = (result.current.gameState as any).aiVictor;
-    expect(v).toBeTruthy();
-    expect(v.family).toBe(targetAI);
-    expect(["territory", "domination"]).toContain(v.type);
+    // Territory now only flips a qualifier; AI must call a Commission Vote to actually win
+    expect((result.current.gameState as any).aiVictor).toBeFalsy();
   });
 
-  it("sets aiVictor.type='domination' when player is gameOver and one AI survives", () => {
+  it("sets aiVictor (commission) when player is gameOver and only one rival survives", () => {
     const { result } = setup();
     const survivor = result.current.gameState.aiOpponents[0].family;
     const others = result.current.gameState.aiOpponents.slice(1).map(o => o.family);
@@ -50,30 +47,28 @@ describe("AI victory detection", () => {
       const s: any = result.current.gameState;
       s.gameOver = { type: "bankruptcy", turn: s.turn };
       s.eliminatedFamilies = [...(s.eliminatedFamilies || []), ...others];
+      // Also drop them from aiOpponents so the survivor count == 1
+      s.aiOpponents = s.aiOpponents.filter((o: any) => !others.includes(o.family));
       result.current.endTurn();
     });
 
     const v = (result.current.gameState as any).aiVictor;
     expect(v).toBeTruthy();
     expect(v.family).toBe(survivor);
-    expect(v.type).toBe("domination");
+    expect(v.type).toBe("commission");
   });
 
-  it("does not set aiVictor when player meets a victory condition the same turn", () => {
+  it("player meeting a qualifier does not trigger victoryType (only Commission Vote does)", () => {
     const { result } = setup();
-    const targetAI = result.current.gameState.aiOpponents[0].family;
 
     act(() => {
       const s: any = result.current.gameState;
-      // Player gets 60+ territory (medium target). Flip player first so AI flips
-      // overwrite some — but because hex map > 60, both can be at threshold.
-      // Flip AI first then player so player ends with the threshold met.
-      flipHexesTo(s, targetAI, 60);
       flipHexesTo(s, s.playerFamily, 80);
       result.current.endTurn();
     });
 
-    expect(result.current.gameState.victoryType).toBeTruthy();
-    expect((result.current.gameState as any).aiVictor).toBeFalsy();
+    // Qualifier met but no auto-win
+    expect(result.current.gameState.victoryType).toBeFalsy();
+    expect((result.current.gameState as any).qualifyingConditions).toContain("territory");
   });
 });

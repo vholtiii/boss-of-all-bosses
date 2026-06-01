@@ -118,11 +118,21 @@ export interface VictoryProgress {
   territory: { current: number; target: number; met: boolean };
   economic: { current: number; target: number; met: boolean };
   legacy: { current: number; highestRival: number; met: boolean };
-  domination: { eliminated: number; target: number; met: boolean };
+  /**
+   * Iron Fist (formerly "Domination") — eliminate enough rivals to dominate,
+   * but a Boss-of-All-Bosses must have families left to rule. You can never
+   * eliminate every rival; the last `survivorFloor` survivors are subjugated.
+   */
+  ironFist: { eliminated: number; target: number; survivorFloor: number; met: boolean };
   commission: { supporting: number; needed: number; met: boolean };
 }
 
-export type VictoryType = 'territory' | 'economic' | 'legacy' | 'domination' | 'commission' | null;
+/** The four "qualifying" wins — none of these end the game on their own; they
+ * unlock the Coronation (Commission Vote) and grant +1 vote each (cap +2). */
+export type QualifyingCondition = 'territory' | 'economic' | 'legacy' | 'ironFist';
+
+/** Only 'commission' is a terminal VictoryType now. */
+export type VictoryType = 'commission' | null;
 
 // ============ GAMEPLAY PHASES ============
 export type GamePhase = 1 | 2 | 3 | 4;
@@ -139,6 +149,12 @@ export interface PhaseConfig {
     minBuiltBusinesses?: number;
     minControlledDistricts?: number; // family owns >= 60% hexes in N districts
     minIncomeOrHexesOrRespect?: { hexes: number; income: number; respect: number }; // OR condition
+    /** Phase 4 diplomacy floor: at least this many rivals still standing. */
+    minSurvivingRivals?: number;
+    /** Phase 4 diplomacy: count of active alliances + ceasefires required. */
+    minActivePacts?: number;
+    /** Phase 4 diplomacy alt: N rivals with relationship ≥ threshold. */
+    minRivalsAtRelationship?: { count: number; threshold: number };
   };
   unlocks: string[];
 }
@@ -161,8 +177,16 @@ export const PHASE_CONFIGS: PhaseConfig[] = [
   },
   {
     phase: 4, name: 'Boss of All Bosses', icon: '👑', minTurn: 18,
-    requirements: { minCapos: 3, minIncomeOrHexesOrRespect: { hexes: 45, income: 50000, respect: 85 } },
-    unlocks: ['Commission Vote', 'HQ Assault'],
+    requirements: {
+      minCapos: 3,
+      minIncomeOrHexesOrRespect: { hexes: 45, income: 50000, respect: 85 },
+      // Diplomacy gate — Phase 4 is about the Commission, not just brute force.
+      // Either condition (active pact OR 2 warm rivals) satisfies the diplomacy floor.
+      minSurvivingRivals: 2,
+      minActivePacts: 1,
+      minRivalsAtRelationship: { count: 2, threshold: 40 },
+    },
+    unlocks: ['Commission Vote (Coronation)', 'HQ Assault → Subjugate'],
   },
 ];
 
@@ -172,6 +196,10 @@ export const COMMISSION_VOTE_COOLDOWN = 10;
 export const COMMISSION_MIN_SURVIVORS = 2;
 export const COMMISSION_VOTE_RELATIONSHIP_THRESHOLD = 60;
 export const COMMISSION_VOTE_FAILED_RELATIONSHIP_PENALTY = 10;
+/** Max number of free YES votes the Coronation can earn from qualifier conditions. */
+export const CORONATION_QUALIFIER_BUFF_CAP = 2;
+/** Permanent relationship bonus a subjugated family carries toward its subjugator. */
+export const SUBJUGATION_RELATIONSHIP_BONUS = 40;
 
 // ============ HQ ASSAULT & FLIP SOLDIER ============
 // ============ SITDOWN (BOSS ACTION) ============
