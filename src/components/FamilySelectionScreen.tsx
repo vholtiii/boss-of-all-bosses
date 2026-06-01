@@ -139,7 +139,7 @@ export const FAMILIES: FamilyInfo[] = [
 ];
 
 // --- Family Crests (inline SVGs) ---
-const FamilyCrest: React.FC<{ familyId: FamilyId; color: string; size?: number }> = ({ familyId, color, size = 32 }) => {
+const FamilyCrest: React.FC<{ familyId: FamilyId; color: string; size?: number }> = React.memo(({ familyId, color, size = 32 }) => {
   const s = size;
   const crests: Record<FamilyId, React.ReactNode> = {
     gambino: (
@@ -202,7 +202,8 @@ const FamilyCrest: React.FC<{ familyId: FamilyId; color: string; size?: number }
     ),
   };
   return <>{crests[familyId]}</>;
-};
+});
+FamilyCrest.displayName = 'FamilyCrest';
 
 // Industrial stat bar
 const StatBar: React.FC<{ value: number; color: string }> = ({ value, color }) => (
@@ -349,17 +350,14 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
     <div
       className="min-h-screen bg-background flex flex-col items-center justify-center p-6 overflow-hidden relative"
     >
-      {/* Ken-Burns background layer */}
-      <motion.div
-        className="absolute inset-0 z-0"
+      {/* Ken-Burns background layer (CSS-driven for compositor offload) */}
+      <div
+        className={cn('ken-burns-bg absolute inset-0 z-0', isTransitioning && 'is-paused')}
         style={{
           backgroundImage: `url(${mafiaSitdownBg})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
-        initial={{ scale: 1.05, x: 0, y: 0 }}
-        animate={{ scale: [1.05, 1.15, 1.08, 1.05], x: [0, -20, 10, 0], y: [0, -10, 5, 0] }}
-        transition={{ duration: 40, repeat: Infinity, ease: 'easeInOut' }}
       />
       {/* Dark overlay + vignette for dramatic atmosphere */}
       <div className="absolute inset-0 bg-black/55 z-0" />
@@ -370,7 +368,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         }}
       />
       {/* Atmospheric particles */}
-      <AtmosphericParticles />
+      <AtmosphericParticles paused={isTransitioning} />
 
       {/* Art-deco corner ornaments — framed playbill feel */}
       {([
@@ -402,13 +400,10 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         {soundConfig.enabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
       </button>
 
-      {/* Grunge noise overlay */}
+      {/* Static grunge noise overlay (no blend-mode → no layer promotion) */}
       <div
-        className="absolute inset-0 pointer-events-none z-[1]"
-        style={{
-          backgroundImage: NOISE_BG,
-          mixBlendMode: 'overlay',
-        }}
+        className="absolute inset-0 pointer-events-none z-[1] opacity-40"
+        style={{ backgroundImage: NOISE_BG }}
       />
 
 
@@ -526,7 +521,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 transition={{ duration: 0.2 }}
                 className={cn(
                   'flex-1 min-w-[220px] max-w-[280px] text-left p-4 rounded-lg border-2 transition-all duration-200',
-                  'backdrop-blur-sm relative overflow-hidden outline-none',
+                  'relative overflow-hidden outline-none',
                   'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                   isActive ? 'border-primary' : 'border-border/40 opacity-80 hover:opacity-100 hover:border-muted-foreground/50',
                 )}
@@ -548,19 +543,12 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 {/* Header */}
                 <div className="flex items-center justify-between gap-2 mb-1 relative">
                   <div className="flex items-center gap-2">
-                    <motion.span
+                    <span
                       className="text-2xl leading-none select-none"
-                      animate={isActive ? {
-                        filter: [
-                          `drop-shadow(0 0 2px ${meta.color})`,
-                          `drop-shadow(0 0 8px ${meta.color})`,
-                          `drop-shadow(0 0 2px ${meta.color})`,
-                        ],
-                      } : {}}
-                      transition={isActive ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' } : {}}
+                      style={isActive ? { filter: `drop-shadow(0 0 6px ${meta.color})` } : undefined}
                     >
                       {meta.icon}
-                    </motion.span>
+                    </span>
                     <span className="font-playfair text-lg font-bold leading-tight text-foreground whitespace-nowrap">
                       {meta.name}
                     </span>
@@ -688,7 +676,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         <AnimatePresence mode="wait">
           {seedInput ? (
             <motion.div
-              key={`active-${seedInput}-${seedFlash}`}
+              key={`active-${seedFlash}`}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
@@ -719,7 +707,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
       </div>
 
       {/* Family cards — horizontal row */}
-      <div className="flex flex-wrap justify-center gap-5 max-w-6xl mx-auto mb-10 relative z-[3]" style={{ perspective: 1200 }}>
+      <div className="flex flex-wrap justify-center gap-5 max-w-6xl mx-auto mb-10 relative z-[3]">
         {FAMILIES.map((family, i) => {
           const isSelected = selectedFamily === family.id;
           const isDimmed = !!selectedFamily && !isSelected;
@@ -730,7 +718,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: isDimmed ? 0.55 : 1 }}
               transition={{ delay: 0.15 + i * 0.08, duration: 0.4 }}
-              whileHover={{ scale: 1.03, y: -4, rotateY: 3, rotateX: -1.5 }}
+              whileHover={{ scale: 1.03, y: -4 }}
               onClick={() => selectFamily(family.id)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -746,7 +734,6 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 'w-[180px] cursor-pointer transition-all duration-200 relative group outline-none',
                 'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm',
               )}
-              style={{ transformStyle: 'preserve-3d' }}
             >
               {/* Spotlight cone behind selected card (outside clip) */}
               {isSelected && (
@@ -782,7 +769,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
 
               {/* Clipped inner card surface */}
               <div
-                className="relative p-5 bg-card/90 backdrop-blur-sm"
+                className="relative p-5 bg-card/95"
                 style={{
                   clipPath: CARD_CLIP,
                   backgroundImage: NOISE_BG,
@@ -792,17 +779,12 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                     : '0 4px 12px hsl(20 15% 5% / 0.4)',
                 }}
               >
-              <motion.div
+              <div
                 className="flex justify-center mb-2"
-                whileHover={{ filter: `drop-shadow(0 0 6px ${family.color})` }}
-                animate={isSelected ? {
-                  scale: [1, 1.1, 1],
-                  filter: [`drop-shadow(0 0 4px ${family.color}60)`, `drop-shadow(0 0 10px ${family.color})`, `drop-shadow(0 0 4px ${family.color}60)`],
-                } : {}}
-                transition={isSelected ? { duration: 1.5, repeat: Infinity, ease: 'easeInOut' } : {}}
+                style={isSelected ? { filter: `drop-shadow(0 0 8px ${family.color})` } : undefined}
               >
                 <FamilyCrest familyId={family.id} color={family.color} size={40} />
-              </motion.div>
+              </div>
 
               <div className="text-lg font-bold font-playfair mb-0.5 text-center" style={{ color: family.color }}>
                 {family.name}
@@ -1022,6 +1004,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     filter: 'saturate(0.85)',
+                    willChange: 'transform, opacity, filter',
                   }}
                   initial={{ scale: 1.05, filter: 'saturate(0.95) brightness(1)' }}
                   animate={{
@@ -1047,12 +1030,11 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                   transition={{ duration: 3.0, times: [0, 0.5, 1], ease: 'easeOut' }}
                 />
 
-                {/* Smoke puffs rushing forward */}
+                {/* Smoke puffs rushing forward — blur baked into the gradient,
+                    no runtime filter:blur() to keep the compositor cheap. */}
                 {[
-                  { left: '20%', top: '60%', size: 700, delay: 0.85 },
-                  { left: '70%', top: '40%', size: 800, delay: 1.0 },
-                  { left: '50%', top: '55%', size: 1000, delay: 0.75 },
-                  { left: '35%', top: '30%', size: 600, delay: 1.15 },
+                  { left: '35%', top: '55%', size: 900, delay: 0.8 },
+                  { left: '65%', top: '45%', size: 800, delay: 1.0 },
                 ].map((p, i) => (
                   <motion.div
                     key={i}
@@ -1064,12 +1046,13 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                       height: p.size,
                       marginLeft: -p.size / 2,
                       marginTop: -p.size / 2,
-                      background: 'radial-gradient(circle, rgba(180,170,160,0.55) 0%, rgba(40,35,30,0.35) 45%, transparent 70%)',
-                      filter: 'blur(40px)',
+                      background:
+                        'radial-gradient(circle, rgba(180,170,160,0.35) 0%, rgba(40,35,30,0.18) 45%, transparent 70%)',
                       mixBlendMode: 'screen',
+                      willChange: 'transform, opacity',
                     }}
                     initial={{ scale: 0.4, opacity: 0 }}
-                    animate={{ scale: [0.4, 2.2, 3.4], opacity: [0, 0.95, 0.9] }}
+                    animate={{ scale: [0.4, 1.4, 2.2], opacity: [0, 0.9, 0.85] }}
                     transition={{ duration: 1.8, delay: p.delay, ease: [0.33, 1, 0.68, 1] }}
                   />
                 ))}
