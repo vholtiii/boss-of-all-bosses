@@ -718,7 +718,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: isDimmed ? 0.55 : 1 }}
               transition={{ delay: 0.15 + i * 0.08, duration: 0.4 }}
-              whileHover={{ scale: 1.03, y: -4, rotateY: 3, rotateX: -1.5 }}
+              whileHover={{ scale: 1.03, y: -4 }}
               onClick={() => selectFamily(family.id)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
