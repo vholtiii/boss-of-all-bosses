@@ -442,25 +442,19 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
 
   // AI Victory — Player Defeat (takes precedence over same-turn bankruptcy/RICO)
   if ((gameState as any).aiVictor) {
-    const v = (gameState as any).aiVictor as { family: string; type: 'territory' | 'economic' | 'legacy' | 'domination'; turn: number };
+    const v = (gameState as any).aiVictor as { family: string; type: 'commission'; turn: number };
     const famLabel = v.family.charAt(0).toUpperCase() + v.family.slice(1);
     const winnerHexes = gameState.hexMap.filter(h => h.controllingFamily === v.family).length;
     const winnerOpp = gameState.aiOpponents?.find(o => o.family === v.family);
     const winnerSoldiers = winnerOpp?.resources?.soldiers ?? 0;
     const playerHexes = gameState.hexMap.filter(h => h.controllingFamily === gameState.playerFamily).length;
     const eliminatedCount = (gameState as any).eliminatedFamilies?.length || 0;
-    const emoji = v.type === 'territory' ? '👑' : v.type === 'economic' ? '💰' : v.type === 'legacy' ? '🏛️' : '☠️';
+    const emoji = '👑';
     const typeTitle: Record<string, string> = {
-      territory: 'TERRITORY DOMINATION',
-      economic: 'ECONOMIC EMPIRE',
-      legacy: 'LEGACY OF POWER',
-      domination: 'TOTAL DOMINATION',
+      commission: 'THE COMMISSION HAS SPOKEN',
     };
     const typeDesc: Record<string, string> = {
-      territory: `The ${famLabel} family controls the city — block by block, the streets are theirs.`,
-      economic: `The ${famLabel} family runs the money. Every dollar in this city flows through them.`,
-      legacy: `The ${famLabel} name now towers over every rival. The reputation is unmatched.`,
-      domination: `Every other family is broken. ${famLabel} stands alone over the ashes.`,
+      commission: `The ${famLabel} family has been crowned Boss of All Bosses. Their rule is now law.`,
     };
     return (
       <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
