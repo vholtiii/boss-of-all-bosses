@@ -1131,9 +1131,12 @@ export const createInitialGameState = (
       territory: { current: 0, target: mapSize === 'small' ? 40 : mapSize === 'large' ? 80 : 60, met: false },
       economic: { current: 0, target: 50000, met: false },
       legacy: { current: 0, highestRival: 0, met: false },
-      domination: { eliminated: 0, target: 4, met: false },
+      // Iron Fist: must leave at least 2 surviving rivals (survivorFloor). Target
+      // is computed from total rival count - survivorFloor; assumes 4 rivals → eliminate 2.
+      ironFist: { eliminated: 0, target: 2, survivorFloor: 2, met: false },
       commission: { supporting: 0, needed: 0, met: false },
     },
+    qualifyingConditions: [] as QualifyingCondition[],
     gamePhase: 1 as GamePhase,
     commissionVoteCooldownUntil: 0,
     commissionVoteResult: null,
