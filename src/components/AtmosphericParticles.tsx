@@ -13,20 +13,29 @@ interface Particle {
   time: number;
 }
 
-const PARTICLE_COUNT = 50;
+const PARTICLE_COUNT = 25;
 const COLORS = [
-  'rgba(255, 180, 60,',   // warm amber
-  'rgba(255, 140, 40,',   // orange ember
-  'rgba(200, 180, 160,',  // warm gray
-  'rgba(180, 160, 140,',  // dusty brown
-  'rgba(255, 100, 30,',   // hot ember
+  'rgba(255, 180, 60,',
+  'rgba(255, 140, 40,',
+  'rgba(200, 180, 160,',
+  'rgba(180, 160, 140,',
+  'rgba(255, 100, 30,',
 ];
 
-const AtmosphericParticles: React.FC = () => {
+interface Props {
+  /** Pause the animation loop (e.g. during transitions). */
+  paused?: boolean;
+}
+
+const AtmosphericParticles: React.FC<Props> = ({ paused = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<Particle[]>([]);
-  const mouseRef = useRef({ x: 0.5, y: 0.5 });
   const animFrameRef = useRef<number>(0);
+  const pausedRef = useRef(paused);
+
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -41,21 +50,19 @@ const AtmosphericParticles: React.FC = () => {
     resize();
     window.addEventListener('resize', resize);
 
-    const handleMouse = (e: MouseEvent) => {
-      mouseRef.current = {
-        x: e.clientX / window.innerWidth,
-        y: e.clientY / window.innerHeight,
-      };
-    };
-    window.addEventListener('mousemove', handleMouse);
-
-    // Init particles
-    particlesRef.current = Array.from({ length: PARTICLE_COUNT }, () => createParticle(canvas.width, canvas.height, true));
+    particlesRef.current = Array.from({ length: PARTICLE_COUNT }, () =>
+      createParticle(canvas.width, canvas.height, true)
+    );
 
     let lastTime = 0;
-    const targetInterval = 1000 / 30; // ~30fps
+    const targetInterval = 1000 / 30;
 
     const animate = (timestamp: number) => {
+      // Skip work entirely when paused or tab is hidden.
+      if (pausedRef.current || document.hidden) {
+        animFrameRef.current = requestAnimationFrame(animate);
+        return;
+      }
       const delta = timestamp - lastTime;
       if (delta < targetInterval) {
         animFrameRef.current = requestAnimationFrame(animate);
@@ -64,8 +71,6 @@ const AtmosphericParticles: React.FC = () => {
       lastTime = timestamp;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const mx = (mouseRef.current.x - 0.5) * 15;
-      const my = (mouseRef.current.y - 0.5) * 10;
 
       for (let i = 0; i < particlesRef.current.length; i++) {
         const p = particlesRef.current[i];
@@ -73,25 +78,11 @@ const AtmosphericParticles: React.FC = () => {
         p.y -= p.speedY;
         p.x += Math.sin(p.time) * p.sway + p.speedX;
 
-        // Parallax offset
-        const px = p.x + mx * (p.size / 3);
-        const py = p.y + my * (p.size / 3);
-
-        // Draw
         ctx.beginPath();
-        ctx.arc(px, py, p.size, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fillStyle = `${p.color} ${p.opacity})`;
         ctx.fill();
 
-        // Glow for embers
-        if (p.opacity > 0.25) {
-          ctx.beginPath();
-          ctx.arc(px, py, p.size * 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = `${p.color} ${p.opacity * 0.15})`;
-          ctx.fill();
-        }
-
-        // Reset if off screen
         if (p.y < -10 || p.x < -10 || p.x > canvas.width + 10) {
           particlesRef.current[i] = createParticle(canvas.width, canvas.height, false);
         }
@@ -105,7 +96,6 @@ const AtmosphericParticles: React.FC = () => {
     return () => {
       cancelAnimationFrame(animFrameRef.current);
       window.removeEventListener('resize', resize);
-      window.removeEventListener('mousemove', handleMouse);
     };
   }, []);
 
