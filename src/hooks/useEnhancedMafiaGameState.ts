@@ -10268,20 +10268,24 @@ export const useEnhancedMafiaGameState = (
     chance = Math.min(HQ_ASSAULT_MAX_CHANCE, Math.max(0.05, chance));
 
     if (Math.random() < chance) {
-      state.eliminatedFamilies = [...(state.eliminatedFamilies || []), targetFamily];
-      state.deployedUnits = state.deployedUnits.filter(u => u.family !== targetFamily);
-      state.hexMap.forEach(t => { if (t.controllingFamily === targetFamily && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
-      state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => f.family !== targetFamily);
-      state.aiOpponents = state.aiOpponents.filter(o => o.family !== targetFamily);
-      state.flippedSoldiers = (state.flippedSoldiers || []).filter(f => f.family !== targetFamily);
-      state.resources.money += 25000;
-      state.reputation.respect = Math.min(100, state.reputation.respect + 30);
-      state.reputation.fear = Math.min(100, state.reputation.fear + 40);
-      state.pendingNotifications = [...state.pendingNotifications, {
-        type: 'success', title: '💀 Family Eliminated!',
-        message: `The ${targetFamily.charAt(0).toUpperCase() + targetFamily.slice(1)} family has been destroyed! +$25,000, +30 Respect, +40 Fear.`,
-      }];
-      state.lastCombatResult = { q: targetQ, r: targetR, s: targetS, success: true, type: 'hit', title: `${targetFamily.toUpperCase()} ELIMINATED`, details: 'HQ Assault successful!', timestamp: Date.now() };
+      const result = tryEliminateOrSubjugate(state, targetFamily, state.playerFamily);
+      if (result.outcome === 'eliminated') {
+        state.resources.money += 25000;
+        state.reputation.respect = Math.min(100, state.reputation.respect + 30);
+        state.reputation.fear = Math.min(100, state.reputation.fear + 40);
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success', title: '💀 Family Eliminated!',
+          message: `The ${targetFamily.charAt(0).toUpperCase() + targetFamily.slice(1)} family has been destroyed! +$25,000, +30 Respect, +40 Fear.`,
+        }];
+        state.lastCombatResult = { q: targetQ, r: targetR, s: targetS, success: true, type: 'hit', title: `${targetFamily.toUpperCase()} ELIMINATED`, details: 'HQ Assault successful!', timestamp: Date.now() };
+      } else if (result.outcome === 'subjugated') {
+        // Iron Fist guard: family bent the knee instead of dying
+        state.resources.money += 15000;
+        state.reputation.respect = Math.min(100, state.reputation.respect + 20);
+        state.reputation.fear = Math.min(100, state.reputation.fear + 30);
+        state.lastCombatResult = { q: targetQ, r: targetR, s: targetS, success: true, type: 'hit', title: `${targetFamily.toUpperCase()} SUBJUGATED`, details: 'They bent the knee — Boss of All Bosses needs subjects.', timestamp: Date.now() };
+      }
+    } else {
     } else {
       state.deployedUnits = state.deployedUnits.filter(u => u.id !== attacker.id);
       delete state.soldierStats[attacker.id];
