@@ -10286,7 +10286,6 @@ export const useEnhancedMafiaGameState = (
         state.lastCombatResult = { q: targetQ, r: targetR, s: targetS, success: true, type: 'hit', title: `${targetFamily.toUpperCase()} SUBJUGATED`, details: 'They bent the knee — Boss of All Bosses needs subjects.', timestamp: Date.now() };
       }
     } else {
-    } else {
       state.deployedUnits = state.deployedUnits.filter(u => u.id !== attacker.id);
       delete state.soldierStats[attacker.id];
       friendlyAdjacent.forEach(u => { const uStats = state.soldierStats[u.id]; if (uStats) uStats.loyalty = Math.max(0, uStats.loyalty - 30); });
