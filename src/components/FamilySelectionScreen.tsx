@@ -548,7 +548,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                       style={isActive ? { filter: `drop-shadow(0 0 6px ${meta.color})` } : undefined}
                     >
                       {meta.icon}
-                    </motion.span>
+                    </span>
                     <span className="font-playfair text-lg font-bold leading-tight text-foreground whitespace-nowrap">
                       {meta.name}
                     </span>
