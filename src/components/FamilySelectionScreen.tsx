@@ -1030,12 +1030,11 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                   transition={{ duration: 3.0, times: [0, 0.5, 1], ease: 'easeOut' }}
                 />
 
-                {/* Smoke puffs rushing forward */}
+                {/* Smoke puffs rushing forward — blur baked into the gradient,
+                    no runtime filter:blur() to keep the compositor cheap. */}
                 {[
-                  { left: '20%', top: '60%', size: 700, delay: 0.85 },
-                  { left: '70%', top: '40%', size: 800, delay: 1.0 },
-                  { left: '50%', top: '55%', size: 1000, delay: 0.75 },
-                  { left: '35%', top: '30%', size: 600, delay: 1.15 },
+                  { left: '35%', top: '55%', size: 900, delay: 0.8 },
+                  { left: '65%', top: '45%', size: 800, delay: 1.0 },
                 ].map((p, i) => (
                   <motion.div
                     key={i}
@@ -1047,12 +1046,13 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                       height: p.size,
                       marginLeft: -p.size / 2,
                       marginTop: -p.size / 2,
-                      background: 'radial-gradient(circle, rgba(180,170,160,0.55) 0%, rgba(40,35,30,0.35) 45%, transparent 70%)',
-                      filter: 'blur(40px)',
+                      background:
+                        'radial-gradient(circle, rgba(180,170,160,0.35) 0%, rgba(40,35,30,0.18) 45%, transparent 70%)',
                       mixBlendMode: 'screen',
+                      willChange: 'transform, opacity',
                     }}
                     initial={{ scale: 0.4, opacity: 0 }}
-                    animate={{ scale: [0.4, 2.2, 3.4], opacity: [0, 0.95, 0.9] }}
+                    animate={{ scale: [0.4, 1.4, 2.2], opacity: [0, 0.9, 0.85] }}
                     transition={{ duration: 1.8, delay: p.delay, ease: [0.33, 1, 0.68, 1] }}
                   />
                 ))}
