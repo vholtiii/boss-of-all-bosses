@@ -510,7 +510,11 @@ export interface EnhancedMafiaGameState {
   arrestedSoldiers: Array<{ unitId: string; returnTurn: number; arrestTurn?: number; source?: 'heat' | 'prosecution'; recruited?: boolean; family?: string }>;
   arrestedCapos: Array<{ unitId: string; returnTurn: number; arrestTurn?: number; name?: string; recruited?: boolean; family?: string }>;
   gameOver?: { type: 'rico' | 'federal_indictment'; turn: number } | null;
-  aiVictor?: { family: string; type: 'territory' | 'economic' | 'legacy' | 'domination'; turn: number } | null;
+  aiVictor?: { family: string; type: 'commission'; turn: number } | null;
+  /** Qualifying conditions currently met. Each grants +1 free YES vote at Coronation, capped. */
+  qualifyingConditions?: QualifyingCondition[];
+  /** Families subjugated (kept alive but ruled). They count toward survivor floor and vote YES for their subjugator. */
+  subjugatedFamilies?: Record<string, string>; // victimFamily -> subjugatorFamily
   pendingBusinessBuild?: { businessType: string; cost: number; isLegal: boolean } | null;
   
   // Blind hit system
