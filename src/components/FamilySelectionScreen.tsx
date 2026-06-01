@@ -139,7 +139,7 @@ export const FAMILIES: FamilyInfo[] = [
 ];
 
 // --- Family Crests (inline SVGs) ---
-const FamilyCrest: React.FC<{ familyId: FamilyId; color: string; size?: number }> = ({ familyId, color, size = 32 }) => {
+const FamilyCrest: React.FC<{ familyId: FamilyId; color: string; size?: number }> = React.memo(({ familyId, color, size = 32 }) => {
   const s = size;
   const crests: Record<FamilyId, React.ReactNode> = {
     gambino: (
