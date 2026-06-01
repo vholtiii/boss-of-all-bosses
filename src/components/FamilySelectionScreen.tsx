@@ -521,7 +521,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 transition={{ duration: 0.2 }}
                 className={cn(
                   'flex-1 min-w-[220px] max-w-[280px] text-left p-4 rounded-lg border-2 transition-all duration-200',
-                  'backdrop-blur-sm relative overflow-hidden outline-none',
+                  'relative overflow-hidden outline-none',
                   'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                   isActive ? 'border-primary' : 'border-border/40 opacity-80 hover:opacity-100 hover:border-muted-foreground/50',
                 )}
