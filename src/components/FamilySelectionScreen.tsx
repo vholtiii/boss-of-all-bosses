@@ -676,7 +676,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         <AnimatePresence mode="wait">
           {seedInput ? (
             <motion.div
-              key={`active-${seedInput}-${seedFlash}`}
+              key={`active-${seedFlash}`}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
