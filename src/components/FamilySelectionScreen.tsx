@@ -350,17 +350,14 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
     <div
       className="min-h-screen bg-background flex flex-col items-center justify-center p-6 overflow-hidden relative"
     >
-      {/* Ken-Burns background layer */}
-      <motion.div
-        className="absolute inset-0 z-0"
+      {/* Ken-Burns background layer (CSS-driven for compositor offload) */}
+      <div
+        className={cn('ken-burns-bg absolute inset-0 z-0', isTransitioning && 'is-paused')}
         style={{
           backgroundImage: `url(${mafiaSitdownBg})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
-        initial={{ scale: 1.05, x: 0, y: 0 }}
-        animate={{ scale: [1.05, 1.15, 1.08, 1.05], x: [0, -20, 10, 0], y: [0, -10, 5, 0] }}
-        transition={{ duration: 40, repeat: Infinity, ease: 'easeInOut' }}
       />
       {/* Dark overlay + vignette for dramatic atmosphere */}
       <div className="absolute inset-0 bg-black/55 z-0" />
