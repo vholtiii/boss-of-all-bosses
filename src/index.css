@@ -176,4 +176,19 @@ All colors MUST be HSL.
     0%, 100% { opacity: 0.3; r: 1.5; }
     50% { opacity: 0.9; r: 2.2; }
   }
+
+  /* Ken-Burns drift for select-screen background. CSS keyframes stay on the
+     compositor thread so it doesn't tick through JS every frame. */
+  .ken-burns-bg {
+    will-change: transform;
+    transform: translateZ(0);
+    animation: kenBurnsDrift 40s ease-in-out infinite;
+  }
+  .ken-burns-bg.is-paused { animation-play-state: paused; }
+  @keyframes kenBurnsDrift {
+    0%   { transform: translate3d(0, 0, 0) scale(1.05); }
+    33%  { transform: translate3d(-20px, -10px, 0) scale(1.15); }
+    66%  { transform: translate3d(10px, 5px, 0) scale(1.08); }
+    100% { transform: translate3d(0, 0, 0) scale(1.05); }
+  }
 }
