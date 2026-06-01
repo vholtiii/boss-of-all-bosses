@@ -68,8 +68,10 @@ export function computeAIPosture(i: PostureInputs): AIPosture {
     return 'COOL_OFF';
   }
 
-  // 2. Cash runway crisis — bankruptcy is more dangerous than rivals
-  if (i.moneyRunway < 3) return 'CONSOLIDATE';
+  // 2. Cash runway crisis — bankruptcy is more dangerous than rivals.
+  // Threshold lowered to <2.5 so that the [2.5, 3) band falls through to
+  // BUILD_ECONOMY (tight runway, no expansion) instead of full CONSOLIDATE.
+  if (i.moneyRunway < 2.5) return 'CONSOLIDATE';
 
   // 3. Just took heavy losses — turtle to recover
   if (i.hqAssaultedRecently || i.recentCapoLosses >= 2) return 'TURTLE';
@@ -83,11 +85,11 @@ export function computeAIPosture(i: PostureInputs): AIPosture {
   // 6. We are the leader in Phase 3+ — pressure #2 instead of generically expanding
   if (i.aiPhase >= 3 && i.myRank === 1) return 'PRESSURE_LEADER';
 
-  // 7. Phase 2+, cool heat, healthy treasury → expand
-  // EXPAND from Phase 1+: in early game, AI must grow to hit Phase 2 hex thresholds.
-  // Loosened runway gate (>2.5) lets AI EXPAND on a moderate treasury instead of
-  // defaulting to BUILD_ECONOMY (which used to silently block plan hits & hitmen).
-  if (i.heatTier === 'cool' && i.moneyRunway > 2.5) return 'EXPAND';
+  // 7. Phase 1+, cool heat, comfortable treasury → expand.
+  // Threshold is >3 (must be a full turn clear of the CONSOLIDATE floor of <2.5),
+  // so the [2.5, 3] band falls through to BUILD_ECONOMY: enough cash to keep
+  // operating, not enough to fund expansion or speculative offense.
+  if (i.heatTier === 'cool' && i.moneyRunway > 3) return 'EXPAND';
 
   // 8. Default: build economy, low-risk only
   return 'BUILD_ECONOMY';

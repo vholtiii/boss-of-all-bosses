@@ -47,17 +47,17 @@ export function getPlanHitBase(d: AIDifficulty | undefined): number {
 export function getHitmanChance(d: AIDifficulty | undefined, atWar: boolean): number {
   if (atWar) {
     switch (d) {
-      case 'easy':   return 0.10;
-      case 'hard':   return 0.18;
+      case 'easy':   return 0.20;
+      case 'hard':   return 0.32;
       case 'normal':
-      default:       return 0.14;
+      default:       return 0.26;
     }
   }
   switch (d) {
-    case 'easy':   return 0.20;
-    case 'hard':   return 0.32;
+    case 'easy':   return 0.10;
+    case 'hard':   return 0.18;
     case 'normal':
-    default:       return 0.26;
+    default:       return 0.14;
   }
 }
 
