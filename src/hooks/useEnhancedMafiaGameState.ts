@@ -1358,89 +1358,84 @@ export const useEnhancedMafiaGameState = (
 
     const legacyMet = state.turn > LEGACY_MIN_TURN && highestRival > 0 && playerRep >= highestRival * LEGACY_MARGIN;
 
-    const eliminatedCount = (state.eliminatedFamilies || []).length;
+    // Iron Fist: eliminate enough rivals to leave only `survivorFloor` (subjugated + active)
+    const totalRivals = (state.aiOpponents || []).length + (state.eliminatedFamilies || []).length;
+    const ironFistFloor = state.victoryProgress?.ironFist?.survivorFloor ?? 2;
+    const ironFistTarget = Math.max(0, totalRivals - ironFistFloor);
+    // "Eliminated" for Iron Fist includes both fully-eliminated AND subjugated families
+    const subjCount = Object.keys(state.subjugatedFamilies || {}).length;
+    const eliminatedCount = (state.eliminatedFamilies || []).length + subjCount;
+    const ironFistMet = ironFistTarget > 0 && eliminatedCount >= ironFistTarget;
+
     state.victoryProgress = {
       territory: { current: playerHexes, target: TERRITORY_TARGET, met: playerHexes >= TERRITORY_TARGET },
       economic: { current: income, target: ECONOMIC_TARGET, met: income >= ECONOMIC_TARGET },
       legacy: { current: playerRep, highestRival, met: legacyMet },
-      domination: { eliminated: eliminatedCount, target: 4, met: eliminatedCount >= 4 },
+      ironFist: { eliminated: eliminatedCount, target: ironFistTarget, survivorFloor: ironFistFloor, met: ironFistMet },
       commission: state.victoryProgress.commission || { supporting: 0, needed: 0, met: false },
     };
 
-    const prevVictory = state.victoryType;
-    if (state.victoryProgress.domination.met) state.victoryType = 'domination';
-    else if (state.victoryProgress.territory.met) state.victoryType = 'territory';
-    else if (state.victoryProgress.economic.met) state.victoryType = 'economic';
-    else if (state.victoryProgress.legacy.met) state.victoryType = 'legacy';
-    else state.victoryType = null;
+    // ── QUALIFYING CONDITIONS ──
+    // None of these end the game on their own anymore. They become Coronation buffs.
+    const prevQualifiers = new Set(state.qualifyingConditions || []);
+    const newQualifiers: QualifyingCondition[] = [];
+    if (state.victoryProgress.territory.met) newQualifiers.push('territory');
+    if (state.victoryProgress.economic.met) newQualifiers.push('economic');
+    if (state.victoryProgress.legacy.met) newQualifiers.push('legacy');
+    if (state.victoryProgress.ironFist.met) newQualifiers.push('ironFist');
+    state.qualifyingConditions = newQualifiers;
 
-    // Notify on first victory
-    if (state.victoryType && !prevVictory) {
-      const labels: Record<string, string> = {
-        domination: 'Total Domination — All rival families have been eliminated!',
-        territory: `Territory Domination — You control ${TERRITORY_TARGET}+ hexes!`,
-        economic: `Economic Empire — $${ECONOMIC_TARGET.toLocaleString()}+ monthly income achieved!`,
-        legacy: 'Legacy of Power — Your reputation surpasses all rivals by 25%!',
-      };
-      state.pendingNotifications = [...state.pendingNotifications, {
-        type: 'success' as const, title: '🏆 VICTORY!',
-        message: labels[state.victoryType] || 'You have won the game!',
-      }];
+    // Notify on newly-met qualifiers
+    const qualifierLabels: Record<QualifyingCondition, string> = {
+      territory: `Territory qualifier met — you control ${TERRITORY_TARGET}+ hexes`,
+      economic: `Economic qualifier met — $${ECONOMIC_TARGET.toLocaleString()}+ monthly income`,
+      legacy: 'Legacy qualifier met — your reputation surpasses all rivals',
+      ironFist: 'Iron Fist qualifier met — rival families broken',
+    };
+    for (const q of newQualifiers) {
+      if (!prevQualifiers.has(q)) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'success' as const,
+          title: '⚖️ Coronation Buff',
+          message: `${qualifierLabels[q]}. Call a Commission Vote to claim the throne (+1 vote, max +${CORONATION_QUALIFIER_BUFF_CAP}).`,
+        }];
+      }
+    }
+    // Notify when a previously-met qualifier was lost
+    for (const q of prevQualifiers) {
+      if (!newQualifiers.includes(q as QualifyingCondition)) {
+        state.pendingNotifications = [...state.pendingNotifications, {
+          type: 'warning' as const,
+          title: '⚖️ Qualifier Lost',
+          message: `Your ${q} qualifier no longer holds — you've lost a Coronation vote buff.`,
+        }];
+      }
     }
 
+    // NOTE: state.victoryType is set ONLY by a successful Commission Vote
+    // (processCommissionVote / AI commission block). The four conditions above
+    // are now qualifiers, not auto-wins. Leave victoryType untouched here.
+
     // ============ AI VICTORY DETECTION ============
-    // Only set if player hasn't already won this turn.
+    // AI victory is also commission-only now. The qualifier-buff logic above
+    // gives a leading AI an easier vote, but they still have to call it.
+    // We DO still detect the "everyone but one family is eliminated/subjugated"
+    // catastrophe — that's an unambiguous end state.
     if (!state.victoryType && !state.aiVictor) {
       const eliminated = new Set(state.eliminatedFamilies || []);
       const survivingAIs = (state.aiOpponents || []).filter(o => !eliminated.has(o.family));
-
-      // Compute legacy "rep" for every family (player + AIs)
-      const allFamilyReps: Record<string, number> = {};
-      allFamilyReps[state.playerFamily] = playerRep;
-      survivingAIs.forEach(opp => {
-        const ht = state.hexMap.filter(t => t.controllingFamily === opp.family).length;
-        allFamilyReps[opp.family] = (ht * 3) + (opp.resources.soldiers * 2) + (opp.resources.money / 500);
-      });
-
-      type Win = { family: string; type: 'territory' | 'economic' | 'legacy' | 'domination' };
-      const candidates: Win[] = [];
-
-      // Domination: player dead + only one AI survives, OR an AI is the only non-eliminated family
       const playerDead = !!state.gameOver;
+      // Last-family-standing catastrophe: only when player is already dead AND
+      // exactly one rival remains. With Iron Fist's survivor floor, this should
+      // be rare/impossible to reach by HQ Assault — only RICO/bankruptcy gets there.
       if (playerDead && survivingAIs.length === 1) {
-        candidates.push({ family: survivingAIs[0].family, type: 'domination' });
-      }
-
-      for (const opp of survivingAIs) {
-        const oppHexes = state.hexMap.filter(t => t.controllingFamily === opp.family).length;
-        if (oppHexes >= TERRITORY_TARGET) candidates.push({ family: opp.family, type: 'territory' });
-        if ((opp.resources.lastTurnIncome || 0) >= ECONOMIC_TARGET) candidates.push({ family: opp.family, type: 'economic' });
-        if (state.turn > LEGACY_MIN_TURN) {
-          const myRep = allFamilyReps[opp.family] || 0;
-          const others = Object.entries(allFamilyReps).filter(([f]) => f !== opp.family).map(([, v]) => v);
-          const nextBest = others.length ? Math.max(...others) : 0;
-          if (myRep > 0 && nextBest > 0 && myRep >= nextBest * LEGACY_MARGIN) {
-            candidates.push({ family: opp.family, type: 'legacy' });
-          }
-        }
-      }
-
-      if (candidates.length > 0) {
-        const order = { domination: 0, territory: 1, economic: 2, legacy: 3 } as const;
-        candidates.sort((a, b) => order[a.type] - order[b.type]);
-        const winner = candidates[0];
-        state.aiVictor = { family: winner.family, type: winner.type, turn: state.turn };
+        const winner = survivingAIs[0];
+        state.aiVictor = { family: winner.family, type: 'commission', turn: state.turn };
         const famLabel = winner.family.charAt(0).toUpperCase() + winner.family.slice(1);
-        const typeLabel: Record<string, string> = {
-          territory: 'Territory Domination',
-          economic: 'Economic Empire',
-          legacy: 'Legacy of Power',
-          domination: 'Total Domination',
-        };
         state.pendingNotifications = [...state.pendingNotifications, {
           type: 'error' as const,
           title: '❌ DEFEAT',
-          message: `The ${famLabel} family has won by ${typeLabel[winner.type]}.`,
+          message: `The ${famLabel} family stands alone. By default, the Commission acclaims them Boss of All Bosses.`,
         }];
       }
     }
