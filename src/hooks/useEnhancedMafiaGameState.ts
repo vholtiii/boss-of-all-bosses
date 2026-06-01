@@ -1331,12 +1331,18 @@ export const useEnhancedMafiaGameState = (
       };
     });
     state.units = newUnits;
+
+    allFamilies.forEach(fam => {
+      const controlled = state.hexMap.filter(t => t.controllingFamily === fam).length;
+      const total = state.hexMap.length;
+      state.familyControl[fam] = Math.round((controlled / total) * 100);
+    });
+  };
+
   /**
    * Iron Fist guard. Tries to eliminate `victimFamily`; if doing so would drop
    * the surviving rival count below the Iron Fist floor (2), the family is
-   * SUBJUGATED instead — kept alive (HQ preserved) but stripped of territory,
-   * forced to vote YES for the subjugator at Coronation.
-   * Returns { outcome: 'eliminated' | 'subjugated' | 'noop' }.
+   * SUBJUGATED instead — kept alive (HQ preserved) but stripped of territory.
    */
   const tryEliminateOrSubjugate = (
     state: EnhancedMafiaGameState,
@@ -1346,13 +1352,10 @@ export const useEnhancedMafiaGameState = (
     if ((state.eliminatedFamilies || []).includes(victimFamily)) return { outcome: 'noop' };
     if ((state.subjugatedFamilies || {})[victimFamily]) return { outcome: 'noop' };
     const floor = state.victoryProgress?.ironFist?.survivorFloor ?? 2;
-    // Count families still standing AFTER hypothetical elimination
     const survivorsAfter = (state.aiOpponents || []).filter(o =>
       o.family !== victimFamily && !(state.eliminatedFamilies || []).includes(o.family)
     ).length + (state.gameOver ? 0 : (victimFamily === state.playerFamily ? 0 : 1));
-    // ↑ +1 accounts for the player still being alive (if not victim/gameOver)
     if (survivorsAfter < floor) {
-      // SUBJUGATE: keep family alive, strip territory & units, mark vassal
       state.subjugatedFamilies = { ...(state.subjugatedFamilies || {}), [victimFamily]: subjugatorFamily };
       state.deployedUnits = state.deployedUnits.filter(u => u.family !== victimFamily);
       state.hexMap.forEach(t => { if (t.controllingFamily === victimFamily && !t.isHeadquarters) t.controllingFamily = subjugatorFamily as any; });
@@ -1364,9 +1367,7 @@ export const useEnhancedMafiaGameState = (
         (victimOpp as any).subjugated = true;
         (victimOpp as any).subjugatedBy = subjugatorFamily;
       }
-      // Permanent relationship bonus from victim → subjugator
       if (subjugatorFamily === state.playerFamily) {
-        // Player is subjugator: bump player's relationship with victim
         state.reputation.familyRelationships[victimFamily] = Math.min(100,
           (state.reputation.familyRelationships[victimFamily] || 0) + SUBJUGATION_RELATIONSHIP_BONUS);
       } else if (victimOpp) {
@@ -1381,7 +1382,6 @@ export const useEnhancedMafiaGameState = (
       });
       return { outcome: 'subjugated' };
     }
-    // Full elimination path
     state.eliminatedFamilies = [...(state.eliminatedFamilies || []), victimFamily];
     state.deployedUnits = state.deployedUnits.filter(u => u.family !== victimFamily);
     state.hexMap.forEach(t => { if (t.controllingFamily === victimFamily && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
@@ -1389,14 +1389,6 @@ export const useEnhancedMafiaGameState = (
     state.aiOpponents = state.aiOpponents.filter(o => o.family !== victimFamily);
     state.flippedSoldiers = (state.flippedSoldiers || []).filter(f => f.family !== victimFamily);
     return { outcome: 'eliminated' };
-  };
-
-
-    allFamilies.forEach(fam => {
-      const controlled = state.hexMap.filter(t => t.controllingFamily === fam).length;
-      const total = state.hexMap.length;
-      state.familyControl[fam] = Math.round((controlled / total) * 100);
-    });
   };
 
   // ============ VICTORY CHECK ============
