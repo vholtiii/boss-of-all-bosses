@@ -202,7 +202,8 @@ const FamilyCrest: React.FC<{ familyId: FamilyId; color: string; size?: number }
     ),
   };
   return <>{crests[familyId]}</>;
-};
+});
+FamilyCrest.displayName = 'FamilyCrest';
 
 // Industrial stat bar
 const StatBar: React.FC<{ value: number; color: string }> = ({ value, color }) => (
