@@ -769,7 +769,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
 
               {/* Clipped inner card surface */}
               <div
-                className="relative p-5 bg-card/90 backdrop-blur-sm"
+                className="relative p-5 bg-card/95"
                 style={{
                   clipPath: CARD_CLIP,
                   backgroundImage: NOISE_BG,
@@ -779,17 +779,12 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                     : '0 4px 12px hsl(20 15% 5% / 0.4)',
                 }}
               >
-              <motion.div
+              <div
                 className="flex justify-center mb-2"
-                whileHover={{ filter: `drop-shadow(0 0 6px ${family.color})` }}
-                animate={isSelected ? {
-                  scale: [1, 1.1, 1],
-                  filter: [`drop-shadow(0 0 4px ${family.color}60)`, `drop-shadow(0 0 10px ${family.color})`, `drop-shadow(0 0 4px ${family.color}60)`],
-                } : {}}
-                transition={isSelected ? { duration: 1.5, repeat: Infinity, ease: 'easeInOut' } : {}}
+                style={isSelected ? { filter: `drop-shadow(0 0 8px ${family.color})` } : undefined}
               >
                 <FamilyCrest familyId={family.id} color={family.color} size={40} />
-              </motion.div>
+              </div>
 
               <div className="text-lg font-bold font-playfair mb-0.5 text-center" style={{ color: family.color }}>
                 {family.name}
