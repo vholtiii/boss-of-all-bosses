@@ -199,6 +199,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     targetFamily: string;
     incomingSitdownId?: string;
     successBonus?: number;
+    lockedDealType?: any;
+    proposedAmount?: number;
+    proposerLabel?: string;
   } | null>(null);
 
   // Plan Hit mode — 2-step: select soldier, then select target hex+unit
@@ -364,12 +367,17 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         proposerLabel: s.fromCapoName ? `${s.fromCapoName} (${famLabel})` : famLabel,
       });
     } else {
+      const fam = String(s.fromFamily || '');
+      const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
       setNegotiationState({
         open: true,
         scope: 'family',
         targetFamily: s.fromFamily,
         incomingSitdownId: s.id,
         successBonus: s.successBonus,
+        lockedDealType: s.proposedDeal,
+        proposedAmount: s.proposedAmount,
+        proposerLabel: s.fromBossName ? `${s.fromBossName} (${famLabel})` : `${famLabel} Boss`,
       });
     }
   }, []);
@@ -2013,6 +2021,9 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               availableEnemyFamilies={incomingSitdownId ? undefined : enemyFamilies}
               successBonus={successBonus}
               treacheryTurnsRemaining={(gameState as any).treacheryDebuff?.turnsRemaining || 0}
+              lockedDealType={(negotiationState as any).lockedDealType}
+              proposedAmount={(negotiationState as any).proposedAmount}
+              proposerLabel={(negotiationState as any).proposerLabel}
             />
           );
         }
