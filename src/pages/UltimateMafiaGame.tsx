@@ -1591,6 +1591,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
 
   const mainContent = (
     <div className="h-full relative" onClick={deselectUnit}>
+      {/* Heat meter — pinned top-center of map */}
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+        <HeatMeter
+          heat={(gameState as any).policeHeat?.level ?? 0}
+          history={heatHistory}
+          ricoTimer={gameState.ricoTimer || 0}
+        />
+      </div>
+
       {/* Phase indicator banner */}
       <motion.div
         key={gameState.turnPhase}
