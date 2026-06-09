@@ -343,7 +343,11 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     persicoSelectionActive: !!state.persicoSelectionActive,
     qualifyingConditions: [...(state.qualifyingConditions || [])],
     subjugatedFamilies: { ...(state.subjugatedFamilies || {}) },
+    wiretaps: (state.wiretaps || []).map(w => ({ ...w })),
+    counterSurveillance: (state.counterSurveillance || []).map(c => ({ ...c })),
+    lastFamilyDinnerTurn: { ...(state.lastFamilyDinnerTurn || {}) },
   });
+
 
 // ============ UNIT TYPES ============
 export interface DeployedUnit {
