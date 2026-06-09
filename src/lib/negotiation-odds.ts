@@ -128,9 +128,10 @@ export function predictCounterReaction(
   _playerIsSupplier: boolean = false,
 ): CounterReaction {
   if (originalPrice <= 0) return 'walk';
+  if (round >= 1) return 'walk';
   const swing = Math.abs(counterPrice - originalPrice) / originalPrice;
   if (swing <= COUNTER_ACCEPT_SWING) return 'accept';
-  if (swing >= COUNTER_WALK_SWING || round >= 1) return 'walk';
+  if (swing >= COUNTER_WALK_SWING) return 'walk';
   return 'recounter';
 }
 
