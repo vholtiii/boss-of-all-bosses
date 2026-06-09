@@ -414,6 +414,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               heat={(gameState as any).policeHeat?.level ?? 0}
               history={heatHistory}
               ricoTimer={gameState.ricoTimer || 0}
+              fedBugCount={((gameState as any).wiretaps || []).filter((w: any) => w.plantedBy === 'feds' && w.targetFamily === gameState.playerFamily).length}
+              fedBugDiscoveredCount={((gameState as any).wiretaps || []).filter((w: any) => w.plantedBy === 'feds' && w.targetFamily === gameState.playerFamily && w.discovered).length}
             />
           </div>
           <EnhancedMafiaHexGrid 
@@ -1306,16 +1308,20 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 const lastDinner = ((gameState as any).lastFamilyDinnerTurn || {})[gameState.playerFamily] || 0;
                 const dinnerCdLeft = lastDinner > 0 ? Math.max(0, 5 - (gameState.turn - lastDinner)) : 0;
                 const csActive = ((gameState as any).counterSurveillance || []).some((c: any) => c.family === gameState.playerFamily);
-                const wiretapsOnMe = ((gameState as any).wiretaps || []).filter((w: any) => w.targetFamily === gameState.playerFamily).length;
+                const wiretapsOnMeAll = ((gameState as any).wiretaps || []).filter((w: any) => w.targetFamily === gameState.playerFamily);
+                const wiretapsOnMe = wiretapsOnMeAll.filter((w: any) => w.plantedBy !== 'feds').length;
+                const fedBugsOnMe = wiretapsOnMeAll.filter((w: any) => w.plantedBy === 'feds').length;
+                const fedDiscovered = wiretapsOnMeAll.filter((w: any) => w.plantedBy === 'feds' && w.discovered).length;
+                const totalSuspected = wiretapsOnMe + fedBugsOnMe;
                 return (
                   <>
                     <Button
                       size="sm" variant="outline" className="text-xs h-7 px-2 ml-1"
                       disabled={noTactical || gameState.resources.money < 800 || csActive}
-                      title={csActive ? 'Counter-surveillance already active' : `Sweep your operation for wiretaps. $800 / 1 tactical. ${wiretapsOnMe > 0 ? `(${wiretapsOnMe} bug${wiretapsOnMe === 1 ? '' : 's'} suspected)` : '(none detected)'}`}
+                      title={csActive ? 'Counter-surveillance already active' : `Sweep your operation for bugs. $800 / 1 tactical. ${totalSuspected > 0 ? `(${wiretapsOnMe} rival + ${fedBugsOnMe} Fed${fedDiscovered > 0 ? ` — ${fedDiscovered} known` : ''} suspected). Fed wires hurt the prosecution case more the longer they've run.` : '(none detected)'}`}
                       onClick={() => handleAction({ type: 'sweep_for_bugs' })}
                     >
-                      🧹 Sweep{csActive ? ' (active)' : wiretapsOnMe > 0 ? ` ⚠️ ${wiretapsOnMe}` : ''}
+                      🧹 Sweep{csActive ? ' (active)' : totalSuspected > 0 ? ` ⚠️ ${totalSuspected}${fedBugsOnMe > 0 ? `🎧` : ''}` : ''}
                     </Button>
                     <Button
                       size="sm" variant="outline" className="text-xs h-7 px-2"
@@ -1648,6 +1654,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           heat={(gameState as any).policeHeat?.level ?? 0}
           history={heatHistory}
           ricoTimer={gameState.ricoTimer || 0}
+          fedBugCount={((gameState as any).wiretaps || []).filter((w: any) => w.plantedBy === 'feds' && w.targetFamily === gameState.playerFamily).length}
+          fedBugDiscoveredCount={((gameState as any).wiretaps || []).filter((w: any) => w.plantedBy === 'feds' && w.targetFamily === gameState.playerFamily && w.discovered).length}
         />
       </div>
 

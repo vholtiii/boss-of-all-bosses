@@ -1,90 +1,80 @@
-## Two New Tactical-Step Actions
+# Prosecution Wiretaps & RICO Aides
 
-Adds one paired intel mechanic (Wiretap ↔ Sweep for Bugs) and one loyalty mechanic (Family Dinner at HQ). Both are full-parity: AI families can use them too. All effects fit existing strategy/territory focus — no missions, no new resources.
+Extend the existing wiretap system with a second class — **Federal bugs** planted by law enforcement — that feed the prosecution / RICO pipeline. The existing rival-family wiretap stays unchanged; this adds a parallel `plantedBy: 'feds'` track plus the discovery, intel, and prosecution consequences around it.
 
-> **Heads-up on existing rule:** `mem://gameplay/intel-sources` says there are exactly 4 canonical intel paths (Scout, Bribe, Flip Soldier, Safehouse). Wiretap adds a 5th. I'll update that memory as part of the build so the rule stays accurate.
+## Mechanics
 
----
+### Placement (both passive + event-driven)
+- **Passive heat-driven**: At end of each turn, for every family in **Hot (60+)** heat or higher, roll a chance to plant 1 Fed bug on one of their non-HQ extorted/built hexes.
+  - Hot 60-79: 12% / turn
+  - Critical 80-89: 22% / turn
+  - RICO 90+: 35% / turn
+  - Target hex weighted toward highest-earning + most-active (recent claims/extorts/hits in last 3 turns).
+  - Cap: max 3 simultaneous active Fed bugs per family. Cannot target HQ.
+- **Event-triggered spikes** (any of these adds 1 Fed bug immediately, ignoring cap +1):
+  - Failed Plan Hit (already raises heat) → 40% bug roll
+  - Raid event resolution → 50% bug roll
+  - Soldier flipped to informant → 100% bug roll
+  - Crossing prosecutionRisk ≥ 40 threshold → 1 guaranteed bug (one-shot per crossing)
 
-### 1. 🎧 Wiretap (intel) + 🧹 Sweep for Bugs (counter-intel)
+### Lifecycle & passive effect
+- Each Fed bug stores: `plantedTurn`, `q,r,s`, `targetFamily`, `discovered: false`.
+- While **undiscovered**: silently accrues. **No** passive prosecutionRisk add (kept clean per your "Age-scaled + RICO accel" choice).
+- While **discovered but not yet swept**: visible UI badge on hex; still produces evidence until swept (same +risk-on-sweep math doesn't double-apply — discovery is the consequence event).
 
-The mob's signature non-violent intel play. One side plants bugs, the other sweeps them.
+### Discovery paths
+1. **Sweep for Bugs** (existing action): now also rolls 75% against Fed bugs on that hex. Finding a Fed bug fires the discovery consequence below.
+2. **Chief bribe (tier 3)** — adds a "Fed wires suspected: **N** active across your territory" line to the bribe report. Count only, no locations.
+3. **Mayor bribe (tier 4)** — reveals exact hex coordinates of all currently active Fed bugs. Marks them `discovered: true` (triggers consequence immediately based on age). Still requires Sweep to remove.
+4. **Consigliere lawyer (passive)** — while retained, each turn 25% chance to flag one undiscovered Fed bug's hex (sets `discovered: true`, triggers consequence). Surfaces as an alert.
 
-**Wiretap a rival hex**
-- **Where**: tactical step menu → target a *known* rival-controlled hex (must have been scouted at least once, so you know what's there). Capo not required — any deployed soldier within 2 hexes of the target can "make the drop".
-- **Cost**: $1,500 + 1 tactical action.
-- **Effect**: For **4 turns**, you passively learn:
-  - The owning family's next planned action on or from that hex (claim, extort, sabotage, hit, plan-hit, sitdown) — revealed in your Alerts log the turn before it resolves.
-  - Live unit count on that hex (bypasses fog).
-- **Discovery risk**: 15% per turn the rival rolls a discovery check. If they have an active Sweep (see below), the chance jumps to 75%. On discovery: wiretap expires, tension +8 with that family, and the rival learns *you* were the planter.
-- **Limits**: max 2 active wiretaps per family. Cannot wiretap an HQ. Phase 2+ only (intel-tier mechanic).
+### Discovery consequence (the core feedback loop)
+When a Fed bug transitions to `discovered`:
+- `age = currentTurn - plantedTurn`
+- **Prosecution risk** += `min(25, age * 3)` for the owning family.
+- **RICO acceleration**: if owning family's heat ≥ 80, immediately tick `ricoTimer += 1` (the Feds "rush the case"). If age ≥ 5 AND heat ≥ 80, tick `+2` instead.
+- Alert/toast: "🎧⚖️ Fed wire discovered on \[district hex] — bug ran **N** turns. Prosecution risk +X.\[ RICO timer rushed.]"
+- Heat is **not** directly raised (heat is the *cause*, prosecution is the *effect*).
 
-**Sweep for Bugs**
-- **Where**: tactical step menu → target your own hex or HQ.
-- **Cost**: $800 + 1 tactical action.
-- **Effect**: Immediately rolls discovery for any active wiretap on that hex (75% chance per wiretap). If found:
-  - Wiretap removed.
-  - +5 respect ("we caught them in our walls").
-  - Tension +5 with the planter.
-- **Passive**: Even if no wiretap was found, the hex gains a 2-turn *Counter-Surveillance* tag (raises discovery rate to 75% for any wiretap planted during those 2 turns).
-- **Limit**: 1 sweep per turn (it's a tactical action, so naturally capped).
+### Removal
+- Only **Sweep for Bugs** removes a Fed bug from the hex (same action that already exists; no new button). Mayor-bribe reveal does not remove, only exposes.
+- Removing a Fed bug grants +3 respect (not the +5 of a rival sweep — Feds expected) and does **not** raise tension (no family planted it).
 
-**Why it's mafia-authentic**: every major NY family ran wire ops on rivals through the 80s; the Bonannos famously got pinched after FBI bugs in their social clubs. Sweeps were a regular routine — Castellano's house was swept weekly.
+### AI parity
+- Same passive/event placement applies to AI families based on their own heat.
+- AI sweep heuristic already exists; extend so AI also weights sweep priority by `(undiscovered Fed bugs) * heatTierWeight` — cautious/strategic personalities sweep more aggressively at Critical/RICO heat.
+- AI Mayor/Chief bribes (when AI does corruption) read the same intel.
+- AI prosecution risk + RICO timer already update through the same shared pipeline.
 
----
+## UI
 
-### 2. 🍝 Family Dinner at HQ (loyalty)
+- **Sweep button tooltip**: extend existing suspected-count to show "(N rival + M Fed suspected)" when in Hot+ heat.
+- **HeatMeter overlay**: add a small `🎧` badge with active Fed-bug count under the meter when ≥1 bug is on the player. Hover tooltip lists hexes (only those discovered).
+- **Hex info panel**: discovered Fed bug shows a "⚖️ Fed wire — ran N turns, swept/active" line.
+- **Alerts log**: new entries for planting (silent — *no* alert; you only learn via discovery), discovery, RICO rush.
+- **Mayor bribe report**: new section listing Fed bug hexes.
 
-The Sunday sit-down at the boss's table — keeps the crew tight.
+## Files to touch (technical section)
 
-- **Where**: tactical step menu → action on your HQ.
-- **Cost**: $1,000 + 1 tactical action. **5-turn cooldown** per family.
-- **Effect**: +6 loyalty to every friendly soldier and capo **on or within 2 hexes of HQ** (matches the existing `LOYALTY_CAPO_AURA_RANGE` for consistency). +1 respect.
-- **Side effect**: small heat cost (+1) — feds notice big gatherings ("Apalachin moment").
-- **Limit**: HQ must have at least 1 friendly unit nearby.
+- `src/types/game-mechanics.ts`
+  - Extend `Wiretap` interface: `plantedBy: FamilyId | 'feds'`; reuse existing fields.
+  - New constants: `FED_BUG_CHANCE_BY_TIER`, `FED_BUG_MAX_PER_FAMILY`, `FED_BUG_AGE_RISK_PER_TURN = 3`, `FED_BUG_AGE_RISK_CAP = 25`, `FED_BUG_RICO_ACCEL_HEAT = 80`, `FED_BUG_RICO_ACCEL_AGE = 5`.
+- `src/hooks/useEnhancedMafiaGameState.ts`
+  - End-of-turn pass: roll Fed-bug placement per family by heat tier; handle event-triggered placements at the existing failed-hit / raid / informant / risk-threshold sites.
+  - Sweep handler: include Fed bugs in the roll; on Fed discovery apply age-scaled risk + RICO accel.
+  - Consigliere passive: per-turn 25% roll for one undiscovered Fed bug on player.
+  - Mayor/Chief bribe handlers: include Fed bug count/locations in returned report; Mayor reveal marks discovered + triggers consequence.
+  - AI sweep weighting update.
+- `src/components/HeatMeter.tsx` — small `🎧 N` chip when player has Fed bugs.
+- `src/pages/UltimateMafiaGame.tsx` — Sweep tooltip + hex info Fed-wire line.
+- `src/components/CorruptionPanel.tsx` / bribe report rendering — Fed bug section.
+- Memory updates:
+  - New `mem://gameplay/prosecution/fed-wiretaps.md` (placement, discovery, consequence, AI parity).
+  - Update `mem://gameplay/tactical/wiretap-sweep.md` (Sweep now handles Fed bugs too).
+  - Update `mem://gameplay/police-heat-system.md` and `mem://gameplay/legal-and-prosecution.md` cross-refs.
+  - Update `mem://gameplay/intel-bribes.md` (Chief count / Mayor locations).
+  - Update `mem://gameplay/defense-and-law-actions.md` (Consigliere passive hint).
+  - Append index.
 
-**Why it's mafia-authentic**: Sunday dinner / wedding gatherings were the social glue that kept loyalty enforceable. Also the historical cause of mass arrests (Apalachin '57).
-
----
-
-### AI Parity
-
-Both AI heat posture and personality already drive tactical decisions. AI hooks:
-
-- **Wiretap**: Cautious/strategic personalities will plant wiretaps on the top-threat rival's nearest extortable hex when they have spare tactical budget and money. Aggressive/opportunistic skip in favor of Plan Hit / direct action. AI uses wiretap intel to pick higher-success Plan Hit targets.
-- **Sweep**: Any AI runs a sweep on its HQ when (a) it detects a wiretap was placed on its hexes (i.e., player's wiretap is now active) — surfaced via tension spike heuristic — or (b) once every ~8 turns as routine. Cautious personalities sweep more.
-- **Family Dinner**: AI uses it when average crew loyalty drops below 55 and cooldown is ready.
-
-All three respect the existing AI heat ceilings (skipped at `critical`/`rico` unless strategic override).
-
----
-
-### Files (planned)
-
-**Types & constants** — `src/types/game-mechanics.ts`
-- `Wiretap` interface: `{ id, targetQ/R/S, plantedBy, plantedTurn, expiresTurn, lastIntel?: string }`.
-- Constants: `WIRETAP_COST`, `WIRETAP_DURATION`, `WIRETAP_DISCOVERY_BASE`, `WIRETAP_DISCOVERY_SWEPT`, `WIRETAP_MAX_PER_FAMILY`, `WIRETAP_PLANT_RANGE`, `SWEEP_COST`, `SWEEP_DISCOVERY_CHANCE`, `COUNTER_SURVEILLANCE_DURATION`, `FAMILY_DINNER_COST`, `FAMILY_DINNER_COOLDOWN`, `FAMILY_DINNER_LOYALTY`, `FAMILY_DINNER_HEAT`.
-- Extend `IntelSource` union with `'wiretap'` and update `INTEL_SOURCE_LABELS`.
-
-**State** — `src/hooks/useEnhancedMafiaGameState.ts`
-- Add `wiretaps: Wiretap[]` and per-hex `counterSurveillanceUntilTurn` to game state.
-- Add `lastFamilyDinnerTurn: Record<family, number>` for cooldown tracking.
-- Action handlers: `plant_wiretap`, `sweep_for_bugs`, `family_dinner`.
-- End-of-turn pass:
-  - Decrement wiretap durations; roll discovery; append intel entries for any rival action originating from a bugged hex next turn.
-  - Decrement counter-surveillance timers.
-- AI turn pass: hooks above (wiretap targeting via existing threat-board, sweep heuristic, dinner loyalty check).
-
-**UI** — `src/components/GameSidePanels.tsx` (tactical action group) + map hex menu
-- "Plant Wiretap" entry on rival hex action menu (when scouted, has range, has budget, Phase ≥ 2).
-- "Sweep for Bugs" entry on own hex action menu.
-- "Family Dinner" entry on HQ action menu (cooldown shown).
-- Active-wiretap badges in `RightSidePanel` intel list (showing target, turns remaining, last intel snippet).
-- Sweep result toast + alerts log entry.
-
-**Memory** — update `mem://gameplay/intel-sources` to include Wiretap as a 5th canonical path; add new memories `mem://gameplay/tactical/wiretap-sweep` and `mem://gameplay/tactical/family-dinner`.
-
-### Out of scope
-- No new resources, no new map mechanics, no UI redesign of the tactical bar beyond adding entries.
-- No "Tail a Capo" / "Pinch a Stoolie" this pass (next batch candidates).
-- Save format gets new optional fields — old saves still load (missing fields default to empty arrays / 0).
+## Out of scope (this pass)
+- No new resources, no new map layers, no Witness Protection / Stoolie mechanics, no "Grand Jury" mini-events. Those can layer on later as additional RICO aides.

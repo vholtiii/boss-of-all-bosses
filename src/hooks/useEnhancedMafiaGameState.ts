@@ -98,6 +98,11 @@ import {
   SWEEP_TENSION_HIT, COUNTER_SURVEILLANCE_DURATION,
   FAMILY_DINNER_COST, FAMILY_DINNER_TACTICAL_COST, FAMILY_DINNER_COOLDOWN,
   FAMILY_DINNER_LOYALTY_BONUS, FAMILY_DINNER_RESPECT_GAIN, FAMILY_DINNER_HEAT_COST, FAMILY_DINNER_RANGE,
+  // Fed wiretaps (prosecution / RICO aide)
+  FED_BUG_PLANTED_BY, FED_BUG_MAX_PER_FAMILY, FED_BUG_DURATION,
+  FED_BUG_AGE_RISK_PER_TURN, FED_BUG_AGE_RISK_CAP, FED_BUG_RISK_BONUS_CAP,
+  FED_BUG_RICO_ACCEL_HEAT, FED_BUG_RICO_ACCEL_AGE, FED_BUG_CONSIGLIERE_REVEAL_CHANCE,
+  FED_BUG_CHANCE_BY_TIER, FED_BUG_SPIKE_COP_FLIP, FED_BUG_SPIKE_RISK_CROSSING, FED_BUG_RISK_CROSSING_THRESHOLD,
 } from '@/types/game-mechanics';
 
 import { generateCapoName } from '@/lib/capo-names';
@@ -532,6 +537,10 @@ export interface EnhancedMafiaGameState {
   lawyerCooldownUntil?: number;
   consigliereLastBlockTurn?: number;
   ricoTimer: number;
+  /** Persistent prosecution-risk bonus accumulated from discovered Fed wires. Capped at FED_BUG_RISK_BONUS_CAP. */
+  fedBugProsecutionBonus?: number;
+  /** Has the prosecutionRisk≥40 one-shot Fed spike already fired this game? */
+  fedBugRiskCrossingFired?: boolean;
   prosecutionTimer: number;
   federalIndictmentTimer: number;
   federalIndictmentActive: boolean;
@@ -1290,6 +1299,8 @@ export const createInitialGameState = (
     lawyerCooldownUntil: 0,
     consigliereLastBlockTurn: 0,
     ricoTimer: 0,
+    fedBugProsecutionBonus: 0,
+    fedBugRiskCrossingFired: false,
     prosecutionTimer: 0,
     federalIndictmentTimer: 0,
     federalIndictmentActive: false,
@@ -3403,10 +3414,42 @@ export const useEnhancedMafiaGameState = (
       // Decay counter-surveillance, then roll discovery for each wiretap, then expire.
       newState.counterSurveillance = (newState.counterSurveillance || []).filter(c => c.expiresOnTurn >= newState.turn);
       const survivingWiretaps: Wiretap[] = [];
+
+      // ── Fed bug discovery consequence helper ──
+      const applyFedBugDiscovery = (wt: Wiretap, via: string) => {
+        const age = Math.max(0, newState.turn - wt.plantedTurn);
+        const riskAdd = Math.min(FED_BUG_AGE_RISK_CAP, age * FED_BUG_AGE_RISK_PER_TURN);
+        if (wt.targetFamily === newState.playerFamily) {
+          const prev = newState.fedBugProsecutionBonus || 0;
+          newState.fedBugProsecutionBonus = Math.min(FED_BUG_RISK_BONUS_CAP, prev + riskAdd);
+          const heat = newState.policeHeat.level;
+          let ricoTick = 0;
+          if (heat >= FED_BUG_RICO_ACCEL_HEAT) {
+            ricoTick = age >= FED_BUG_RICO_ACCEL_AGE ? 2 : 1;
+            newState.ricoTimer = (newState.ricoTimer || 0) + ricoTick;
+          }
+          newState.pendingNotifications.push({
+            type: 'error' as const, title: '🎧⚖️ Fed Wire Discovered',
+            message: `${via} — Fed bug ran ${age} turn${age === 1 ? '' : 's'}. Prosecution risk +${riskAdd}${ricoTick > 0 ? `, RICO timer rushed +${ricoTick}.` : '.'}`,
+          });
+          if (turnReport) turnReport.events.push(`🎧⚖️ Fed wire found (age ${age}) — prosecution +${riskAdd}${ricoTick > 0 ? `, RICO +${ricoTick}` : ''}.`);
+        } else {
+          // AI family — bump their heat as proxy for prosecution pressure
+          const opp = newState.aiOpponents.find(o => o.family === wt.targetFamily);
+          if (opp) {
+            opp.resources.heat = Math.min(100, (opp.resources.heat || 0) + Math.min(20, age * 2));
+          }
+        }
+        wt.discovered = true;
+        wt.discoveredOnTurn = newState.turn;
+      };
+
       for (const wt of (newState.wiretaps || [])) {
+        const isFed = wt.plantedBy === FED_BUG_PLANTED_BY;
+
         // Expiry
         if (newState.turn > wt.expiresOnTurn) {
-          if (wt.plantedBy === newState.playerFamily) {
+          if (!isFed && wt.plantedBy === newState.playerFamily) {
             newState.pendingNotifications.push({
               type: 'info' as const, title: '🎧 Wiretap Expired',
               message: `Your bug on the ${wt.targetFamily} location went silent.`,
@@ -3414,11 +3457,30 @@ export const useEnhancedMafiaGameState = (
           }
           continue;
         }
-        // Discovery check
+
+        if (isFed) {
+          // Fed bugs do NOT auto-discover via random rolls — only via Sweep / bribes / consigliere.
+          // Apply per-turn discovery paths for player-targeted bugs:
+          if (wt.targetFamily === newState.playerFamily && !wt.discovered) {
+            const hasMayor = newState.activeBribes.some(b => b.tier === 'mayor' && b.active);
+            const hasChief = newState.activeBribes.some(b => b.tier === 'police_chief' && b.active);
+            const consigliereActive = newState.lawyerTier === 'consigliere' && (newState.lawyerActiveUntil || 0) >= newState.turn;
+            if (hasMayor) {
+              applyFedBugDiscovery(wt, "Mayor's office tipped you off to a Fed wire");
+            } else if (consigliereActive && Math.random() < FED_BUG_CONSIGLIERE_REVEAL_CHANCE) {
+              applyFedBugDiscovery(wt, 'Your Consigliere flagged a Fed wire');
+            } else if (hasChief) {
+              // Count-only — no discovery, handled as aggregate notification below
+            }
+          }
+          survivingWiretaps.push(wt);
+          continue;
+        }
+
+        // ── Rival wiretap: existing discovery roll behavior ──
         const targetHasCS = (newState.counterSurveillance || []).some(c => c.family === wt.targetFamily);
         const discChance = targetHasCS ? WIRETAP_DISCOVERY_SWEPT : WIRETAP_DISCOVERY_BASE;
         if (Math.random() < discChance) {
-          // Caught — owner gains respect, planter loses tension, wiretap removed.
           if (wt.targetFamily === newState.playerFamily) {
             newState.reputation.respect += SWEEP_RESPECT_GAIN;
             newState.pendingNotifications.push({
@@ -3434,16 +3496,15 @@ export const useEnhancedMafiaGameState = (
           addPairTension(newState, wt.plantedBy, wt.targetFamily, WIRETAP_DISCOVERY_TENSION);
           continue;
         }
-        // Survive — pump intel for player's wiretaps: mark any aiPlannedHit from the bugged owner as detected.
+        // Survive — pump intel for player's wiretaps
         if (wt.plantedBy === newState.playerFamily) {
           const hits = (newState.aiPlannedHits || []) as any[];
           for (const ph of hits) {
             if (ph.family !== wt.targetFamily || ph.detectedVia) continue;
-            // If target unit is at or adjacent to the bugged hex, attribute intel to wiretap.
             const tgt = newState.deployedUnits.find(u => u.id === ph.targetUnitId);
             if (!tgt) continue;
             const adj = Math.abs(tgt.q - wt.q) + Math.abs(tgt.r - wt.r) + Math.abs(tgt.s - wt.s);
-            if (adj <= 4) { // within 2 hex steps in cube coords (each step adds 2 to sum)
+            if (adj <= 4) {
               ph.detectedVia = 'wiretap';
               ph.detectedOnTurn = newState.turn;
               newState.pendingNotifications.push({
@@ -3452,7 +3513,6 @@ export const useEnhancedMafiaGameState = (
               });
             }
           }
-          // Routine intel ping: live count of units on or adjacent to bugged hex
           if ((newState.turn - wt.plantedTurn) % 2 === 1) {
             const cnt = newState.deployedUnits.filter(u =>
               u.family === wt.targetFamily &&
@@ -3467,6 +3527,58 @@ export const useEnhancedMafiaGameState = (
         survivingWiretaps.push(wt);
       }
       newState.wiretaps = survivingWiretaps;
+
+      // ============ FEDERAL WIRETAP PASS ============
+      // 1) Chief-bribe aggregate count (no locations, no discovery)
+      {
+        const hasChief = newState.activeBribes.some(b => b.tier === 'police_chief' && b.active);
+        const hasMayor = newState.activeBribes.some(b => b.tier === 'mayor' && b.active);
+        if (hasChief && !hasMayor) {
+          const undiscovered = newState.wiretaps.filter(w => w.plantedBy === FED_BUG_PLANTED_BY && w.targetFamily === newState.playerFamily && !w.discovered).length;
+          if (undiscovered > 0 && newState.turn % 2 === 0) {
+            newState.pendingNotifications.push({
+              type: 'warning' as const, title: '🎧 Chief: Fed Wires Suspected',
+              message: `Your Chief contact says ${undiscovered} federal wire${undiscovered === 1 ? '' : 's'} may be active on your territory. Sweep to find them.`,
+            });
+          }
+        }
+      }
+      // 2) Passive placement for any family in Hot+ heat
+      {
+        const tierOf = (h: number) => h >= 90 ? 'rico' : h >= 80 ? 'critical' : h >= 60 ? 'hot' : h >= 40 ? 'warm' : 'cool';
+        const allFams: string[] = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'];
+        for (const fam of allFams) {
+          const heat = fam === newState.playerFamily
+            ? newState.policeHeat.level
+            : (newState.aiOpponents.find(o => o.family === fam)?.resources.heat || 0);
+          const chance = (FED_BUG_CHANCE_BY_TIER as any)[tierOf(heat)] || 0;
+          if (chance <= 0) continue;
+          const myFedBugs = newState.wiretaps.filter(w => w.plantedBy === FED_BUG_PLANTED_BY && w.targetFamily === fam);
+          if (myFedBugs.length >= FED_BUG_MAX_PER_FAMILY) continue;
+          if (Math.random() >= chance) continue;
+          // Pick a non-HQ owned hex (extorted/built) weighted by recent activity (using businesses count proxy: just random eligible)
+          const eligible = newState.hexMap.filter(t =>
+            t.controllingFamily === fam &&
+            !t.isHeadquarters &&
+            !myFedBugs.some(w => w.q === t.q && w.r === t.r && w.s === t.s)
+          );
+          if (eligible.length === 0) continue;
+          const tgt = eligible[Math.floor(Math.random() * eligible.length)];
+          newState.wiretaps.push({
+            id: `fbi_${newState.turn}_${fam}_${Math.random().toString(36).slice(2, 6)}`,
+            plantedBy: FED_BUG_PLANTED_BY,
+            targetFamily: fam,
+            q: tgt.q, r: tgt.r, s: tgt.s,
+            plantedTurn: newState.turn,
+            expiresOnTurn: newState.turn + FED_BUG_DURATION,
+            discovered: false,
+          });
+          // Silent for the target — they only learn via discovery
+        }
+      }
+
+
+
 
 
       // ============ A1: PENDING CLAIM FINALIZATION ============
@@ -4817,10 +4929,35 @@ export const useEnhancedMafiaGameState = (
           - (hasCaptain ? 10 : 0)
           - (hasChief ? 15 : 0)
           - (hasMayor ? 20 : 0)
-          - (hasLawyer ? PROSECUTION_LAWYER_REDUCTION : 0);
+          - (hasLawyer ? PROSECUTION_LAWYER_REDUCTION : 0)
+          + (newState.fedBugProsecutionBonus || 0);
         // Firm/Consigliere additionally halve total prosecution risk
         if (firmOrBetter) risk = Math.floor(risk * 0.5);
         risk = Math.min(100, Math.max(0, risk));
+        // One-shot Fed-bug spike when prosecutionRisk first crosses 40
+        if (risk >= FED_BUG_RISK_CROSSING_THRESHOLD && !newState.fedBugRiskCrossingFired) {
+          newState.fedBugRiskCrossingFired = true;
+          const myFedBugs = newState.wiretaps.filter(w => w.plantedBy === FED_BUG_PLANTED_BY && w.targetFamily === newState.playerFamily);
+          if (myFedBugs.length < FED_BUG_MAX_PER_FAMILY) {
+            const eligible = newState.hexMap.filter(t =>
+              t.controllingFamily === newState.playerFamily &&
+              !t.isHeadquarters &&
+              !myFedBugs.some(w => w.q === t.q && w.r === t.r && w.s === t.s)
+            );
+            if (eligible.length > 0 && Math.random() < FED_BUG_SPIKE_RISK_CROSSING) {
+              const tgt = eligible[Math.floor(Math.random() * eligible.length)];
+              newState.wiretaps.push({
+                id: `fbi_${newState.turn}_spike_${Math.random().toString(36).slice(2, 6)}`,
+                plantedBy: FED_BUG_PLANTED_BY,
+                targetFamily: newState.playerFamily,
+                q: tgt.q, r: tgt.r, s: tgt.s,
+                plantedTurn: newState.turn,
+                expiresOnTurn: newState.turn + FED_BUG_DURATION,
+                discovered: false,
+              });
+            }
+          }
+        }
         newState.legalStatus.prosecutionRisk = risk;
 
         // --- Prosecution Arrest (50+ for 3 consecutive turns) ---
@@ -5117,6 +5254,19 @@ export const useEnhancedMafiaGameState = (
                 hexS: soldier.s,
               });
               turnReport.events.push(`🐀 A ${family} soldier has become a police informant!`);
+              // Fed-bug spike: a flipped soldier gives the Feds a perfect tap on that hex.
+              const myFedBugs = newState.wiretaps.filter(w => w.plantedBy === FED_BUG_PLANTED_BY && w.targetFamily === family);
+              if (myFedBugs.length < FED_BUG_MAX_PER_FAMILY + 1 && Math.random() < FED_BUG_SPIKE_COP_FLIP) {
+                newState.wiretaps.push({
+                  id: `fbi_${newState.turn}_rat_${Math.random().toString(36).slice(2, 6)}`,
+                  plantedBy: FED_BUG_PLANTED_BY,
+                  targetFamily: family,
+                  q: soldier.q, r: soldier.r, s: soldier.s,
+                  plantedTurn: newState.turn,
+                  expiresOnTurn: newState.turn + FED_BUG_DURATION,
+                  discovered: false,
+                });
+              }
             }
           }
         }
@@ -7806,12 +7956,18 @@ export const useEnhancedMafiaGameState = (
             if (w.targetFamily !== fam) { survivors.push(w); continue; }
             if (Math.random() < SWEEP_DISCOVERY_CHANCE) {
               caught++;
-              addPairTension(state, fam, w.plantedBy, SWEEP_TENSION_HIT);
-              if (w.plantedBy === state.playerFamily) {
-                state.pendingNotifications.push({
-                  type: 'error' as const, title: '🐛 Your Wiretap Found',
-                  message: `The ${fam} family swept their joints and caught your bug. Tension rising.`,
-                });
+              if (w.plantedBy === FED_BUG_PLANTED_BY) {
+                // AI parity: discovered Fed bug bumps the family's heat proportional to age
+                const age = Math.max(0, state.turn - w.plantedTurn);
+                opponent.resources.heat = Math.min(100, (opponent.resources.heat || 0) + Math.min(20, age * 2));
+              } else {
+                addPairTension(state, fam, w.plantedBy, SWEEP_TENSION_HIT);
+                if (w.plantedBy === state.playerFamily) {
+                  state.pendingNotifications.push({
+                    type: 'error' as const, title: '🐛 Your Wiretap Found',
+                    message: `The ${fam} family swept their joints and caught your bug. Tension rising.`,
+                  });
+                }
               }
             } else {
               survivors.push(w);
@@ -9495,17 +9651,37 @@ export const useEnhancedMafiaGameState = (
           newState.tacticalActionsRemaining -= SWEEP_TACTICAL_COST;
           const onMyHexes = (newState.wiretaps || []).filter(w => w.targetFamily === newState.playerFamily);
           let found = 0;
+          let fedFound = 0;
           const survivors: Wiretap[] = [];
           for (const w of (newState.wiretaps || [])) {
             if (w.targetFamily !== newState.playerFamily) { survivors.push(w); continue; }
             if (Math.random() < SWEEP_DISCOVERY_CHANCE) {
               found++;
-              newState.reputation.respect += SWEEP_RESPECT_GAIN;
-              addPairTension(newState, newState.playerFamily, w.plantedBy, SWEEP_TENSION_HIT);
-              newState.pendingNotifications.push({
-                type: 'success', title: '🧹 Bug Found!',
-                message: `Caught the ${w.plantedBy} family wiring your operation. +${SWEEP_RESPECT_GAIN} respect, tension rising.`,
-              });
+              if (w.plantedBy === FED_BUG_PLANTED_BY) {
+                fedFound++;
+                // Fed-bug discovery consequence: age-scaled prosecution + possible RICO accel.
+                const age = Math.max(0, newState.turn - w.plantedTurn);
+                const riskAdd = Math.min(FED_BUG_AGE_RISK_CAP, age * FED_BUG_AGE_RISK_PER_TURN);
+                newState.fedBugProsecutionBonus = Math.min(FED_BUG_RISK_BONUS_CAP, (newState.fedBugProsecutionBonus || 0) + riskAdd);
+                const heat = newState.policeHeat.level;
+                let ricoTick = 0;
+                if (heat >= FED_BUG_RICO_ACCEL_HEAT) {
+                  ricoTick = age >= FED_BUG_RICO_ACCEL_AGE ? 2 : 1;
+                  newState.ricoTimer = (newState.ricoTimer || 0) + ricoTick;
+                }
+                newState.reputation.respect += 3;
+                newState.pendingNotifications.push({
+                  type: 'error', title: '🎧⚖️ Fed Wire Swept',
+                  message: `Pulled a federal bug that ran ${age} turn${age === 1 ? '' : 's'}. Prosecution risk +${riskAdd}${ricoTick > 0 ? `, RICO timer rushed +${ricoTick}.` : '.'}`,
+                });
+              } else {
+                newState.reputation.respect += SWEEP_RESPECT_GAIN;
+                addPairTension(newState, newState.playerFamily, w.plantedBy, SWEEP_TENSION_HIT);
+                newState.pendingNotifications.push({
+                  type: 'success', title: '🧹 Bug Found!',
+                  message: `Caught the ${w.plantedBy} family wiring your operation. +${SWEEP_RESPECT_GAIN} respect, tension rising.`,
+                });
+              }
             } else {
               survivors.push(w);
             }

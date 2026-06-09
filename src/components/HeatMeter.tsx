@@ -8,6 +8,8 @@ interface HeatMeterProps {
   heat: number;
   history: number[]; // chronological, oldest → newest, EXCLUDES current
   ricoTimer?: number;
+  fedBugCount?: number;             // total active Fed wires on the player
+  fedBugDiscoveredCount?: number;   // of those, how many are already revealed
 }
 
 type Tier = 'cool' | 'warm' | 'hot' | 'critical' | 'rico';
@@ -49,7 +51,7 @@ const Sparkline: React.FC<{ values: number[]; tier: Tier }> = ({ values, tier })
   );
 };
 
-const HeatMeter: React.FC<HeatMeterProps> = ({ heat, history, ricoTimer = 0 }) => {
+const HeatMeter: React.FC<HeatMeterProps> = ({ heat, history, ricoTimer = 0, fedBugCount = 0, fedBugDiscoveredCount = 0 }) => {
   const h = Math.max(0, Math.min(100, Math.round(heat)));
   const tier = getTier(h);
   const meta = TIER_META[tier];
@@ -113,6 +115,26 @@ const HeatMeter: React.FC<HeatMeterProps> = ({ heat, history, ricoTimer = 0 }) =
 
           {/* Sparkline */}
           {trail.length >= 2 && <Sparkline values={trail} tier={tier} />}
+
+          {/* Fed wire badge — total active vs known on the player */}
+          {fedBugCount > 0 && (
+            <div
+              className={cn(
+                'flex items-center gap-1 text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full border',
+                fedBugDiscoveredCount > 0
+                  ? 'text-red-300 border-red-500/50 bg-red-500/15 animate-pulse'
+                  : 'text-amber-300 border-amber-500/40 bg-amber-500/10'
+              )}
+              title={
+                fedBugDiscoveredCount > 0
+                  ? `${fedBugDiscoveredCount} Fed wire(s) discovered, ${fedBugCount - fedBugDiscoveredCount} suspected. Sweep to remove.`
+                  : `${fedBugCount} Fed wire(s) suspected on your territory. Mayor bribe / Consigliere / Sweep can find them.`
+              }
+            >
+              <span>🎧</span>
+              <span>{fedBugDiscoveredCount > 0 ? `${fedBugDiscoveredCount}/${fedBugCount}` : `?${fedBugCount}`}</span>
+            </div>
+          )}
         </motion.div>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="max-w-xs text-xs">
@@ -128,6 +150,11 @@ const HeatMeter: React.FC<HeatMeterProps> = ({ heat, history, ricoTimer = 0 }) =
           <p className="text-muted-foreground">{meta.desc}</p>
           {ricoTimer > 0 && (
             <p className="text-red-300 font-semibold">🚨 RICO timer: {ricoTimer}/5 — game over at 5.</p>
+          )}
+          {fedBugCount > 0 && (
+            <p className="text-amber-300">
+              🎧 Fed wires: {fedBugDiscoveredCount}/{fedBugCount} discovered. Long-running bugs hurt the most on discovery.
+            </p>
           )}
           <div className="pt-1 border-t border-border/40 text-[10px] text-muted-foreground/80 space-y-0.5">
             <div>Tiers: Cool &lt;40 · Warm 40 · Hot 60 · Critical 80 · RICO 90+</div>
