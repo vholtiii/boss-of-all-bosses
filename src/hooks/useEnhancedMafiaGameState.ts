@@ -1952,6 +1952,20 @@ export const useEnhancedMafiaGameState = (
           return { ...prev, selectedUnitId: unit.id, availableMoveHexes: scoutableHexes, deployMode: null, availableDeployHexes: [] };
         }
 
+        if (moveAction === 'wiretap' && (unitType === 'soldier' || unitType === 'capo')) {
+          if (prev.tacticalActionsRemaining <= 0) return prev;
+          const targets = getHexesInRange(unit.q, unit.r, unit.s, WIRETAP_PLANT_RANGE).filter(h => {
+            const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+            if (!tile) return false;
+            if (!tile.controllingFamily || tile.controllingFamily === prev.playerFamily) return false;
+            if (tile.isHeadquarters) return false;
+            if ((prev.wiretaps || []).some(w => w.plantedBy === prev.playerFamily && w.q === tile.q && w.r === tile.r && w.s === tile.s)) return false;
+            return true;
+          });
+          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: targets, deployMode: null, availableDeployHexes: [] };
+        }
+
+
         if (moveAction === 'safehouse' && unitType === 'capo') {
           if (prev.tacticalActionsRemaining <= 0) return prev;
           // One-click safehouse: apply immediately on capo select
