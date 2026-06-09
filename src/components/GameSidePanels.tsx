@@ -760,20 +760,59 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 : tier === 'firm' ? 'Defense Firm'
                 : tier === 'street' ? 'Street Attorney'
                 : 'Lawyer';
-              const tierBlurb = tier === 'consigliere' ? 'Sentences −25% · Blocks 1 arrest/turn · −1 heat/turn · Pauses RICO'
-                : tier === 'firm' ? 'Sentences −25% · Prosecution risk −50%'
-                : 'Sentences −25%';
               const turnsLeft = (gameState as any).lawyerActiveUntil - gameState.turn + 1;
+              const totalDuration = tier === 'consigliere' ? 5 : tier === 'firm' ? 4 : 3;
+              const perTurnCost = tier === 'consigliere' ? 3000 : tier === 'firm' ? 1500 : 0;
               return (
-                <div className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 font-medium space-y-0.5">
-                  <div className="flex items-center gap-1.5">
-                    ⚖️ {tierLabel}
-                    <span className="ml-auto text-muted-foreground">
-                      {turnsLeft} turn{turnsLeft !== 1 ? 's' : ''} left
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-green-300/80">{tierBlurb}</div>
-                </div>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 font-medium space-y-0.5 cursor-help">
+                        <div className="flex items-center gap-1.5">
+                          ⚖️ {tierLabel}
+                          <span className="ml-auto text-muted-foreground">
+                            {turnsLeft}/{totalDuration} turns
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-green-300/80">
+                          {tier === 'consigliere' ? '−25% sentences · Blocks 1 arrest/turn · −1 heat/turn · Pauses RICO'
+                            : tier === 'firm' ? '−25% sentences · −50% prosecution risk · Auto-release 1 soldier'
+                            : '−25% sentences'}
+                          {perTurnCost > 0 && ` · −$${perTurnCost.toLocaleString()}/turn`}
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="max-w-[280px] space-y-1">
+                      <p className="font-semibold text-green-400">{tierLabel} — Active {turnsLeft} more turn{turnsLeft !== 1 ? 's' : ''}</p>
+                      {tier === 'consigliere' && (
+                        <ul className="text-xs space-y-0.5 list-disc list-inside text-muted-foreground">
+                          <li>Reduces jail sentences by 25%</li>
+                          <li>Blocks <strong>1 arrest per turn</strong> before it happens</li>
+                          <li>Passive <strong>−1 heat each turn</strong></li>
+                          <li>Pauses the RICO countdown timer</li>
+                          <li>Costs <strong>$3,000/turn</strong> while active</li>
+                          <li>3-turn cooldown after retainer ends</li>
+                        </ul>
+                      )}
+                      {tier === 'firm' && (
+                        <ul className="text-xs space-y-0.5 list-disc list-inside text-muted-foreground">
+                          <li>Reduces jail sentences by 25%</li>
+                          <li>Prosecution risk <strong>−50%</strong></li>
+                          <li>Automatically <strong>releases 1 jailed soldier</strong> on hire</li>
+                          <li>Costs <strong>$1,500/turn</strong> while active</li>
+                          <li>3-turn cooldown after retainer ends</li>
+                        </ul>
+                      )}
+                      {tier === 'street' && (
+                        <ul className="text-xs space-y-0.5 list-disc list-inside text-muted-foreground">
+                          <li>Reduces jail sentences by 25%</li>
+                          <li>No per-turn cost</li>
+                          <li>3-turn cooldown after retainer ends</li>
+                        </ul>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               );
             })()}
             {/* Charity Passive Badge */}
