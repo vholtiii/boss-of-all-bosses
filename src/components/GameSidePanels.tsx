@@ -894,39 +894,85 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               if (heat >= 40) return <div className="text-xs text-blue-400 font-semibold px-1">🔵 LOW — −25% illegal income</div>;
               return null;
             })()}
-            <ActionButton
-              icon={<Crown className="h-4 w-4" />}
-              label="Public Appearance"
-              sublabel="$3,000 · −5 Heat · +2 Rep · 1 action"
-              disabled={resources.money < 3000 || gameState.actionsRemaining <= 0}
-              disabledReason={gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 3000 ? 'Need $3,000' : undefined}
-              phaseLocked={actionsLocked}
-              onClick={() => onAction({ type: 'public_appearance', cost: 3000 })}
-            />
-            <ActionButton
-              icon={<HandCoins className="h-4 w-4" />}
-              label="Charitable Donation"
-              sublabel="$5,000 · −10 Heat · +3 Rep · 1 action"
-              disabled={resources.money < 5000 || gameState.actionsRemaining <= 0}
-              disabledReason={gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 5000 ? 'Need $5,000' : undefined}
-              phaseLocked={actionsLocked}
-              onClick={() => onAction({ type: 'charitable_donation', amount: 5000 })}
-            />
             {(() => {
-              const lawyerCooldown = 3;
-              const lastLawyerTurn = (gameState as any).lastLawyerTurn || 0;
-              const turnsLeft = Math.max(0, lawyerCooldown - (gameState.turn - lastLawyerTurn));
-              const onCooldown = turnsLeft > 0;
+              const PA_CD = 2;
+              const lastPA = (gameState as any).lastPublicAppearanceTurn || 0;
+              const paTurnsLeft = lastPA > 0 ? Math.max(0, PA_CD - (gameState.turn - lastPA)) : 0;
+              const paOnCooldown = paTurnsLeft > 0;
+              const lastCharity = (gameState as any).lastCharityTurn || 0;
+              const paStacked = lastCharity === gameState.turn;
+              const paHeat = paStacked ? 3 : 6;
               return (
                 <ActionButton
-                  icon={<Scale className="h-4 w-4" />}
-                  label="Hire Lawyer"
-                  sublabel={onCooldown ? `Cooldown: ${turnsLeft} turn${turnsLeft > 1 ? 's' : ''}` : '$8,000 · Clears arrest, −25% sentences · 1 action'}
-                  disabled={resources.money < 8000 || gameState.actionsRemaining <= 0 || onCooldown}
-                  disabledReason={onCooldown ? `Cooldown: ${turnsLeft}t` : gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 8000 ? 'Need $8,000' : undefined}
+                  icon={<Crown className="h-4 w-4" />}
+                  label="Public Appearance"
+                  sublabel={paOnCooldown ? `Cooldown: ${paTurnsLeft} turn${paTurnsLeft > 1 ? 's' : ''}` : `$3,000 · −${paHeat} Heat${paStacked ? ' (stacked)' : ''} · +2 Rep · 1 action`}
+                  disabled={resources.money < 3000 || gameState.actionsRemaining <= 0 || paOnCooldown}
+                  disabledReason={paOnCooldown ? `Cooldown: ${paTurnsLeft}t` : gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 3000 ? 'Need $3,000' : undefined}
                   phaseLocked={actionsLocked}
-                  onClick={() => onAction({ type: 'hire_lawyer' })}
+                  onClick={() => onAction({ type: 'public_appearance', cost: 3000 })}
                 />
+              );
+            })()}
+            {(() => {
+              const CHAR_CD = 4;
+              const lastCharity = (gameState as any).lastCharityTurn || 0;
+              const charTurnsLeft = lastCharity > 0 ? Math.max(0, CHAR_CD - (gameState.turn - lastCharity)) : 0;
+              const charOnCooldown = charTurnsLeft > 0;
+              const lastPA = (gameState as any).lastPublicAppearanceTurn || 0;
+              const charStacked = lastPA === gameState.turn;
+              const charHeat = charStacked ? 9 : 18;
+              return (
+                <ActionButton
+                  icon={<HandCoins className="h-4 w-4" />}
+                  label="Charitable Donation"
+                  sublabel={charOnCooldown ? `Cooldown: ${charTurnsLeft} turn${charTurnsLeft > 1 ? 's' : ''}` : `$15,000 · −${charHeat} Heat${charStacked ? ' (stacked)' : ''} · +5 Rep · +1 regen 2t · 1 action`}
+                  disabled={resources.money < 15000 || gameState.actionsRemaining <= 0 || charOnCooldown}
+                  disabledReason={charOnCooldown ? `Cooldown: ${charTurnsLeft}t` : gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 15000 ? 'Need $15,000' : undefined}
+                  phaseLocked={actionsLocked}
+                  onClick={() => onAction({ type: 'charitable_donation', amount: 15000 })}
+                />
+              );
+            })()}
+            {(() => {
+              const activeTier = (gameState as any).lawyerTier as 'street' | 'firm' | 'consigliere' | null;
+              const lawyerActive = activeTier && ((gameState as any).lawyerActiveUntil || 0) >= gameState.turn;
+              const cdUntil = (gameState as any).lawyerCooldownUntil || 0;
+              const cdTurnsLeft = !lawyerActive && cdUntil > gameState.turn ? cdUntil - gameState.turn : 0;
+              const onCooldown = cdTurnsLeft > 0;
+              const ricoBlock = gameState.policeHeat.level >= 90;
+              type Tier = { id: 'street' | 'firm' | 'consigliere'; name: string; retainer: number; perTurn: number; duration: number; blurb: string };
+              const tiers: Tier[] = [
+                { id: 'street', name: 'Street Attorney', retainer: 5000, perTurn: 0, duration: 3, blurb: '−25% sentences' },
+                { id: 'firm', name: 'Defense Firm', retainer: 12000, perTurn: 1500, duration: 4, blurb: '−50% prosecution risk · releases 1 soldier' },
+                { id: 'consigliere', name: 'Consigliere Counsel', retainer: 25000, perTurn: 3000, duration: 5, blurb: 'Blocks 1 arrest/turn · −1 heat · pauses RICO' },
+              ];
+              if (lawyerActive) return null;
+              return (
+                <div className="space-y-1">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">Retain Counsel</div>
+                  {tiers.map(t => {
+                    const cantAfford = resources.money < t.retainer;
+                    const blockRico = t.id === 'consigliere' && ricoBlock;
+                    const disabled = cantAfford || gameState.actionsRemaining <= 0 || onCooldown || blockRico;
+                    const reason = onCooldown ? `Cooldown: ${cdTurnsLeft}t`
+                      : blockRico ? 'Drop heat below 90 first'
+                      : gameState.actionsRemaining <= 0 ? 'No actions left'
+                      : cantAfford ? `Need $${t.retainer.toLocaleString()}` : undefined;
+                    return (
+                      <ActionButton
+                        key={t.id}
+                        icon={<Scale className="h-4 w-4" />}
+                        label={t.name}
+                        sublabel={`$${t.retainer.toLocaleString()}${t.perTurn ? ` + $${t.perTurn.toLocaleString()}/t` : ''} · ${t.duration}t · ${t.blurb}`}
+                        disabled={disabled}
+                        disabledReason={reason}
+                        phaseLocked={actionsLocked}
+                        onClick={() => onAction({ type: 'hire_lawyer', tier: t.id })}
+                      />
+                    );
+                  })}
+                </div>
               );
             })()}
             {/* Arrested Units Summary — player only */}
