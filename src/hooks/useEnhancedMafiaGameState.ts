@@ -481,6 +481,11 @@ export interface EnhancedMafiaGameState {
   planHitCooldownUntil: number;
   selectedMoveAction: MoveAction;
   pendingNegotiations: PendingNegotiation[];
+  // Wiretap / sweep / family dinner (new tactical actions)
+  wiretaps?: import('@/types/game-mechanics').Wiretap[];
+  counterSurveillance?: import('@/types/game-mechanics').CounterSurveillance[];
+  lastFamilyDinnerTurn?: Record<string, number>;
+
   
   // Action & tactical budgets
   actionsRemaining: number;
