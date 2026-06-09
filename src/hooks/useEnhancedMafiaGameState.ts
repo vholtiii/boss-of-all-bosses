@@ -4515,29 +4515,46 @@ export const useEnhancedMafiaGameState = (
 
         const layingLow = isLayingLow(newState);
 
+        // Consigliere can block 1 new arrest per turn (street OR capo)
+        const consigliereActive = newState.lawyerTier === 'consigliere' && (newState.lawyerActiveUntil || 0) >= newState.turn;
+        const tryConsigliereBlock = (): boolean => {
+          if (!consigliereActive) return false;
+          if ((newState.consigliereLastBlockTurn || 0) === newState.turn) return false;
+          newState.consigliereLastBlockTurn = newState.turn;
+          return true;
+        };
+
         // Tier 2: 50+ → 30% chance soldier arrest (3 turns, 2 with lawyer)
         if (heat >= 50 && !layingLow) {
           if (Math.random() < 0.30) {
             const playerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
             if (playerSoldiers.length > 0) {
-              const arrested = playerSoldiers[Math.floor(Math.random() * playerSoldiers.length)];
-              newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== arrested.id);
-              const baseSentence = 3;
-              const sentence = lawyerActive ? Math.max(1, Math.floor(baseSentence * 0.75)) : baseSentence;
-              newState.arrestedSoldiers = [...(newState.arrestedSoldiers || []), { unitId: arrested.id, returnTurn: newState.turn + sentence, arrestTurn: newState.turn, source: 'heat', recruited: (arrested as any).recruited, family: newState.playerFamily }];
-              newState.policeHeat.arrests.push({
-                id: `arrest-street-${newState.turn}`,
-                type: 'street',
-                target: 'Soldier',
-                turn: newState.turn,
-                sentence,
-                impactOnProfit: 5,
-              });
-              turnReport.events.push(`🚔 Street arrest! A soldier was picked up. Jailed for ${sentence} turns.${lawyerActive ? ' (Lawyer reduced sentence)' : ''}`);
-              newState.pendingNotifications.push({
-                type: 'error' as const, title: '🚔 Soldier Arrested',
-                message: `A soldier was arrested. Jailed for ${sentence} turns.${lawyerActive ? ' (Lawyer reduced sentence)' : ''}`,
-              });
+              if (tryConsigliereBlock()) {
+                turnReport.events.push(`⚖️ Consigliere blocked a soldier arrest this turn.`);
+                newState.pendingNotifications.push({
+                  type: 'info' as const, title: '⚖️ Arrest Blocked',
+                  message: `Your Consigliere quashed a soldier arrest before it stuck.`,
+                });
+              } else {
+                const arrested = playerSoldiers[Math.floor(Math.random() * playerSoldiers.length)];
+                newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== arrested.id);
+                const baseSentence = 3;
+                const sentence = lawyerActive ? Math.max(1, Math.floor(baseSentence * 0.75)) : baseSentence;
+                newState.arrestedSoldiers = [...(newState.arrestedSoldiers || []), { unitId: arrested.id, returnTurn: newState.turn + sentence, arrestTurn: newState.turn, source: 'heat', recruited: (arrested as any).recruited, family: newState.playerFamily }];
+                newState.policeHeat.arrests.push({
+                  id: `arrest-street-${newState.turn}`,
+                  type: 'street',
+                  target: 'Soldier',
+                  turn: newState.turn,
+                  sentence,
+                  impactOnProfit: 5,
+                });
+                turnReport.events.push(`🚔 Street arrest! A soldier was picked up. Jailed for ${sentence} turns.${lawyerActive ? ' (Lawyer reduced sentence)' : ''}`);
+                newState.pendingNotifications.push({
+                  type: 'error' as const, title: '🚔 Soldier Arrested',
+                  message: `A soldier was arrested. Jailed for ${sentence} turns.${lawyerActive ? ' (Lawyer reduced sentence)' : ''}`,
+                });
+              }
             }
           }
         }
