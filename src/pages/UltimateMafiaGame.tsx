@@ -1357,6 +1357,18 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               {gameState.selectedMoveAction === 'move' && (
                 <p className="italic">Select a tactical action above to see its description. No regular movement in this phase.</p>
               )}
+              {gameState.selectedMoveAction === 'wiretap' && (
+                <div>
+                  <p className="font-semibold text-foreground mb-1">🎧 Wiretap — How it works:</p>
+                  <ol className="list-decimal list-inside space-y-0.5 text-muted-foreground">
+                    <li><span className="text-foreground">Select a soldier or capo</span> next to or within 2 of a rival hex</li>
+                    <li><span className="text-foreground">Click the rival hex</span> — $1,500, 1 tactical action</li>
+                    <li><span className="text-foreground">For 4 turns</span>: live unit counts + intel on planned hits from that hex</li>
+                    <li><span className="text-amber-400">Risk:</span> 15% / turn discovery (75% if they've swept). Caught bugs hike tension.</li>
+                  </ol>
+                </div>
+              )}
+
             </div>
           </div>
         )}
