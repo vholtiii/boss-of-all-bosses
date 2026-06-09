@@ -1300,7 +1300,36 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               {gameState.safehouses.length > 0 && (
                 <span className="text-xs text-muted-foreground ml-1">🏠 {gameState.safehouses.map(s => `${s.turnsRemaining}t`).join(', ')}</span>
               )}
+              {/* Sweep + Family Dinner one-click buttons */}
+              {(() => {
+                const noTactical = gameState.tacticalActionsRemaining <= 0;
+                const lastDinner = ((gameState as any).lastFamilyDinnerTurn || {})[gameState.playerFamily] || 0;
+                const dinnerCdLeft = lastDinner > 0 ? Math.max(0, 5 - (gameState.turn - lastDinner)) : 0;
+                const csActive = ((gameState as any).counterSurveillance || []).some((c: any) => c.family === gameState.playerFamily);
+                const wiretapsOnMe = ((gameState as any).wiretaps || []).filter((w: any) => w.targetFamily === gameState.playerFamily).length;
+                return (
+                  <>
+                    <Button
+                      size="sm" variant="outline" className="text-xs h-7 px-2 ml-1"
+                      disabled={noTactical || gameState.resources.money < 800 || csActive}
+                      title={csActive ? 'Counter-surveillance already active' : `Sweep your operation for wiretaps. $800 / 1 tactical. ${wiretapsOnMe > 0 ? `(${wiretapsOnMe} bug${wiretapsOnMe === 1 ? '' : 's'} suspected)` : '(none detected)'}`}
+                      onClick={() => handleAction({ type: 'sweep_for_bugs' })}
+                    >
+                      🧹 Sweep{csActive ? ' (active)' : wiretapsOnMe > 0 ? ` ⚠️ ${wiretapsOnMe}` : ''}
+                    </Button>
+                    <Button
+                      size="sm" variant="outline" className="text-xs h-7 px-2"
+                      disabled={noTactical || gameState.resources.money < 1000 || dinnerCdLeft > 0}
+                      title={dinnerCdLeft > 0 ? `Next dinner in ${dinnerCdLeft} turn(s)` : 'Sunday dinner at HQ. $1,000 / 1 tactical. +6 loyalty to crew within 2 of HQ, +1 respect, +1 heat.'}
+                      onClick={() => handleAction({ type: 'family_dinner' })}
+                    >
+                      🍝 Dinner{dinnerCdLeft > 0 ? ` (${dinnerCdLeft}t)` : ''}
+                    </Button>
+                  </>
+                );
+              })()}
             </div>
+
             {/* Tactical action description panel */}
             <div className="bg-background/80 rounded-lg px-3 py-2 border border-noir-light text-xs text-muted-foreground max-w-md">
               {gameState.selectedMoveAction === 'scout' && (
