@@ -310,6 +310,19 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const { autoSave, emergencySaveAuto } = useGameSaveLoad();
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<number | null>(null);
 
+  // ---- Heat history (last 8 turns, excluding current) for HeatMeter sparkline + delta ----
+  const [heatHistory, setHeatHistory] = useState<number[]>([]);
+  const lastTrackedHeatTurnRef = React.useRef<number>(gameState.turn);
+  useEffect(() => {
+    if (gameState.turn !== lastTrackedHeatTurnRef.current) {
+      // Turn advanced — capture the heat as it was at end of previous turn.
+      // We snapshot the current heat (start of new turn) which reflects end-of-turn effects.
+      const prevHeat = (gameState as any).policeHeat?.level ?? 0;
+      setHeatHistory(h => [...h, Math.round(prevHeat)].slice(-8));
+      lastTrackedHeatTurnRef.current = gameState.turn;
+    }
+  }, [gameState.turn]);
+
   const handleLoadGame = (loadedGameState: any) => {
     try {
       loadGameState(loadedGameState);
