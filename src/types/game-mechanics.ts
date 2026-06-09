@@ -507,7 +507,53 @@ export const SAFEHOUSE_MAX_STOCKPILE = 5;
 export const SAFEHOUSE_MAX_ALLOCATION = 50;
 export const SAFEHOUSE_STOCKPILE_RATE = 1; // units per turn at 50% allocation per node type
 
-export type MoveAction = 'move' | 'scout' | 'fortify' | 'escort' | 'safehouse' | 'send_word' | 'family_power';
+export type MoveAction = 'move' | 'scout' | 'fortify' | 'escort' | 'safehouse' | 'send_word' | 'family_power' | 'wiretap';
+
+// ============ WIRETAP / SWEEP (intel & counter-intel) ============
+// Real-world mafia signature: planting bugs on rivals' joints, sweeping your own.
+export const WIRETAP_COST = 1500;
+export const WIRETAP_TACTICAL_COST = 1;
+export const WIRETAP_DURATION = 4;             // turns of intel
+export const WIRETAP_PLANT_RANGE = 2;          // hexes from a friendly soldier/capo
+export const WIRETAP_MAX_PER_FAMILY = 2;
+export const WIRETAP_DISCOVERY_BASE = 0.15;    // chance per turn the owner finds it
+export const WIRETAP_DISCOVERY_SWEPT = 0.75;   // chance when counter-surveillance is active
+export const WIRETAP_DISCOVERY_TENSION = 8;    // tension hit when caught
+export const WIRETAP_MIN_PHASE = 2;            // intel tier
+
+export const SWEEP_COST = 800;
+export const SWEEP_TACTICAL_COST = 1;
+export const SWEEP_DISCOVERY_CHANCE = 0.75;    // per existing wiretap on the family
+export const SWEEP_RESPECT_GAIN = 5;
+export const SWEEP_TENSION_HIT = 5;            // applied to caught planter
+export const COUNTER_SURVEILLANCE_DURATION = 2;
+
+export interface Wiretap {
+  id: string;
+  plantedBy: string;     // family that planted
+  targetFamily: string;  // family whose hex is bugged (owner at plant time)
+  q: number; r: number; s: number;
+  plantedTurn: number;
+  expiresOnTurn: number;
+}
+
+// Family-level counter-surveillance flag (covers all hexes of that family until expires)
+export interface CounterSurveillance {
+  family: string;
+  expiresOnTurn: number;
+}
+
+// ============ FAMILY DINNER (loyalty) ============
+// Sunday dinner at the boss's table — keeps the crew tight. Apalachin-style heat cost.
+export const FAMILY_DINNER_COST = 1000;
+export const FAMILY_DINNER_TACTICAL_COST = 1;
+export const FAMILY_DINNER_COOLDOWN = 5;
+export const FAMILY_DINNER_LOYALTY_BONUS = 6;
+export const FAMILY_DINNER_RESPECT_GAIN = 1;
+export const FAMILY_DINNER_HEAT_COST = 1;
+export const FAMILY_DINNER_RANGE = 2;          // hexes from HQ
+
+
 
 // ============ FAMILY POWER SYSTEM ============
 export interface FamilyPower {
@@ -723,14 +769,16 @@ export const AI_PLAN_HIT_CHANCE = 0.20;        // Normal baseline; difficulty sc
 export const AI_PLAN_HIT_SUCCESS_RATE = 0.5;   // 50% success when executing
 export const AI_PLAN_HIT_DURATION = 2;         // turns before AI executes the hit
 
-export type IntelSource = 'scout' | 'bribe_captain' | 'bribe_chief' | 'bribe_mayor';
+export type IntelSource = 'scout' | 'bribe_captain' | 'bribe_chief' | 'bribe_mayor' | 'wiretap';
 
 export const INTEL_SOURCE_LABELS: Record<IntelSource, { label: string; flavorPrefix: string }> = {
   scout: { label: 'Street Scout', flavorPrefix: 'Your soldier overheard' },
   bribe_captain: { label: 'Police Captain', flavorPrefix: 'The Captain tipped you off —' },
   bribe_chief: { label: 'Police Chief', flavorPrefix: 'High-level sources confirm —' },
   bribe_mayor: { label: "Mayor's Office", flavorPrefix: 'Top brass intelligence —' },
+  wiretap: { label: 'Wiretap', flavorPrefix: 'Your bug picked up chatter —' },
 };
+
 
 export interface AIPlannedHit {
   family: string;

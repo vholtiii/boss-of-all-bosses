@@ -1260,10 +1260,13 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 { action: 'escort' as const, label: '🚗 Escort', tip: 'Call a soldier to your capo\'s location. Select a soldier, then click a capo.' },
                 { action: 'safehouse' as const, label: '🏠 Safehouse', tip: 'Select a capo on your territory to set up a secondary deploy point (5 turns).' },
                 { action: 'send_word' as const, label: `📩 Send Word (${((gameState as any).pendingNegotiations || []).length})`, tip: 'Select a capo, then click an enemy hex to request a sitdown. Negotiation available next turn.' },
+                { action: 'wiretap' as const, label: `🎧 Wiretap (${((gameState as any).wiretaps || []).filter((w: any) => w.plantedBy === gameState.playerFamily).length}/2)`, tip: 'Phase 2+. Select a soldier/capo, click a rival hex within 2. $1,500 — 4 turns of intel on that hex.' },
               ] as const).filter(({ action }) => {
                 if (action === 'send_word' && ((gameState as any).gamePhase || 1) < 2) return false;
+                if (action === 'wiretap' && ((gameState as any).gamePhase || 1) < 2) return false;
                 return true;
               }).map(({ action, label, tip }) => {
+
                 const noTactical = gameState.tacticalActionsRemaining <= 0;
                 const selectedUnit = gameState.selectedUnitId ? (gameState.deployedUnits || []).find((u: any) => u.id === gameState.selectedUnitId) : null;
                 const isSoldier = selectedUnit?.type === 'soldier';
@@ -1297,7 +1300,36 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               {gameState.safehouses.length > 0 && (
                 <span className="text-xs text-muted-foreground ml-1">🏠 {gameState.safehouses.map(s => `${s.turnsRemaining}t`).join(', ')}</span>
               )}
+              {/* Sweep + Family Dinner one-click buttons */}
+              {(() => {
+                const noTactical = gameState.tacticalActionsRemaining <= 0;
+                const lastDinner = ((gameState as any).lastFamilyDinnerTurn || {})[gameState.playerFamily] || 0;
+                const dinnerCdLeft = lastDinner > 0 ? Math.max(0, 5 - (gameState.turn - lastDinner)) : 0;
+                const csActive = ((gameState as any).counterSurveillance || []).some((c: any) => c.family === gameState.playerFamily);
+                const wiretapsOnMe = ((gameState as any).wiretaps || []).filter((w: any) => w.targetFamily === gameState.playerFamily).length;
+                return (
+                  <>
+                    <Button
+                      size="sm" variant="outline" className="text-xs h-7 px-2 ml-1"
+                      disabled={noTactical || gameState.resources.money < 800 || csActive}
+                      title={csActive ? 'Counter-surveillance already active' : `Sweep your operation for wiretaps. $800 / 1 tactical. ${wiretapsOnMe > 0 ? `(${wiretapsOnMe} bug${wiretapsOnMe === 1 ? '' : 's'} suspected)` : '(none detected)'}`}
+                      onClick={() => handleAction({ type: 'sweep_for_bugs' })}
+                    >
+                      🧹 Sweep{csActive ? ' (active)' : wiretapsOnMe > 0 ? ` ⚠️ ${wiretapsOnMe}` : ''}
+                    </Button>
+                    <Button
+                      size="sm" variant="outline" className="text-xs h-7 px-2"
+                      disabled={noTactical || gameState.resources.money < 1000 || dinnerCdLeft > 0}
+                      title={dinnerCdLeft > 0 ? `Next dinner in ${dinnerCdLeft} turn(s)` : 'Sunday dinner at HQ. $1,000 / 1 tactical. +6 loyalty to crew within 2 of HQ, +1 respect, +1 heat.'}
+                      onClick={() => handleAction({ type: 'family_dinner' })}
+                    >
+                      🍝 Dinner{dinnerCdLeft > 0 ? ` (${dinnerCdLeft}t)` : ''}
+                    </Button>
+                  </>
+                );
+              })()}
             </div>
+
             {/* Tactical action description panel */}
             <div className="bg-background/80 rounded-lg px-3 py-2 border border-noir-light text-xs text-muted-foreground max-w-md">
               {gameState.selectedMoveAction === 'scout' && (
@@ -1325,6 +1357,18 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               {gameState.selectedMoveAction === 'move' && (
                 <p className="italic">Select a tactical action above to see its description. No regular movement in this phase.</p>
               )}
+              {gameState.selectedMoveAction === 'wiretap' && (
+                <div>
+                  <p className="font-semibold text-foreground mb-1">🎧 Wiretap — How it works:</p>
+                  <ol className="list-decimal list-inside space-y-0.5 text-muted-foreground">
+                    <li><span className="text-foreground">Select a soldier or capo</span> next to or within 2 of a rival hex</li>
+                    <li><span className="text-foreground">Click the rival hex</span> — $1,500, 1 tactical action</li>
+                    <li><span className="text-foreground">For 4 turns</span>: live unit counts + intel on planned hits from that hex</li>
+                    <li><span className="text-amber-400">Risk:</span> 15% / turn discovery (75% if they've swept). Caught bugs hike tension.</li>
+                  </ol>
+                </div>
+              )}
+
             </div>
           </div>
         )}

@@ -89,7 +89,17 @@ import {
   EROSION_RESPECT_LOSS, EROSION_INFLUENCE_LOSS, EXPANSION_RESPECT_GAIN, EXPANSION_INFLUENCE_GAIN,
   // Alerts log
   AlertEntry, AlertCategory, categorizeAlert,
+  // Wiretap / Sweep / Family Dinner
+  Wiretap, CounterSurveillance,
+  WIRETAP_COST, WIRETAP_TACTICAL_COST, WIRETAP_DURATION, WIRETAP_PLANT_RANGE,
+  WIRETAP_MAX_PER_FAMILY, WIRETAP_DISCOVERY_BASE, WIRETAP_DISCOVERY_SWEPT,
+  WIRETAP_DISCOVERY_TENSION, WIRETAP_MIN_PHASE,
+  SWEEP_COST, SWEEP_TACTICAL_COST, SWEEP_DISCOVERY_CHANCE, SWEEP_RESPECT_GAIN,
+  SWEEP_TENSION_HIT, COUNTER_SURVEILLANCE_DURATION,
+  FAMILY_DINNER_COST, FAMILY_DINNER_TACTICAL_COST, FAMILY_DINNER_COOLDOWN,
+  FAMILY_DINNER_LOYALTY_BONUS, FAMILY_DINNER_RESPECT_GAIN, FAMILY_DINNER_HEAT_COST, FAMILY_DINNER_RANGE,
 } from '@/types/game-mechanics';
+
 import { generateCapoName } from '@/lib/capo-names';
 import {
   rollFamilyPersonality, rollFamilyStrategy, computeDynamicMood, blendMoodWithPersonality,
@@ -343,7 +353,11 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     persicoSelectionActive: !!state.persicoSelectionActive,
     qualifyingConditions: [...(state.qualifyingConditions || [])],
     subjugatedFamilies: { ...(state.subjugatedFamilies || {}) },
+    wiretaps: (state.wiretaps || []).map(w => ({ ...w })),
+    counterSurveillance: (state.counterSurveillance || []).map(c => ({ ...c })),
+    lastFamilyDinnerTurn: { ...(state.lastFamilyDinnerTurn || {}) },
   });
+
 
 // ============ UNIT TYPES ============
 export interface DeployedUnit {
@@ -481,6 +495,11 @@ export interface EnhancedMafiaGameState {
   planHitCooldownUntil: number;
   selectedMoveAction: MoveAction;
   pendingNegotiations: PendingNegotiation[];
+  // Wiretap / sweep / family dinner (new tactical actions)
+  wiretaps?: import('@/types/game-mechanics').Wiretap[];
+  counterSurveillance?: import('@/types/game-mechanics').CounterSurveillance[];
+  lastFamilyDinnerTurn?: Record<string, number>;
+
   
   // Action & tactical budgets
   actionsRemaining: number;
@@ -1198,10 +1217,14 @@ export const createInitialGameState = (
     planHitCooldownUntil: 0,
     selectedMoveAction: 'move' as MoveAction,
     pendingNegotiations: [],
+    wiretaps: [],
+    counterSurveillance: [],
+    lastFamilyDinnerTurn: {},
     actionsRemaining: BASE_ACTIONS_PER_TURN,
     maxActions: BASE_ACTIONS_PER_TURN,
     tacticalActionsRemaining: TACTICAL_ACTIONS_PER_TURN,
     maxTacticalActions: TACTICAL_ACTIONS_PER_TURN,
+
     
     economy: {
       marketConditions: [
@@ -1929,6 +1952,20 @@ export const useEnhancedMafiaGameState = (
           return { ...prev, selectedUnitId: unit.id, availableMoveHexes: scoutableHexes, deployMode: null, availableDeployHexes: [] };
         }
 
+        if (moveAction === 'wiretap' && (unitType === 'soldier' || unitType === 'capo')) {
+          if (prev.tacticalActionsRemaining <= 0) return prev;
+          const targets = getHexesInRange(unit.q, unit.r, unit.s, WIRETAP_PLANT_RANGE).filter(h => {
+            const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
+            if (!tile) return false;
+            if (!tile.controllingFamily || tile.controllingFamily === prev.playerFamily) return false;
+            if (tile.isHeadquarters) return false;
+            if ((prev.wiretaps || []).some(w => w.plantedBy === prev.playerFamily && w.q === tile.q && w.r === tile.r && w.s === tile.s)) return false;
+            return true;
+          });
+          return { ...prev, selectedUnitId: unit.id, availableMoveHexes: targets, deployMode: null, availableDeployHexes: [] };
+        }
+
+
         if (moveAction === 'safehouse' && unitType === 'capo') {
           if (prev.tacticalActionsRemaining <= 0) return prev;
           // One-click safehouse: apply immediately on capo select
@@ -2105,7 +2142,51 @@ export const useEnhancedMafiaGameState = (
         return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
       }
 
-      // Handle family_power hex target (Gambino area scout / Genovese hide hex)
+      // Handle wiretap action (tactical phase only) — click target hex after selecting friendly soldier/capo.
+      if (prev.turnPhase === 'move' && moveAction === 'wiretap' && (unit.type === 'soldier' || unit.type === 'capo')) {
+        if ((prev.gamePhase || 1) < WIRETAP_MIN_PHASE) {
+          return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🔒 Phase Locked', message: `Wiretaps unlock in Phase ${WIRETAP_MIN_PHASE}.` }] };
+        }
+        // Defer to performAction handler so all guards stay in one place.
+        // Mutate via dispatching synthetically here:
+        const result = (() => {
+          const newState = cloneStateForMutation(prev);
+          if (newState.tacticalActionsRemaining < WIRETAP_TACTICAL_COST) return newState;
+          if (newState.resources.money < WIRETAP_COST) {
+            newState.pendingNotifications.push({ type: 'warning' as const, title: '💸 Insufficient Funds', message: `Wiretap costs $${WIRETAP_COST.toLocaleString()}.` });
+            return newState;
+          }
+          const tile = newState.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
+          if (!tile || !tile.controllingFamily || tile.controllingFamily === newState.playerFamily || tile.isHeadquarters) return newState;
+          const myWiretaps = (newState.wiretaps || []).filter(w => w.plantedBy === newState.playerFamily);
+          if (myWiretaps.length >= WIRETAP_MAX_PER_FAMILY) {
+            newState.pendingNotifications.push({ type: 'warning' as const, title: '🎧 Wiretap Limit', message: `Max ${WIRETAP_MAX_PER_FAMILY} active wiretaps.` });
+            return newState;
+          }
+          if (myWiretaps.some(w => w.q === tile.q && w.r === tile.r && w.s === tile.s)) return newState;
+          if (hexDistance(unit, tile) > WIRETAP_PLANT_RANGE) return newState;
+          newState.resources.money -= WIRETAP_COST;
+          newState.tacticalActionsRemaining -= WIRETAP_TACTICAL_COST;
+          newState.wiretaps = [...(newState.wiretaps || []), {
+            id: `wt_${newState.turn}_${Math.random().toString(36).slice(2, 8)}`,
+            plantedBy: newState.playerFamily,
+            targetFamily: tile.controllingFamily,
+            q: tile.q, r: tile.r, s: tile.s,
+            plantedTurn: newState.turn,
+            expiresOnTurn: newState.turn + WIRETAP_DURATION,
+          }];
+          newState.selectedMoveAction = 'move' as MoveAction;
+          newState.selectedUnitId = null;
+          newState.availableMoveHexes = [];
+          newState.pendingNotifications.push({
+            type: 'success' as const, title: '🎧 Wiretap Planted',
+            message: `Bugged a ${tile.controllingFamily} location. Intel flows for ${WIRETAP_DURATION} turns.`,
+          });
+          return newState;
+        })();
+        return result;
+      }
+
       if (prev.turnPhase === 'move' && moveAction === 'family_power') {
         const power = FAMILY_POWERS[prev.playerFamily];
         if (!power || !power.requiresHexTarget) return prev;
@@ -3317,6 +3398,76 @@ export const useEnhancedMafiaGameState = (
       newState.turn += 1;
       // Clear transient bold-move trackers at turn boundary
       newState._sabotagedThisTurn = [];
+
+      // ============ WIRETAP / COUNTER-SURVEILLANCE UPKEEP ============
+      // Decay counter-surveillance, then roll discovery for each wiretap, then expire.
+      newState.counterSurveillance = (newState.counterSurveillance || []).filter(c => c.expiresOnTurn >= newState.turn);
+      const survivingWiretaps: Wiretap[] = [];
+      for (const wt of (newState.wiretaps || [])) {
+        // Expiry
+        if (newState.turn > wt.expiresOnTurn) {
+          if (wt.plantedBy === newState.playerFamily) {
+            newState.pendingNotifications.push({
+              type: 'info' as const, title: '🎧 Wiretap Expired',
+              message: `Your bug on the ${wt.targetFamily} location went silent.`,
+            });
+          }
+          continue;
+        }
+        // Discovery check
+        const targetHasCS = (newState.counterSurveillance || []).some(c => c.family === wt.targetFamily);
+        const discChance = targetHasCS ? WIRETAP_DISCOVERY_SWEPT : WIRETAP_DISCOVERY_BASE;
+        if (Math.random() < discChance) {
+          // Caught — owner gains respect, planter loses tension, wiretap removed.
+          if (wt.targetFamily === newState.playerFamily) {
+            newState.reputation.respect += SWEEP_RESPECT_GAIN;
+            newState.pendingNotifications.push({
+              type: 'warning' as const, title: '🐛 Bug Discovered',
+              message: `Your crew found a ${wt.plantedBy} wiretap during routine checks. Tensions are spiking.`,
+            });
+          } else if (wt.plantedBy === newState.playerFamily) {
+            newState.pendingNotifications.push({
+              type: 'error' as const, title: '🎧 Wiretap Burned',
+              message: `The ${wt.targetFamily} family found your bug. Tension rising.`,
+            });
+          }
+          addPairTension(newState, wt.plantedBy, wt.targetFamily, WIRETAP_DISCOVERY_TENSION);
+          continue;
+        }
+        // Survive — pump intel for player's wiretaps: mark any aiPlannedHit from the bugged owner as detected.
+        if (wt.plantedBy === newState.playerFamily) {
+          const hits = (newState.aiPlannedHits || []) as any[];
+          for (const ph of hits) {
+            if (ph.family !== wt.targetFamily || ph.detectedVia) continue;
+            // If target unit is at or adjacent to the bugged hex, attribute intel to wiretap.
+            const tgt = newState.deployedUnits.find(u => u.id === ph.targetUnitId);
+            if (!tgt) continue;
+            const adj = Math.abs(tgt.q - wt.q) + Math.abs(tgt.r - wt.r) + Math.abs(tgt.s - wt.s);
+            if (adj <= 4) { // within 2 hex steps in cube coords (each step adds 2 to sum)
+              ph.detectedVia = 'wiretap';
+              ph.detectedOnTurn = newState.turn;
+              newState.pendingNotifications.push({
+                type: 'warning' as const, title: '🎧 Wiretap Intel',
+                message: `Your bug picked up chatter — the ${ph.family} family is moving on one of your capos.`,
+              });
+            }
+          }
+          // Routine intel ping: live count of units on or adjacent to bugged hex
+          if ((newState.turn - wt.plantedTurn) % 2 === 1) {
+            const cnt = newState.deployedUnits.filter(u =>
+              u.family === wt.targetFamily &&
+              Math.abs(u.q - wt.q) + Math.abs(u.r - wt.r) + Math.abs(u.s - wt.s) <= 2
+            ).length;
+            newState.pendingNotifications.push({
+              type: 'info' as const, title: '🎧 Wiretap Report',
+              message: `${cnt} ${wt.targetFamily} unit${cnt === 1 ? '' : 's'} active on or near the bugged hex.`,
+            });
+          }
+        }
+        survivingWiretaps.push(wt);
+      }
+      newState.wiretaps = survivingWiretaps;
+
 
       // ============ A1: PENDING CLAIM FINALIZATION ============
       // For every hex with a pendingClaim from two turns ago (claim turn N → resolves at end of turn N+1):
@@ -7599,6 +7750,111 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
+      // ── B2b: WIRETAP / SWEEP / FAMILY DINNER (AI parity for new tactical actions) ──
+      // Wiretap: cautious/strategic personalities, Phase 2+, when safe and not RICO-tier.
+      if (
+        aiPhase >= WIRETAP_MIN_PHASE &&
+        aiTacticalRemaining >= WIRETAP_TACTICAL_COST &&
+        opponent.resources.money >= WIRETAP_COST + 3000 &&
+        !aiOffenseDisabled &&
+        (basePersonality === 'defensive' || basePersonality === 'diplomatic' || basePersonality === 'opportunistic')
+      ) {
+        const myActiveWiretaps = (state.wiretaps || []).filter(w => w.plantedBy === fam).length;
+        if (myActiveWiretaps < WIRETAP_MAX_PER_FAMILY && Math.random() < 0.18) {
+          // Pick a player-owned hex within range of any of this AI's units, that doesn't already have our bug.
+          const myUnits = state.deployedUnits.filter(u => u.family === fam);
+          const candidates = state.hexMap.filter(t =>
+            t.controllingFamily === state.playerFamily &&
+            !t.isHeadquarters &&
+            !(state.wiretaps || []).some(w => w.plantedBy === fam && w.q === t.q && w.r === t.r && w.s === t.s) &&
+            myUnits.some(u => hexDistance(u, t) <= WIRETAP_PLANT_RANGE)
+          );
+          if (candidates.length > 0) {
+            // Prefer hexes with player units (juicier intel)
+            candidates.sort((a, b) => {
+              const ua = state.deployedUnits.filter(u => u.family === state.playerFamily && u.q === a.q && u.r === a.r && u.s === a.s).length;
+              const ub = state.deployedUnits.filter(u => u.family === state.playerFamily && u.q === b.q && u.r === b.r && u.s === b.s).length;
+              return ub - ua;
+            });
+            const tgt = candidates[0];
+            opponent.resources.money -= WIRETAP_COST;
+            aiTacticalRemaining -= WIRETAP_TACTICAL_COST;
+            state.wiretaps = [...(state.wiretaps || []), {
+              id: `wt_${state.turn}_${fam}_${Math.random().toString(36).slice(2, 6)}`,
+              plantedBy: fam,
+              targetFamily: state.playerFamily,
+              q: tgt.q, r: tgt.r, s: tgt.s,
+              plantedTurn: state.turn,
+              expiresOnTurn: state.turn + WIRETAP_DURATION,
+            }];
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'wiretap', detail: `Planted a bug in player territory` });
+          }
+        }
+      }
+
+      // Sweep: routine sweep on AI's HQ — higher chance if a wiretap is currently targeting this family.
+      if (aiTacticalRemaining >= SWEEP_TACTICAL_COST && opponent.resources.money >= SWEEP_COST) {
+        const bugsOnMe = (state.wiretaps || []).filter(w => w.targetFamily === fam).length;
+        const csActive = (state.counterSurveillance || []).some(c => c.family === fam);
+        const sweepChance = csActive ? 0 : (bugsOnMe > 0 ? 0.55 : 0.06);
+        if (sweepChance > 0 && Math.random() < sweepChance) {
+          opponent.resources.money -= SWEEP_COST;
+          aiTacticalRemaining -= SWEEP_TACTICAL_COST;
+          const survivors: Wiretap[] = [];
+          let caught = 0;
+          for (const w of (state.wiretaps || [])) {
+            if (w.targetFamily !== fam) { survivors.push(w); continue; }
+            if (Math.random() < SWEEP_DISCOVERY_CHANCE) {
+              caught++;
+              addPairTension(state, fam, w.plantedBy, SWEEP_TENSION_HIT);
+              if (w.plantedBy === state.playerFamily) {
+                state.pendingNotifications.push({
+                  type: 'error' as const, title: '🐛 Your Wiretap Found',
+                  message: `The ${fam} family swept their joints and caught your bug. Tension rising.`,
+                });
+              }
+            } else {
+              survivors.push(w);
+            }
+          }
+          state.wiretaps = survivors;
+          state.counterSurveillance = [
+            ...(state.counterSurveillance || []).filter(c => c.family !== fam),
+            { family: fam, expiresOnTurn: state.turn + COUNTER_SURVEILLANCE_DURATION },
+          ];
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'sweep', detail: caught > 0 ? `Swept HQ, caught ${caught} wiretap(s)` : `Routine sweep, no bugs found` });
+        }
+      }
+
+      // Family Dinner: when average crew loyalty drops below 55 and cooldown ready.
+      if (aiTacticalRemaining >= FAMILY_DINNER_TACTICAL_COST && opponent.resources.money >= FAMILY_DINNER_COST) {
+        const last = (state.lastFamilyDinnerTurn || {})[fam] || 0;
+        if (last === 0 || (state.turn - last) >= FAMILY_DINNER_COOLDOWN) {
+          const aiHq = state.headquarters[fam];
+          if (aiHq) {
+            const nearby = state.deployedUnits.filter(u => u.family === fam && hexDistance(u, aiHq) <= FAMILY_DINNER_RANGE);
+            if (nearby.length > 0) {
+              const avgLoy = nearby.reduce((s, u) => s + (state.soldierStats[u.id]?.loyalty ?? 75), 0) / nearby.length;
+              if (avgLoy < 55 && Math.random() < 0.6) {
+                opponent.resources.money -= FAMILY_DINNER_COST;
+                aiTacticalRemaining -= FAMILY_DINNER_TACTICAL_COST;
+                state.lastFamilyDinnerTurn = { ...(state.lastFamilyDinnerTurn || {}), [fam]: state.turn };
+                for (const u of nearby) {
+                  const s = state.soldierStats[u.id];
+                  if (s) {
+                    const cap = u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP;
+                    s.loyalty = Math.min(cap, s.loyalty + FAMILY_DINNER_LOYALTY_BONUS);
+                  }
+                }
+                (opponent.resources as any).heat = Math.min(100, ((opponent.resources as any).heat || 0) + FAMILY_DINNER_HEAT_COST);
+                if (turnReport) turnReport.aiActions.push({ family: fam, action: 'family_dinner', detail: `Held a family dinner (+loyalty to ${nearby.length} crew)` });
+              }
+            }
+          }
+        }
+      }
+
+
       // ── B3: AI BUILD BUSINESS — instant illegal-style racket on owned empty hex with a Capo ──
       // Mirrors the player build (requires Capo on hex, costs money, occupies an action) but
       // bypasses the multi-turn legal construction pipeline — AI builds an extorted-style biz
@@ -9170,7 +9426,149 @@ export const useEnhancedMafiaGameState = (
           }
           return newState;
         }
+        case 'plant_wiretap': {
+          // Tactical: plant a wiretap on a rival hex within range of a friendly soldier/capo.
+          // action: { targetQ, targetR, targetS }
+          const gp = (newState as any).gamePhase || 1;
+          if (gp < WIRETAP_MIN_PHASE) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🎧 Wiretap Locked', message: `Available from Phase ${WIRETAP_MIN_PHASE}.` });
+            return newState;
+          }
+          if (newState.turnPhase !== 'move') return newState;
+          if (newState.tacticalActionsRemaining < WIRETAP_TACTICAL_COST) return newState;
+          if (newState.resources.money < WIRETAP_COST) {
+            newState.pendingNotifications.push({ type: 'warning', title: '💸 Insufficient Funds', message: `Wiretap costs $${WIRETAP_COST.toLocaleString()}.` });
+            return newState;
+          }
+          const tile = newState.hexMap.find(t => t.q === action.targetQ && t.r === action.targetR && t.s === action.targetS);
+          if (!tile || !tile.controllingFamily || tile.controllingFamily === newState.playerFamily) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🎧 Invalid Target', message: 'Wiretap a rival-controlled hex.' });
+            return newState;
+          }
+          if (tile.isHeadquarters) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🎧 No HQ Bugs', message: 'HQ security is too tight to wire.' });
+            return newState;
+          }
+          const myWiretaps = (newState.wiretaps || []).filter(w => w.plantedBy === newState.playerFamily);
+          if (myWiretaps.length >= WIRETAP_MAX_PER_FAMILY) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🎧 Wiretap Limit', message: `Max ${WIRETAP_MAX_PER_FAMILY} active wiretaps.` });
+            return newState;
+          }
+          if (myWiretaps.some(w => w.q === tile.q && w.r === tile.r && w.s === tile.s)) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🎧 Already Bugged', message: 'You already have a wiretap on this hex.' });
+            return newState;
+          }
+          const friendly = newState.deployedUnits.filter(u => u.family === newState.playerFamily);
+          const inRange = friendly.some(u => hexDistance(u, tile) <= WIRETAP_PLANT_RANGE);
+          if (!inRange) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🎧 Out of Range', message: `Need a soldier or capo within ${WIRETAP_PLANT_RANGE} hex(es) of the target.` });
+            return newState;
+          }
+          newState.resources.money -= WIRETAP_COST;
+          newState.tacticalActionsRemaining -= WIRETAP_TACTICAL_COST;
+          newState.wiretaps = [...(newState.wiretaps || []), {
+            id: `wt_${newState.turn}_${Math.random().toString(36).slice(2, 8)}`,
+            plantedBy: newState.playerFamily,
+            targetFamily: tile.controllingFamily,
+            q: tile.q, r: tile.r, s: tile.s,
+            plantedTurn: newState.turn,
+            expiresOnTurn: newState.turn + WIRETAP_DURATION,
+          }];
+          newState.selectedMoveAction = 'move' as MoveAction;
+          newState.selectedUnitId = null;
+          newState.availableMoveHexes = [];
+          newState.pendingNotifications.push({
+            type: 'success', title: '🎧 Wiretap Planted',
+            message: `Bugged a ${tile.controllingFamily} location. Intel flows for ${WIRETAP_DURATION} turns.`,
+          });
+          return newState;
+        }
+        case 'sweep_for_bugs': {
+          // Tactical: sweep all wiretaps targeting any of your hexes. $800 / 1 tactical.
+          if (newState.turnPhase !== 'move') return newState;
+          if (newState.tacticalActionsRemaining < SWEEP_TACTICAL_COST) return newState;
+          if (newState.resources.money < SWEEP_COST) {
+            newState.pendingNotifications.push({ type: 'warning', title: '💸 Insufficient Funds', message: `Sweep costs $${SWEEP_COST.toLocaleString()}.` });
+            return newState;
+          }
+          newState.resources.money -= SWEEP_COST;
+          newState.tacticalActionsRemaining -= SWEEP_TACTICAL_COST;
+          const onMyHexes = (newState.wiretaps || []).filter(w => w.targetFamily === newState.playerFamily);
+          let found = 0;
+          const survivors: Wiretap[] = [];
+          for (const w of (newState.wiretaps || [])) {
+            if (w.targetFamily !== newState.playerFamily) { survivors.push(w); continue; }
+            if (Math.random() < SWEEP_DISCOVERY_CHANCE) {
+              found++;
+              newState.reputation.respect += SWEEP_RESPECT_GAIN;
+              addPairTension(newState, newState.playerFamily, w.plantedBy, SWEEP_TENSION_HIT);
+              newState.pendingNotifications.push({
+                type: 'success', title: '🧹 Bug Found!',
+                message: `Caught the ${w.plantedBy} family wiring your operation. +${SWEEP_RESPECT_GAIN} respect, tension rising.`,
+              });
+            } else {
+              survivors.push(w);
+            }
+          }
+          newState.wiretaps = survivors;
+          // Apply counter-surveillance flag to player family
+          const cs = (newState.counterSurveillance || []).filter(c => c.family !== newState.playerFamily);
+          cs.push({ family: newState.playerFamily, expiresOnTurn: newState.turn + COUNTER_SURVEILLANCE_DURATION });
+          newState.counterSurveillance = cs;
+          if (found === 0) {
+            newState.pendingNotifications.push({
+              type: 'info', title: '🧹 Sweep Complete',
+              message: onMyHexes.length === 0
+                ? `Clean — no bugs found. Counter-surveillance active for ${COUNTER_SURVEILLANCE_DURATION} turns.`
+                : `Some bugs may have escaped detection. Counter-surveillance active for ${COUNTER_SURVEILLANCE_DURATION} turns.`,
+            });
+          }
+          return newState;
+        }
+        case 'family_dinner': {
+          // Tactical: +loyalty to soldiers/capos within range of HQ. $1000 / 1 tactical, 5-turn cooldown.
+          if (newState.turnPhase !== 'move') return newState;
+          if (newState.tacticalActionsRemaining < FAMILY_DINNER_TACTICAL_COST) return newState;
+          const last = (newState.lastFamilyDinnerTurn || {})[newState.playerFamily] || 0;
+          if (last > 0 && (newState.turn - last) < FAMILY_DINNER_COOLDOWN) {
+            const left = FAMILY_DINNER_COOLDOWN - (newState.turn - last);
+            newState.pendingNotifications.push({ type: 'warning', title: '🍝 Dinner Cooldown', message: `Next family dinner in ${left} turn${left === 1 ? '' : 's'}.` });
+            return newState;
+          }
+          if (newState.resources.money < FAMILY_DINNER_COST) {
+            newState.pendingNotifications.push({ type: 'warning', title: '💸 Insufficient Funds', message: `Family dinner costs $${FAMILY_DINNER_COST.toLocaleString()}.` });
+            return newState;
+          }
+          const hq = newState.headquarters[newState.playerFamily];
+          if (!hq) return newState;
+          const nearby = newState.deployedUnits.filter(u =>
+            u.family === newState.playerFamily &&
+            hexDistance(u, hq) <= FAMILY_DINNER_RANGE
+          );
+          if (nearby.length === 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🍝 Empty Table', message: 'Need at least one soldier or capo within 2 hexes of HQ.' });
+            return newState;
+          }
+          newState.resources.money -= FAMILY_DINNER_COST;
+          newState.tacticalActionsRemaining -= FAMILY_DINNER_TACTICAL_COST;
+          newState.lastFamilyDinnerTurn = { ...(newState.lastFamilyDinnerTurn || {}), [newState.playerFamily]: newState.turn };
+          for (const u of nearby) {
+            const s = newState.soldierStats[u.id];
+            if (s) {
+              const cap = u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP;
+              s.loyalty = Math.min(cap, s.loyalty + FAMILY_DINNER_LOYALTY_BONUS);
+            }
+          }
+          newState.reputation.respect += FAMILY_DINNER_RESPECT_GAIN;
+          newState.policeHeat.level = Math.min(100, newState.policeHeat.level + FAMILY_DINNER_HEAT_COST);
+          newState.pendingNotifications.push({
+            type: 'success', title: '🍝 Family Dinner',
+            message: `Sunday dinner served — +${FAMILY_DINNER_LOYALTY_BONUS} loyalty to ${nearby.length} crew near HQ. +${FAMILY_DINNER_RESPECT_GAIN} respect, +${FAMILY_DINNER_HEAT_COST} heat.`,
+          });
+          return newState;
+        }
         case 'public_appearance': {
+
           const COST = 3000;
           const BASE_HEAT_REDUCTION = 6;
           const CD_TURNS = 2;
