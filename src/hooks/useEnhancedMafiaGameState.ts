@@ -9645,17 +9645,37 @@ export const useEnhancedMafiaGameState = (
           newState.tacticalActionsRemaining -= SWEEP_TACTICAL_COST;
           const onMyHexes = (newState.wiretaps || []).filter(w => w.targetFamily === newState.playerFamily);
           let found = 0;
+          let fedFound = 0;
           const survivors: Wiretap[] = [];
           for (const w of (newState.wiretaps || [])) {
             if (w.targetFamily !== newState.playerFamily) { survivors.push(w); continue; }
             if (Math.random() < SWEEP_DISCOVERY_CHANCE) {
               found++;
-              newState.reputation.respect += SWEEP_RESPECT_GAIN;
-              addPairTension(newState, newState.playerFamily, w.plantedBy, SWEEP_TENSION_HIT);
-              newState.pendingNotifications.push({
-                type: 'success', title: '🧹 Bug Found!',
-                message: `Caught the ${w.plantedBy} family wiring your operation. +${SWEEP_RESPECT_GAIN} respect, tension rising.`,
-              });
+              if (w.plantedBy === FED_BUG_PLANTED_BY) {
+                fedFound++;
+                // Fed-bug discovery consequence: age-scaled prosecution + possible RICO accel.
+                const age = Math.max(0, newState.turn - w.plantedTurn);
+                const riskAdd = Math.min(FED_BUG_AGE_RISK_CAP, age * FED_BUG_AGE_RISK_PER_TURN);
+                newState.fedBugProsecutionBonus = Math.min(FED_BUG_RISK_BONUS_CAP, (newState.fedBugProsecutionBonus || 0) + riskAdd);
+                const heat = newState.policeHeat.level;
+                let ricoTick = 0;
+                if (heat >= FED_BUG_RICO_ACCEL_HEAT) {
+                  ricoTick = age >= FED_BUG_RICO_ACCEL_AGE ? 2 : 1;
+                  newState.ricoTimer = (newState.ricoTimer || 0) + ricoTick;
+                }
+                newState.reputation.respect += 3;
+                newState.pendingNotifications.push({
+                  type: 'error', title: '🎧⚖️ Fed Wire Swept',
+                  message: `Pulled a federal bug that ran ${age} turn${age === 1 ? '' : 's'}. Prosecution risk +${riskAdd}${ricoTick > 0 ? `, RICO timer rushed +${ricoTick}.` : '.'}`,
+                });
+              } else {
+                newState.reputation.respect += SWEEP_RESPECT_GAIN;
+                addPairTension(newState, newState.playerFamily, w.plantedBy, SWEEP_TENSION_HIT);
+                newState.pendingNotifications.push({
+                  type: 'success', title: '🧹 Bug Found!',
+                  message: `Caught the ${w.plantedBy} family wiring your operation. +${SWEEP_RESPECT_GAIN} respect, tension rising.`,
+                });
+              }
             } else {
               survivors.push(w);
             }
