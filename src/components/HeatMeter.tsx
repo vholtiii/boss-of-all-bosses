@@ -8,6 +8,8 @@ interface HeatMeterProps {
   heat: number;
   history: number[]; // chronological, oldest → newest, EXCLUDES current
   ricoTimer?: number;
+  fedBugCount?: number;             // total active Fed wires on the player
+  fedBugDiscoveredCount?: number;   // of those, how many are already revealed
 }
 
 type Tier = 'cool' | 'warm' | 'hot' | 'critical' | 'rico';
