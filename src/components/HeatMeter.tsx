@@ -115,6 +115,26 @@ const HeatMeter: React.FC<HeatMeterProps> = ({ heat, history, ricoTimer = 0, fed
 
           {/* Sparkline */}
           {trail.length >= 2 && <Sparkline values={trail} tier={tier} />}
+
+          {/* Fed wire badge — total active vs known on the player */}
+          {fedBugCount > 0 && (
+            <div
+              className={cn(
+                'flex items-center gap-1 text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full border',
+                fedBugDiscoveredCount > 0
+                  ? 'text-red-300 border-red-500/50 bg-red-500/15 animate-pulse'
+                  : 'text-amber-300 border-amber-500/40 bg-amber-500/10'
+              )}
+              title={
+                fedBugDiscoveredCount > 0
+                  ? `${fedBugDiscoveredCount} Fed wire(s) discovered, ${fedBugCount - fedBugDiscoveredCount} suspected. Sweep to remove.`
+                  : `${fedBugCount} Fed wire(s) suspected on your territory. Mayor bribe / Consigliere / Sweep can find them.`
+              }
+            >
+              <span>🎧</span>
+              <span>{fedBugDiscoveredCount > 0 ? `${fedBugDiscoveredCount}/${fedBugCount}` : `?${fedBugCount}`}</span>
+            </div>
+          )}
         </motion.div>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="max-w-xs text-xs">
