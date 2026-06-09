@@ -43,6 +43,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { buildThreatSections } from '@/lib/threat-board';
 import SoundSettingsDialog from '@/components/SoundSettingsDialog';
+import HeatMeter from '@/components/HeatMeter';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
 
