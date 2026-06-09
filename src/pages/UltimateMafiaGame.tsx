@@ -408,7 +408,14 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       label: 'Map',
       icon: <Target className="h-4 w-4" />,
       content: (
-        <div className="h-full">
+        <div className="h-full relative">
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+            <HeatMeter
+              heat={(gameState as any).policeHeat?.level ?? 0}
+              history={heatHistory}
+              ricoTimer={gameState.ricoTimer || 0}
+            />
+          </div>
           <EnhancedMafiaHexGrid 
             key="hex-grid-mobile"
             width={12}
