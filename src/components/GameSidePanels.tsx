@@ -760,20 +760,59 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 : tier === 'firm' ? 'Defense Firm'
                 : tier === 'street' ? 'Street Attorney'
                 : 'Lawyer';
-              const tierBlurb = tier === 'consigliere' ? 'Sentences −25% · Blocks 1 arrest/turn · −1 heat/turn · Pauses RICO'
-                : tier === 'firm' ? 'Sentences −25% · Prosecution risk −50%'
-                : 'Sentences −25%';
               const turnsLeft = (gameState as any).lawyerActiveUntil - gameState.turn + 1;
+              const totalDuration = tier === 'consigliere' ? 5 : tier === 'firm' ? 4 : 3;
+              const perTurnCost = tier === 'consigliere' ? 3000 : tier === 'firm' ? 1500 : 0;
               return (
-                <div className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 font-medium space-y-0.5">
-                  <div className="flex items-center gap-1.5">
-                    ⚖️ {tierLabel}
-                    <span className="ml-auto text-muted-foreground">
-                      {turnsLeft} turn{turnsLeft !== 1 ? 's' : ''} left
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-green-300/80">{tierBlurb}</div>
-                </div>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 font-medium space-y-0.5 cursor-help">
+                        <div className="flex items-center gap-1.5">
+                          ⚖️ {tierLabel}
+                          <span className="ml-auto text-muted-foreground">
+                            {turnsLeft}/{totalDuration} turns
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-green-300/80">
+                          {tier === 'consigliere' ? '−25% sentences · Blocks 1 arrest/turn · −1 heat/turn · Pauses RICO'
+                            : tier === 'firm' ? '−25% sentences · −50% prosecution risk · Auto-release 1 soldier'
+                            : '−25% sentences'}
+                          {perTurnCost > 0 && ` · −$${perTurnCost.toLocaleString()}/turn`}
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="max-w-[280px] space-y-1">
+                      <p className="font-semibold text-green-400">{tierLabel} — Active {turnsLeft} more turn{turnsLeft !== 1 ? 's' : ''}</p>
+                      {tier === 'consigliere' && (
+                        <ul className="text-xs space-y-0.5 list-disc list-inside text-muted-foreground">
+                          <li>Reduces jail sentences by 25%</li>
+                          <li>Blocks <strong>1 arrest per turn</strong> before it happens</li>
+                          <li>Passive <strong>−1 heat each turn</strong></li>
+                          <li>Pauses the RICO countdown timer</li>
+                          <li>Costs <strong>$3,000/turn</strong> while active</li>
+                          <li>3-turn cooldown after retainer ends</li>
+                        </ul>
+                      )}
+                      {tier === 'firm' && (
+                        <ul className="text-xs space-y-0.5 list-disc list-inside text-muted-foreground">
+                          <li>Reduces jail sentences by 25%</li>
+                          <li>Prosecution risk <strong>−50%</strong></li>
+                          <li>Automatically <strong>releases 1 jailed soldier</strong> on hire</li>
+                          <li>Costs <strong>$1,500/turn</strong> while active</li>
+                          <li>3-turn cooldown after retainer ends</li>
+                        </ul>
+                      )}
+                      {tier === 'street' && (
+                        <ul className="text-xs space-y-0.5 list-disc list-inside text-muted-foreground">
+                          <li>Reduces jail sentences by 25%</li>
+                          <li>No per-turn cost</li>
+                          <li>3-turn cooldown after retainer ends</li>
+                        </ul>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               );
             })()}
             {/* Charity Passive Badge */}
@@ -941,11 +980,35 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               const cdTurnsLeft = !lawyerActive && cdUntil > gameState.turn ? cdUntil - gameState.turn : 0;
               const onCooldown = cdTurnsLeft > 0;
               const ricoBlock = gameState.policeHeat.level >= 90;
-              type Tier = { id: 'street' | 'firm' | 'consigliere'; name: string; retainer: number; perTurn: number; duration: number; blurb: string };
+              type Tier = { id: 'street' | 'firm' | 'consigliere'; name: string; retainer: number; perTurn: number; duration: number; blurb: string; tooltip: string };
               const tiers: Tier[] = [
-                { id: 'street', name: 'Street Attorney', retainer: 5000, perTurn: 0, duration: 3, blurb: '−25% sentences' },
-                { id: 'firm', name: 'Defense Firm', retainer: 12000, perTurn: 1500, duration: 4, blurb: '−50% prosecution risk · releases 1 soldier' },
-                { id: 'consigliere', name: 'Consigliere Counsel', retainer: 25000, perTurn: 3000, duration: 5, blurb: 'Blocks 1 arrest/turn · −1 heat · pauses RICO' },
+                {
+                  id: 'street',
+                  name: 'Street Attorney',
+                  retainer: 5000,
+                  perTurn: 0,
+                  duration: 3,
+                  blurb: '−25% sentences',
+                  tooltip: '3-turn retainer. Reduces all jail sentences by 25%. No recurring fee. 3-turn cooldown after expiry.',
+                },
+                {
+                  id: 'firm',
+                  name: 'Defense Firm',
+                  retainer: 12000,
+                  perTurn: 1500,
+                  duration: 4,
+                  blurb: '−50% prosecution risk · releases 1 soldier',
+                  tooltip: '4-turn retainer. Reduces sentences by 25%, cuts prosecution risk in half, and immediately releases 1 jailed soldier on hire. Costs $1,500/turn. 3-turn cooldown after expiry.',
+                },
+                {
+                  id: 'consigliere',
+                  name: 'Consigliere Counsel',
+                  retainer: 25000,
+                  perTurn: 3000,
+                  duration: 5,
+                  blurb: 'Blocks 1 arrest/turn · −1 heat · pauses RICO',
+                  tooltip: '5-turn retainer. Blocks 1 arrest per turn, passively −1 heat/turn, and pauses the RICO timer. Also reduces sentences by 25%. Costs $3,000/turn. Cannot hire while heat ≥ 90. 3-turn cooldown after expiry.',
+                },
               ];
               if (lawyerActive) return null;
               return (
@@ -967,6 +1030,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                         sublabel={`$${t.retainer.toLocaleString()}${t.perTurn ? ` + $${t.perTurn.toLocaleString()}/t` : ''} · ${t.duration}t · ${t.blurb}`}
                         disabled={disabled}
                         disabledReason={reason}
+                        tooltip={t.tooltip}
                         phaseLocked={actionsLocked}
                         onClick={() => onAction({ type: 'hire_lawyer', tier: t.id })}
                       />
@@ -1820,11 +1884,12 @@ const ActionButton: React.FC<{
   disabled?: boolean;
   phaseLocked?: boolean;
   disabledReason?: string;
+  tooltip?: string;
   variant?: 'default' | 'destructive' | 'outline';
   onClick: () => void;
-}> = ({ icon, label, sublabel, disabled, phaseLocked, disabledReason, variant = 'outline', onClick }) => {
+}> = ({ icon, label, sublabel, disabled, phaseLocked, disabledReason, tooltip, variant = 'outline', onClick }) => {
   const isDisabled = disabled || phaseLocked;
-  const tooltipText = phaseLocked ? 'Available in a different phase' : disabledReason;
+  const tooltipText = phaseLocked ? 'Available in a different phase' : disabledReason || tooltip;
 
   const button = (
     <Button
@@ -1846,14 +1911,14 @@ const ActionButton: React.FC<{
     </Button>
   );
 
-  if (isDisabled && tooltipText) {
+  if (tooltipText) {
     return (
       <TooltipProvider delayDuration={200}>
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="w-full block">{button}</span>
           </TooltipTrigger>
-          <TooltipContent side="left">
+          <TooltipContent side="left" className="max-w-[260px]">
             <p>{tooltipText}</p>
           </TooltipContent>
         </Tooltip>
