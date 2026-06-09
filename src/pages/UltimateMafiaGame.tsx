@@ -43,6 +43,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { buildThreatSections } from '@/lib/threat-board';
 import SoundSettingsDialog from '@/components/SoundSettingsDialog';
+import HeatMeter from '@/components/HeatMeter';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
 
@@ -309,6 +310,19 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const { autoSave, emergencySaveAuto } = useGameSaveLoad();
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<number | null>(null);
 
+  // ---- Heat history (last 8 turns, excluding current) for HeatMeter sparkline + delta ----
+  const [heatHistory, setHeatHistory] = useState<number[]>([]);
+  const lastTrackedHeatTurnRef = React.useRef<number>(gameState.turn);
+  useEffect(() => {
+    if (gameState.turn !== lastTrackedHeatTurnRef.current) {
+      // Turn advanced — capture the heat as it was at end of previous turn.
+      // We snapshot the current heat (start of new turn) which reflects end-of-turn effects.
+      const prevHeat = (gameState as any).policeHeat?.level ?? 0;
+      setHeatHistory(h => [...h, Math.round(prevHeat)].slice(-8));
+      lastTrackedHeatTurnRef.current = gameState.turn;
+    }
+  }, [gameState.turn]);
+
   const handleLoadGame = (loadedGameState: any) => {
     try {
       loadGameState(loadedGameState);
@@ -394,7 +408,14 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       label: 'Map',
       icon: <Target className="h-4 w-4" />,
       content: (
-        <div className="h-full">
+        <div className="h-full relative">
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+            <HeatMeter
+              heat={(gameState as any).policeHeat?.level ?? 0}
+              history={heatHistory}
+              ricoTimer={gameState.ricoTimer || 0}
+            />
+          </div>
           <EnhancedMafiaHexGrid 
             key="hex-grid-mobile"
             width={12}
@@ -1577,6 +1598,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
 
   const mainContent = (
     <div className="h-full relative" onClick={deselectUnit}>
+      {/* Heat meter — pinned top-center of map */}
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+        <HeatMeter
+          heat={(gameState as any).policeHeat?.level ?? 0}
+          history={heatHistory}
+          ricoTimer={gameState.ricoTimer || 0}
+        />
+      </div>
+
       {/* Phase indicator banner */}
       <motion.div
         key={gameState.turnPhase}
