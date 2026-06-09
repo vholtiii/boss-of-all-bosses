@@ -980,11 +980,35 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               const cdTurnsLeft = !lawyerActive && cdUntil > gameState.turn ? cdUntil - gameState.turn : 0;
               const onCooldown = cdTurnsLeft > 0;
               const ricoBlock = gameState.policeHeat.level >= 90;
-              type Tier = { id: 'street' | 'firm' | 'consigliere'; name: string; retainer: number; perTurn: number; duration: number; blurb: string };
+              type Tier = { id: 'street' | 'firm' | 'consigliere'; name: string; retainer: number; perTurn: number; duration: number; blurb: string; tooltip: string };
               const tiers: Tier[] = [
-                { id: 'street', name: 'Street Attorney', retainer: 5000, perTurn: 0, duration: 3, blurb: '−25% sentences' },
-                { id: 'firm', name: 'Defense Firm', retainer: 12000, perTurn: 1500, duration: 4, blurb: '−50% prosecution risk · releases 1 soldier' },
-                { id: 'consigliere', name: 'Consigliere Counsel', retainer: 25000, perTurn: 3000, duration: 5, blurb: 'Blocks 1 arrest/turn · −1 heat · pauses RICO' },
+                {
+                  id: 'street',
+                  name: 'Street Attorney',
+                  retainer: 5000,
+                  perTurn: 0,
+                  duration: 3,
+                  blurb: '−25% sentences',
+                  tooltip: '3-turn retainer. Reduces all jail sentences by 25%. No recurring fee. 3-turn cooldown after expiry.',
+                },
+                {
+                  id: 'firm',
+                  name: 'Defense Firm',
+                  retainer: 12000,
+                  perTurn: 1500,
+                  duration: 4,
+                  blurb: '−50% prosecution risk · releases 1 soldier',
+                  tooltip: '4-turn retainer. Reduces sentences by 25%, cuts prosecution risk in half, and immediately releases 1 jailed soldier on hire. Costs $1,500/turn. 3-turn cooldown after expiry.',
+                },
+                {
+                  id: 'consigliere',
+                  name: 'Consigliere Counsel',
+                  retainer: 25000,
+                  perTurn: 3000,
+                  duration: 5,
+                  blurb: 'Blocks 1 arrest/turn · −1 heat · pauses RICO',
+                  tooltip: '5-turn retainer. Blocks 1 arrest per turn, passively −1 heat/turn, and pauses the RICO timer. Also reduces sentences by 25%. Costs $3,000/turn. Cannot hire while heat ≥ 90. 3-turn cooldown after expiry.',
+                },
               ];
               if (lawyerActive) return null;
               return (
@@ -1006,6 +1030,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                         sublabel={`$${t.retainer.toLocaleString()}${t.perTurn ? ` + $${t.perTurn.toLocaleString()}/t` : ''} · ${t.duration}t · ${t.blurb}`}
                         disabled={disabled}
                         disabledReason={reason}
+                        tooltip={t.tooltip}
                         phaseLocked={actionsLocked}
                         onClick={() => onAction({ type: 'hire_lawyer', tier: t.id })}
                       />
