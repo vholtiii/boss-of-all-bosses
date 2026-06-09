@@ -5254,6 +5254,19 @@ export const useEnhancedMafiaGameState = (
                 hexS: soldier.s,
               });
               turnReport.events.push(`🐀 A ${family} soldier has become a police informant!`);
+              // Fed-bug spike: a flipped soldier gives the Feds a perfect tap on that hex.
+              const myFedBugs = newState.wiretaps.filter(w => w.plantedBy === FED_BUG_PLANTED_BY && w.targetFamily === family);
+              if (myFedBugs.length < FED_BUG_MAX_PER_FAMILY + 1 && Math.random() < FED_BUG_SPIKE_COP_FLIP) {
+                newState.wiretaps.push({
+                  id: `fbi_${newState.turn}_rat_${Math.random().toString(36).slice(2, 6)}`,
+                  plantedBy: FED_BUG_PLANTED_BY,
+                  targetFamily: family,
+                  q: soldier.q, r: soldier.r, s: soldier.s,
+                  plantedTurn: newState.turn,
+                  expiresOnTurn: newState.turn + FED_BUG_DURATION,
+                  discovered: false,
+                });
+              }
             }
           }
         }
