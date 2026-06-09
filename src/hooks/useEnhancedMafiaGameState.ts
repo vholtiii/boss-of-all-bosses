@@ -1299,6 +1299,8 @@ export const createInitialGameState = (
     lawyerCooldownUntil: 0,
     consigliereLastBlockTurn: 0,
     ricoTimer: 0,
+    fedBugProsecutionBonus: 0,
+    fedBugRiskCrossingFired: false,
     prosecutionTimer: 0,
     federalIndictmentTimer: 0,
     federalIndictmentActive: false,
