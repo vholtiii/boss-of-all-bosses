@@ -530,11 +530,15 @@ export const COUNTER_SURVEILLANCE_DURATION = 2;
 
 export interface Wiretap {
   id: string;
-  plantedBy: string;     // family that planted
+  plantedBy: string;     // family that planted, or 'feds' for law enforcement bugs
   targetFamily: string;  // family whose hex is bugged (owner at plant time)
   q: number; r: number; s: number;
   plantedTurn: number;
   expiresOnTurn: number;
+  /** Fed bugs only: once true, the owner knows about it (still needs Sweep to remove). */
+  discovered?: boolean;
+  /** Turn the bug was first discovered (for UI display). */
+  discoveredOnTurn?: number;
 }
 
 // Family-level counter-surveillance flag (covers all hexes of that family until expires)
@@ -542,6 +546,27 @@ export interface CounterSurveillance {
   family: string;
   expiresOnTurn: number;
 }
+
+// ============ FEDERAL WIRETAPS (prosecution / RICO aide) ============
+// Law enforcement plants bugs when families get hot. Discovered bugs feed prosecution risk
+// and rush the RICO clock based on how long they sat.
+export const FED_BUG_PLANTED_BY = 'feds' as const;
+export const FED_BUG_MAX_PER_FAMILY = 3;
+export const FED_BUG_DURATION = 12;                    // turns before the Feds rotate the bug
+export const FED_BUG_AGE_RISK_PER_TURN = 3;           // +prosecutionRisk per turn the bug ran
+export const FED_BUG_AGE_RISK_CAP = 25;               // cap per single discovered bug
+export const FED_BUG_RISK_BONUS_CAP = 40;             // accumulator cap on the persistent bonus
+export const FED_BUG_RICO_ACCEL_HEAT = 80;            // heat threshold for RICO acceleration on discovery
+export const FED_BUG_RICO_ACCEL_AGE = 5;              // age threshold for +2 RICO tick (vs +1)
+export const FED_BUG_CONSIGLIERE_REVEAL_CHANCE = 0.25;
+// Passive placement chance per family per turn, keyed by heat tier
+export const FED_BUG_CHANCE_BY_TIER = {
+  cool: 0, warm: 0, hot: 0.12, critical: 0.22, rico: 0.35,
+} as const;
+// Event-triggered spike chances
+export const FED_BUG_SPIKE_COP_FLIP = 1.0;            // soldier flipped to informant → guaranteed
+export const FED_BUG_SPIKE_RISK_CROSSING = 1.0;       // crossing prosecutionRisk ≥40 → guaranteed (one-shot)
+export const FED_BUG_RISK_CROSSING_THRESHOLD = 40;
 
 // ============ FAMILY DINNER (loyalty) ============
 // Sunday dinner at the boss's table — keeps the crew tight. Apalachin-style heat cost.
