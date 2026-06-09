@@ -51,7 +51,7 @@ const Sparkline: React.FC<{ values: number[]; tier: Tier }> = ({ values, tier })
   );
 };
 
-const HeatMeter: React.FC<HeatMeterProps> = ({ heat, history, ricoTimer = 0 }) => {
+const HeatMeter: React.FC<HeatMeterProps> = ({ heat, history, ricoTimer = 0, fedBugCount = 0, fedBugDiscoveredCount = 0 }) => {
   const h = Math.max(0, Math.min(100, Math.round(heat)));
   const tier = getTier(h);
   const meta = TIER_META[tier];
