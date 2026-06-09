@@ -4657,6 +4657,7 @@ export const useEnhancedMafiaGameState = (
         const hasChief = newState.activeBribes.some(b => b.tier === 'police_chief' && b.active);
         const hasMayor = newState.activeBribes.some(b => b.tier === 'mayor' && b.active);
         const hasLawyer = (newState.lawyerActiveUntil || 0) >= newState.turn;
+        const firmOrBetter = hasLawyer && (newState.lawyerTier === 'firm' || newState.lawyerTier === 'consigliere');
 
         let risk = Math.floor(heat * 0.4)
           + informantCount * 10
@@ -4666,6 +4667,8 @@ export const useEnhancedMafiaGameState = (
           - (hasChief ? 15 : 0)
           - (hasMayor ? 20 : 0)
           - (hasLawyer ? PROSECUTION_LAWYER_REDUCTION : 0);
+        // Firm/Consigliere additionally halve total prosecution risk
+        if (firmOrBetter) risk = Math.floor(risk * 0.5);
         risk = Math.min(100, Math.max(0, risk));
         newState.legalStatus.prosecutionRisk = risk;
 
