@@ -9399,28 +9399,10 @@ export const useEnhancedMafiaGameState = (
 
           // Ratio of counter to original. >1 means player asked more; <1 means asked less.
           // AI prefers paying less when buying, getting more when selling.
-          // For both directions, we treat anything within 15% of original as "acceptable",
-          // 40%+ swing as "walks away", anything between as a re-counter at midpoint.
-          const swing = Math.abs(counterPrice - original) / original;
-          if (swing <= 0.15) {
-            // AI accepts — refresh the sitdown with the new price so the player can click Accept.
-            newState.incomingSitdowns.push({
-              ...sitdown,
-              id: `incoming-supply-accepted-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-              proposedAmount: counterPrice,
-              turnRequested: newState.turn,
-              expiresOnTurn: newState.turn + 2,
-              isCounterOffer: false,
-              counterRound: 0,
-              originalPrice: counterPrice,
-            });
-            newState.pendingNotifications.push({
-              type: 'success' as const,
-              title: '✅ Counter Accepted',
-              message: `${famLabel} agreed to $${counterPrice.toLocaleString()}. Open the Sitdowns panel to finalize.`,
-            });
-          } else if (swing >= 0.4 || round >= 1) {
-            // Reject outright — too greedy or already had a round.
+          // Round >= 1 always walks (one re-counter max). On round 0:
+          // within 15% of original = accept, 40%+ = walk, else re-counter at midpoint.
+          if (round >= 1) {
+            // Already had one re-counter — AI walks away.
             addPairTension(newState, newState.playerFamily, sitdown.fromFamily, 5);
             newState.pendingNotifications.push({
               type: 'warning' as const,
@@ -9428,23 +9410,51 @@ export const useEnhancedMafiaGameState = (
               message: `${famLabel} walked away from the table. Tension +5.`,
             });
           } else {
-            // Re-counter at the midpoint between counterPrice and original (rounded to nearest $500).
-            const mid = Math.max(2000, Math.round(((counterPrice + original) / 2) / 500) * 500);
-            newState.incomingSitdowns.push({
-              ...sitdown,
-              id: `incoming-supply-recounter-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-              proposedAmount: mid,
-              turnRequested: newState.turn,
-              expiresOnTurn: newState.turn + 2,
-              isCounterOffer: true,
-              counterRound: 1,
-              originalPrice: original,
-            });
-            newState.pendingNotifications.push({
-              type: 'info' as const,
-              title: '↩️ They Counter Back',
-              message: `${famLabel} pushed back: "We'll do it for $${mid.toLocaleString()}, final offer."`,
-            });
+            const swing = Math.abs(counterPrice - original) / original;
+            if (swing <= 0.15) {
+              // AI accepts — refresh the sitdown with the new price so the player can click Accept.
+              newState.incomingSitdowns.push({
+                ...sitdown,
+                id: `incoming-supply-accepted-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                proposedAmount: counterPrice,
+                turnRequested: newState.turn,
+                expiresOnTurn: newState.turn + 2,
+                isCounterOffer: false,
+                counterRound: 0,
+                originalPrice: counterPrice,
+              });
+              newState.pendingNotifications.push({
+                type: 'success' as const,
+                title: '✅ Counter Accepted',
+                message: `${famLabel} agreed to $${counterPrice.toLocaleString()}. Open the Sitdowns panel to finalize.`,
+              });
+            } else if (swing >= 0.4) {
+              // Reject outright — too greedy.
+              addPairTension(newState, newState.playerFamily, sitdown.fromFamily, 5);
+              newState.pendingNotifications.push({
+                type: 'warning' as const,
+                title: '🚫 Counter Rejected',
+                message: `${famLabel} walked away from the table. Tension +5.`,
+              });
+            } else {
+              // Re-counter at the midpoint between counterPrice and original (rounded to nearest $500).
+              const mid = Math.max(2000, Math.round(((counterPrice + original) / 2) / 500) * 500);
+              newState.incomingSitdowns.push({
+                ...sitdown,
+                id: `incoming-supply-recounter-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                proposedAmount: mid,
+                turnRequested: newState.turn,
+                expiresOnTurn: newState.turn + 2,
+                isCounterOffer: true,
+                counterRound: 1,
+                originalPrice: original,
+              });
+              newState.pendingNotifications.push({
+                type: 'info' as const,
+                title: '↩️ They Counter Back',
+                message: `${famLabel} pushed back: "We'll do it for $${mid.toLocaleString()}, final offer."`,
+              });
+            }
           }
           return newState;
         }
