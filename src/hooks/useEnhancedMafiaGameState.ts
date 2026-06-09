@@ -9137,87 +9137,184 @@ export const useEnhancedMafiaGameState = (
           }];
           return newState;
         }
-        case 'charitable_donation':
-          if (newState.resources.money >= 5000 && newState.actionsRemaining > 0) {
-            newState.resources.money -= 5000;
-            const repGainCD = 3 * (1 + bonuses.reputationGain / 100);
+        case 'charitable_donation': {
+          const COST = 15000;
+          const BASE_HEAT_REDUCTION = 18;
+          const CD_TURNS = 4;
+          const lastCharityTurn = newState.lastCharityTurn || 0;
+          const lastPATurn = newState.lastPublicAppearanceTurn || 0;
+          const onCooldown = lastCharityTurn > 0 && (newState.turn - lastCharityTurn) < CD_TURNS;
+          if (onCooldown) {
+            const turnsLeft = CD_TURNS - (newState.turn - lastCharityTurn);
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '🤝 Donation Cooldown',
+              message: `Another high-profile donation would look staged. ${turnsLeft} turn${turnsLeft === 1 ? '' : 's'} until next.`,
+            }];
+            return newState;
+          }
+          if (newState.resources.money >= COST && newState.actionsRemaining > 0) {
+            newState.resources.money -= COST;
+            // Diminishing returns if a public appearance already used this turn
+            const stacked = lastPATurn === newState.turn;
+            const heatCut = stacked ? Math.floor(BASE_HEAT_REDUCTION / 2) : BASE_HEAT_REDUCTION;
+            const repGainCD = 5 * (1 + bonuses.reputationGain / 100);
             newState.reputation.reputation += repGainCD;
-            newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 10);
+            newState.policeHeat.level = Math.max(0, newState.policeHeat.level - heatCut);
             newState.actionsRemaining -= 1;
+            newState.lastCharityTurn = newState.turn;
+            newState.charityActiveUntil = newState.turn + 2;
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'info' as const, title: '🤝 Charitable Donation',
-              message: `Donated $5,000. Heat −10, Reputation +${repGainCD.toFixed(0)}.`,
+              message: `Donated $${COST.toLocaleString()}. Heat −${heatCut}${stacked ? ' (stacked, halved)' : ''}, Reputation +${repGainCD.toFixed(0)}. +1 heat regen for 2 turns.`,
             }];
           }
           return newState;
-        case 'public_appearance':
-          if (newState.resources.money >= 3000 && newState.actionsRemaining > 0) {
-            newState.resources.money -= 3000;
+        }
+        case 'public_appearance': {
+          const COST = 3000;
+          const BASE_HEAT_REDUCTION = 6;
+          const CD_TURNS = 2;
+          const lastPATurn = newState.lastPublicAppearanceTurn || 0;
+          const lastCharityTurn = newState.lastCharityTurn || 0;
+          const onCooldown = lastPATurn > 0 && (newState.turn - lastPATurn) < CD_TURNS;
+          if (onCooldown) {
+            const turnsLeft = CD_TURNS - (newState.turn - lastPATurn);
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '👑 Appearance Cooldown',
+              message: `The press needs time between photo ops. ${turnsLeft} turn${turnsLeft === 1 ? '' : 's'} until next.`,
+            }];
+            return newState;
+          }
+          if (newState.resources.money >= COST && newState.actionsRemaining > 0) {
+            newState.resources.money -= COST;
+            const stacked = lastCharityTurn === newState.turn;
+            const heatCut = stacked ? Math.floor(BASE_HEAT_REDUCTION / 2) : BASE_HEAT_REDUCTION;
             const repGainPA = 2 * (1 + bonuses.reputationGain / 100);
             newState.reputation.reputation += repGainPA;
-            newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 5);
+            newState.policeHeat.level = Math.max(0, newState.policeHeat.level - heatCut);
             newState.actionsRemaining -= 1;
+            newState.lastPublicAppearanceTurn = newState.turn;
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'info' as const, title: '👑 Public Appearance',
-              message: `Spent $3,000. Heat −5, Reputation +${repGainPA.toFixed(0)}.`,
+              message: `Spent $${COST.toLocaleString()}. Heat −${heatCut}${stacked ? ' (stacked, halved)' : ''}, Reputation +${repGainPA.toFixed(0)}.`,
             }];
           }
           return newState;
+        }
         case 'hire_lawyer': {
-          const lawyerCost = 8000;
-          const lawyerCooldown = 3;
-          const lastLawyerTurn = newState.lastLawyerTurn || 0;
-          const turnsSinceLawyer = newState.turn - lastLawyerTurn;
-          if (newState.resources.money >= lawyerCost && newState.actionsRemaining > 0 && turnsSinceLawyer >= lawyerCooldown) {
-            newState.resources.money -= lawyerCost;
-            newState.actionsRemaining -= 1;
-            newState.lastLawyerTurn = newState.turn;
-            newState.lawyerActiveUntil = newState.turn + 3;
-            
-            // Reduce all active arrest sentences by 25% — but never reduce arrests
-            // created on the current turn (player would lose them next turn), and
-            // always leave at least 2 turns until release so it doesn't feel like
-            // a "spontaneous" return.
-            const MIN_RELEASE_GAP = 2;
-            newState.policeHeat.arrests = newState.policeHeat.arrests.map(a => {
-              if (a.turn === newState.turn) return a;
-              if (newState.turn - a.turn < a.sentence) {
-                return { ...a, sentence: Math.max(a.sentence - (newState.turn - a.turn), Math.floor(a.sentence * 0.75)) };
-              }
-              return a;
-            });
-            const reduceReturn = (returnTurn: number, arrestTurn?: number) => {
-              if (arrestTurn !== undefined && arrestTurn === newState.turn) return returnTurn;
-              const remaining = returnTurn - newState.turn;
-              if (remaining <= MIN_RELEASE_GAP) return returnTurn;
-              return newState.turn + Math.max(MIN_RELEASE_GAP, Math.floor(remaining * 0.75));
-            };
-            const isPlayerArrest = (a: any) => !a.family || a.family === newState.playerFamily;
-            newState.arrestedSoldiers = (newState.arrestedSoldiers || []).map(a => (
-              isPlayerArrest(a) ? { ...a, returnTurn: reduceReturn(a.returnTurn, a.arrestTurn) } : a
-            ));
-            newState.arrestedCapos = (newState.arrestedCapos || []).map(a => (
-              isPlayerArrest(a) ? { ...a, returnTurn: reduceReturn(a.returnTurn, a.arrestTurn) } : a
-            ));
-            
-            // Remove first active arrest if any, otherwise just reduce heat
-            const activeArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn < a.sentence);
-            if (activeArrests.length > 0) {
-              const cleared = activeArrests[0];
-              newState.policeHeat.arrests = newState.policeHeat.arrests.filter(a => a.id !== cleared.id);
-              newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 3);
-              newState.pendingNotifications = [...newState.pendingNotifications, {
-                type: 'info' as const, title: '⚖️ Lawyer Hired',
-                message: `Cleared arrest of ${cleared.target}. All sentences reduced 25% for 3 turns. Heat −3.`,
-              }];
-            } else {
-              newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 3);
-              newState.pendingNotifications = [...newState.pendingNotifications, {
-                type: 'info' as const, title: '⚖️ Lawyer Retained',
-                message: `No active arrests to clear. Sentences −25% for 3 turns. Heat −3.`,
-              }];
+          type LawyerTier = 'street' | 'firm' | 'consigliere';
+          const LAWYER_TIERS: Record<LawyerTier, { name: string; retainer: number; perTurn: number; duration: number; blurb: string }> = {
+            street: { name: 'Street Attorney', retainer: 5000, perTurn: 0, duration: 3, blurb: '−25% sentences (existing & new)' },
+            firm: { name: 'Defense Firm', retainer: 12000, perTurn: 1500, duration: 4, blurb: '−25% sentences + −50% prosecution risk + release 1 soldier' },
+            consigliere: { name: 'Consigliere Counsel', retainer: 25000, perTurn: 3000, duration: 5, blurb: 'Above + block 1 arrest/turn, −1 heat/turn, pauses RICO' },
+          };
+          const tier: LawyerTier = (action.tier as LawyerTier) || 'street';
+          const def = LAWYER_TIERS[tier];
+          if (!def) return newState;
+
+          if (newState.actionsRemaining <= 0) return newState;
+          // Already have an active lawyer
+          if (newState.lawyerTier && (newState.lawyerActiveUntil || 0) >= newState.turn) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚖️ Lawyer Already Retained',
+              message: `Fire current counsel before hiring a new one.`,
+            }];
+            return newState;
+          }
+          // Cooldown check
+          if ((newState.lawyerCooldownUntil || 0) > newState.turn) {
+            const turnsLeft = (newState.lawyerCooldownUntil || 0) - newState.turn;
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚖️ Retainer Cooldown',
+              message: `New representation available in ${turnsLeft} turn${turnsLeft === 1 ? '' : 's'}.`,
+            }];
+            return newState;
+          }
+          // Consigliere cannot be hired while already at RICO tier
+          if (tier === 'consigliere' && newState.policeHeat.level >= 90) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚖️ Too Late for Consigliere',
+              message: `Drop heat below 90 first — no top counsel will take a RICO-tier case mid-storm.`,
+            }];
+            return newState;
+          }
+          if (newState.resources.money < def.retainer) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '⚖️ Retainer Too High',
+              message: `${def.name} needs $${def.retainer.toLocaleString()} up front.`,
+            }];
+            return newState;
+          }
+
+          newState.resources.money -= def.retainer;
+          newState.actionsRemaining -= 1;
+          newState.lastLawyerTurn = newState.turn;
+          newState.lawyerTier = tier;
+          newState.lawyerActiveUntil = newState.turn + def.duration;
+          newState.lawyerRetainerEndsTurn = newState.turn + def.duration;
+          // Cooldown begins 3 turns after retainer ends — assigned at expiry too, but seed it now
+          newState.lawyerCooldownUntil = newState.turn + def.duration + 3;
+
+          // Sentence reductions (street and above)
+          const MIN_RELEASE_GAP = 2;
+          newState.policeHeat.arrests = newState.policeHeat.arrests.map(a => {
+            if (a.turn === newState.turn) return a;
+            if (newState.turn - a.turn < a.sentence) {
+              return { ...a, sentence: Math.max(a.sentence - (newState.turn - a.turn), Math.floor(a.sentence * 0.75)) };
+            }
+            return a;
+          });
+          const reduceReturn = (returnTurn: number, arrestTurn?: number) => {
+            if (arrestTurn !== undefined && arrestTurn === newState.turn) return returnTurn;
+            const remaining = returnTurn - newState.turn;
+            if (remaining <= MIN_RELEASE_GAP) return returnTurn;
+            return newState.turn + Math.max(MIN_RELEASE_GAP, Math.floor(remaining * 0.75));
+          };
+          const isPlayerArrest = (a: any) => !a.family || a.family === newState.playerFamily;
+          newState.arrestedSoldiers = (newState.arrestedSoldiers || []).map(a => (
+            isPlayerArrest(a) ? { ...a, returnTurn: reduceReturn(a.returnTurn, a.arrestTurn) } : a
+          ));
+          newState.arrestedCapos = (newState.arrestedCapos || []).map(a => (
+            isPlayerArrest(a) ? { ...a, returnTurn: reduceReturn(a.returnTurn, a.arrestTurn) } : a
+          ));
+
+          // Clear one active arrest immediately (all tiers)
+          const activeArrests = newState.policeHeat.arrests.filter(a => newState.turn - a.turn < a.sentence);
+          let clearedMsg = '';
+          if (activeArrests.length > 0) {
+            const cleared = activeArrests[0];
+            newState.policeHeat.arrests = newState.policeHeat.arrests.filter(a => a.id !== cleared.id);
+            newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 3);
+            clearedMsg = `Cleared arrest of ${cleared.target}. `;
+          } else {
+            newState.policeHeat.level = Math.max(0, newState.policeHeat.level - 3);
+          }
+
+          // Defense Firm bonus: release 1 jailed soldier (not arrested this turn)
+          let releaseMsg = '';
+          if (tier === 'firm' || tier === 'consigliere') {
+            const playerFam = newState.playerFamily;
+            const idx = (newState.arrestedSoldiers || []).findIndex(a =>
+              (!a.family || a.family === playerFam) && a.arrestTurn !== newState.turn
+            );
+            if (idx >= 0) {
+              const released = newState.arrestedSoldiers[idx];
+              newState.arrestedSoldiers = newState.arrestedSoldiers.filter((_, i) => i !== idx);
+              releaseMsg = `Released 1 jailed soldier. `;
+              newState.pendingNotifications.push({
+                type: 'success' as const, title: '🔓 Soldier Released',
+                message: `${def.name} sprung your soldier early.`,
+              });
+              // Note: actual unit re-spawn happens via the existing arrest-release pipeline at turn end
+              // For now we drop the arrest record; the soldier returns next maintenance pass.
+              (newState as any).pendingSoldierReturns = [...((newState as any).pendingSoldierReturns || []), released.unitId];
             }
           }
+
+          newState.pendingNotifications = [...newState.pendingNotifications, {
+            type: 'success' as const, title: `⚖️ ${def.name} Retained`,
+            message: `Retainer $${def.retainer.toLocaleString()}${def.perTurn > 0 ? ` + $${def.perTurn.toLocaleString()}/turn` : ''} for ${def.duration} turns. ${clearedMsg}${releaseMsg}${def.blurb}.`,
+          }];
           return newState;
         }
         case 'build_business': {
