@@ -113,9 +113,9 @@ describe('counter_supply_sitdown — AI walk-away path', () => {
   );
 
   runWalkAwayCase(
-    'mild 10% counter but already on round 1 → walks away',
+    'mid-band 25% counter on round 1 → walks away (no second re-counter)',
     { proposedAmount: 10000, originalPrice: 10000, counterRound: 1 },
-    11000,
+    7500,
   );
 
   runWalkAwayCase(
