@@ -1203,10 +1203,14 @@ export const createInitialGameState = (
     planHitCooldownUntil: 0,
     selectedMoveAction: 'move' as MoveAction,
     pendingNegotiations: [],
+    wiretaps: [],
+    counterSurveillance: [],
+    lastFamilyDinnerTurn: {},
     actionsRemaining: BASE_ACTIONS_PER_TURN,
     maxActions: BASE_ACTIONS_PER_TURN,
     tacticalActionsRemaining: TACTICAL_ACTIONS_PER_TURN,
     maxTacticalActions: TACTICAL_ACTIONS_PER_TURN,
+
     
     economy: {
       marketConditions: [
