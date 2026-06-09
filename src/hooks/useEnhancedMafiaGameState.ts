@@ -537,6 +537,10 @@ export interface EnhancedMafiaGameState {
   lawyerCooldownUntil?: number;
   consigliereLastBlockTurn?: number;
   ricoTimer: number;
+  /** Persistent prosecution-risk bonus accumulated from discovered Fed wires. Capped at FED_BUG_RISK_BONUS_CAP. */
+  fedBugProsecutionBonus?: number;
+  /** Has the prosecutionRisk≥40 one-shot Fed spike already fired this game? */
+  fedBugRiskCrossingFired?: boolean;
   prosecutionTimer: number;
   federalIndictmentTimer: number;
   federalIndictmentActive: boolean;
