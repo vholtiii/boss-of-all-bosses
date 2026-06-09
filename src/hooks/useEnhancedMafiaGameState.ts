@@ -7750,6 +7750,111 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
+      // ── B2b: WIRETAP / SWEEP / FAMILY DINNER (AI parity for new tactical actions) ──
+      // Wiretap: cautious/strategic personalities, Phase 2+, when safe and not RICO-tier.
+      if (
+        aiPhase >= WIRETAP_MIN_PHASE &&
+        aiTacticalRemaining >= WIRETAP_TACTICAL_COST &&
+        opponent.resources.money >= WIRETAP_COST + 3000 &&
+        !aiOffenseDisabled &&
+        (basePersonality === 'cautious' || basePersonality === 'strategic' || basePersonality === 'opportunistic')
+      ) {
+        const myActiveWiretaps = (state.wiretaps || []).filter(w => w.plantedBy === fam).length;
+        if (myActiveWiretaps < WIRETAP_MAX_PER_FAMILY && Math.random() < 0.18) {
+          // Pick a player-owned hex within range of any of this AI's units, that doesn't already have our bug.
+          const myUnits = state.deployedUnits.filter(u => u.family === fam);
+          const candidates = state.hexMap.filter(t =>
+            t.controllingFamily === state.playerFamily &&
+            !t.isHeadquarters &&
+            !(state.wiretaps || []).some(w => w.plantedBy === fam && w.q === t.q && w.r === t.r && w.s === t.s) &&
+            myUnits.some(u => hexDistance(u, t) <= WIRETAP_PLANT_RANGE)
+          );
+          if (candidates.length > 0) {
+            // Prefer hexes with player units (juicier intel)
+            candidates.sort((a, b) => {
+              const ua = state.deployedUnits.filter(u => u.family === state.playerFamily && u.q === a.q && u.r === a.r && u.s === a.s).length;
+              const ub = state.deployedUnits.filter(u => u.family === state.playerFamily && u.q === b.q && u.r === b.r && u.s === b.s).length;
+              return ub - ua;
+            });
+            const tgt = candidates[0];
+            opponent.resources.money -= WIRETAP_COST;
+            aiTacticalRemaining -= WIRETAP_TACTICAL_COST;
+            state.wiretaps = [...(state.wiretaps || []), {
+              id: `wt_${state.turn}_${fam}_${Math.random().toString(36).slice(2, 6)}`,
+              plantedBy: fam,
+              targetFamily: state.playerFamily,
+              q: tgt.q, r: tgt.r, s: tgt.s,
+              plantedTurn: state.turn,
+              expiresOnTurn: state.turn + WIRETAP_DURATION,
+            }];
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'wiretap', detail: `Planted a bug in player territory` });
+          }
+        }
+      }
+
+      // Sweep: routine sweep on AI's HQ — higher chance if a wiretap is currently targeting this family.
+      if (aiTacticalRemaining >= SWEEP_TACTICAL_COST && opponent.resources.money >= SWEEP_COST) {
+        const bugsOnMe = (state.wiretaps || []).filter(w => w.targetFamily === fam).length;
+        const csActive = (state.counterSurveillance || []).some(c => c.family === fam);
+        const sweepChance = csActive ? 0 : (bugsOnMe > 0 ? 0.55 : 0.06);
+        if (sweepChance > 0 && Math.random() < sweepChance) {
+          opponent.resources.money -= SWEEP_COST;
+          aiTacticalRemaining -= SWEEP_TACTICAL_COST;
+          const survivors: Wiretap[] = [];
+          let caught = 0;
+          for (const w of (state.wiretaps || [])) {
+            if (w.targetFamily !== fam) { survivors.push(w); continue; }
+            if (Math.random() < SWEEP_DISCOVERY_CHANCE) {
+              caught++;
+              addPairTension(state, fam, w.plantedBy, SWEEP_TENSION_HIT);
+              if (w.plantedBy === state.playerFamily) {
+                state.pendingNotifications.push({
+                  type: 'error' as const, title: '🐛 Your Wiretap Found',
+                  message: `The ${fam} family swept their joints and caught your bug. Tension rising.`,
+                });
+              }
+            } else {
+              survivors.push(w);
+            }
+          }
+          state.wiretaps = survivors;
+          state.counterSurveillance = [
+            ...(state.counterSurveillance || []).filter(c => c.family !== fam),
+            { family: fam, expiresOnTurn: state.turn + COUNTER_SURVEILLANCE_DURATION },
+          ];
+          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'sweep', detail: caught > 0 ? `Swept HQ, caught ${caught} wiretap(s)` : `Routine sweep, no bugs found` });
+        }
+      }
+
+      // Family Dinner: when average crew loyalty drops below 55 and cooldown ready.
+      if (aiTacticalRemaining >= FAMILY_DINNER_TACTICAL_COST && opponent.resources.money >= FAMILY_DINNER_COST) {
+        const last = (state.lastFamilyDinnerTurn || {})[fam] || 0;
+        if (last === 0 || (state.turn - last) >= FAMILY_DINNER_COOLDOWN) {
+          const aiHq = state.headquarters[fam];
+          if (aiHq) {
+            const nearby = state.deployedUnits.filter(u => u.family === fam && hexDistance(u, aiHq) <= FAMILY_DINNER_RANGE);
+            if (nearby.length > 0) {
+              const avgLoy = nearby.reduce((s, u) => s + (state.soldierStats[u.id]?.loyalty ?? 75), 0) / nearby.length;
+              if (avgLoy < 55 && Math.random() < 0.6) {
+                opponent.resources.money -= FAMILY_DINNER_COST;
+                aiTacticalRemaining -= FAMILY_DINNER_TACTICAL_COST;
+                state.lastFamilyDinnerTurn = { ...(state.lastFamilyDinnerTurn || {}), [fam]: state.turn };
+                for (const u of nearby) {
+                  const s = state.soldierStats[u.id];
+                  if (s) {
+                    const cap = u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP;
+                    s.loyalty = Math.min(cap, s.loyalty + FAMILY_DINNER_LOYALTY_BONUS);
+                  }
+                }
+                (opponent.resources as any).heat = Math.min(100, ((opponent.resources as any).heat || 0) + FAMILY_DINNER_HEAT_COST);
+                if (turnReport) turnReport.aiActions.push({ family: fam, action: 'family_dinner', detail: `Held a family dinner (+loyalty to ${nearby.length} crew)` });
+              }
+            }
+          }
+        }
+      }
+
+
       // ── B3: AI BUILD BUSINESS — instant illegal-style racket on owned empty hex with a Capo ──
       // Mirrors the player build (requires Capo on hex, costs money, occupies an action) but
       // bypasses the multi-turn legal construction pipeline — AI builds an extorted-style biz
