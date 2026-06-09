@@ -4929,10 +4929,35 @@ export const useEnhancedMafiaGameState = (
           - (hasCaptain ? 10 : 0)
           - (hasChief ? 15 : 0)
           - (hasMayor ? 20 : 0)
-          - (hasLawyer ? PROSECUTION_LAWYER_REDUCTION : 0);
+          - (hasLawyer ? PROSECUTION_LAWYER_REDUCTION : 0)
+          + (newState.fedBugProsecutionBonus || 0);
         // Firm/Consigliere additionally halve total prosecution risk
         if (firmOrBetter) risk = Math.floor(risk * 0.5);
         risk = Math.min(100, Math.max(0, risk));
+        // One-shot Fed-bug spike when prosecutionRisk first crosses 40
+        if (risk >= FED_BUG_RISK_CROSSING_THRESHOLD && !newState.fedBugRiskCrossingFired) {
+          newState.fedBugRiskCrossingFired = true;
+          const myFedBugs = newState.wiretaps.filter(w => w.plantedBy === FED_BUG_PLANTED_BY && w.targetFamily === newState.playerFamily);
+          if (myFedBugs.length < FED_BUG_MAX_PER_FAMILY) {
+            const eligible = newState.hexMap.filter(t =>
+              t.controllingFamily === newState.playerFamily &&
+              !t.isHeadquarters &&
+              !myFedBugs.some(w => w.q === t.q && w.r === t.r && w.s === t.s)
+            );
+            if (eligible.length > 0 && Math.random() < FED_BUG_SPIKE_RISK_CROSSING) {
+              const tgt = eligible[Math.floor(Math.random() * eligible.length)];
+              newState.wiretaps.push({
+                id: `fbi_${newState.turn}_spike_${Math.random().toString(36).slice(2, 6)}`,
+                plantedBy: FED_BUG_PLANTED_BY,
+                targetFamily: newState.playerFamily,
+                q: tgt.q, r: tgt.r, s: tgt.s,
+                plantedTurn: newState.turn,
+                expiresOnTurn: newState.turn + FED_BUG_DURATION,
+                discovered: false,
+              });
+            }
+          }
+        }
         newState.legalStatus.prosecutionRisk = risk;
 
         // --- Prosecution Arrest (50+ for 3 consecutive turns) ---
