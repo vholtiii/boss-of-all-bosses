@@ -9299,15 +9299,16 @@ export const useEnhancedMafiaGameState = (
             );
             if (idx >= 0) {
               const released = newState.arrestedSoldiers[idx];
-              newState.arrestedSoldiers = newState.arrestedSoldiers.filter((_, i) => i !== idx);
-              releaseMsg = `Released 1 jailed soldier. `;
+              // Schedule release at end of next turn via existing arrest-release pipeline
+              newState.arrestedSoldiers = newState.arrestedSoldiers.map((a, i) =>
+                i === idx ? { ...a, returnTurn: newState.turn + 1 } : a
+              );
+              releaseMsg = `Released 1 jailed soldier (returns next turn). `;
               newState.pendingNotifications.push({
                 type: 'success' as const, title: '🔓 Soldier Released',
-                message: `${def.name} sprung your soldier early.`,
+                message: `${def.name} sprung your soldier — returning next turn.`,
               });
-              // Note: actual unit re-spawn happens via the existing arrest-release pipeline at turn end
-              // For now we drop the arrest record; the soldier returns next maintenance pass.
-              (newState as any).pendingSoldierReturns = [...((newState as any).pendingSoldierReturns || []), released.unitId];
+              void released; // keep variable referenced
             }
           }
 
