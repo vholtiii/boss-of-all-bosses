@@ -7956,12 +7956,18 @@ export const useEnhancedMafiaGameState = (
             if (w.targetFamily !== fam) { survivors.push(w); continue; }
             if (Math.random() < SWEEP_DISCOVERY_CHANCE) {
               caught++;
-              addPairTension(state, fam, w.plantedBy, SWEEP_TENSION_HIT);
-              if (w.plantedBy === state.playerFamily) {
-                state.pendingNotifications.push({
-                  type: 'error' as const, title: '🐛 Your Wiretap Found',
-                  message: `The ${fam} family swept their joints and caught your bug. Tension rising.`,
-                });
+              if (w.plantedBy === FED_BUG_PLANTED_BY) {
+                // AI parity: discovered Fed bug bumps the family's heat proportional to age
+                const age = Math.max(0, state.turn - w.plantedTurn);
+                opponent.resources.heat = Math.min(100, (opponent.resources.heat || 0) + Math.min(20, age * 2));
+              } else {
+                addPairTension(state, fam, w.plantedBy, SWEEP_TENSION_HIT);
+                if (w.plantedBy === state.playerFamily) {
+                  state.pendingNotifications.push({
+                    type: 'error' as const, title: '🐛 Your Wiretap Found',
+                    message: `The ${fam} family swept their joints and caught your bug. Tension rising.`,
+                  });
+                }
               }
             } else {
               survivors.push(w);
