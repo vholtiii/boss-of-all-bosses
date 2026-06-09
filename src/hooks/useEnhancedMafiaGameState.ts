@@ -4564,25 +4564,33 @@ export const useEnhancedMafiaGameState = (
           if (Math.random() < 0.25) {
             const playerCapos = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'capo');
             if (playerCapos.length > 0) {
-              const arrested = playerCapos[Math.floor(Math.random() * playerCapos.length)];
-              newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== arrested.id);
-              const baseSentence = 5;
-              const sentence = lawyerActive ? Math.max(1, Math.floor(baseSentence * 0.75)) : baseSentence;
-              newState.arrestedCapos = [...(newState.arrestedCapos || []), { unitId: arrested.id, returnTurn: newState.turn + sentence, arrestTurn: newState.turn, name: (arrested as any).name, recruited: (arrested as any).recruited, family: newState.playerFamily }];
-              newState.policeHeat.arrests.push({
-                id: `arrest-capo-${newState.turn}`,
-                type: 'management',
-                target: arrested.name || 'Capo',
-                turn: newState.turn,
-                sentence,
-                impactOnProfit: 15,
-              });
-              newState.resources.influence = Math.max(0, newState.resources.influence - 2);
-              turnReport.events.push(`👔 Capo arrested! ${arrested.name || 'A capo'} jailed for ${sentence} turns. -2 Influence.${lawyerActive ? ' (Lawyer reduced sentence)' : ''}`);
-              newState.pendingNotifications.push({
-                type: 'error' as const, title: '👔 Capo Arrested!',
-                message: `${arrested.name || 'A capo'} was arrested. Returns in ${sentence} turns.`,
-              });
+              if (tryConsigliereBlock()) {
+                turnReport.events.push(`⚖️ Consigliere blocked a capo arrest this turn.`);
+                newState.pendingNotifications.push({
+                  type: 'info' as const, title: '⚖️ Arrest Blocked',
+                  message: `Your Consigliere quashed a capo arrest before it stuck.`,
+                });
+              } else {
+                const arrested = playerCapos[Math.floor(Math.random() * playerCapos.length)];
+                newState.deployedUnits = newState.deployedUnits.filter(u => u.id !== arrested.id);
+                const baseSentence = 5;
+                const sentence = lawyerActive ? Math.max(1, Math.floor(baseSentence * 0.75)) : baseSentence;
+                newState.arrestedCapos = [...(newState.arrestedCapos || []), { unitId: arrested.id, returnTurn: newState.turn + sentence, arrestTurn: newState.turn, name: (arrested as any).name, recruited: (arrested as any).recruited, family: newState.playerFamily }];
+                newState.policeHeat.arrests.push({
+                  id: `arrest-capo-${newState.turn}`,
+                  type: 'management',
+                  target: arrested.name || 'Capo',
+                  turn: newState.turn,
+                  sentence,
+                  impactOnProfit: 15,
+                });
+                newState.resources.influence = Math.max(0, newState.resources.influence - 2);
+                turnReport.events.push(`👔 Capo arrested! ${arrested.name || 'A capo'} jailed for ${sentence} turns. -2 Influence.${lawyerActive ? ' (Lawyer reduced sentence)' : ''}`);
+                newState.pendingNotifications.push({
+                  type: 'error' as const, title: '👔 Capo Arrested!',
+                  message: `${arrested.name || 'A capo'} was arrested. Returns in ${sentence} turns.`,
+                });
+              }
             }
           }
         }
