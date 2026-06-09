@@ -9193,7 +9193,149 @@ export const useEnhancedMafiaGameState = (
           }
           return newState;
         }
+        case 'plant_wiretap': {
+          // Tactical: plant a wiretap on a rival hex within range of a friendly soldier/capo.
+          // action: { targetQ, targetR, targetS }
+          const gp = (newState as any).gamePhase || 1;
+          if (gp < WIRETAP_MIN_PHASE) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🎧 Wiretap Locked', message: `Available from Phase ${WIRETAP_MIN_PHASE}.` });
+            return newState;
+          }
+          if (newState.turnPhase !== 'move') return newState;
+          if (newState.tacticalActionsRemaining < WIRETAP_TACTICAL_COST) return newState;
+          if (newState.resources.money < WIRETAP_COST) {
+            newState.pendingNotifications.push({ type: 'warning', title: '💸 Insufficient Funds', message: `Wiretap costs $${WIRETAP_COST.toLocaleString()}.` });
+            return newState;
+          }
+          const tile = newState.hexMap.find(t => t.q === action.targetQ && t.r === action.targetR && t.s === action.targetS);
+          if (!tile || !tile.controllingFamily || tile.controllingFamily === newState.playerFamily) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🎧 Invalid Target', message: 'Wiretap a rival-controlled hex.' });
+            return newState;
+          }
+          if (tile.isHeadquarters) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🎧 No HQ Bugs', message: 'HQ security is too tight to wire.' });
+            return newState;
+          }
+          const myWiretaps = (newState.wiretaps || []).filter(w => w.plantedBy === newState.playerFamily);
+          if (myWiretaps.length >= WIRETAP_MAX_PER_FAMILY) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🎧 Wiretap Limit', message: `Max ${WIRETAP_MAX_PER_FAMILY} active wiretaps.` });
+            return newState;
+          }
+          if (myWiretaps.some(w => w.q === tile.q && w.r === tile.r && w.s === tile.s)) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🎧 Already Bugged', message: 'You already have a wiretap on this hex.' });
+            return newState;
+          }
+          const friendly = newState.deployedUnits.filter(u => u.family === newState.playerFamily);
+          const inRange = friendly.some(u => hexDistance(u, tile) <= WIRETAP_PLANT_RANGE);
+          if (!inRange) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🎧 Out of Range', message: `Need a soldier or capo within ${WIRETAP_PLANT_RANGE} hex(es) of the target.` });
+            return newState;
+          }
+          newState.resources.money -= WIRETAP_COST;
+          newState.tacticalActionsRemaining -= WIRETAP_TACTICAL_COST;
+          newState.wiretaps = [...(newState.wiretaps || []), {
+            id: `wt_${newState.turn}_${Math.random().toString(36).slice(2, 8)}`,
+            plantedBy: newState.playerFamily,
+            targetFamily: tile.controllingFamily,
+            q: tile.q, r: tile.r, s: tile.s,
+            plantedTurn: newState.turn,
+            expiresOnTurn: newState.turn + WIRETAP_DURATION,
+          }];
+          newState.selectedMoveAction = 'move' as MoveAction;
+          newState.selectedUnitId = null;
+          newState.availableMoveHexes = [];
+          newState.pendingNotifications.push({
+            type: 'success', title: '🎧 Wiretap Planted',
+            message: `Bugged a ${tile.controllingFamily} location. Intel flows for ${WIRETAP_DURATION} turns.`,
+          });
+          return newState;
+        }
+        case 'sweep_for_bugs': {
+          // Tactical: sweep all wiretaps targeting any of your hexes. $800 / 1 tactical.
+          if (newState.turnPhase !== 'move') return newState;
+          if (newState.tacticalActionsRemaining < SWEEP_TACTICAL_COST) return newState;
+          if (newState.resources.money < SWEEP_COST) {
+            newState.pendingNotifications.push({ type: 'warning', title: '💸 Insufficient Funds', message: `Sweep costs $${SWEEP_COST.toLocaleString()}.` });
+            return newState;
+          }
+          newState.resources.money -= SWEEP_COST;
+          newState.tacticalActionsRemaining -= SWEEP_TACTICAL_COST;
+          const onMyHexes = (newState.wiretaps || []).filter(w => w.targetFamily === newState.playerFamily);
+          let found = 0;
+          const survivors: Wiretap[] = [];
+          for (const w of (newState.wiretaps || [])) {
+            if (w.targetFamily !== newState.playerFamily) { survivors.push(w); continue; }
+            if (Math.random() < SWEEP_DISCOVERY_CHANCE) {
+              found++;
+              newState.reputation.respect += SWEEP_RESPECT_GAIN;
+              addPairTension(newState, newState.playerFamily, w.plantedBy, SWEEP_TENSION_HIT);
+              newState.pendingNotifications.push({
+                type: 'success', title: '🧹 Bug Found!',
+                message: `Caught the ${w.plantedBy} family wiring your operation. +${SWEEP_RESPECT_GAIN} respect, tension rising.`,
+              });
+            } else {
+              survivors.push(w);
+            }
+          }
+          newState.wiretaps = survivors;
+          // Apply counter-surveillance flag to player family
+          const cs = (newState.counterSurveillance || []).filter(c => c.family !== newState.playerFamily);
+          cs.push({ family: newState.playerFamily, expiresOnTurn: newState.turn + COUNTER_SURVEILLANCE_DURATION });
+          newState.counterSurveillance = cs;
+          if (found === 0) {
+            newState.pendingNotifications.push({
+              type: 'info', title: '🧹 Sweep Complete',
+              message: onMyHexes.length === 0
+                ? `Clean — no bugs found. Counter-surveillance active for ${COUNTER_SURVEILLANCE_DURATION} turns.`
+                : `Some bugs may have escaped detection. Counter-surveillance active for ${COUNTER_SURVEILLANCE_DURATION} turns.`,
+            });
+          }
+          return newState;
+        }
+        case 'family_dinner': {
+          // Tactical: +loyalty to soldiers/capos within range of HQ. $1000 / 1 tactical, 5-turn cooldown.
+          if (newState.turnPhase !== 'move') return newState;
+          if (newState.tacticalActionsRemaining < FAMILY_DINNER_TACTICAL_COST) return newState;
+          const last = (newState.lastFamilyDinnerTurn || {})[newState.playerFamily] || 0;
+          if (last > 0 && (newState.turn - last) < FAMILY_DINNER_COOLDOWN) {
+            const left = FAMILY_DINNER_COOLDOWN - (newState.turn - last);
+            newState.pendingNotifications.push({ type: 'warning', title: '🍝 Dinner Cooldown', message: `Next family dinner in ${left} turn${left === 1 ? '' : 's'}.` });
+            return newState;
+          }
+          if (newState.resources.money < FAMILY_DINNER_COST) {
+            newState.pendingNotifications.push({ type: 'warning', title: '💸 Insufficient Funds', message: `Family dinner costs $${FAMILY_DINNER_COST.toLocaleString()}.` });
+            return newState;
+          }
+          const hq = newState.headquarters[newState.playerFamily];
+          if (!hq) return newState;
+          const nearby = newState.deployedUnits.filter(u =>
+            u.family === newState.playerFamily &&
+            hexDistance(u, hq) <= FAMILY_DINNER_RANGE
+          );
+          if (nearby.length === 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '🍝 Empty Table', message: 'Need at least one soldier or capo within 2 hexes of HQ.' });
+            return newState;
+          }
+          newState.resources.money -= FAMILY_DINNER_COST;
+          newState.tacticalActionsRemaining -= FAMILY_DINNER_TACTICAL_COST;
+          newState.lastFamilyDinnerTurn = { ...(newState.lastFamilyDinnerTurn || {}), [newState.playerFamily]: newState.turn };
+          for (const u of nearby) {
+            const s = newState.soldierStats[u.id];
+            if (s) {
+              const cap = u.type === 'capo' ? CAPO_LOYALTY_CAP : SOLDIER_LOYALTY_CAP;
+              s.loyalty = Math.min(cap, s.loyalty + FAMILY_DINNER_LOYALTY_BONUS);
+            }
+          }
+          newState.reputation.respect += FAMILY_DINNER_RESPECT_GAIN;
+          newState.policeHeat.level = Math.min(100, newState.policeHeat.level + FAMILY_DINNER_HEAT_COST);
+          newState.pendingNotifications.push({
+            type: 'success', title: '🍝 Family Dinner',
+            message: `Sunday dinner served — +${FAMILY_DINNER_LOYALTY_BONUS} loyalty to ${nearby.length} crew near HQ. +${FAMILY_DINNER_RESPECT_GAIN} respect, +${FAMILY_DINNER_HEAT_COST} heat.`,
+          });
+          return newState;
+        }
         case 'public_appearance': {
+
           const COST = 3000;
           const BASE_HEAT_REDUCTION = 6;
           const CD_TURNS = 2;
