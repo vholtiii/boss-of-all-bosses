@@ -4892,7 +4892,38 @@ export const useEnhancedMafiaGameState = (
       if (hasPlayerDistrictBonus(newState, 'heat')) {
         heatReduction += 5;
       }
+      // Charitable donation lingering effect: +1 heat regen for 2 turns
+      if ((newState.charityActiveUntil || 0) >= newState.turn) {
+        heatReduction += 1;
+      }
+      // Consigliere passive: -1 heat/turn while retained
+      if (newState.lawyerTier === 'consigliere' && (newState.lawyerActiveUntil || 0) >= newState.turn) {
+        heatReduction += 1;
+      }
       newState.policeHeat.level = Math.max(0, newState.policeHeat.level - heatReduction);
+
+      // --- Lawyer retainer per-turn fee + expiry ---
+      {
+        const tier = newState.lawyerTier;
+        const activeThisTurn = tier && (newState.lawyerActiveUntil || 0) >= newState.turn;
+        if (activeThisTurn) {
+          const fee = tier === 'firm' ? 1500 : tier === 'consigliere' ? 3000 : 0;
+          if (fee > 0) {
+            newState.resources.money -= fee;
+            turnReport.events.push(`⚖️ Lawyer retainer: -$${fee.toLocaleString()} (${tier === 'firm' ? 'Defense Firm' : 'Consigliere Counsel'}).`);
+          }
+        } else if (tier) {
+          // Retainer just ended — clear tier, start 3-turn cooldown before next hire
+          const endedTurn = newState.lawyerRetainerEndsTurn || newState.turn;
+          newState.lawyerTier = null;
+          newState.lawyerCooldownUntil = endedTurn + 3;
+          newState.pendingNotifications.push({
+            type: 'info' as const, title: '⚖️ Retainer Ended',
+            message: `Your lawyer is off the books. New hire available in 3 turns.`,
+          });
+        }
+      }
+
       
       // --- COP FLIP (RAT) SYSTEM: Per-turn processing ---
       {
