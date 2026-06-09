@@ -3399,6 +3399,76 @@ export const useEnhancedMafiaGameState = (
       // Clear transient bold-move trackers at turn boundary
       newState._sabotagedThisTurn = [];
 
+      // ============ WIRETAP / COUNTER-SURVEILLANCE UPKEEP ============
+      // Decay counter-surveillance, then roll discovery for each wiretap, then expire.
+      newState.counterSurveillance = (newState.counterSurveillance || []).filter(c => c.expiresOnTurn >= newState.turn);
+      const survivingWiretaps: Wiretap[] = [];
+      for (const wt of (newState.wiretaps || [])) {
+        // Expiry
+        if (newState.turn > wt.expiresOnTurn) {
+          if (wt.plantedBy === newState.playerFamily) {
+            newState.pendingNotifications.push({
+              type: 'info' as const, title: '🎧 Wiretap Expired',
+              message: `Your bug on the ${wt.targetFamily} location went silent.`,
+            });
+          }
+          continue;
+        }
+        // Discovery check
+        const targetHasCS = (newState.counterSurveillance || []).some(c => c.family === wt.targetFamily);
+        const discChance = targetHasCS ? WIRETAP_DISCOVERY_SWEPT : WIRETAP_DISCOVERY_BASE;
+        if (Math.random() < discChance) {
+          // Caught — owner gains respect, planter loses tension, wiretap removed.
+          if (wt.targetFamily === newState.playerFamily) {
+            newState.reputation.respect += SWEEP_RESPECT_GAIN;
+            newState.pendingNotifications.push({
+              type: 'warning' as const, title: '🐛 Bug Discovered',
+              message: `Your crew found a ${wt.plantedBy} wiretap during routine checks. Tensions are spiking.`,
+            });
+          } else if (wt.plantedBy === newState.playerFamily) {
+            newState.pendingNotifications.push({
+              type: 'error' as const, title: '🎧 Wiretap Burned',
+              message: `The ${wt.targetFamily} family found your bug. Tension rising.`,
+            });
+          }
+          addPairTension(newState, wt.plantedBy, wt.targetFamily, WIRETAP_DISCOVERY_TENSION);
+          continue;
+        }
+        // Survive — pump intel for player's wiretaps: mark any aiPlannedHit from the bugged owner as detected.
+        if (wt.plantedBy === newState.playerFamily) {
+          const hits = (newState.aiPlannedHits || []) as any[];
+          for (const ph of hits) {
+            if (ph.family !== wt.targetFamily || ph.detectedVia) continue;
+            // If target unit is at or adjacent to the bugged hex, attribute intel to wiretap.
+            const tgt = newState.deployedUnits.find(u => u.id === ph.targetUnitId);
+            if (!tgt) continue;
+            const adj = Math.abs(tgt.q - wt.q) + Math.abs(tgt.r - wt.r) + Math.abs(tgt.s - wt.s);
+            if (adj <= 4) { // within 2 hex steps in cube coords (each step adds 2 to sum)
+              ph.detectedVia = 'wiretap';
+              ph.detectedOnTurn = newState.turn;
+              newState.pendingNotifications.push({
+                type: 'warning' as const, title: '🎧 Wiretap Intel',
+                message: `Your bug picked up chatter — the ${ph.family} family is moving on one of your capos.`,
+              });
+            }
+          }
+          // Routine intel ping: live count of units on or adjacent to bugged hex
+          if ((newState.turn - wt.plantedTurn) % 2 === 1) {
+            const cnt = newState.deployedUnits.filter(u =>
+              u.family === wt.targetFamily &&
+              Math.abs(u.q - wt.q) + Math.abs(u.r - wt.r) + Math.abs(u.s - wt.s) <= 2
+            ).length;
+            newState.pendingNotifications.push({
+              type: 'info' as const, title: '🎧 Wiretap Report',
+              message: `${cnt} ${wt.targetFamily} unit${cnt === 1 ? '' : 's'} active on or near the bugged hex.`,
+            });
+          }
+        }
+        survivingWiretaps.push(wt);
+      }
+      newState.wiretaps = survivingWiretaps;
+
+
       // ============ A1: PENDING CLAIM FINALIZATION ============
       // For every hex with a pendingClaim from two turns ago (claim turn N → resolves at end of turn N+1):
       //   • If a friendly unit is on or adjacent → finalize (controllingFamily = family),
