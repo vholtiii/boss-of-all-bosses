@@ -7757,7 +7757,7 @@ export const useEnhancedMafiaGameState = (
         aiTacticalRemaining >= WIRETAP_TACTICAL_COST &&
         opponent.resources.money >= WIRETAP_COST + 3000 &&
         !aiOffenseDisabled &&
-        (basePersonality === 'cautious' || basePersonality === 'strategic' || basePersonality === 'opportunistic')
+        (basePersonality === 'defensive' || basePersonality === 'diplomatic' || basePersonality === 'opportunistic')
       ) {
         const myActiveWiretaps = (state.wiretaps || []).filter(w => w.plantedBy === fam).length;
         if (myActiveWiretaps < WIRETAP_MAX_PER_FAMILY && Math.random() < 0.18) {
