@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useEnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
-import { getTensionPairKey } from '@/types/enhanced-mechanics';
+import { getTensionPairKey } from '@/types/game-mechanics';
 
 // Verifies the AI walk-away branch of `counter_supply_sitdown`:
 //   - sitdown is removed (no stale or replacement card)
