@@ -504,6 +504,14 @@ export interface EnhancedMafiaGameState {
   policeHeat: PoliceHeat;
   lastLawyerTurn: number;
   lawyerActiveUntil: number;
+  // Heat-reduction strategic cooldowns + tiered lawyer system
+  lastPublicAppearanceTurn?: number;
+  lastCharityTurn?: number;
+  charityActiveUntil?: number;
+  lawyerTier?: 'street' | 'firm' | 'consigliere' | null;
+  lawyerRetainerEndsTurn?: number;
+  lawyerCooldownUntil?: number;
+  consigliereLastBlockTurn?: number;
   ricoTimer: number;
   prosecutionTimer: number;
   federalIndictmentTimer: number;
@@ -1251,6 +1259,13 @@ export const createInitialGameState = (
     policeHeat: { level: 15, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 },
     lastLawyerTurn: 0,
     lawyerActiveUntil: 0,
+    lastPublicAppearanceTurn: 0,
+    lastCharityTurn: 0,
+    charityActiveUntil: 0,
+    lawyerTier: null,
+    lawyerRetainerEndsTurn: 0,
+    lawyerCooldownUntil: 0,
+    consigliereLastBlockTurn: 0,
     ricoTimer: 0,
     prosecutionTimer: 0,
     federalIndictmentTimer: 0,
