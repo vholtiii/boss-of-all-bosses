@@ -4612,22 +4612,30 @@ export const useEnhancedMafiaGameState = (
             });
           }
 
-          // RICO timer (3 turns to indictment)
-          newState.ricoTimer = (newState.ricoTimer || 0) + 1;
-          turnReport.events.push(`⚠️ RICO INVESTIGATION: ${newState.ricoTimer}/3 turns at critical heat!`);
-          if (newState.ricoTimer >= 3) {
-            newState.gameOver = { type: 'rico', turn: newState.turn };
-            turnReport.events.push(`🚨 RICO INDICTMENT! The federal government has brought down your empire!`);
+          // RICO timer (3 turns to indictment) — paused while Consigliere is active
+          if (consigliereActive) {
+            turnReport.events.push(`⚖️ Consigliere stalls federal indictment — RICO timer paused.`);
             newState.pendingNotifications.push({
-              type: 'error' as const, title: '🚨 GAME OVER — RICO Indictment',
-              message: `3 consecutive turns at critical heat. Your entire organization has been dismantled by the feds.`,
+              type: 'warning' as const, title: '⚖️ RICO Stalled',
+              message: `Your Consigliere is delaying the federal indictment. Drop heat below 90 to clear it.`,
             });
           } else {
-            newState.pendingNotifications.push({
-              type: 'error' as const,
-              title: `⏱️ RICO Timer ${newState.ricoTimer}/3`,
-              message: `Heat still at 90+. ${3 - newState.ricoTimer} turn${3 - newState.ricoTimer === 1 ? '' : 's'} until federal indictment.`,
-            });
+            newState.ricoTimer = (newState.ricoTimer || 0) + 1;
+            turnReport.events.push(`⚠️ RICO INVESTIGATION: ${newState.ricoTimer}/3 turns at critical heat!`);
+            if (newState.ricoTimer >= 3) {
+              newState.gameOver = { type: 'rico', turn: newState.turn };
+              turnReport.events.push(`🚨 RICO INDICTMENT! The federal government has brought down your empire!`);
+              newState.pendingNotifications.push({
+                type: 'error' as const, title: '🚨 GAME OVER — RICO Indictment',
+                message: `3 consecutive turns at critical heat. Your entire organization has been dismantled by the feds.`,
+              });
+            } else {
+              newState.pendingNotifications.push({
+                type: 'error' as const,
+                title: `⏱️ RICO Timer ${newState.ricoTimer}/3`,
+                message: `Heat still at 90+. ${3 - newState.ricoTimer} turn${3 - newState.ricoTimer === 1 ? '' : 's'} until federal indictment.`,
+              });
+            }
           }
         } else {
           // Reset RICO timer if heat drops below 90
