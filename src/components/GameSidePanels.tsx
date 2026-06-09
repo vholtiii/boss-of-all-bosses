@@ -1820,11 +1820,12 @@ const ActionButton: React.FC<{
   disabled?: boolean;
   phaseLocked?: boolean;
   disabledReason?: string;
+  tooltip?: string;
   variant?: 'default' | 'destructive' | 'outline';
   onClick: () => void;
-}> = ({ icon, label, sublabel, disabled, phaseLocked, disabledReason, variant = 'outline', onClick }) => {
+}> = ({ icon, label, sublabel, disabled, phaseLocked, disabledReason, tooltip, variant = 'outline', onClick }) => {
   const isDisabled = disabled || phaseLocked;
-  const tooltipText = phaseLocked ? 'Available in a different phase' : disabledReason;
+  const tooltipText = phaseLocked ? 'Available in a different phase' : disabledReason || tooltip;
 
   const button = (
     <Button
@@ -1846,14 +1847,14 @@ const ActionButton: React.FC<{
     </Button>
   );
 
-  if (isDisabled && tooltipText) {
+  if (tooltipText) {
     return (
       <TooltipProvider delayDuration={200}>
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="w-full block">{button}</span>
           </TooltipTrigger>
-          <TooltipContent side="left">
+          <TooltipContent side="left" className="max-w-[260px]">
             <p>{tooltipText}</p>
           </TooltipContent>
         </Tooltip>
