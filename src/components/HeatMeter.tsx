@@ -151,6 +151,11 @@ const HeatMeter: React.FC<HeatMeterProps> = ({ heat, history, ricoTimer = 0, fed
           {ricoTimer > 0 && (
             <p className="text-red-300 font-semibold">🚨 RICO timer: {ricoTimer}/5 — game over at 5.</p>
           )}
+          {fedBugCount > 0 && (
+            <p className="text-amber-300">
+              🎧 Fed wires: {fedBugDiscoveredCount}/{fedBugCount} discovered. Long-running bugs hurt the most on discovery.
+            </p>
+          )}
           <div className="pt-1 border-t border-border/40 text-[10px] text-muted-foreground/80 space-y-0.5">
             <div>Tiers: Cool &lt;40 · Warm 40 · Hot 60 · Critical 80 · RICO 90+</div>
             <div>Reduce heat: bribe officials, hire lawyer, donate to charity, public appearance.</div>
