@@ -763,23 +763,47 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               const turnsLeft = (gameState as any).lawyerActiveUntil - gameState.turn + 1;
               const totalDuration = tier === 'consigliere' ? 5 : tier === 'firm' ? 4 : 3;
               const perTurnCost = tier === 'consigliere' ? 3000 : tier === 'firm' ? 1500 : 0;
+              const pct = Math.max(0, Math.min(100, (turnsLeft / totalDuration) * 100));
+              const barColor = turnsLeft <= 1 ? 'bg-destructive' : turnsLeft <= 2 ? 'bg-yellow-500' : 'bg-green-500';
+              const borderColor = turnsLeft <= 1 ? 'border-destructive/50' : turnsLeft <= 2 ? 'border-yellow-500/40' : 'border-green-500/30';
+              const bgColor = turnsLeft <= 1 ? 'bg-destructive/10' : turnsLeft <= 2 ? 'bg-yellow-500/10' : 'bg-green-500/10';
+              const textColor = turnsLeft <= 1 ? 'text-destructive' : turnsLeft <= 2 ? 'text-yellow-300' : 'text-green-400';
               return (
                 <TooltipProvider delayDuration={200}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 font-medium space-y-0.5 cursor-help">
+                      <div className={cn("rounded-md border px-3 py-2 text-xs font-medium space-y-1.5 cursor-help", borderColor, bgColor, textColor)}>
                         <div className="flex items-center gap-1.5">
                           ⚖️ {tierLabel}
                           <span className="ml-auto text-muted-foreground">
                             {turnsLeft}/{totalDuration} turns
                           </span>
                         </div>
-                        <div className="text-[10px] text-green-300/80">
+                        <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-background/40">
+                          <div
+                            className={cn("h-full transition-all duration-500", barColor)}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <div className="text-[10px] opacity-80">
                           {tier === 'consigliere' ? '−25% sentences · Blocks 1 arrest/turn · −1 heat/turn · Pauses RICO'
                             : tier === 'firm' ? '−25% sentences · −50% prosecution risk · Auto-release 1 soldier'
                             : '−25% sentences'}
                           {perTurnCost > 0 && ` · −$${perTurnCost.toLocaleString()}/turn`}
                         </div>
+                        {turnsLeft <= 2 && (
+                          <div className={cn(
+                            "rounded border px-2 py-1 text-[10px] font-semibold flex items-center gap-1",
+                            turnsLeft === 1
+                              ? "border-destructive/60 bg-destructive/20 text-destructive animate-pulse"
+                              : "border-yellow-500/50 bg-yellow-500/15 text-yellow-200"
+                          )}>
+                            <AlertTriangle className="h-3 w-3" />
+                            {turnsLeft === 1
+                              ? 'Last turn! Retainer expires after this turn'
+                              : 'Retainer expires in 2 turns — consider renewing'}
+                          </div>
+                        )}
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="left" className="max-w-[280px] space-y-1">
