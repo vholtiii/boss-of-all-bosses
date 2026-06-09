@@ -2142,7 +2142,51 @@ export const useEnhancedMafiaGameState = (
         return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
       }
 
-      // Handle family_power hex target (Gambino area scout / Genovese hide hex)
+      // Handle wiretap action (tactical phase only) — click target hex after selecting friendly soldier/capo.
+      if (prev.turnPhase === 'move' && moveAction === 'wiretap' && (unit.type === 'soldier' || unit.type === 'capo')) {
+        if ((prev.gamePhase || 1) < WIRETAP_MIN_PHASE) {
+          return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🔒 Phase Locked', message: `Wiretaps unlock in Phase ${WIRETAP_MIN_PHASE}.` }] };
+        }
+        // Defer to performAction handler so all guards stay in one place.
+        // Mutate via dispatching synthetically here:
+        const result = (() => {
+          const newState = cloneStateForMutation(prev);
+          if (newState.tacticalActionsRemaining < WIRETAP_TACTICAL_COST) return newState;
+          if (newState.resources.money < WIRETAP_COST) {
+            newState.pendingNotifications.push({ type: 'warning' as const, title: '💸 Insufficient Funds', message: `Wiretap costs $${WIRETAP_COST.toLocaleString()}.` });
+            return newState;
+          }
+          const tile = newState.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
+          if (!tile || !tile.controllingFamily || tile.controllingFamily === newState.playerFamily || tile.isHeadquarters) return newState;
+          const myWiretaps = (newState.wiretaps || []).filter(w => w.plantedBy === newState.playerFamily);
+          if (myWiretaps.length >= WIRETAP_MAX_PER_FAMILY) {
+            newState.pendingNotifications.push({ type: 'warning' as const, title: '🎧 Wiretap Limit', message: `Max ${WIRETAP_MAX_PER_FAMILY} active wiretaps.` });
+            return newState;
+          }
+          if (myWiretaps.some(w => w.q === tile.q && w.r === tile.r && w.s === tile.s)) return newState;
+          if (hexDistance(unit, tile) > WIRETAP_PLANT_RANGE) return newState;
+          newState.resources.money -= WIRETAP_COST;
+          newState.tacticalActionsRemaining -= WIRETAP_TACTICAL_COST;
+          newState.wiretaps = [...(newState.wiretaps || []), {
+            id: `wt_${newState.turn}_${Math.random().toString(36).slice(2, 8)}`,
+            plantedBy: newState.playerFamily,
+            targetFamily: tile.controllingFamily,
+            q: tile.q, r: tile.r, s: tile.s,
+            plantedTurn: newState.turn,
+            expiresOnTurn: newState.turn + WIRETAP_DURATION,
+          }];
+          newState.selectedMoveAction = 'move' as MoveAction;
+          newState.selectedUnitId = null;
+          newState.availableMoveHexes = [];
+          newState.pendingNotifications.push({
+            type: 'success' as const, title: '🎧 Wiretap Planted',
+            message: `Bugged a ${tile.controllingFamily} location. Intel flows for ${WIRETAP_DURATION} turns.`,
+          });
+          return newState;
+        })();
+        return result;
+      }
+
       if (prev.turnPhase === 'move' && moveAction === 'family_power') {
         const power = FAMILY_POWERS[prev.playerFamily];
         if (!power || !power.requiresHexTarget) return prev;
