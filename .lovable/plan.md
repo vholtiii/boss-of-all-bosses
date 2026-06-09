@@ -1,30 +1,61 @@
-# Test the AI walk-away path end-to-end
 
 ## Goal
-Lock in the behavior of the `counter_supply_sitdown` reducer when the player's counter triggers the AI to walk away (≥40% swing, or any swing on a second round). The UI surface for this path is small: the sitdown card disappears, a "Counter Rejected" warning notification fires, and pair tension goes up by 5. A reducer-level test gives us a deterministic, fast check on all four of those without needing a live browser session (the swing thresholds are hard to hit reliably via click-testing).
+Stop heat-reduction from being a flat "pay-to-clear" loop. Make each tool a real decision with cost, timing, and trade-offs.
 
-## What the test will assert
-For each walk-away trigger, after dispatching `counter_supply_sitdown`:
+## Changes
 
-1. The targeted sitdown is removed from `incomingSitdowns` (no stale card left over, no replacement pushed).
-2. A `pendingNotifications` entry exists with `type: 'warning'`, title `🚫 Counter Rejected`, and a message naming the from-family + "walked away".
-3. Pair tension between `playerFamily` and `sitdown.fromFamily` increased by exactly 5 vs. the pre-dispatch value.
-4. No success/info notification leaks in (i.e. we didn't accidentally take the accept or re-counter branch).
+### 1. Public Appearance — cheap, frequent, weak
+- Cost stays $3,000, 1 action.
+- Heat reduction: **−5 → −6**.
+- Add **2-turn cooldown** (`lastPublicAppearanceTurn`).
+- UI shows cooldown sublabel like Hire Lawyer does today.
 
-## Cases covered
-- **Greedy swing, round 0**: original $10,000, counter $5,000 (50% swing) → walk.
-- **Mild swing, round 1**: original $10,000, counter $11,000 (10% swing) but `counterRound: 1` already set → walk (the "one round only" rule).
-- **Supplier-direction greedy swing**: `playerIsSupplier: true`, original $10,000, counter $20,000 → walk.
+### 2. Charitable Donation — substantial spend, real cooldown
+- Cost: **$5,000 → $15,000**, 1 action. Now a genuine economic commitment, not pocket change.
+- Heat reduction: **−10 → −18** (stronger to justify the higher price).
+- Add **4-turn cooldown** (`lastCharityTurn`). Kills the "donate twice in a row" loop.
+- Lingering effect: `charityActiveUntil = turn + 2` — **−1 extra heat regen per turn for 2 turns**, surfaced as a status pill.
+- Reputation: **+3 → +5** (scales with bigger gesture).
 
-## Files
-- New: `src/hooks/__tests__/counter-sitdown-walk-away.test.ts`
-  - Imports the exported reducer (or a thin wrapper) from `src/hooks/useEnhancedMafiaGameState.ts`. If the reducer isn't directly exported, the test will use the hook via `renderHook` + `act` from `@testing-library/react` and dispatch through the returned dispatcher — matches the pattern already used in `src/hooks/__tests__/ai-territory-sitdown.test.ts`.
-  - Seeds state with one synthetic entry in `incomingSitdowns` (id, fromFamily, proposedAmount, originalPrice, counterRound, playerIsSupplier) and a known `pairTension` baseline.
+### 3. Hire Lawyer — split into 3 tiers with retainers
+Replace single "Hire Lawyer" button with a small picker (or 3 buttons). Each is a retainer paid up-front, then a per-turn fee while active. Only one lawyer active at a time. Cooldown applies after a retainer expires/ends.
+
+| Tier | Retainer | Per-turn | Duration | Effect |
+|---|---|---|---|---|
+| **Street Attorney** | $5,000 | $0 | 3 turns | Current behavior: −25% on existing sentences, −25% on new sentences. |
+| **Defense Firm** | $12,000 | $1,500/turn | 4 turns | Above + **−50% prosecution risk** from heat/informants/arrests while active + immediately releases 1 jailed soldier (not capo, not arrested-this-turn). |
+| **Consigliere Counsel** | $25,000 | $3,000/turn | 5 turns | Above + **blocks 1 new arrest per turn** (street or capo) + **−1 heat/turn** passive while retained + RICO timer pauses while active. Cannot be hired if already at RICO tier 90+. |
+
+- Retainer cooldown: **3 turns after the active period ends** before any new lawyer can be hired.
+- Firing a lawyer mid-term refunds nothing and starts the cooldown.
+- UI: arrest panel surfaces tier badge and turns remaining. Per-turn fee shows in economy maintenance breakdown.
+
+### 4. Diminishing Returns on stacking PR in one turn
+If both Public Appearance and Charitable Donation are used in the same turn, the second one's heat reduction is halved. Encourages spreading them out across cooldowns, not burst-clearing.
+
+### 5. Maintain AI parity
+AI already pays for `Lay Low` / `Mattresses` (per AI heat precautions memory). No AI changes — these are player-facing actions. Update heat memory to document cooldowns + tier choices.
+
+## Technical Notes
+
+**State additions** (`useEnhancedMafiaGameState.ts`):
+```ts
+lastPublicAppearanceTurn: number;
+lastCharityTurn: number;
+charityActiveUntil: number;
+lawyerTier: 'street' | 'firm' | 'consigliere' | null;
+lawyerRetainerEndsTurn: number;
+lawyerCooldownUntil: number;
+```
+
+**Reducers to edit**: `public_appearance`, `charitable_donation`, `hire_lawyer` (add `tier` payload). Add per-turn fee deduction + charity passive tick in the economy maintenance phase (~line 4842).
+
+**UI to edit** (`GameSidePanels.tsx` ~820-910): cooldown sublabels, 3 lawyer buttons (or single → dropdown), active-tier badge near existing `lawyerActiveUntil` pill (line 757), charity passive pill.
+
+**Memory updates**: refresh `mem://gameplay/defense-and-law-actions`; add cooldown + tiered-lawyer note to `mem://gameplay/police-heat-system`.
+
+**Tests**: reducer test asserting (a) charity blocked during cooldown, (b) second PR action in same turn yields halved heat, (c) Consigliere blocks a new arrest and pauses RICO.
 
 ## Out of scope
-- No code changes to the reducer, panel, or odds library — this is a verification task.
-- No browser/preview run; the swing math is deterministic and a unit test is the right tool.
-
-## Technical notes
-- Pattern reference: `src/hooks/__tests__/ai-territory-sitdown.test.ts` for hook/reducer wiring, and `src/hooks/__tests__/negotiation-fairness.test.ts` for the swing constants already covered at the pure-function layer.
-- The existing `negotiation-fairness.test.ts` covers `predictCounterReaction` (the UI hint). This new test covers the reducer's parallel branch, which is what actually mutates game state.
+- No changes to passive heat sources, bribes, or AI heat behavior.
+- No rebalance of arrest probabilities themselves.
