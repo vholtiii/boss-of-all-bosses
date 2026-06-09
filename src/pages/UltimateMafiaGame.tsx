@@ -414,6 +414,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               heat={(gameState as any).policeHeat?.level ?? 0}
               history={heatHistory}
               ricoTimer={gameState.ricoTimer || 0}
+              fedBugCount={((gameState as any).wiretaps || []).filter((w: any) => w.plantedBy === 'feds' && w.targetFamily === gameState.playerFamily).length}
+              fedBugDiscoveredCount={((gameState as any).wiretaps || []).filter((w: any) => w.plantedBy === 'feds' && w.targetFamily === gameState.playerFamily && w.discovered).length}
             />
           </div>
           <EnhancedMafiaHexGrid 
