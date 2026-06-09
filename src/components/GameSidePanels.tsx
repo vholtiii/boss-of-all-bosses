@@ -754,14 +754,38 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         >
           <div className="space-y-1.5">
             {/* Lawyer Active Badge */}
-            {(gameState as any).lawyerActiveUntil >= gameState.turn && (
-              <div className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 font-medium flex items-center gap-1.5">
-                ⚖️ Lawyer Active — Sentences −25%
-                <span className="ml-auto text-muted-foreground">
-                  {(gameState as any).lawyerActiveUntil - gameState.turn + 1} turn{(gameState as any).lawyerActiveUntil - gameState.turn + 1 !== 1 ? 's' : ''} left
-                </span>
-              </div>
-            )}
+            {(gameState as any).lawyerActiveUntil >= gameState.turn && (() => {
+              const tier = (gameState as any).lawyerTier as 'street' | 'firm' | 'consigliere' | null;
+              const tierLabel = tier === 'consigliere' ? 'Consigliere Counsel'
+                : tier === 'firm' ? 'Defense Firm'
+                : tier === 'street' ? 'Street Attorney'
+                : 'Lawyer';
+              const tierBlurb = tier === 'consigliere' ? 'Sentences −25% · Blocks 1 arrest/turn · −1 heat/turn · Pauses RICO'
+                : tier === 'firm' ? 'Sentences −25% · Prosecution risk −50%'
+                : 'Sentences −25%';
+              const turnsLeft = (gameState as any).lawyerActiveUntil - gameState.turn + 1;
+              return (
+                <div className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 font-medium space-y-0.5">
+                  <div className="flex items-center gap-1.5">
+                    ⚖️ {tierLabel}
+                    <span className="ml-auto text-muted-foreground">
+                      {turnsLeft} turn{turnsLeft !== 1 ? 's' : ''} left
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-green-300/80">{tierBlurb}</div>
+                </div>
+              );
+            })()}
+            {/* Charity Passive Badge */}
+            {((gameState as any).charityActiveUntil || 0) >= gameState.turn && (() => {
+              const left = (gameState as any).charityActiveUntil - gameState.turn + 1;
+              return (
+                <div className="rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 text-xs text-blue-300 font-medium flex items-center gap-1.5">
+                  🤝 Charity Goodwill — +1 heat regen
+                  <span className="ml-auto text-muted-foreground">{left} turn{left !== 1 ? 's' : ''} left</span>
+                </div>
+              );
+            })()}
             {/* RICO Warning */}
             {(gameState as any).ricoTimer > 0 && (
               <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-1.5 text-xs text-destructive font-bold flex items-center gap-1.5 animate-pulse">
