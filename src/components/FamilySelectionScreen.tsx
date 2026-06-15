@@ -500,11 +500,23 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         <p className="text-sm text-muted-foreground mt-4 font-source max-w-md mx-auto">
           Choose your family and difficulty. Each has unique strengths, weaknesses, and strategies for domination.
         </p>
+
+        {/* STEP 1 header */}
+        <div className="mt-10 mb-3 flex items-center justify-center gap-3 relative z-[3]">
+          <span className="h-px w-10 bg-primary/40" />
+          <span className="font-mono text-[10px] tracking-[0.32em] uppercase text-primary/80">
+            Step 1 · Choose Your Game
+          </span>
+          <span className="h-px w-10 bg-primary/40" />
+        </div>
+        <p className="text-[11px] text-emerald-400/85 font-mono uppercase tracking-wider mb-3">
+          🟢 New player? Start with <span className="font-bold">Wiseguy</span> (Easy).
+        </p>
         {/* Difficulty Selector — dossier folders */}
         <div
           role="radiogroup"
           aria-label="Game difficulty"
-          className="flex flex-wrap items-stretch justify-center gap-5 mt-10 max-w-4xl mx-auto px-2"
+          className="flex flex-wrap items-stretch justify-center gap-5 mt-2 max-w-4xl mx-auto px-2"
           onKeyDown={(e) => {
             const order = ['easy', 'normal', 'hard'] as const;
             const idx = order.indexOf(difficulty);
