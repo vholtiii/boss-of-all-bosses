@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import NegotiationDialog from '@/components/NegotiationDialog';
+import TurnStepRail from '@/components/TurnStepRail';
 import { NotificationProvider, useMafiaNotifications } from '@/components/ui/notification-system';
 import { AnimatedCard, AnimatedCardHeader, AnimatedCardTitle, AnimatedCardContent } from '@/components/ui/animated-card';
 import { EnhancedButton } from '@/components/ui/enhanced-button';
