@@ -1,59 +1,55 @@
-# Difficulty + Map Size: Dossier Redesign
+# UX Refinement Pass — Information Clarity
 
-Scope: visual-only refresh of the difficulty selector and the SMALL/MEDIUM/LARGE row on the Family Selection screen. No gameplay, data, or callback changes. File: `src/components/FamilySelectionScreen.tsx` (lines ~443–628).
+Goal: cut clutter and ambiguity across the four touched surfaces. No new gameplay; every change is presentation, hierarchy, or copy. Each item lists the exact friction it removes.
 
-Palette stays as-is: charcoal `#1a1a1a` / `#262626` surfaces, amber `#fbbf24` (selected), rose `#ef4444` (hard accent), emerald (easy accent).
+## 1. Onboarding / Family Selection
 
-## 1. Difficulty cards — "Manila dossier folders"
+- **Sticky confirmation bar.** The "Start as [Family]" CTA + seed + map size collapse into a thin bar pinned to the bottom of the viewport so the user always sees the full commitment without scrolling. Removes the disconnect between picking a family at the top and confirming at the bottom.
+- **Stat normalization on family cards.** Today each family card mixes labels ($, soldiers, loyalty, racketeering, ability). Group into 3 fixed rows: *Resources*, *Strengths*, *Signature Power*. Same row order on every card so eyes can compare across columns.
+- **Recommended badge demoted.** Replace the green "RECOMMENDED" highlight on Easy/Wiseguy with a small "👋 New player?" hint pinned to the difficulty selector instead — it shouldn't bias family choice.
+- **Map seed row collapsed by default** behind a "⚙ Advanced" disclosure. Most players never touch it; hiding it removes 1 row of visual weight.
+- **Difficulty + map size labeled section header.** Add a small "STEP 1 · CHOOSE YOUR GAME" → "STEP 2 · CHOOSE YOUR FAMILY" rhythm so the page reads top-to-bottom.
 
-Replace the current rounded-card look with a file-folder aesthetic. Each card becomes a piece of case-file paper clipped to a folder.
+## 2. In-game HUD & sidebars
 
-**Folder shape & paper**
-- Card body: slightly off-square (`rounded-sm`), aged-paper tint via layered gradient (`linear-gradient(180deg, rgba(255,240,210,0.04), rgba(255,240,210,0.01))` over `hsl(var(--card))`), faint noise (`NOISE_BG`) at opacity 0.06 always-on, subtle vignette in corners.
-- Top edge: protruding "folder tab" — a small 70px-wide notch absolutely positioned at `top:-10px left:18px`, same paper tint, holding a hand-typed code label (e.g. `FILE No. 001 — EASY`) in `font-mono uppercase text-[9px]`.
-- Two faint horizontal rule lines (1px, `rgba(255,255,255,0.04)`) behind the stats list to evoke ruled paper.
-- Slight per-card rotation: easy `-0.6deg`, normal `0`, hard `+0.6deg` to look like scattered files. Reset to 0 on hover/active for crispness.
+- **Top status HUD: one-line resource strip.** Money / Soldiers / Respect / Influence / Heat get equal-width slots with: big number, tiny delta-this-turn under it (`+$420`, `-2`). Removes the need to open the turn summary to know if your last turn made or lost money.
+- **Phase chip absorbs the phase banner.** Today phase info lives in two places (banner + top chip). Drop the banner; the chip in the HUD becomes the single source ("PHASE 2 · ACTION · 2/3 used") with click-to-expand requirements list.
+- **Left action menu: collapse-by-default with badges.** Each section header shows the count of available actions ("Tactical · 3", "Strategic · 1 new"). Expanded section auto-collapses others. Reduces vertical noise from always-open accordions.
+- **Right sidebar rival cards: comparable bars.** Each rival shows Territory / Soldiers / Heat as 3 thin progress bars normalized to the leader, not raw numbers. At-a-glance "who's ahead" without math.
+- **Sitdowns panel: state-grouped, not flat list.** Headers `⏳ Awaiting you (2)` / `✓ Ready (1)` / `📨 Incoming (1)` with a single primary action per item.
+- **Boss/HQ panel: split tabs.** Today the panel mixes loyalty, businesses, supply, recruitment. Tab it into *Roster · Businesses · Supply* so each view fits the panel without scrolling.
 
-**Stamps replace pill chips**
-- Replace the rounded `EASY/STANDARD/HARD` chips with a diagonal rubber-stamp graphic in the top-right: bordered rectangle, 2px solid in the meta color, rotated `-8deg`, `font-stencil`/`font-mono` uppercase, with `mix-blend-mode: screen` and reduced opacity (0.85) so it reads as ink on paper. Add 1–2px stamp "smudge" via tiny `text-shadow` offset.
-- Selected state: stamp swaps to a gold `APPROVED ✓` stamp (amber color) with a small drop-shadow.
+## 3. Map interaction
 
-**Header**
-- Replace emoji icon block with a typewriter-style header row: `font-playfair` name on the left, small `CLASSIFIED` micro-label under it in `font-mono text-[9px] tracking-[0.3em] text-muted-foreground`.
-- Keep the existing emoji but render it smaller (text-xl) inside a 28px circular "evidence sticker" with a dashed border in the meta color.
+- **Bottom-left hex card is the single source of hex truth.** Today some info lives on hover tooltip, some in the card, some on the action menu. Move all per-hex info (owner, business, units, fortify, safehouse, supply status, district control %) into the pinned card; hover gives only owner + business name.
+- **Selected-unit dock above the hex card.** When a unit is selected, a small dock shows portrait, name, toughness, loyalty, move budget left, and a strip of legal actions for this turn. Eliminates hunting for action buttons inside the action menu when a unit is selected.
+- **Legend becomes one collapsible hex.** A single corner button "❓ Legend" opens an overlay panel grouping outlines, badges, and supply icons in 3 columns with short captions. Replaces the always-visible legend strip.
+- **Highlight rules simplified.** Movement = solid amber ring, attack range = dashed rose ring, supply = dotted grey ring. Document in the new legend.
+- **Zoom % indicator + 1-click reset** near the zoom button so players know they're zoomed in and can snap back.
 
-**Quote block**
-- Style as a handwritten margin note: italic, slight `transform: rotate(-0.4deg)`, with a tiny paperclip glyph (`📎` or inline SVG) pinning it to the upper-left.
+## 4. Turn flow, modals & feedback
 
-**Stats list**
-- Render as a typed table: monospace labels (`font-mono text-[10px] uppercase tracking-wider`), values right-aligned in the existing tone colors but bolder weight (700). Add dotted leader lines (`border-b border-dotted border-border/30`) between label and value for that case-file feel.
-
-**Selected state**
-- Border thickens to 2px solid in meta color, paper brightens (gradient amplitude doubled), subtle outer glow at `0 0 24px meta.glow` retained, plus an inner highlight `inset 0 0 0 1px rgba(255,255,255,0.04)`.
-- Tab label adds `★` prefix.
-
-## 2. Map size selector — Mini hex-grid previews
-
-Replace the three pill buttons with three taller cards (~120×96px) each containing a live SVG of a hex cluster sized to its option.
-
-**Per option**
-- SVG renders a tessellated honeycomb (pointy-top hexes, `r≈6` for small, `r≈5` for medium, `r≈4` for large) clipped to a circular mask to suggest a city map. Hex fill `hsl(var(--muted) / 0.35)`, stroke `hsl(var(--border))` at 0.5px.
-- Sprinkle 4–6 hexes with subtle family-color tints (amber, emerald, rose, blue, purple) at 35% opacity to hint at territory control.
-- Below the SVG: bold uppercase label (`SMALL` / `MEDIUM` / `LARGE`) and a one-line description (`~169 hexes`, etc.) in `text-[10px] text-muted-foreground`.
-
-**Selected state**
-- Amber border (2px), amber glow (`0 0 18px rgba(251,191,36,0.45)`), label turns amber, hex strokes brighten to amber at 0.6 opacity, and a tiny `✓` badge pins the top-right.
-
-**Layout**
-- Switch row to `flex gap-3 justify-center mt-4`, cards `w-[140px]`.
+- **Turn step indicator in HUD.** `DEPLOY ▸ TACTICAL ▸ ACTION ▸ END` with the current step lit and click-to-skip on completed prior steps. Replaces scattered "skip" buttons.
+- **End-of-turn summary modal restructure.** Three tabs: *Money & Heat* (delta breakdown), *Combat* (log), *Diplomacy & Events* (sitdowns, random events). Today everything is one long scroll.
+- **Inline confirmations replace modals for routine actions.** Claim, extort, fortify, scout: confirm via a 2-button popover anchored to the hex menu instead of a full modal. Modals stay for destructive/irreversible actions (Plan Hit, HQ Assault, Declare War, Abandon Territory).
+- **Risk preview standardization.** Every action with risk shows the same 4-line block: *Cost · Success odds · Heat · Tension*. Replaces today's mix of paragraphs and stat lists per action.
+- **Notification toast grouping.** Multiple same-turn notifications of the same type collapse ("3 territories shifted") with click-to-expand. Stops the post-AI-turn toast flood.
+- **Wounded / low-loyalty units surface a persistent badge** in the right sidebar "Roster" tab so users don't lose track between turns.
 
 ## Out of scope
-- Family cards grid below (unchanged).
-- Seed input row (unchanged).
-- Any gameplay/state/callback wiring.
 
-## Technical notes
-- Pure JSX/Tailwind/inline-style edits inside `FamilySelectionScreen.tsx`.
-- New helper component `MapSizeHexPreview` (small, in-file) renders the SVG honeycomb given a hex radius and count.
-- Continue using existing `meta.color/glow/tint`, `NOISE_BG`, `cn`, and `motion.button` — no new deps.
-- Respect `prefersReducedMotion`: skip the per-card rotation when true.
+- Gameplay rules, balance, AI behavior — none changed.
+- New mechanics or screens.
+- Audio, art, animation overhauls beyond what naturally falls out of layout changes.
+
+## Suggested order (each ships independently)
+
+1. Turn step indicator + inline confirmations (biggest friction win, low risk)
+2. Top resource strip with deltas + phase chip merge
+3. Bottom-left hex card consolidation + unit dock
+4. Right sidebar grouping (sitdowns, rivals, roster tabs)
+5. Family selection sticky bar + section steps
+6. End-of-turn modal tabs + notification grouping
+7. Legend overlay + highlight rule pass
+
+Tell me which slice to ship first — or whether you want me to bundle 1-3 as one "in-game clarity" PR.
