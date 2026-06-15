@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import NegotiationDialog from '@/components/NegotiationDialog';
 import TurnStepRail from '@/components/TurnStepRail';
+import ResourceStrip from '@/components/ResourceStrip';
 import { NotificationProvider, useMafiaNotifications } from '@/components/ui/notification-system';
 import { AnimatedCard, AnimatedCardHeader, AnimatedCardTitle, AnimatedCardContent } from '@/components/ui/animated-card';
 import { EnhancedButton } from '@/components/ui/enhanced-button';
@@ -1214,13 +1215,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             </span>
           </div>
         )}
-        {!gameState.selectedUnitId && !gameState.deployMode && (
-          <div className="flex items-center space-x-2 px-3 py-1 bg-muted/50 rounded-full">
-            <span className="text-xs font-medium text-muted-foreground uppercase">
-              Phase: {gameState.turnPhase === 'deploy' ? '📦 Deploy & move units across the map' : gameState.turnPhase === 'move' ? '📋 Tactical actions only (Scout, Fortify, Escort) — no movement' : gameState.turnPhase === 'action' ? `⚔️ Select a unit first, then click a target — ${gameState.actionsRemaining}/${gameState.maxActions} actions left` : '⏳ End your turn'}
-            </span>
-          </div>
-        )}
+        {/* Phase status chip removed — TurnStepRail is now the single source of truth for phase. */}
 
         {/* Tactical action toolbar — only during tactical (move) phase */}
         {gameState.turnPhase === 'move' && (
@@ -1489,25 +1484,19 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         })()}
       </div>
       
-      {/* Center - Resources */}
-      <div className="flex items-center space-x-6">
-        <div className="text-center">
-          <div className="text-sm font-bold text-green-400">${gameState.resources.money.toLocaleString()}</div>
-          <div className="text-xs text-muted-foreground">Money</div>
-        </div>
-        <div className="text-center">
-          <div className="text-sm font-bold text-red-400">{gameState.resources.soldiers}</div>
-          <div className="text-xs text-muted-foreground">Soldiers</div>
-        </div>
-        <div className="text-center">
-          <div className="text-sm font-bold text-blue-400">{gameState.resources.respect}%</div>
-          <div className="text-xs text-muted-foreground">Respect</div>
-        </div>
-        <div className="text-center">
-          <div className="text-sm font-bold text-purple-400">{gameState.resources.researchPoints}</div>
-          <div className="text-xs text-muted-foreground">Research</div>
-        </div>
-      </div>
+      {/* Center - Unified resource strip with deltas */}
+      <ResourceStrip
+        turn={gameState.turn}
+        values={{
+          money: gameState.resources.money,
+          soldiers: gameState.resources.soldiers,
+          respect: gameState.resources.respect,
+          influence: gameState.resources.influence || 0,
+          politicalPower: gameState.resources.politicalPower || 0,
+          heat: (gameState as any).policeHeat?.level || 0,
+        }}
+        lastTurnIncome={gameState.lastTurnIncome}
+      />
       
       {/* Right side - Active Pacts */}
       <div className="flex items-center gap-2 text-xs">
