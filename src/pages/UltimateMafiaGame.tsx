@@ -1110,44 +1110,14 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
 
       {/* Right side - Actions */}
       <div className="flex items-center space-x-2">
-        {/* Phase indicator */}
-        <div className="flex items-center space-x-1 bg-background/80 rounded-lg px-2 py-1 border border-noir-light">
-          {(['deploy', 'move', 'action'] as const).map((phase) => (
-              <div
-                key={phase}
-                className={cn(
-                  "px-3 py-1 rounded text-xs font-bold uppercase transition-all",
-                  gameState.turnPhase === phase
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground"
-                )}
-              >
-                {phase === 'deploy' ? 'deploy' : phase === 'move' ? 'tactical' : phase}
-              </div>
-            ))}
-        </div>
-
-        <Button
-          size="sm"
-          onClick={() => advancePhase()}
-          disabled={gameState.turnPhase === 'waiting'}
-          className={cn("font-medium", gameState.turnPhase !== 'waiting' && gameState.turnPhase !== 'action' && "animate-pulse")}
-          variant={gameState.turnPhase === 'action' ? 'default' : 'outline'}
-        >
-          <SkipForward className="h-4 w-4 mr-2" />
-          {gameState.turnPhase === 'action' ? 'End Turn' : gameState.turnPhase === 'waiting' ? 'Waiting...' : 'Next Step'}
-        </Button>
-
-        {(gameState.turnPhase === 'deploy' || gameState.turnPhase === 'move') && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => skipToActionPhase()}
-            className="font-medium text-muted-foreground hover:text-foreground"
-          >
-            ⏭ Skip to Action
-          </Button>
-        )}
+        <TurnStepRail
+          phase={gameState.turnPhase}
+          jailed={gameState.legalStatus.jailTime > 0}
+          jailTime={gameState.legalStatus.jailTime}
+          onAdvance={() => advancePhase()}
+          onSkipToAction={() => skipToActionPhase()}
+          onEndTurn={() => { playSound('notification'); endTurn(); }}
+        />
 
         <SaveLoadDialog 
           gameState={gameState} 
