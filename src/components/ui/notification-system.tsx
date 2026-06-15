@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, Info, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type NotificationType = 'success' | 'error' | 'warning' | 'info';
@@ -11,6 +11,11 @@ export interface Notification {
   title: string;
   message?: string;
   duration?: number;
+  /** Internal: group key (type + title). When set, grouping logic merges incoming
+   *  toasts with the same key fired within GROUP_WINDOW_MS into a single collapsed toast. */
+  groupKey?: string;
+  /** Internal: child notifications when this toast is a collapsed group. */
+  items?: Array<{ title: string; message?: string }>;
   action?: {
     label: string;
     onClick: () => void;
@@ -48,12 +53,20 @@ const notificationColors = {
   info: 'bg-blue-500 border-blue-500 text-white',
 };
 
+const GROUP_WINDOW_MS = 800;
+const MAX_VISIBLE_ITEMS = 5;
+
 const NotificationItem: React.FC<{ notification: Notification; onRemove: (id: string) => void }> = ({
   notification,
   onRemove,
 }) => {
   const Icon = notificationIcons[notification.type];
   const colorClass = notificationColors[notification.type];
+  const [expanded, setExpanded] = useState(false);
+  const items = notification.items || [];
+  const isGroup = items.length > 1;
+  const visible = expanded ? items : items.slice(0, MAX_VISIBLE_ITEMS);
+  const hidden = items.length - visible.length;
 
   return (
     <motion.div
@@ -68,9 +81,30 @@ const NotificationItem: React.FC<{ notification: Notification; onRemove: (id: st
     >
       <Icon className="h-5 w-5 mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">
-        <h4 className="font-semibold text-sm">{notification.title}</h4>
-        {notification.message && (
+        <h4 className="font-semibold text-sm flex items-center gap-1.5">
+          {isGroup ? `${items.length}× ${notification.title}` : notification.title}
+          {isGroup && (
+            <button
+              onClick={() => setExpanded(e => !e)}
+              className="ml-auto p-0.5 hover:bg-black/10 rounded"
+              aria-label={expanded ? 'Collapse' : 'Expand'}
+            >
+              {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </button>
+          )}
+        </h4>
+        {!isGroup && notification.message && (
           <p className="text-sm opacity-90 mt-1">{notification.message}</p>
+        )}
+        {isGroup && (
+          <ul className="mt-1 space-y-0.5 text-xs opacity-90">
+            {visible.map((it, i) => (
+              <li key={i} className="truncate">• {it.message || it.title}</li>
+            ))}
+            {!expanded && hidden > 0 && (
+              <li className="italic opacity-75">+{hidden} more…</li>
+            )}
+          </ul>
         )}
         {notification.action && (
           <button
@@ -93,17 +127,38 @@ const NotificationItem: React.FC<{ notification: Notification; onRemove: (id: st
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  // Tracks recent toasts by group key for the merging window.
+  const groupRegistryRef = useRef<Map<string, { id: string; lastAt: number }>>(new Map());
 
   const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
     const id = Math.random().toString(36).substr(2, 9);
-    const newNotification = { ...notification, id };
-    
-    setNotifications(prev => [...prev, newNotification]);
+    const groupKey = `${notification.type}::${notification.title}`;
+    const now = Date.now();
+    const existing = groupRegistryRef.current.get(groupKey);
 
-    // Auto-remove after duration
+    if (existing && now - existing.lastAt < GROUP_WINDOW_MS) {
+      // Merge into existing group toast.
+      setNotifications(prev => prev.map(n => {
+        if (n.id !== existing.id) return n;
+        const items = n.items || [{ title: n.title, message: n.message }];
+        return {
+          ...n,
+          items: [...items, { title: notification.title, message: notification.message }],
+        };
+      }));
+      groupRegistryRef.current.set(groupKey, { id: existing.id, lastAt: now });
+      return;
+    }
+
+    const newNotification: Notification = { ...notification, id, groupKey };
+    setNotifications(prev => [...prev, newNotification]);
+    groupRegistryRef.current.set(groupKey, { id, lastAt: now });
+
     const duration = notification.duration || 5000;
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id));
+      const reg = groupRegistryRef.current.get(groupKey);
+      if (reg && reg.id === id) groupRegistryRef.current.delete(groupKey);
     }, duration);
   }, []);
 
@@ -113,6 +168,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const clearAll = useCallback(() => {
     setNotifications([]);
+    groupRegistryRef.current.clear();
   }, []);
 
   return (
