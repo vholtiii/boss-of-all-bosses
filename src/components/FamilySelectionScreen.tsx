@@ -310,6 +310,7 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
   const [seedInput, setSeedInput] = useState<string>(() => Math.floor(Math.random() * 1e9).toString());
   const [seedFlash, setSeedFlash] = useState(0);
   const [seedCopied, setSeedCopied] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const rerollSeed = useCallback(() => {
     setSeedInput(Math.floor(Math.random() * 1e9).toString());
