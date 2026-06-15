@@ -40,6 +40,7 @@ import VictoryTracker from '@/components/VictoryTracker';
 import PhaseInfographic from '@/components/PhaseInfographic';
 import ThreatBoardPanel from '@/components/ThreatBoardPanel';
 import SitdownsPanel from '@/components/SitdownsPanel';
+import RivalComparisonStrip from '@/components/RivalComparisonStrip';
 import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType, SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, Safehouse, getTensionPairKey, WAR_TENSION_THRESHOLD, FAMILY_POWERS, PendingNegotiation, IncomingSitdown } from '@/types/game-mechanics';
 import { Anchor, Wrench, Truck, Wine, Fish, Package, Link2 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
@@ -1385,6 +1386,13 @@ export const RightSidePanel: React.FC<{
             </div>
           </CollapsibleSection>
         )}
+
+        {/* ── At-a-glance rival comparison ── */}
+        <RivalComparisonStrip
+          gameState={gameState}
+          highlightedFamily={highlightedFamily}
+          onHighlightFamily={onHighlightFamily}
+        />
 
         {/* ── Rival Families ── */}
         <CollapsibleSection
