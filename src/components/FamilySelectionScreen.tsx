@@ -929,15 +929,6 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 />
               )}
 
-              {/* Recommended tag for new players (outside clip) */}
-              {isRecommended && !isSelected && (
-                <div
-                  className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider flex items-center gap-1 bg-emerald-500/90 text-emerald-950 shadow-md whitespace-nowrap z-20"
-                >
-                  <Star className="h-2.5 w-2.5 fill-current" />
-                  New player pick
-                </div>
-              )}
 
               {/* Clipped inner card surface */}
               <div
