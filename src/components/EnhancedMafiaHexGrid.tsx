@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
+import SelectedUnitDock from '@/components/SelectedUnitDock';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
 import { ScoutedHex, Safehouse, PlannedHit, SupplyNode, SUPPLY_NODE_CONFIG, SupplyNodeType, FortifiedHex, FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, FLIP_SOLDIER_BASE_COST, FLIP_SOLDIER_COST_ESCALATION, FLIP_SOLDIER_BASE_CHANCE, SUPPLY_DEPENDENCIES } from '@/types/game-mechanics';
 
@@ -2569,6 +2570,13 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           );
         })()}
       </AnimatePresence>
+
+      {/* Selected Unit Dock — surfaces current selection above the hex info card */}
+      <SelectedUnitDock
+        gameState={gameState}
+        playerFamily={playerFamily}
+        onClearSelection={() => onAction && onAction({ type: 'clear_selection' })}
+      />
 
       {/* Map Legend */}
       <div className="absolute bottom-3 left-3 z-30">
