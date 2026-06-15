@@ -1,80 +1,53 @@
-# Prosecution Wiretaps & RICO Aides
+# Premium Per-Family Unit Art
 
-Extend the existing wiretap system with a second class — **Federal bugs** planted by law enforcement — that feed the prosecution / RICO pipeline. The existing rival-family wiretap stays unchanged; this adds a parallel `plantedBy: 'feds'` track plus the discovery, intel, and prosecution consequences around it.
+Replace the current single Soldier and Capo PNGs with **10 family-tuned premium images** (5 families × 2 ranks) and tighten the in-map presentation. Capo stays close to current silhouette but reads cleaner and a touch more authoritative.
 
-## Mechanics
+## Art direction
 
-### Placement (both passive + event-driven)
-- **Passive heat-driven**: At end of each turn, for every family in **Hot (60+)** heat or higher, roll a chance to plant 1 Fed bug on one of their non-HQ extorted/built hexes.
-  - Hot 60-79: 12% / turn
-  - Critical 80-89: 22% / turn
-  - RICO 90+: 35% / turn
-  - Target hex weighted toward highest-earning + most-active (recent claims/extorts/hits in last 3 turns).
-  - Cap: max 3 simultaneous active Fed bugs per family. Cannot target HQ.
-- **Event-triggered spikes** (any of these adds 1 Fed bug immediately, ignoring cap +1):
-  - Failed Plan Hit (already raises heat) → 40% bug roll
-  - Raid event resolution → 50% bug roll
-  - Soldier flipped to informant → 100% bug roll
-  - Crossing prosecutionRisk ≥ 40 threshold → 1 guaranteed bug (one-shot per crossing)
+Shared base (consistency across all 10):
+- Noir 1940s mafia figures, full body, front-facing, slight contrapposto
+- Fedora, suit, long shadow; transparent background; soft rim light
+- Painted/illustrated style (not photoreal, not cartoon) — matches existing board-game noir aesthetic
+- Square 1024×1536 tall portrait, transparent PNG
 
-### Lifecycle & passive effect
-- Each Fed bug stores: `plantedTurn`, `q,r,s`, `targetFamily`, `discovered: false`.
-- While **undiscovered**: silently accrues. **No** passive prosecutionRisk add (kept clean per your "Age-scaled + RICO accel" choice).
-- While **discovered but not yet swept**: visible UI badge on hex; still produces evidence until swept (same +risk-on-sweep math doesn't double-apply — discovery is the consequence event).
+Per-family flavor (subtle — color/accent only, silhouette stays family-readable at hex scale):
+- **Gambino** (cyan #42D3F2) — charcoal suit, cyan pocket square / tie
+- **Genovese** (green #2AA63E) — olive suit, green tie
+- **Lucchese** (royal blue #4169E1) — navy pinstripe, blue tie
+- **Bonanno** (crimson #DC143C) — black suit, red tie / boutonnière
+- **Colombo** (purple #8A2BE2) — dark purple suit, violet tie
 
-### Discovery paths
-1. **Sweep for Bugs** (existing action): now also rolls 75% against Fed bugs on that hex. Finding a Fed bug fires the discovery consequence below.
-2. **Chief bribe (tier 3)** — adds a "Fed wires suspected: **N** active across your territory" line to the bribe report. Count only, no locations.
-3. **Mayor bribe (tier 4)** — reveals exact hex coordinates of all currently active Fed bugs. Marks them `discovered: true` (triggers consequence immediately based on age). Still requires Sweep to remove.
-4. **Consigliere lawyer (passive)** — while retained, each turn 25% chance to flag one undiscovered Fed bug's hex (sets `discovered: true`, triggers consequence). Surfaces as an alert.
+Rank differentiation (Capo = "current+", per user pick):
+- **Soldier**: shorter jacket, hands at sides or one in pocket, plain fedora, no accessory
+- **Capo**: longer overcoat over suit, fedora with subtle band detail, cigar in hand, a small gold lapel pin; ~10% broader stance. Same color palette as the family's soldier so they read as same family at a glance.
 
-### Discovery consequence (the core feedback loop)
-When a Fed bug transitions to `discovered`:
-- `age = currentTurn - plantedTurn`
-- **Prosecution risk** += `min(25, age * 3)` for the owning family.
-- **RICO acceleration**: if owning family's heat ≥ 80, immediately tick `ricoTimer += 1` (the Feds "rush the case"). If age ≥ 5 AND heat ≥ 80, tick `+2` instead.
-- Alert/toast: "🎧⚖️ Fed wire discovered on \[district hex] — bug ran **N** turns. Prosecution risk +X.\[ RICO timer rushed.]"
-- Heat is **not** directly raised (heat is the *cause*, prosecution is the *effect*).
+## Files
 
-### Removal
-- Only **Sweep for Bugs** removes a Fed bug from the hex (same action that already exists; no new button). Mayor-bribe reveal does not remove, only exposes.
-- Removing a Fed bug grants +3 respect (not the +5 of a rival sweep — Feds expected) and does **not** raise tension (no family planted it).
+New assets (generated via premium model, transparent PNG):
+- `src/assets/units/soldier-gambino.png` … `soldier-colombo.png` (5)
+- `src/assets/units/capo-gambino.png` … `capo-colombo.png` (5)
 
-### AI parity
-- Same passive/event placement applies to AI families based on their own heat.
-- AI sweep heuristic already exists; extend so AI also weights sweep priority by `(undiscovered Fed bugs) * heatTierWeight` — cautious/strategic personalities sweep more aggressively at Critical/RICO heat.
-- AI Mayor/Chief bribes (when AI does corruption) read the same intel.
-- AI prosecution risk + RICO timer already update through the same shared pipeline.
+Code changes (presentation only, no game-logic touched):
+- `src/components/SoldierIcon.tsx` — import a `family → image` map; pick image by `family` prop. Keep existing glow/badge/selection logic untouched.
+- `src/components/CapoIcon.tsx` — same pattern. Bump `size` from 32 → 34 and the gold ring stroke from 2 → 2.25 for the subtle "Capo reads slightly more important" tweak. Keep current star/level badge.
+- Delete old `src/assets/soldier-figure.png` and `src/assets/capo-figure.png` once both icons are switched over.
 
-## UI
+No changes to:
+- Hex placement, stacking, badges (count, wounded, marked-for-death)
+- Selection rings, pulse animation, drop-shadow tinting by family color
+- Any game state, AI, or balance code
 
-- **Sweep button tooltip**: extend existing suspected-count to show "(N rival + M Fed suspected)" when in Hot+ heat.
-- **HeatMeter overlay**: add a small `🎧` badge with active Fed-bug count under the meter when ≥1 bug is on the player. Hover tooltip lists hexes (only those discovered).
-- **Hex info panel**: discovered Fed bug shows a "⚖️ Fed wire — ran N turns, swept/active" line.
-- **Alerts log**: new entries for planting (silent — *no* alert; you only learn via discovery), discovery, RICO rush.
-- **Mayor bribe report**: new section listing Fed bug hexes.
+## Quality bar
 
-## Files to touch (technical section)
+After generation, spot-check all 10 images at the in-map render size (~20–34px tall) to confirm:
+- Family color is recognizable without the colored glow halo
+- Capo vs Soldier silhouette difference is readable at small size
+- No background fringe / halo artifacts on transparent PNG
 
-- `src/types/game-mechanics.ts`
-  - Extend `Wiretap` interface: `plantedBy: FamilyId | 'feds'`; reuse existing fields.
-  - New constants: `FED_BUG_CHANCE_BY_TIER`, `FED_BUG_MAX_PER_FAMILY`, `FED_BUG_AGE_RISK_PER_TURN = 3`, `FED_BUG_AGE_RISK_CAP = 25`, `FED_BUG_RICO_ACCEL_HEAT = 80`, `FED_BUG_RICO_ACCEL_AGE = 5`.
-- `src/hooks/useEnhancedMafiaGameState.ts`
-  - End-of-turn pass: roll Fed-bug placement per family by heat tier; handle event-triggered placements at the existing failed-hit / raid / informant / risk-threshold sites.
-  - Sweep handler: include Fed bugs in the roll; on Fed discovery apply age-scaled risk + RICO accel.
-  - Consigliere passive: per-turn 25% roll for one undiscovered Fed bug on player.
-  - Mayor/Chief bribe handlers: include Fed bug count/locations in returned report; Mayor reveal marks discovered + triggers consequence.
-  - AI sweep weighting update.
-- `src/components/HeatMeter.tsx` — small `🎧 N` chip when player has Fed bugs.
-- `src/pages/UltimateMafiaGame.tsx` — Sweep tooltip + hex info Fed-wire line.
-- `src/components/CorruptionPanel.tsx` / bribe report rendering — Fed bug section.
-- Memory updates:
-  - New `mem://gameplay/prosecution/fed-wiretaps.md` (placement, discovery, consequence, AI parity).
-  - Update `mem://gameplay/tactical/wiretap-sweep.md` (Sweep now handles Fed bugs too).
-  - Update `mem://gameplay/police-heat-system.md` and `mem://gameplay/legal-and-prosecution.md` cross-refs.
-  - Update `mem://gameplay/intel-bribes.md` (Chief count / Mayor locations).
-  - Update `mem://gameplay/defense-and-law-actions.md` (Consigliere passive hint).
-  - Append index.
+If any family's image fails the check, regenerate just that one before swapping the import.
 
-## Out of scope (this pass)
-- No new resources, no new map layers, no Witness Protection / Stoolie mechanics, no "Grand Jury" mini-events. Those can layer on later as additional RICO aides.
+## Out of scope
+
+- Family crest shields, animated auras, pedestals (rejected option)
+- HQ icon, hitman icon, scout/intel overlays
+- Any gameplay or rule changes

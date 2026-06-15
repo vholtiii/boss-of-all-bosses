@@ -1,6 +1,10 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import soldierImg from '@/assets/soldier-figure.png';
+import soldierGambino from '@/assets/units/soldier-gambino.png';
+import soldierGenovese from '@/assets/units/soldier-genovese.png';
+import soldierLucchese from '@/assets/units/soldier-lucchese.png';
+import soldierBonanno from '@/assets/units/soldier-bonanno.png';
+import soldierColombo from '@/assets/units/soldier-colombo.png';
 
 interface SoldierIconProps {
   x: number;
@@ -21,12 +25,21 @@ const familyColors = {
   colombo: '#8A2BE2',
 };
 
-const SoldierIcon: React.FC<SoldierIconProps> = ({ 
-  x, y, family, count, isPlayerFamily = false, selected = false, markedForDeath = false, onClick 
+const soldierImages = {
+  gambino: soldierGambino,
+  genovese: soldierGenovese,
+  lucchese: soldierLucchese,
+  bonanno: soldierBonanno,
+  colombo: soldierColombo,
+};
+
+const SoldierIcon: React.FC<SoldierIconProps> = ({
+  x, y, family, count, isPlayerFamily = false, selected = false, markedForDeath = false, onClick
 }) => {
   const familyColor = familyColors[family];
+  const soldierImg = soldierImages[family];
   const size = 20;
-  
+
   return (
     <motion.g
       initial={{ opacity: 0, scale: 0 }}
@@ -49,7 +62,7 @@ const SoldierIcon: React.FC<SoldierIconProps> = ({
 
       {/* Family color glow */}
       <circle cx={x} cy={y + 2} r={size / 2 + 2} fill={familyColor} opacity={selected ? 0.5 : 0.25} />
-      
+
       {/* Soldier figure image */}
       <image
         href={soldierImg}
@@ -57,14 +70,15 @@ const SoldierIcon: React.FC<SoldierIconProps> = ({
         y={y - size / 2 - 4}
         width={size}
         height={size * 1.5}
+        preserveAspectRatio="xMidYMid meet"
         style={{ filter: `drop-shadow(0 0 ${selected ? '6' : '3'}px ${selected ? '#FFD700' : familyColor})` }}
       />
-      
+
       {/* Player family gold ring */}
       {isPlayerFamily && !selected && (
         <circle cx={x} cy={y + 2} r={size / 2 + 4} fill="none" stroke="#D4AF37" strokeWidth="1.5" opacity="0.8" />
       )}
-      
+
       {/* Soldier count badge */}
       {count > 1 && (
         <motion.g
