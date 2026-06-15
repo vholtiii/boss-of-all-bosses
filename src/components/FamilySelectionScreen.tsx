@@ -440,11 +440,11 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         <p className="text-sm text-muted-foreground mt-4 font-source max-w-md mx-auto">
           Choose your family and difficulty. Each has unique strengths, weaknesses, and strategies for domination.
         </p>
-        {/* Difficulty Selector — dossier cards */}
+        {/* Difficulty Selector — dossier folders */}
         <div
           role="radiogroup"
           aria-label="Game difficulty"
-          className="flex flex-wrap items-stretch justify-center gap-3 mt-6 max-w-4xl mx-auto"
+          className="flex flex-wrap items-stretch justify-center gap-5 mt-10 max-w-4xl mx-auto px-2"
           onKeyDown={(e) => {
             const order = ['easy', 'normal', 'hard'] as const;
             const idx = order.indexOf(difficulty);
@@ -459,52 +459,54 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
             }
           }}
         >
-          {(['easy', 'normal', 'hard'] as const).map(d => {
+          {(['easy', 'normal', 'hard'] as const).map((d, dIdx) => {
             type Tone = 'buff' | 'neutral' | 'debuff';
             const meta = ({
               easy: {
-                icon: '🥃', name: 'Wiseguy', chip: 'EASY',
+                icon: '🥃', name: 'Wiseguy', chip: 'EASY', fileNo: '001',
                 tagline: 'Learn the ropes',
                 quote: '"Welcome to the family, kid."',
                 color: 'rgb(16,185,129)', glow: 'rgba(16,185,129,0.55)', tint: 'rgba(16,185,129,0.10)',
                 stats: [
-                  { icon: '💰', label: 'Income',      value: '+50%',      tone: 'buff' as Tone },
-                  { icon: '⚔️', label: 'AI Rivals',   value: 'Reactive',  tone: 'buff' as Tone },
-                  { icon: '🚓', label: 'Police Heat', value: 'Lenient',   tone: 'buff' as Tone },
-                  { icon: '🤝', label: 'Diplomacy',   value: 'Forgiving', tone: 'buff' as Tone },
+                  { label: 'Income',      value: '+50%',      tone: 'buff' as Tone },
+                  { label: 'AI Rivals',   value: 'Reactive',  tone: 'buff' as Tone },
+                  { label: 'Police Heat', value: 'Lenient',   tone: 'buff' as Tone },
+                  { label: 'Diplomacy',   value: 'Forgiving', tone: 'buff' as Tone },
                 ],
               },
               normal: {
-                icon: '🎩', name: 'Made Man', chip: 'STANDARD',
+                icon: '🎩', name: 'Made Man', chip: 'STANDARD', fileNo: '002',
                 tagline: 'Prove your worth',
                 quote: '"No favors. No mercy."',
                 color: 'rgb(251,191,36)', glow: 'rgba(251,191,36,0.55)', tint: 'rgba(251,191,36,0.10)',
                 stats: [
-                  { icon: '💰', label: 'Income',      value: 'Base',     tone: 'neutral' as Tone },
-                  { icon: '⚔️', label: 'AI Rivals',   value: 'Adaptive', tone: 'neutral' as Tone },
-                  { icon: '🚓', label: 'Police Heat', value: 'Standard', tone: 'neutral' as Tone },
-                  { icon: '🤝', label: 'Diplomacy',   value: 'Cautious', tone: 'neutral' as Tone },
+                  { label: 'Income',      value: 'Base',     tone: 'neutral' as Tone },
+                  { label: 'AI Rivals',   value: 'Adaptive', tone: 'neutral' as Tone },
+                  { label: 'Police Heat', value: 'Standard', tone: 'neutral' as Tone },
+                  { label: 'Diplomacy',   value: 'Cautious', tone: 'neutral' as Tone },
                 ],
               },
               hard: {
-                icon: '🔫', name: 'The Don', chip: 'HARD',
+                icon: '🔫', name: 'The Don', chip: 'HARD', fileNo: '003',
                 tagline: 'Earn your respect',
                 quote: '"Only the strong survive."',
                 color: 'rgb(244,63,94)', glow: 'rgba(244,63,94,0.55)', tint: 'rgba(244,63,94,0.10)',
                 stats: [
-                  { icon: '💰', label: 'Income',      value: '−25%',        tone: 'debuff' as Tone },
-                  { icon: '⚔️', label: 'AI Rivals',   value: 'Ruthless',    tone: 'debuff' as Tone },
-                  { icon: '🚓', label: 'Police Heat', value: 'Aggressive',  tone: 'debuff' as Tone },
-                  { icon: '🤝', label: 'Diplomacy',   value: 'Treacherous', tone: 'debuff' as Tone },
+                  { label: 'Income',      value: '−25%',        tone: 'debuff' as Tone },
+                  { label: 'AI Rivals',   value: 'Ruthless',    tone: 'debuff' as Tone },
+                  { label: 'Police Heat', value: 'Aggressive',  tone: 'debuff' as Tone },
+                  { label: 'Diplomacy',   value: 'Treacherous', tone: 'debuff' as Tone },
                 ],
               },
             })[d];
             const isActive = difficulty === d;
             const toneClass: Record<Tone, string> = {
               buff: 'text-emerald-400',
-              neutral: 'text-muted-foreground',
+              neutral: 'text-amber-300',
               debuff: 'text-rose-400',
             };
+            const rotations = prefersReducedMotion ? [0, 0, 0] : [-0.8, 0, 0.8];
+            const baseRot = rotations[dIdx];
             return (
               <motion.button
                 key={d}
@@ -516,85 +518,116 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                   setDifficulty(d);
                   playSound(d === 'hard' ? 'success' : 'click');
                 }}
-                whileHover={{ y: -3 }}
+                animate={{ rotate: isActive ? 0 : baseRot, y: 0 }}
+                whileHover={{ y: -4, rotate: 0 }}
                 whileTap={{ scale: 0.98 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.25 }}
                 className={cn(
-                  'flex-1 min-w-[220px] max-w-[280px] text-left p-4 rounded-lg border-2 transition-all duration-200',
-                  'relative overflow-hidden outline-none',
+                  'flex-1 min-w-[230px] max-w-[290px] text-left px-4 pt-6 pb-4 rounded-sm transition-colors duration-200',
+                  'relative outline-none mt-3',
                   'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-                  isActive ? 'border-primary' : 'border-border/40 opacity-80 hover:opacity-100 hover:border-muted-foreground/50',
                 )}
                 style={{
-                  background: isActive
-                    ? `linear-gradient(135deg, ${meta.tint} 0%, transparent 70%), hsl(var(--card) / 0.85)`
-                    : 'hsl(var(--card) / 0.8)',
-                  boxShadow: isActive ? `0 0 24px ${meta.glow}, inset 0 1px 0 rgba(255,255,255,0.05)` : undefined,
+                  background: `linear-gradient(180deg, rgba(255,240,210,${isActive ? 0.07 : 0.035}) 0%, rgba(255,240,210,${isActive ? 0.02 : 0.008}) 100%), hsl(var(--card) / 0.92)`,
+                  border: isActive ? `2px solid ${meta.color}` : '1px solid hsl(var(--border) / 0.5)',
+                  boxShadow: isActive
+                    ? `0 0 26px ${meta.glow}, inset 0 0 0 1px rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.45)`
+                    : '0 4px 12px rgba(0,0,0,0.35)',
                 }}
               >
-                {/* Texture overlay when active */}
-                {isActive && (
-                  <div
-                    className="absolute inset-0 opacity-[0.04] pointer-events-none"
-                    style={{ backgroundImage: NOISE_BG }}
-                  />
-                )}
+                {/* Paper noise texture (always on) */}
+                <div
+                  className="absolute inset-0 opacity-[0.06] pointer-events-none rounded-sm"
+                  style={{ backgroundImage: NOISE_BG }}
+                />
+                {/* Ruled paper lines */}
+                <div className="absolute left-4 right-4 top-[58%] h-px bg-white/[0.04] pointer-events-none" />
+                <div className="absolute left-4 right-4 top-[72%] h-px bg-white/[0.04] pointer-events-none" />
+                {/* Corner vignette */}
+                <div
+                  className="absolute inset-0 pointer-events-none rounded-sm"
+                  style={{ background: 'radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.35) 100%)' }}
+                />
+
+                {/* Folder tab */}
+                <div
+                  className="absolute -top-3 left-4 px-2.5 py-0.5 rounded-t-sm font-mono text-[9px] uppercase tracking-widest"
+                  style={{
+                    background: `linear-gradient(180deg, rgba(255,240,210,0.08), rgba(255,240,210,0.02)), hsl(var(--card))`,
+                    border: isActive ? `2px solid ${meta.color}` : '1px solid hsl(var(--border) / 0.5)',
+                    borderBottom: 'none',
+                    color: isActive ? meta.color : 'hsl(var(--muted-foreground))',
+                  }}
+                >
+                  {isActive ? '★ ' : ''}File №{meta.fileNo} — {meta.chip}
+                </div>
+
+                {/* Stamp (top-right) */}
+                <div
+                  className="absolute top-3 right-3 px-2 py-0.5 font-mono font-black uppercase text-[10px] tracking-[0.18em] select-none pointer-events-none"
+                  style={{
+                    color: isActive ? 'rgb(251,191,36)' : meta.color,
+                    border: `2px solid ${isActive ? 'rgb(251,191,36)' : meta.color}`,
+                    transform: 'rotate(-8deg)',
+                    opacity: isActive ? 0.92 : 0.8,
+                    textShadow: '0.5px 0.5px 0 rgba(0,0,0,0.4)',
+                    boxShadow: `0 0 0 1px rgba(0,0,0,0.25) inset`,
+                    mixBlendMode: 'screen',
+                  }}
+                >
+                  {isActive ? '✓ Approved' : meta.chip}
+                </div>
 
                 {/* Header */}
-                <div className="flex items-center justify-between gap-2 mb-1 relative">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="text-2xl leading-none select-none"
-                      style={isActive ? { filter: `drop-shadow(0 0 6px ${meta.color})` } : undefined}
-                    >
-                      {meta.icon}
-                    </span>
+                <div className="relative flex items-center gap-2.5 mb-2 mt-1">
+                  <span
+                    className="flex items-center justify-center w-8 h-8 rounded-full text-lg leading-none select-none"
+                    style={{
+                      border: `1px dashed ${meta.color}`,
+                      background: 'rgba(0,0,0,0.25)',
+                      filter: isActive ? `drop-shadow(0 0 6px ${meta.color})` : undefined,
+                    }}
+                  >
+                    {meta.icon}
+                  </span>
+                  <div className="flex flex-col">
                     <span className="font-playfair text-lg font-bold leading-tight text-foreground whitespace-nowrap">
                       {meta.name}
                     </span>
+                    <span className="font-mono text-[8px] tracking-[0.3em] uppercase text-muted-foreground/70">
+                      Classified · Subject
+                    </span>
                   </div>
-                  {isActive ? (
-                    <span
-                      className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                      style={{ background: meta.color, color: '#0a0a0a' }}
-                    >
-                      ✓ Selected
-                    </span>
-                  ) : (
-                    <span
-                      className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border"
-                      style={{ borderColor: meta.color, color: meta.color }}
-                    >
-                      {meta.chip}
-                    </span>
-                  )}
                 </div>
 
                 {/* Tagline */}
-                <div className="text-xs text-foreground/80 font-medium mb-1.5">
+                <div className="relative text-xs text-foreground/80 font-semibold mb-2 uppercase tracking-wide">
                   {meta.tagline}
                 </div>
 
-                {/* Quote */}
+                {/* Quote — handwritten margin note */}
                 <div
-                  className="text-[11px] italic text-muted-foreground border-l-2 pl-2 mb-2 leading-snug"
-                  style={{ borderColor: meta.color }}
+                  className="relative text-[11px] italic text-muted-foreground border-l-2 pl-2 pr-1 py-1 mb-3 leading-snug"
+                  style={{
+                    borderColor: meta.color,
+                    transform: prefersReducedMotion ? undefined : 'rotate(-0.4deg)',
+                    background: 'rgba(255,240,210,0.025)',
+                  }}
                 >
-                  {meta.quote}
+                  <span className="mr-1 opacity-70">📎</span>{meta.quote}
                 </div>
 
-                {/* Divider */}
-                <div className="border-t border-border/30 my-2" />
-
-                {/* Stat rows */}
-                <div className="space-y-0.5">
+                {/* Stat rows — typed table with dotted leaders */}
+                <div className="relative space-y-1">
                   {meta.stats.map(s => (
-                    <div key={s.label} className="flex items-center justify-between text-[11px] py-0.5">
-                      <span className="flex items-center gap-1.5 text-muted-foreground">
-                        <span className="text-xs leading-none">{s.icon}</span>
+                    <div key={s.label} className="flex items-baseline gap-1.5 text-[11px]">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground whitespace-nowrap">
                         {s.label}
                       </span>
-                      <span className={cn('font-bold', toneClass[s.tone])}>{s.value}</span>
+                      <span className="flex-1 border-b border-dotted border-border/40 mb-0.5" />
+                      <span className={cn('font-mono font-bold uppercase tracking-wider', toneClass[s.tone])}>
+                        {s.value}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -602,26 +635,51 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
             );
           })}
         </div>
-        {/* Map Size Selector */}
-        <div className="flex items-center justify-center gap-2 mt-3">
+
+        {/* Map Size Selector — mini hex-grid previews */}
+        <div className="flex items-center justify-center gap-3 mt-6">
           {(['small', 'medium', 'large'] as const).map(s => {
-            const labels = { small: '🗺️ Small', medium: '🗺️ Medium', large: '🗺️ Large' };
-            const descs = { small: '~169 hexes · Fast games', medium: '~331 hexes · Classic', large: '~547 hexes · Epic sprawl' };
+            const meta = {
+              small:  { label: 'Small',  desc: '~169 hexes · Fast',     radius: 2, count: 19 },
+              medium: { label: 'Medium', desc: '~331 hexes · Classic',  radius: 3, count: 37 },
+              large:  { label: 'Large',  desc: '~547 hexes · Epic',     radius: 4, count: 61 },
+            }[s];
             const isActive = mapSize === s;
             return (
               <button
                 key={s}
-                onClick={() => setMapSize(s)}
+                onClick={() => { setMapSize(s); playSound('click'); }}
                 className={cn(
-                  'px-4 py-2 rounded-lg border-2 text-xs font-bold uppercase tracking-wider transition-all duration-200',
-                  'bg-card/80 backdrop-blur-sm',
-                  isActive
-                    ? 'border-primary text-primary shadow-md scale-105'
-                    : 'border-border/50 text-muted-foreground hover:border-muted-foreground/50'
+                  'relative flex flex-col items-center gap-1 w-[140px] px-3 pt-3 pb-2 rounded-md transition-all duration-200',
+                  'bg-card/80 backdrop-blur-sm outline-none',
+                  'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                 )}
-                title={descs[s]}
+                style={{
+                  border: isActive ? '2px solid rgb(251,191,36)' : '1px solid hsl(var(--border) / 0.5)',
+                  boxShadow: isActive
+                    ? '0 0 18px rgba(251,191,36,0.4), inset 0 0 0 1px rgba(251,191,36,0.1)'
+                    : '0 2px 8px rgba(0,0,0,0.25)',
+                }}
+                title={meta.desc}
               >
-                {labels[s]}
+                {isActive && (
+                  <span
+                    className="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                    style={{ background: 'rgb(251,191,36)', color: '#0a0a0a' }}
+                  >
+                    ✓
+                  </span>
+                )}
+                <MapSizeHexPreview gridRadius={meta.radius} highlighted={isActive} />
+                <div
+                  className={cn(
+                    'text-xs font-bold uppercase tracking-widest font-mono',
+                    isActive ? 'text-amber-400' : 'text-muted-foreground'
+                  )}
+                >
+                  {meta.label}
+                </div>
+                <div className="text-[9px] text-muted-foreground/70 font-mono">{meta.desc}</div>
               </button>
             );
           })}
