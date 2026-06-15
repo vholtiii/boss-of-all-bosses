@@ -240,6 +240,65 @@ const CARD_CLIP = 'polygon(0% 1.5%, 1% 0%, 99% 0.5%, 100% 2%, 99.5% 98%, 100% 10
 
 type MapSize = 'small' | 'medium' | 'large';
 
+// Mini hex-grid preview for map size selector
+const MapSizeHexPreview: React.FC<{ gridRadius: number; highlighted: boolean }> = ({ gridRadius, highlighted }) => {
+  const size = 64;
+  // Hex math: pointy-top, fit `gridRadius` rings into ~size px
+  const hexR = size / (2 * (gridRadius + 1) + 0.5);
+  const hexW = Math.sqrt(3) * hexR;
+  const hexH = 2 * hexR;
+  const cx = size / 2;
+  const cy = size / 2;
+  const cells: { x: number; y: number; q: number; r: number }[] = [];
+  for (let q = -gridRadius; q <= gridRadius; q++) {
+    for (let r = -gridRadius; r <= gridRadius; r++) {
+      if (Math.abs(q + r) > gridRadius) continue;
+      const x = cx + hexW * (q + r / 2);
+      const y = cy + (hexH * 3) / 4 * r;
+      cells.push({ x, y, q, r });
+    }
+  }
+  const hexPath = (cx2: number, cy2: number, r2: number) => {
+    const pts: string[] = [];
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI / 180) * (60 * i - 30);
+      pts.push(`${cx2 + r2 * Math.cos(a)},${cy2 + r2 * Math.sin(a)}`);
+    }
+    return `M${pts.join('L')}Z`;
+  };
+  // Deterministic family tint sprinkles
+  const tints = ['rgba(251,191,36,0.55)', 'rgba(16,185,129,0.5)', 'rgba(244,63,94,0.5)', 'rgba(59,130,246,0.5)', 'rgba(168,85,247,0.5)'];
+  const tinted = new Map<number, string>();
+  const seed = gridRadius * 7 + 3;
+  const tintCount = Math.min(cells.length, gridRadius + 3);
+  for (let i = 0; i < tintCount; i++) {
+    const idx = (i * 13 + seed) % cells.length;
+    tinted.set(idx, tints[i % tints.length]);
+  }
+  const strokeColor = highlighted ? 'rgba(251,191,36,0.7)' : 'rgba(255,255,255,0.18)';
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="block">
+      <defs>
+        <clipPath id={`hexClip-${gridRadius}`}>
+          <circle cx={cx} cy={cy} r={size / 2 - 1} />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#hexClip-${gridRadius})`}>
+        {cells.map((c, i) => (
+          <path
+            key={i}
+            d={hexPath(c.x, c.y, hexR * 0.92)}
+            fill={tinted.get(i) ?? 'rgba(255,255,255,0.06)'}
+            stroke={strokeColor}
+            strokeWidth={0.6}
+          />
+        ))}
+      </g>
+      <circle cx={cx} cy={cy} r={size / 2 - 0.5} fill="none" stroke={highlighted ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.12)'} strokeWidth={1} />
+    </svg>
+  );
+};
+
 interface Props {
   onSelectFamily: (familyId: FamilyId, resources: FamilyInfo['startingResources'], difficulty: 'easy' | 'normal' | 'hard', seed?: number, mapSize?: MapSize) => void;
 }
