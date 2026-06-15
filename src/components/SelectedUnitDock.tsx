@@ -2,8 +2,26 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import SoldierIcon from '@/components/SoldierIcon';
-import CapoIcon from '@/components/CapoIcon';
+
+const familyColors: Record<string, string> = {
+  gambino: '#42D3F2',
+  genovese: '#2AA63E',
+  lucchese: '#4169E1',
+  bonanno: '#DC143C',
+  colombo: '#8A2BE2',
+};
+
+const UnitPortrait: React.FC<{ family: string; type: 'soldier' | 'capo' }> = ({ family, type }) => (
+  <div
+    className="w-10 h-10 rounded-full flex items-center justify-center text-lg border-2 shrink-0"
+    style={{
+      backgroundColor: `${familyColors[family] || '#555'}33`,
+      borderColor: familyColors[family] || '#555',
+    }}
+  >
+    {type === 'capo' ? '👔' : '👤'}
+  </div>
+);
 
 interface SelectedUnitDockProps {
   gameState: any;
