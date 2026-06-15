@@ -41,6 +41,16 @@ const CapoIcon: React.FC<CapoIconProps> = ({
   const capoImg = capoImages[family];
   const size = 34;
 
+  // Deterministic 0..1 phase offset per capo so stacks don't pulse in lockstep
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  const idleDuration = wounded ? 5 : 3.8;
+  const phaseDelay = -((Math.abs(h) % 1000) / 1000) * idleDuration;
+  const idleAnimate = wounded
+    ? { y: [0, 1, 0.6, 0], rotate: [0, 0, 0, 0], scale: [1, 1, 1, 1] }
+    : { y: [0, -0.8, 0], rotate: [0, -0.4, 0], scale: [1, 1.02, 1] };
+
+
   return (
     <motion.g
       initial={{ opacity: 0, scale: 0 }}
@@ -64,16 +74,23 @@ const CapoIcon: React.FC<CapoIconProps> = ({
       {/* Family color glow */}
       <circle cx={x} cy={y + 2} r={size / 2 + 3} fill={familyColor} opacity={selected ? 0.5 : 0.3} />
 
-      {/* Capo figure image */}
-      <image
-        href={capoImg}
-        x={x - size / 2}
-        y={y - size / 2 - 6}
-        width={size}
-        height={size * 1.4}
-        preserveAspectRatio="xMidYMid meet"
-        style={{ filter: `drop-shadow(0 0 ${selected ? '8' : '4'}px ${selected ? '#FFD700' : familyColor})` }}
-      />
+      {/* Capo figure image with idle presence */}
+      <motion.g
+        animate={selected ? { y: 0, rotate: 0, scale: 1 } : idleAnimate}
+        transition={selected ? { duration: 0.2 } : { duration: idleDuration, repeat: Infinity, ease: 'easeInOut', delay: phaseDelay }}
+        style={{ transformOrigin: `${x}px ${y + size}px`, transformBox: 'fill-box' }}
+      >
+        <image
+          href={capoImg}
+          x={x - size / 2}
+          y={y - size / 2 - 6}
+          width={size}
+          height={size * 1.4}
+          preserveAspectRatio="xMidYMid meet"
+          style={{ filter: `drop-shadow(0 0 ${selected ? '8' : '4'}px ${selected ? '#FFD700' : familyColor})` }}
+        />
+      </motion.g>
+
 
       {/* Player family gold ring */}
       {isPlayerFamily && !selected && (
