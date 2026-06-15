@@ -1198,24 +1198,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           </span>
         </div>
         
-        {/* Phase Status */}
-        {(gameState.selectedUnitId || gameState.deployMode) && (
-          <div className="flex items-center space-x-2 px-3 py-1 bg-accent/20 rounded-full border border-accent/30">
-            <Target className="h-3 w-3 text-accent-foreground" />
-            <span className="text-xs font-medium text-accent-foreground">
-              {gameState.deployMode 
-                ? `Deploying ${gameState.deployMode.unitType} — click a highlighted hex`
-                : (() => {
-                    const unit = gameState.deployedUnits.find((u: any) => u.id === gameState.selectedUnitId);
-                    if (!unit) return 'Select a unit';
-                    if (gameState.turnPhase === 'action') return `${unit.type === 'capo' ? '👔' : '👤'} ${unit.type} selected — click a highlighted hex to act`;
-                    return `Moving ${unit.type} (${unit.movesRemaining} moves left)`;
-                  })()
-              }
-            </span>
-          </div>
-        )}
-        {/* Phase status chip removed — TurnStepRail is now the single source of truth for phase. */}
+        {/* Selection pill removed — SelectedUnitDock on the map is now the source of truth. */}
 
         {/* Tactical action toolbar — only during tactical (move) phase */}
         {gameState.turnPhase === 'move' && (
