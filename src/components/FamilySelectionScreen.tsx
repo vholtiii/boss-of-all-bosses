@@ -1129,6 +1129,51 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         </AnimatePresence>
       </div>
 
+      {/* Sticky bottom confirmation bar */}
+      <AnimatePresence>
+        {activeFamily && !isTransitioning && (
+          <motion.div
+            key="sticky-bar"
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed bottom-0 left-0 right-0 z-[40] border-t border-border/40 bg-background/85 backdrop-blur-md"
+            style={{ boxShadow: `0 -8px 24px rgba(0,0,0,0.55), inset 0 1px 0 ${activeFamily.color}30` }}
+          >
+            <div className="max-w-6xl mx-auto px-6 py-3 flex items-center gap-4 flex-wrap">
+              <FamilyCrest familyId={activeFamily.id} color={activeFamily.color} size={32} />
+              <div className="flex flex-col min-w-0">
+                <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground leading-none">Selected family</span>
+                <span className="font-playfair text-base font-bold leading-tight" style={{ color: activeFamily.color }}>
+                  {activeFamily.name}
+                </span>
+              </div>
+              <div className="h-8 w-px bg-border/40" />
+              <div className="flex items-center gap-3 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                <span>Difficulty: <span className="text-foreground font-bold">{difficulty}</span></span>
+                <span>·</span>
+                <span>Map: <span className="text-foreground font-bold">{mapSize}</span></span>
+                <span>·</span>
+                <span>Seed: <span className="text-foreground font-bold">{seedInput || 'random'}</span></span>
+              </div>
+              <Button
+                onClick={beginGame}
+                disabled={isTransitioning}
+                className="ml-auto font-playfair font-bold text-sm px-6 py-5"
+                style={{
+                  backgroundColor: activeFamily.color,
+                  color: '#000',
+                  boxShadow: `0 0 18px ${activeFamily.color}55`,
+                }}
+              >
+                Start as {activeFamily.name} →
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Cinematic transition overlay: pull-back through smoke */}
       <AnimatePresence>
         {isTransitioning && activeFamily && (
