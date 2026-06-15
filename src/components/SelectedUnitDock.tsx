@@ -64,9 +64,9 @@ const SelectedUnitDock: React.FC<SelectedUnitDockProps> = ({
             <div className="flex items-center gap-3">
               <div className="shrink-0">
                 {deployMode.unitType === 'capo' ? (
-                  <CapoIcon family={playerFamily as any} size={36} />
+                  <UnitPortrait family={deployMode ? playerFamily : unit.family} type="capo" />
                 ) : (
-                  <SoldierIcon family={playerFamily as any} size={32} />
+                  <UnitPortrait family={deployMode ? playerFamily : unit.family} type="soldier" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
@@ -101,9 +101,9 @@ const SelectedUnitDock: React.FC<SelectedUnitDockProps> = ({
               <div className="flex items-start gap-3">
                 <div className="shrink-0">
                   {isCapo ? (
-                    <CapoIcon family={unit.family} size={40} />
+                    <UnitPortrait family={deployMode ? playerFamily : unit.family} type="capo" />
                   ) : (
-                    <SoldierIcon family={unit.family} size={32} />
+                    <UnitPortrait family={deployMode ? playerFamily : unit.family} type="soldier" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
