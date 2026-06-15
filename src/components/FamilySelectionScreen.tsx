@@ -769,79 +769,121 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
             placeholder="Random"
             className="w-36 px-3 py-1.5 rounded-lg border border-border/50 bg-card/80 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono"
           />
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => { playSound('click'); rerollSeed(); }}
-                  className="p-1.5 rounded-lg border border-border/50 bg-card/80 text-muted-foreground hover:text-primary hover:border-primary/60 transition-colors"
-                  aria-label="Reroll seed"
-                >
-                  <Dices className="w-4 h-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Reroll seed</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={copySeed}
-                  disabled={!seedInput}
-                  className="p-1.5 rounded-lg border border-border/50 bg-card/80 text-muted-foreground hover:text-primary hover:border-primary/60 transition-colors disabled:opacity-40 disabled:hover:text-muted-foreground disabled:hover:border-border/50"
-                  aria-label="Copy seed"
-                >
-                  {seedCopied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{seedCopied ? 'Copied!' : 'Copy seed'}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-
-        {/* Confirmation row */}
-        <AnimatePresence mode="wait">
-          {seedInput ? (
+      {/* Map Seed Input — collapsed under Advanced */}
+      <div className="flex flex-col items-center gap-2 mb-6 relative z-[3]">
+        <button
+          type="button"
+          onClick={() => { playSound('click'); setShowAdvanced(v => !v); }}
+          className="text-[11px] font-mono uppercase tracking-[0.2em] text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5"
+          aria-expanded={showAdvanced}
+        >
+          <span>⚙</span> Advanced {showAdvanced ? '▾' : '▸'}
+          {!showAdvanced && (
+            <span className="ml-2 text-muted-foreground/60 normal-case tracking-normal">
+              seed {seedInput || 'random'}
+            </span>
+          )}
+        </button>
+        <AnimatePresence initial={false}>
+          {showAdvanced && (
             <motion.div
-              key={`active-${seedFlash}`}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="flex items-center gap-2 text-[11px]"
+              key="advanced"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
             >
-              <span className="px-2.5 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary font-mono tracking-wider">
-                Active seed: {seedInput}
-              </span>
-              <span className="flex items-center gap-1 text-primary/80">
-                <Check className="w-3 h-3" />
-                Will be loaded when game starts
-              </span>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="random"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex items-center gap-1 text-[11px] text-amber-400/90"
-            >
-              <AlertTriangle className="w-3 h-3" />
-              A random seed will be generated
+              <div className="flex flex-col items-center gap-2 pt-2">
+                <div className="flex items-center justify-center gap-2">
+                  <label className="text-xs text-muted-foreground font-source">Map Seed:</label>
+                  <input
+                    type="text"
+                    value={seedInput}
+                    onChange={(e) => setSeedInput(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="Random"
+                    className="w-36 px-3 py-1.5 rounded-lg border border-border/50 bg-card/80 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono"
+                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => { playSound('click'); rerollSeed(); }}
+                        className="p-1.5 rounded-lg border border-border/50 bg-card/80 text-muted-foreground hover:text-primary hover:border-primary/60 transition-colors"
+                        aria-label="Reroll seed"
+                      >
+                        <Dices className="w-4 h-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Reroll seed</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={copySeed}
+                        disabled={!seedInput}
+                        className="p-1.5 rounded-lg border border-border/50 bg-card/80 text-muted-foreground hover:text-primary hover:border-primary/60 transition-colors disabled:opacity-40 disabled:hover:text-muted-foreground disabled:hover:border-border/50"
+                        aria-label="Copy seed"
+                      >
+                        {seedCopied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>{seedCopied ? 'Copied!' : 'Copy seed'}</TooltipContent>
+                  </Tooltip>
+                </div>
+                <AnimatePresence mode="wait">
+                  {seedInput ? (
+                    <motion.div
+                      key={`active-${seedFlash}`}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className="flex items-center gap-2 text-[11px]"
+                    >
+                      <span className="px-2.5 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary font-mono tracking-wider">
+                        Active seed: {seedInput}
+                      </span>
+                      <span className="flex items-center gap-1 text-primary/80">
+                        <Check className="w-3 h-3" />
+                        Will be loaded when game starts
+                      </span>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="random"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex items-center gap-1 text-[11px] text-amber-400/90"
+                    >
+                      <AlertTriangle className="w-3 h-3" />
+                      A random seed will be generated
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
+      {/* STEP 2 header */}
+      <div className="mb-4 flex items-center justify-center gap-3 relative z-[3]">
+        <span className="h-px w-10 bg-primary/40" />
+        <span className="font-mono text-[10px] tracking-[0.32em] uppercase text-primary/80">
+          Step 2 · Choose Your Family
+        </span>
+        <span className="h-px w-10 bg-primary/40" />
+      </div>
+
       {/* Family cards — horizontal row */}
-      <div className="flex flex-wrap justify-center gap-5 max-w-6xl mx-auto mb-10 relative z-[3]">
+      <div className="flex flex-wrap justify-center gap-5 max-w-6xl mx-auto mb-10 relative z-[3] pb-24">
         {FAMILIES.map((family, i) => {
           const isSelected = selectedFamily === family.id;
           const isDimmed = !!selectedFamily && !isSelected;
-          const isRecommended = family.difficulty === 'Easy';
+
           return (
             <motion.div
               key={family.id}
