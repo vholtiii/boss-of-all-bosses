@@ -1,53 +1,56 @@
-# Premium Per-Family Unit Art
+# Subtle Idle Animations for Units
 
-Replace the current single Soldier and Capo PNGs with **10 family-tuned premium images** (5 families × 2 ranks) and tighten the in-map presentation. Capo stays close to current silhouette but reads cleaner and a touch more authoritative.
+Add gentle, board-game-piece-style breathing motion to Soldier and Capo portraits so they read as "alive" without distracting from gameplay.
 
-## Art direction
+## Animation design
 
-Shared base (consistency across all 10):
-- Noir 1940s mafia figures, full body, front-facing, slight contrapposto
-- Fedora, suit, long shadow; transparent background; soft rim light
-- Painted/illustrated style (not photoreal, not cartoon) — matches existing board-game noir aesthetic
-- Square 1024×1536 tall portrait, transparent PNG
+**Soldier — "breathing"**
+- Vertical bob: `y` translate ±0.6px, 3.2s loop, `easeInOut`
+- Subtle scale: 1.00 → 1.015 → 1.00 synced to bob
+- Idle only — animation pauses while `selected` (the gold pulse ring already provides motion) and while the parent `motion.g` is in its hover/tap states (those scale transforms take priority via framer-motion).
 
-Per-family flavor (subtle — color/accent only, silhouette stays family-readable at hex scale):
-- **Gambino** (cyan #42D3F2) — charcoal suit, cyan pocket square / tie
-- **Genovese** (green #2AA63E) — olive suit, green tie
-- **Lucchese** (royal blue #4169E1) — navy pinstripe, blue tie
-- **Bonanno** (crimson #DC143C) — black suit, red tie / boutonnière
-- **Colombo** (purple #8A2BE2) — dark purple suit, violet tie
+**Capo — "presence"**
+- Same bob but slightly slower (3.8s) and slightly larger (±0.8px, scale to 1.02) so a Capo reads as the heavier, more deliberate piece.
+- Cigar-smoke nod: every loop adds a near-imperceptible 0.4° rotation tilt at the top of the bob — only on Capos, reinforces the "boss" silhouette.
 
-Rank differentiation (Capo = "current+", per user pick):
-- **Soldier**: shorter jacket, hands at sides or one in pocket, plain fedora, no accessory
-- **Capo**: longer overcoat over suit, fedora with subtle band detail, cigar in hand, a small gold lapel pin; ~10% broader stance. Same color palette as the family's soldier so they read as same family at a glance.
+**Per-unit phase offset (critical so a stack doesn't pulse in lockstep)**
+- Derive a deterministic 0–1 offset from a stable id: for soldiers use `${family}-${x}-${y}` hash; for capos use `name`. Multiply by the loop duration and pass as a negative `delay` so each unit starts at a different point in the cycle.
+
+**Wounded capo override**
+- When `wounded`, swap to a slower 5s loop with no scale change (just a tiny droop: y +1px held longer than -1px). Sells "hurt" without a new asset.
+
+## Implementation
+
+Wrap the existing `<image>` element inside a nested `motion.g` that owns the idle loop. The outer `motion.g` keeps owning entry/selection/hover/tap. This avoids fighting framer-motion's animate prop on the outer group.
+
+```tsx
+<motion.g
+  animate={selected ? {} : { y: [0, -0.6, 0], scale: [1, 1.015, 1] }}
+  transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: -phaseOffset }}
+  style={{ transformOrigin: `${x}px ${y}px`, transformBox: "fill-box" }}
+>
+  <image ... />
+</motion.g>
+```
+
+`transformOrigin` anchored at the figure's feet keeps the bob looking like the unit is shifting weight, not floating.
 
 ## Files
 
-New assets (generated via premium model, transparent PNG):
-- `src/assets/units/soldier-gambino.png` … `soldier-colombo.png` (5)
-- `src/assets/units/capo-gambino.png` … `capo-colombo.png` (5)
+- `src/components/SoldierIcon.tsx` — wrap `<image>` in idle `motion.g`, add hash helper.
+- `src/components/CapoIcon.tsx` — same wrap with Capo timings + wounded variant.
 
-Code changes (presentation only, no game-logic touched):
-- `src/components/SoldierIcon.tsx` — import a `family → image` map; pick image by `family` prop. Keep existing glow/badge/selection logic untouched.
-- `src/components/CapoIcon.tsx` — same pattern. Bump `size` from 32 → 34 and the gold ring stroke from 2 → 2.25 for the subtle "Capo reads slightly more important" tweak. Keep current star/level badge.
-- Delete old `src/assets/soldier-figure.png` and `src/assets/capo-figure.png` once both icons are switched over.
+No new assets, no game logic, no other components touched.
 
-No changes to:
-- Hex placement, stacking, badges (count, wounded, marked-for-death)
-- Selection rings, pulse animation, drop-shadow tinting by family color
-- Any game state, AI, or balance code
+## Performance
 
-## Quality bar
-
-After generation, spot-check all 10 images at the in-map render size (~20–34px tall) to confirm:
-- Family color is recognizable without the colored glow halo
-- Capo vs Soldier silhouette difference is readable at small size
-- No background fringe / halo artifacts on transparent PNG
-
-If any family's image fails the check, regenerate just that one before swapping the import.
+- Pure CSS transforms via framer-motion (GPU-accelerated).
+- `repeat: Infinity` with `ease: "easeInOut"` — framer-motion uses `requestAnimationFrame`, pauses when tab is hidden.
+- Per-unit phase offset is computed once per render from props, no state.
+- At typical map sizes (≤40 units visible) this is negligible. If profiling later shows cost, the easy escape hatch is to disable idle when map zoom < 0.5 — not doing it preemptively.
 
 ## Out of scope
 
-- Family crest shields, animated auras, pedestals (rejected option)
-- HQ icon, hitman icon, scout/intel overlays
-- Any gameplay or rule changes
+- Walk animations between hexes (movement tween is separate work)
+- Combat hit-reaction shakes (already exist as flash effects)
+- HQ icon, scout/intel overlays

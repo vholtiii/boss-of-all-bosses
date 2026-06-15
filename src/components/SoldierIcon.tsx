@@ -40,6 +40,14 @@ const SoldierIcon: React.FC<SoldierIconProps> = ({
   const soldierImg = soldierImages[family];
   const size = 20;
 
+  // Deterministic 0..1 phase offset so stacked units don't pulse in lockstep
+  const seedStr = `${family}-${x}-${y}`;
+  let h = 0;
+  for (let i = 0; i < seedStr.length; i++) h = (h * 31 + seedStr.charCodeAt(i)) | 0;
+  const idleDuration = 3.2;
+  const phaseDelay = -((Math.abs(h) % 1000) / 1000) * idleDuration;
+
+
   return (
     <motion.g
       initial={{ opacity: 0, scale: 0 }}
@@ -63,16 +71,23 @@ const SoldierIcon: React.FC<SoldierIconProps> = ({
       {/* Family color glow */}
       <circle cx={x} cy={y + 2} r={size / 2 + 2} fill={familyColor} opacity={selected ? 0.5 : 0.25} />
 
-      {/* Soldier figure image */}
-      <image
-        href={soldierImg}
-        x={x - size / 2}
-        y={y - size / 2 - 4}
-        width={size}
-        height={size * 1.5}
-        preserveAspectRatio="xMidYMid meet"
-        style={{ filter: `drop-shadow(0 0 ${selected ? '6' : '3'}px ${selected ? '#FFD700' : familyColor})` }}
-      />
+      {/* Soldier figure image with idle breathing */}
+      <motion.g
+        animate={selected ? { y: 0, scale: 1 } : { y: [0, -0.6, 0], scale: [1, 1.015, 1] }}
+        transition={selected ? { duration: 0.2 } : { duration: idleDuration, repeat: Infinity, ease: 'easeInOut', delay: phaseDelay }}
+        style={{ transformOrigin: `${x}px ${y + size}px`, transformBox: 'fill-box' }}
+      >
+        <image
+          href={soldierImg}
+          x={x - size / 2}
+          y={y - size / 2 - 4}
+          width={size}
+          height={size * 1.5}
+          preserveAspectRatio="xMidYMid meet"
+          style={{ filter: `drop-shadow(0 0 ${selected ? '6' : '3'}px ${selected ? '#FFD700' : familyColor})` }}
+        />
+      </motion.g>
+
 
       {/* Player family gold ring */}
       {isPlayerFamily && !selected && (
