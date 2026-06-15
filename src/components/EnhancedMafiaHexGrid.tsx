@@ -2575,7 +2575,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       <SelectedUnitDock
         gameState={gameState}
         playerFamily={playerFamily}
-        onClearSelection={() => onAction && onAction({ type: 'clear_selection' })}
       />
 
       {/* Map Legend */}
