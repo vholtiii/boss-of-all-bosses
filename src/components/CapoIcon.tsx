@@ -1,6 +1,10 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import capoImg from '@/assets/capo-figure.png';
+import capoGambino from '@/assets/units/capo-gambino.png';
+import capoGenovese from '@/assets/units/capo-genovese.png';
+import capoLucchese from '@/assets/units/capo-lucchese.png';
+import capoBonanno from '@/assets/units/capo-bonanno.png';
+import capoColombo from '@/assets/units/capo-colombo.png';
 
 interface CapoIconProps {
   x: number;
@@ -22,12 +26,21 @@ const familyColors = {
   colombo: '#8A2BE2',
 };
 
-const CapoIcon: React.FC<CapoIconProps> = ({ 
-  x, y, family, name, level, isPlayerFamily = false, selected = false, wounded = false, onClick 
+const capoImages = {
+  gambino: capoGambino,
+  genovese: capoGenovese,
+  lucchese: capoLucchese,
+  bonanno: capoBonanno,
+  colombo: capoColombo,
+};
+
+const CapoIcon: React.FC<CapoIconProps> = ({
+  x, y, family, name, level, isPlayerFamily = false, selected = false, wounded = false, onClick
 }) => {
   const familyColor = familyColors[family];
-  const size = 32;
-  
+  const capoImg = capoImages[family];
+  const size = 34;
+
   return (
     <motion.g
       initial={{ opacity: 0, scale: 0 }}
@@ -50,7 +63,7 @@ const CapoIcon: React.FC<CapoIconProps> = ({
 
       {/* Family color glow */}
       <circle cx={x} cy={y + 2} r={size / 2 + 3} fill={familyColor} opacity={selected ? 0.5 : 0.3} />
-      
+
       {/* Capo figure image */}
       <image
         href={capoImg}
@@ -58,14 +71,15 @@ const CapoIcon: React.FC<CapoIconProps> = ({
         y={y - size / 2 - 6}
         width={size}
         height={size * 1.4}
+        preserveAspectRatio="xMidYMid meet"
         style={{ filter: `drop-shadow(0 0 ${selected ? '8' : '4'}px ${selected ? '#FFD700' : familyColor})` }}
       />
-      
+
       {/* Player family gold ring */}
       {isPlayerFamily && !selected && (
-        <circle cx={x} cy={y + 2} r={size / 2 + 5} fill="none" stroke="#D4AF37" strokeWidth="2" opacity="0.8" />
+        <circle cx={x} cy={y + 2} r={size / 2 + 5} fill="none" stroke="#D4AF37" strokeWidth="2.25" opacity="0.85" />
       )}
-      
+
       {/* Level badge */}
       {level > 1 && (
         <motion.g
