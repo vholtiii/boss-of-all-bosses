@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { DollarSign, Shield, Swords, Users, Eye, Volume2, VolumeX, Crown, Star, Dices, Check, Copy, AlertTriangle } from 'lucide-react';
+import { DollarSign, Shield, Swords, Users, Eye, Volume2, VolumeX, Crown, Dices, Check, Copy, AlertTriangle } from 'lucide-react';
 import { useBgMusic } from '@/hooks/useBgMusic';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import AtmosphericParticles from '@/components/AtmosphericParticles';
