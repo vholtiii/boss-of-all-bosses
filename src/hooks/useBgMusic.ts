@@ -16,22 +16,9 @@ export const useBgMusic = ({
 }: UseBgMusicOptions) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fadeIntervalRef = useRef<number | null>(null);
+  const disposedRef = useRef(false);
   const musicLevel = soundConfig.musicVolume ?? soundConfig.sfxVolume * 0.7;
-  const targetVolume = soundConfig.enabled ? musicLevel : 0; // background music level
-
-  // Create audio element once
-  useEffect(() => {
-    const audio = new Audio(src);
-    audio.loop = true;
-    audio.volume = 0;
-    audioRef.current = audio;
-
-    return () => {
-      audio.pause();
-      audio.src = '';
-      audioRef.current = null;
-    };
-  }, [src]);
+  const targetVolume = soundConfig.enabled ? musicLevel : 0;
 
   // Fade helper
   const fadeTo = useCallback((target: number, durationMs: number) => {
@@ -57,46 +44,72 @@ export const useBgMusic = ({
     }, stepMs);
   }, []);
 
-  // Start playing & fade in on mount, fade out on unmount
+  // Single mount effect: own the audio + autoplay-unlock listeners atomically
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    disposedRef.current = false;
+    const audio = new Audio(src);
+    audio.loop = true;
+    audio.volume = 0;
+    audioRef.current = audio;
 
-    const tryPlay = () => {
-      audio.play().then(() => {
-        fadeTo(targetVolume, fadeInMs);
-      }).catch(() => {
-        // Autoplay blocked — retry on first user interaction
-        const handler = () => {
-          audio.play().then(() => fadeTo(targetVolume, fadeInMs)).catch(() => {});
-          document.removeEventListener('click', handler);
-          document.removeEventListener('keydown', handler);
-        };
-        document.addEventListener('click', handler, { once: true });
-        document.addEventListener('keydown', handler, { once: true });
-      });
+    let unlockClick: ((e: Event) => void) | null = null;
+    let unlockKey: ((e: Event) => void) | null = null;
+
+    const removeUnlockHandlers = () => {
+      if (unlockClick) document.removeEventListener('click', unlockClick);
+      if (unlockKey) document.removeEventListener('keydown', unlockKey);
+      unlockClick = null;
+      unlockKey = null;
     };
 
-    tryPlay();
+    audio.play().then(() => {
+      if (disposedRef.current) return;
+      fadeTo(targetVolume, fadeInMs);
+    }).catch(() => {
+      // Autoplay blocked — retry on first user interaction
+      const handler = () => {
+        removeUnlockHandlers();
+        if (disposedRef.current) return;
+        const a = audioRef.current;
+        if (!a || a !== audio) return; // stale mount, skip
+        a.play().then(() => {
+          if (disposedRef.current) return;
+          fadeTo(targetVolume, fadeInMs);
+        }).catch(() => {});
+      };
+      unlockClick = handler;
+      unlockKey = handler;
+      document.addEventListener('click', handler, { once: true });
+      document.addEventListener('keydown', handler, { once: true });
+    });
 
     return () => {
-      if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+      disposedRef.current = true;
+      removeUnlockHandlers();
+      if (fadeIntervalRef.current) {
+        clearInterval(fadeIntervalRef.current);
+        fadeIntervalRef.current = null;
+      }
       audio.pause();
-      audio.volume = 0;
+      audio.src = '';
+      audioRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [src]);
 
   // React to volume/mute changes
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || disposedRef.current) return;
     if (targetVolume <= 0) {
       fadeTo(0, 300);
     } else if (!audio.paused) {
       fadeTo(targetVolume, 300);
     } else {
-      audio.play().then(() => fadeTo(targetVolume, 300)).catch(() => {});
+      audio.play().then(() => {
+        if (disposedRef.current) return;
+        fadeTo(targetVolume, 300);
+      }).catch(() => {});
     }
   }, [targetVolume, fadeTo]);
 
