@@ -240,22 +240,21 @@ const CARD_CLIP = 'polygon(0% 1.5%, 1% 0%, 99% 0.5%, 100% 2%, 99.5% 98%, 100% 10
 
 type MapSize = 'small' | 'medium' | 'large';
 
-// Mini hex-grid preview for map size selector
-const MapSizeHexPreview: React.FC<{ gridRadius: number; highlighted: boolean }> = ({ gridRadius, highlighted }) => {
-  const size = 64;
-  // Hex math: pointy-top, fit `gridRadius` rings into ~size px
+// Mini hex-grid preview for map size selector — tactical dossier window
+const MapSizeHexPreview: React.FC<{ gridRadius: number; highlighted: boolean; refTag: string }> = ({ gridRadius, highlighted, refTag }) => {
+  const size = 92;
   const hexR = size / (2 * (gridRadius + 1) + 0.5);
   const hexW = Math.sqrt(3) * hexR;
   const hexH = 2 * hexR;
   const cx = size / 2;
   const cy = size / 2;
-  const cells: { x: number; y: number; q: number; r: number }[] = [];
+  const cells: { x: number; y: number }[] = [];
   for (let q = -gridRadius; q <= gridRadius; q++) {
     for (let r = -gridRadius; r <= gridRadius; r++) {
       if (Math.abs(q + r) > gridRadius) continue;
       const x = cx + hexW * (q + r / 2);
       const y = cy + (hexH * 3) / 4 * r;
-      cells.push({ x, y, q, r });
+      cells.push({ x, y });
     }
   }
   const hexPath = (cx2: number, cy2: number, r2: number) => {
@@ -267,7 +266,7 @@ const MapSizeHexPreview: React.FC<{ gridRadius: number; highlighted: boolean }> 
     return `M${pts.join('L')}Z`;
   };
   // Deterministic family tint sprinkles
-  const tints = ['rgba(251,191,36,0.55)', 'rgba(16,185,129,0.5)', 'rgba(244,63,94,0.5)', 'rgba(59,130,246,0.5)', 'rgba(168,85,247,0.5)'];
+  const tints = ['rgba(251,191,36,0.6)', 'rgba(16,185,129,0.55)', 'rgba(244,63,94,0.55)', 'rgba(59,130,246,0.55)', 'rgba(168,85,247,0.55)'];
   const tinted = new Map<number, string>();
   const seed = gridRadius * 7 + 3;
   const tintCount = Math.min(cells.length, gridRadius + 3);
@@ -275,27 +274,35 @@ const MapSizeHexPreview: React.FC<{ gridRadius: number; highlighted: boolean }> 
     const idx = (i * 13 + seed) % cells.length;
     tinted.set(idx, tints[i % tints.length]);
   }
-  const strokeColor = highlighted ? 'rgba(251,191,36,0.7)' : 'rgba(255,255,255,0.18)';
+  const baseFill = highlighted ? 'hsl(var(--primary) / 0.10)' : 'rgba(255,255,255,0.04)';
+  const strokeColor = highlighted ? 'hsl(var(--primary) / 0.55)' : 'rgba(255,255,255,0.18)';
+  const cornerColor = highlighted ? 'hsl(var(--primary) / 0.7)' : 'rgba(255,255,255,0.25)';
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="block">
-      <defs>
-        <clipPath id={`hexClip-${gridRadius}`}>
-          <circle cx={cx} cy={cy} r={size / 2 - 1} />
-        </clipPath>
-      </defs>
-      <g clipPath={`url(#hexClip-${gridRadius})`}>
+    <div className="relative w-full aspect-square overflow-hidden bg-black/40">
+      {/* Tactical corner brackets */}
+      <span aria-hidden className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-t border-l" style={{ borderColor: cornerColor }} />
+      <span aria-hidden className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-t border-r" style={{ borderColor: cornerColor }} />
+      <span aria-hidden className="absolute bottom-1.5 left-1.5 w-2.5 h-2.5 border-b border-l" style={{ borderColor: cornerColor }} />
+      <span aria-hidden className="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 border-b border-r" style={{ borderColor: cornerColor }} />
+      <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`} className="block">
         {cells.map((c, i) => (
           <path
             key={i}
             d={hexPath(c.x, c.y, hexR * 0.92)}
-            fill={tinted.get(i) ?? 'rgba(255,255,255,0.06)'}
+            fill={tinted.get(i) ?? baseFill}
             stroke={strokeColor}
             strokeWidth={0.6}
           />
         ))}
-      </g>
-      <circle cx={cx} cy={cy} r={size / 2 - 0.5} fill="none" stroke={highlighted ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.12)'} strokeWidth={1} />
-    </svg>
+      </svg>
+      <span
+        aria-hidden
+        className="absolute bottom-1 left-2 font-mono text-[8px] tracking-tighter uppercase"
+        style={{ color: highlighted ? 'hsl(var(--primary) / 0.7)' : 'rgba(255,255,255,0.35)' }}
+      >
+        {refTag}
+      </span>
+    </div>
   );
 };
 
