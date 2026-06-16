@@ -70,10 +70,10 @@ const NotificationItem: React.FC<{ notification: Notification; onRemove: (id: st
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 300, scale: 0.8 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0, x: 300, scale: 0.8 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
+      initial={{ opacity: 0, x: 16, y: 4 }}
+      animate={{ opacity: 1, x: 0, y: 0 }}
+      exit={{ opacity: 0, x: 16, y: 4 }}
+      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
         "relative flex items-start gap-3 p-4 rounded-lg border shadow-lg w-full pointer-events-auto",
         colorClass

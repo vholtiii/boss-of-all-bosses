@@ -101,7 +101,7 @@ const SoldierIcon: React.FC<SoldierIconProps> = ({
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.2, delay: 0.4 }}
         >
-          <circle cx={x + 12} cy={y - 12} r="8" fill={familyColor} stroke="#ffffff" strokeWidth="1" />
+          <circle cx={x + 12} cy={y - 12} r="8" fill={familyColor} stroke="#0a0a0a" strokeWidth="1.25" />
           <text x={x + 12} y={y - 8.5} textAnchor="middle" fontSize="8" fill="#ffffff" fontWeight="bold" className="select-none">
             {count}
           </text>
@@ -115,7 +115,7 @@ const SoldierIcon: React.FC<SoldierIconProps> = ({
           animate={{ opacity: 1, scale: [1, 1.15, 1] }}
           transition={{ duration: 1.5, repeat: Infinity }}
         >
-          <circle cx={x - 12} cy={y - 12} r="8" fill="#8B0000" stroke="#FF4444" strokeWidth="1.5" />
+          <circle cx={x - 12} cy={y - 12} r="8" fill="#8B0000" stroke="#0a0a0a" strokeWidth="1.25" />
           <text x={x - 12} y={y - 8.5} textAnchor="middle" fontSize="9" className="select-none">
             ☠️
           </text>

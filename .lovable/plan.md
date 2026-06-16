@@ -1,55 +1,67 @@
-# UX Refinement Pass — Information Clarity
+# Slice 7 — Audio / Art / Animation polish pass
 
-Goal: cut clutter and ambiguity across the four touched surfaces. No new gameplay; every change is presentation, hierarchy, or copy. Each item lists the exact friction it removes.
+Tightens what already exists. No new SFX library, no rebranded art direction, no new motion framework. Three small, parallel edits that make the existing surfaces feel more crafted.
 
-## 1. Onboarding / Family Selection
+## A. Audio polish — `src/hooks/useSoundSystem.ts`
 
-- **Sticky confirmation bar.** The "Start as [Family]" CTA + seed + map size collapse into a thin bar pinned to the bottom of the viewport so the user always sees the full commitment without scrolling. Removes the disconnect between picking a family at the top and confirming at the bottom.
-- **Stat normalization on family cards.** Today each family card mixes labels ($, soldiers, loyalty, racketeering, ability). Group into 3 fixed rows: *Resources*, *Strengths*, *Signature Power*. Same row order on every card so eyes can compare across columns.
-- **Recommended badge demoted.** Replace the green "RECOMMENDED" highlight on Easy/Wiseguy with a small "👋 New player?" hint pinned to the difficulty selector instead — it shouldn't bias family choice.
-- **Map seed row collapsed by default** behind a "⚙ Advanced" disclosure. Most players never touch it; hiding it removes 1 row of visual weight.
-- **Difficulty + map size labeled section header.** Add a small "STEP 1 · CHOOSE YOUR GAME" → "STEP 2 · CHOOSE YOUR FAMILY" rhythm so the page reads top-to-bottom.
+The synth presets are flat sine/square blips with linear-attack/exp-decay envelopes. Three targeted improvements:
 
-## 2. In-game HUD & sidebars
+1. **Reuse one AudioContext + master gain node** instead of creating gain/oscillator chains directly on `destination`. Add a `masterGainRef` so future ducking is one line.
+2. **Resume context on first user gesture.** Browsers suspend `AudioContext` until interaction; right now the first few clicks can silently fail. Wire a one-shot `pointerdown`/`keydown` listener that calls `audioContext.resume()`.
+3. **Better envelopes for the 12 synth presets.** Replace the single-osc presets with small, hand-tuned voices:
+   - `click` → very short square + 8ms decay (current is fine, just shorten)
+   - `success` → two-osc perfect-fifth chime (sine 880 + sine 1320), 220ms
+   - `error` → detuned saw pair, 350ms with slight pitch drop
+   - `notification` → triangle 660 → 880 glide, 180ms
+   - `combat` / `hit_success` / `hit_fail` → low square + noise burst (use a short BufferSource of white noise) — gives actual impact
+   - `money` → sine 1200 + sine 1800 stacked, 180ms
+   - `danger` → saw with LFO-style pitch wobble via `setValueCurveAtTime`
+   No new sound files. Keep the same trigger names so all 43 existing call sites are untouched.
+4. **Soft clip the master gain** at 0.8 so layered triggers don't pop.
 
-- **Top status HUD: one-line resource strip.** Money / Soldiers / Respect / Influence / Heat get equal-width slots with: big number, tiny delta-this-turn under it (`+$420`, `-2`). Removes the need to open the turn summary to know if your last turn made or lost money.
-- **Phase chip absorbs the phase banner.** Today phase info lives in two places (banner + top chip). Drop the banner; the chip in the HUD becomes the single source ("PHASE 2 · ACTION · 2/3 used") with click-to-expand requirements list.
-- **Left action menu: collapse-by-default with badges.** Each section header shows the count of available actions ("Tactical · 3", "Strategic · 1 new"). Expanded section auto-collapses others. Reduces vertical noise from always-open accordions.
-- **Right sidebar rival cards: comparable bars.** Each rival shows Territory / Soldiers / Heat as 3 thin progress bars normalized to the leader, not raw numbers. At-a-glance "who's ahead" without math.
-- **Sitdowns panel: state-grouped, not flat list.** Headers `⏳ Awaiting you (2)` / `✓ Ready (1)` / `📨 Incoming (1)` with a single primary action per item.
-- **Boss/HQ panel: split tabs.** Today the panel mixes loyalty, businesses, supply, recruitment. Tab it into *Roster · Businesses · Supply* so each view fits the panel without scrolling.
+Out of scope: new mp3s, music layers, per-event mixing UI.
 
-## 3. Map interaction
+## B. Art polish — crests, unit icons, hex tile chrome
 
-- **Bottom-left hex card is the single source of hex truth.** Today some info lives on hover tooltip, some in the card, some on the action menu. Move all per-hex info (owner, business, units, fortify, safehouse, supply status, district control %) into the pinned card; hover gives only owner + business name.
-- **Selected-unit dock above the hex card.** When a unit is selected, a small dock shows portrait, name, toughness, loyalty, move budget left, and a strip of legal actions for this turn. Eliminates hunting for action buttons inside the action menu when a unit is selected.
-- **Legend becomes one collapsible hex.** A single corner button "❓ Legend" opens an overlay panel grouping outlines, badges, and supply icons in 3 columns with short captions. Replaces the always-visible legend strip.
-- **Highlight rules simplified.** Movement = solid amber ring, attack range = dashed rose ring, supply = dotted grey ring. Document in the new legend.
-- **Zoom % indicator + 1-click reset** near the zoom button so players know they're zoomed in and can snap back.
+No new asset generation. Refinements to existing SVG/CSS:
 
-## 4. Turn flow, modals & feedback
+1. **`src/components/FamilyCrest.tsx`** (if present, otherwise wherever crests render): add a subtle inner stroke + drop-shadow filter so crests read as embossed instead of flat. One `<filter>` def reused per crest.
+2. **`src/components/SoldierIcon.tsx` / `CapoIcon.tsx`**: tighten the badge contrast — current badges are semi-transparent over the figure and get muddy on dark hexes. Switch to a solid pill with 1px family-color outline; hide badges entirely when the unit is the only one on its hex (memory rule already says so — verify it's still honoured).
+3. **`src/components/EnhancedMafiaHexGrid.tsx`**: add a 1px inner highlight stroke on owned hexes (lighter family color at 30% alpha, inset 2px) so they feel beveled rather than flat-filled. Pure SVG, no new geometry.
 
-- **Turn step indicator in HUD.** `DEPLOY ▸ TACTICAL ▸ ACTION ▸ END` with the current step lit and click-to-skip on completed prior steps. Replaces scattered "skip" buttons.
-- **End-of-turn summary modal restructure.** Three tabs: *Money & Heat* (delta breakdown), *Combat* (log), *Diplomacy & Events* (sitdowns, random events). Today everything is one long scroll.
-- **Inline confirmations replace modals for routine actions.** Claim, extort, fortify, scout: confirm via a 2-button popover anchored to the hex menu instead of a full modal. Modals stay for destructive/irreversible actions (Plan Hit, HQ Assault, Declare War, Abandon Territory).
-- **Risk preview standardization.** Every action with risk shows the same 4-line block: *Cost · Success odds · Heat · Tension*. Replaces today's mix of paragraphs and stat lists per action.
-- **Notification toast grouping.** Multiple same-turn notifications of the same type collapse ("3 territories shifted") with click-to-expand. Stops the post-AI-turn toast flood.
-- **Wounded / low-loyalty units surface a persistent badge** in the right sidebar "Roster" tab so users don't lose track between turns.
+Out of scope: regenerating crest art, new unit illustrations, new hex textures, district background art.
 
-## Out of scope
+## C. Animation polish — modal/panel motion timing
 
-- Gameplay rules, balance, AI behavior — none changed.
-- New mechanics or screens.
-- Audio, art, animation overhauls beyond what naturally falls out of layout changes.
+Across the framer-motion call sites, durations and easings are inconsistent (some 0.2s linear, some 0.4s spring, some no exit). Standardize without changing what animates:
 
-## Suggested order (each ships independently)
+1. **Add `src/lib/motion-presets.ts`** exporting 4 reusable variants:
+   - `fadeIn` (opacity 0→1, 180ms ease-out)
+   - `popIn` (opacity + scale 0.96→1, 200ms ease-out)
+   - `slideUp` (y+8→0 + opacity, 220ms ease-out)
+   - `panelSlide` (x±16→0 + opacity, 240ms ease-out)
+   Each includes matching `exit`.
+2. **Apply the presets** in the 5 most-visible surfaces (no behavior changes, just swap inline `initial/animate/exit` objects):
+   - `TurnSummaryModal.tsx` (popIn for the modal, fadeIn for tab content)
+   - `notification-system.tsx` (slideUp for toasts — currently mixes spring + tween)
+   - `SelectedUnitDock.tsx` (slideUp)
+   - `GameSidePanels.tsx` (panelSlide on sidebar reveal)
+   - `HeadquartersInfoPanel.tsx` (popIn)
+3. **Standardize hex-flash timing** in `EnhancedMafiaHexGrid.tsx` combat overlays to 400ms ease-out (currently varies). Keeps the existing flash colors and shapes.
 
-1. Turn step indicator + inline confirmations (biggest friction win, low risk)
-2. Top resource strip with deltas + phase chip merge
-3. Bottom-left hex card consolidation + unit dock
-4. Right sidebar grouping (sitdowns, rivals, roster tabs)
-5. Family selection sticky bar + section steps
-6. End-of-turn modal tabs + notification grouping
-7. Legend overlay + highlight rule pass
+Out of scope: new animations on elements that don't currently animate, scroll-linked effects, page transitions, GSAP/Lottie.
 
-Tell me which slice to ship first — or whether you want me to bundle 1-3 as one "in-game clarity" PR.
+## Files touched
+- `src/hooks/useSoundSystem.ts`
+- `src/components/SoldierIcon.tsx`
+- `src/components/CapoIcon.tsx`
+- `src/components/EnhancedMafiaHexGrid.tsx`
+- `src/components/FamilyCrest.tsx` (if it exists; otherwise crest render site)
+- `src/lib/motion-presets.ts` (new)
+- `src/components/TurnSummaryModal.tsx`
+- `src/components/ui/notification-system.tsx`
+- `src/components/SelectedUnitDock.tsx`
+- `src/components/GameSidePanels.tsx`
+- `src/components/HeadquartersInfoPanel.tsx`
+
+Say **implement** to ship it, or call out any of A/B/C you want dropped or expanded.
