@@ -104,7 +104,7 @@ const CapoIcon: React.FC<CapoIconProps> = ({
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.2, delay: 0.4 }}
         >
-          <circle cx={x + 14} cy={y - 14} r="10" fill={familyColor} stroke="#ffffff" strokeWidth="1" />
+          <circle cx={x + 14} cy={y - 14} r="10" fill={familyColor} stroke="#0a0a0a" strokeWidth="1.25" />
           <text x={x + 14} y={y - 10.5} textAnchor="middle" fontSize="10" fill="#ffffff" fontWeight="bold" className="select-none">
             {level}
           </text>
@@ -118,7 +118,7 @@ const CapoIcon: React.FC<CapoIconProps> = ({
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.2, delay: 0.5 }}
         >
-          <circle cx={x - 14} cy={y - 14} r="10" fill="#DC2626" stroke="#ffffff" strokeWidth="1" />
+          <circle cx={x - 14} cy={y - 14} r="10" fill="#DC2626" stroke="#0a0a0a" strokeWidth="1.25" />
           <text x={x - 14} y={y - 10.5} textAnchor="middle" fontSize="10" className="select-none">🩸</text>
         </motion.g>
       )}
