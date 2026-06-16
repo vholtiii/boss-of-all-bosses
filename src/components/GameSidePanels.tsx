@@ -1515,21 +1515,18 @@ export const RightSidePanel: React.FC<{
           >
             <p className="text-[10px] text-muted-foreground mb-2 italic">Connect HQ to nodes via territory to supply your businesses</p>
             <div className="space-y-2">
-              {((gameState as any).supplyNodes || []).map((node: any) => {
-                const cfg = SUPPLY_NODE_CONFIG[node.type as SupplyNodeType];
-                const nodeTile = (gameState.hexMap || []).find((t: any) => t.q === node.q && t.r === node.r && t.s === node.s);
-                const isOwned = nodeTile?.controllingFamily === gameState.playerFamily;
-                // Check connection via BFS from HQ through player-controlled territory
-                const isConnected = (() => {
-                  const hMap = gameState.hexMap || [];
-                  const hqTile = hMap.find((t: any) => t.isHeadquarters === gameState.playerFamily);
+              {(() => {
+                const hMap = gameState.hexMap || [];
+                const hk = (q: number, r: number, s: number) => `${q},${r},${s}`;
+                const dirs = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
+                const isConnectedForFamily = (node: any, family: string): boolean => {
+                  if (!family || family === 'neutral') return false;
+                  const hqTile = hMap.find((t: any) => t.isHeadquarters === family);
                   if (!hqTile) return false;
-                  const hk = (q: number, r: number, s: number) => `${q},${r},${s}`;
                   const nodeKey = hk(node.q, node.r, node.s);
                   const visited = new Set<string>();
                   const queue: Array<{q:number;r:number;s:number}> = [{ q: hqTile.q, r: hqTile.r, s: hqTile.s }];
                   visited.add(hk(hqTile.q, hqTile.r, hqTile.s));
-                  const dirs = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
                   while (queue.length > 0) {
                     const c = queue.shift()!;
                     if (hk(c.q, c.r, c.s) === nodeKey) return true;
@@ -1538,77 +1535,143 @@ export const RightSidePanel: React.FC<{
                       const nk = hk(nq, nr, ns);
                       if (visited.has(nk)) continue;
                       const t = hMap.find((h: any) => h.q === nq && h.r === nr && h.s === ns);
-                      if (t && (t.controllingFamily === gameState.playerFamily || t.isHeadquarters === gameState.playerFamily || nk === nodeKey)) {
+                      if (t && (t.controllingFamily === family || t.isHeadquarters === family || nk === nodeKey)) {
                         visited.add(nk);
                         queue.push({q:nq, r:nr, s:ns});
                       }
                     }
                   }
                   return false;
-                })();
-                const stockEntry = ((gameState as any).supplyStockpile || []).find(
-                  (e: any) => e.family === gameState.playerFamily && e.nodeType === node.type && e.turnsSinceDisconnected > 0
-                );
-                const turnsSinceDisconnected = stockEntry?.turnsSinceDisconnected || 0;
-                const inBuffer = !isConnected && turnsSinceDisconnected > 0 && turnsSinceDisconnected <= SUPPLY_STOCKPILE_BUFFER;
-                const isDecaying = !isConnected && turnsSinceDisconnected > SUPPLY_STOCKPILE_BUFFER;
-                
-                // Find dependent businesses
-                const depBizTypes = Object.entries(SUPPLY_DEPENDENCIES)
-                  .filter(([, deps]) => deps.includes(node.type as SupplyNodeType))
-                  .map(([bType]) => bType);
-                
-                return (
-                  <div
-                    key={node.type}
-                    className={cn(
-                      "rounded-lg border bg-card p-2.5 cursor-pointer transition-colors",
-                      highlightedSupplyHex && highlightedSupplyHex.q === node.q && highlightedSupplyHex.r === node.r && highlightedSupplyHex.s === node.s
-                        ? "border-primary ring-1 ring-primary/50"
-                        : "border-border hover:border-muted-foreground/50"
-                    )}
-                    onClick={() => {
-                      playSound('click');
-                      if (onHighlightSupplyNode) {
-                        const isSelected = highlightedSupplyHex && highlightedSupplyHex.q === node.q && highlightedSupplyHex.r === node.r && highlightedSupplyHex.s === node.s;
-                        onHighlightSupplyNode(isSelected ? null : { q: node.q, r: node.r, s: node.s });
-                      }
-                    }}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-base">{cfg.icon}</span>
-                      <span className="text-xs font-bold text-foreground flex-1">{cfg.label}</span>
-                      {isConnected ? (
-                        <Badge variant="default" className="text-[9px] h-4 bg-green-600">✓ Active</Badge>
-                      ) : inBuffer ? (
-                        <Badge variant="outline" className="text-[9px] h-4 border-yellow-500 text-yellow-500">Stockpile: {SUPPLY_STOCKPILE_BUFFER - turnsSinceDisconnected + 1} turn{(SUPPLY_STOCKPILE_BUFFER - turnsSinceDisconnected + 1) !== 1 ? 's' : ''} left</Badge>
-                      ) : isDecaying ? (
-                        <Badge variant="destructive" className="text-[9px] h-4">✗ Severed</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[9px] h-4">— No Route</Badge>
+                };
+                const familyDotMap: Record<string, string> = {
+                  gambino: 'bg-families-gambino',
+                  genovese: 'bg-families-genovese',
+                  lucchese: 'bg-families-lucchese',
+                  bonanno: 'bg-families-bonanno',
+                  colombo: 'bg-families-colombo',
+                };
+                const familyBadgeMap: Record<string, string> = {
+                  gambino: 'border-families-gambino text-families-gambino',
+                  genovese: 'border-families-genovese text-families-genovese',
+                  lucchese: 'border-families-lucchese text-families-lucchese',
+                  bonanno: 'border-families-bonanno text-families-bonanno',
+                  colombo: 'border-families-colombo text-families-colombo',
+                };
+                const famLabel = (f: string) => f === 'neutral' ? 'Neutral' : f.charAt(0).toUpperCase() + f.slice(1);
+
+                // Group + sort: player first, then rivals (grouped), then neutral
+                const nodes = [...(((gameState as any).supplyNodes || []))];
+                const ownerOf = (node: any) => {
+                  const t = hMap.find((h: any) => h.q === node.q && h.r === node.r && h.s === node.s);
+                  return t?.controllingFamily || 'neutral';
+                };
+                const rank = (owner: string) => {
+                  if (owner === gameState.playerFamily) return 0;
+                  if (owner === 'neutral') return 2;
+                  return 1;
+                };
+                nodes.sort((a, b) => {
+                  const oa = ownerOf(a), ob = ownerOf(b);
+                  const ra = rank(oa), rb = rank(ob);
+                  if (ra !== rb) return ra - rb;
+                  if (oa !== ob) return oa.localeCompare(ob);
+                  return 0;
+                });
+
+                return nodes.map((node: any) => {
+                  const cfg = SUPPLY_NODE_CONFIG[node.type as SupplyNodeType];
+                  const owner: string = ownerOf(node);
+                  const isPlayerOwned = owner === gameState.playerFamily;
+                  const isNeutral = owner === 'neutral';
+                  const ownerConnected = !isNeutral && isConnectedForFamily(node, owner);
+
+                  const stockEntry = isPlayerOwned ? ((gameState as any).supplyStockpile || []).find(
+                    (e: any) => e.family === gameState.playerFamily && e.nodeType === node.type && e.turnsSinceDisconnected > 0
+                  ) : null;
+                  const turnsSinceDisconnected = stockEntry?.turnsSinceDisconnected || 0;
+                  const inBuffer = isPlayerOwned && !ownerConnected && turnsSinceDisconnected > 0 && turnsSinceDisconnected <= SUPPLY_STOCKPILE_BUFFER;
+                  const isDecaying = isPlayerOwned && !ownerConnected && turnsSinceDisconnected > SUPPLY_STOCKPILE_BUFFER;
+
+                  const depBizTypes = Object.entries(SUPPLY_DEPENDENCIES)
+                    .filter(([, deps]) => deps.includes(node.type as SupplyNodeType))
+                    .map(([bType]) => bType);
+
+                  const isHighlighted = highlightedSupplyHex && highlightedSupplyHex.q === node.q && highlightedSupplyHex.r === node.r && highlightedSupplyHex.s === node.s;
+
+                  return (
+                    <div
+                      key={`${node.type}-${node.q}-${node.r}`}
+                      className={cn(
+                        "rounded-lg border bg-card p-2.5 cursor-pointer transition-colors",
+                        isHighlighted
+                          ? "border-primary ring-1 ring-primary/50"
+                          : "border-border hover:border-muted-foreground/50"
+                      )}
+                      onClick={() => {
+                        playSound('click');
+                        if (onHighlightSupplyNode) {
+                          onHighlightSupplyNode(isHighlighted ? null : { q: node.q, r: node.r, s: node.s });
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-base">{cfg.icon}</span>
+                        <span className="text-xs font-bold text-foreground flex-1">{cfg.label}</span>
+                        {/* Status badge — player perspective when player-owned, owner perspective otherwise */}
+                        {isPlayerOwned && ownerConnected ? (
+                          <Badge variant="default" className="text-[9px] h-4 bg-green-600">✓ Active</Badge>
+                        ) : inBuffer ? (
+                          <Badge variant="outline" className="text-[9px] h-4 border-yellow-500 text-yellow-500">Stockpile: {SUPPLY_STOCKPILE_BUFFER - turnsSinceDisconnected + 1}t left</Badge>
+                        ) : isDecaying ? (
+                          <Badge variant="destructive" className="text-[9px] h-4">✗ Severed</Badge>
+                        ) : isPlayerOwned ? (
+                          <Badge variant="outline" className="text-[9px] h-4">— No Route</Badge>
+                        ) : isNeutral ? (
+                          <Badge variant="outline" className="text-[9px] h-4 border-muted-foreground/40 text-muted-foreground">Unclaimed</Badge>
+                        ) : ownerConnected ? (
+                          <Badge variant="outline" className={cn("text-[9px] h-4", familyBadgeMap[owner] || '')}>✓ Connected</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[9px] h-4 border-destructive/60 text-destructive">✗ Severed</Badge>
+                        )}
+                      </div>
+                      {/* Owner row */}
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className={cn(
+                          "h-2 w-2 rounded-full shrink-0",
+                          isNeutral ? "bg-muted-foreground/40" : (familyDotMap[owner] || 'bg-primary')
+                        )} />
+                        <span className={cn(
+                          "text-[10px] font-semibold",
+                          isNeutral ? "text-muted-foreground" : isPlayerOwned ? "text-foreground" : "text-foreground/90"
+                        )}>
+                          {isPlayerOwned ? `${famLabel(owner)} (You)` : famLabel(owner)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground ml-auto truncate">{node.district}</span>
+                      </div>
+                      {depBizTypes.length > 0 && (
+                        <p className="text-[10px] font-semibold text-muted-foreground mt-0.5">
+                          Supplies: {depBizTypes.map(t => t.replace('_', ' ')).join(', ')}
+                        </p>
+                      )}
+                      {!isPlayerOwned && !isNeutral && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5 italic">
+                          Not yours — cut their route to hurt their income.
+                        </p>
+                      )}
+                      {inBuffer && (
+                        <p className="text-[10px] text-yellow-500 mt-0.5">
+                          ⏳ Businesses running on stored supplies
+                        </p>
+                      )}
+                      {isDecaying && (
+                        <p className="text-[10px] text-destructive mt-0.5">
+                          ⚠️ Supply cut — businesses at {Math.max(20, 100 - (turnsSinceDisconnected - SUPPLY_STOCKPILE_BUFFER) * 10)}% revenue
+                        </p>
                       )}
                     </div>
-                    <p className="text-[10px] text-muted-foreground">
-                      {node.district} · {isOwned ? 'Owned' : nodeTile?.controllingFamily !== 'neutral' ? `Held by ${nodeTile?.controllingFamily}` : 'Neutral'}
-                    </p>
-                    {depBizTypes.length > 0 && (
-                      <p className="text-[10px] font-semibold text-muted-foreground mt-0.5">
-                        Supplies: {depBizTypes.map(t => t.replace('_', ' ')).join(', ')}
-                      </p>
-                    )}
-                    {inBuffer && (
-                      <p className="text-[10px] text-yellow-500 mt-0.5">
-                        ⏳ Businesses running on stored supplies
-                      </p>
-                    )}
-                    {isDecaying && (
-                      <p className="text-[10px] text-destructive mt-0.5">
-                        ⚠️ Supply cut — businesses at {Math.max(20, 100 - (turnsSinceDisconnected - SUPPLY_STOCKPILE_BUFFER) * 10)}% revenue
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
             {/* Active Supply Deals */}
             {(() => {
