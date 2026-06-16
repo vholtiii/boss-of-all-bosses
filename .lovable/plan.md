@@ -1,40 +1,26 @@
 ## Goal
+Make `mafia-theme.mp3` reliably play on the family selection screen. The hook is already imported and called, but two bugs in `useBgMusic` can leave it silent.
 
-In the right-sidebar **Supply Lines** section, make each node clearly show **who owns it** and whether **that owner** has it connected — instead of always describing status from the player's perspective.
+## Changes
 
-Today (in `src/components/GameSidePanels.tsx`, ~lines 1517-1612):
-- Each node card computes `isConnected` as "connected to **player** HQ" only.
-- Ownership is buried as small grey text: `Owned` / `Held by gambino` / `Neutral`.
-- A rival-owned node always shows `— No Route`, which is misleading (it means "no route for *you*"), and there's no indication whether the rival actually has it hooked up.
+### `src/hooks/useBgMusic.ts`
+1. **Always attempt playback on mount, even when muted.**
+   - In the mount effect (currently `[]` deps), call `audio.play()` and register the click/keydown autoplay-unlock fallback regardless of `targetVolume`. Keep volume at 0 if muted; let the existing `[targetVolume]` effect fade it up later when the user unmutes.
+   - Fixes the case where a user who launched with sound muted never gets music even after unmuting on the select screen.
+2. **Add an explicit `musicVolume` channel (optional, small).**
+   - Read `soundConfig.musicVolume` if present, else fall back to `sfxVolume * 0.7`. Pure additive — no breaking change.
+   - Keeps behavior identical for current users while letting music exist independent of SFX going forward (no UI work in this slice).
 
-## Changes (UI-only, single file)
-
-**`src/components/GameSidePanels.tsx`** — Supply Lines `CollapsibleSection`:
-
-1. **Owner row, prominent.** Replace the small "district · ownership" line with a dedicated row at the top of each card:
-   - Family color swatch (4px dot using existing family color tokens) + bold family label, or "Neutral" in muted text.
-   - Keep district name to the right in muted text.
-
-2. **Per-owner connection status.** Generalize the existing BFS so it accepts a `family` argument and check connectivity from **that family's HQ** through **their** controlled territory.
-   - If neutral → status badge `Unclaimed`.
-   - If owned (player or rival) → run BFS for the owner and show `Connected` / `Severed` badge tinted with the owner's family color.
-   - Stockpile/decay copy (`Stockpile: N turns left`, `Supply cut — businesses at X%`) stays **player-only** and only renders when the player owns the node, since stockpile state is tracked per family.
-
-3. **Player-perspective hint, secondary.** Under the owner row, add a small line only when the node is rival-owned:
-   - `Not yours — cut their route to hurt their income.` (muted, single line, no new actions.)
-
-4. **Sort order.** Group cards: player-owned first, then rival-owned (grouped by family), then neutral. Within each group, keep current node-type order.
-
-5. **No changes** to: supply node data model, BFS/decay/stockpile game logic, map rendering, AI logic, or the Active Supply Deals subsection below.
-
-## Technical notes
-
-- Extract the inline BFS into a small local helper `isConnectedForFamily(node, family)` inside the component so it can be called for any family without duplicating the dir/visited boilerplate.
-- Reuse the existing family color map already used elsewhere in `GameSidePanels.tsx` (e.g. tension cards) — no new tokens.
-- Keep the existing `onHighlightSupplyNode` click behavior intact for all cards, including rival/neutral ones, so players can locate any node on the map.
+### `src/components/FamilySelectionScreen.tsx`
+No code changes needed — the hook is already wired at line 331 with the correct src and `soundConfig`. Verify after the hook fix by:
+- Loading the select screen with sound enabled → music fades in (immediate or after first click if browser blocks autoplay).
+- Toggling the mute button off then on → music resumes.
 
 ## Out of scope
+- New music-volume slider in `SoundSettingsDialog` (can follow once channel exists).
+- Touching in-game music or `useSoundSystem` SFX synth voices.
+- Changing the ambience crossfade in `beginGame`.
 
-- New actions (sabotage shortcuts, claim buttons) on rival nodes.
-- Map overlay changes (route colors per family stay as the existing uniform grey).
-- Showing rival stockpile counters (that info is hidden by design).
+## Technical notes
+- `useBgMusic.ts` mount effect: move `tryPlay()` out of any volume gate; the existing `fadeTo(targetVolume, ...)` handles the 0-volume case (audio plays muted, autoplay unlock still wires up).
+- `SoundConfig` type stays backward compatible — `musicVolume?: number` is optional and persists via the existing `updateSoundConfig` path without migration work.
