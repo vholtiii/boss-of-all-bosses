@@ -16,7 +16,8 @@ export const useBgMusic = ({
 }: UseBgMusicOptions) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fadeIntervalRef = useRef<number | null>(null);
-  const targetVolume = soundConfig.enabled ? soundConfig.sfxVolume * 0.7 : 0; // background music level
+  const musicLevel = soundConfig.musicVolume ?? soundConfig.sfxVolume * 0.7;
+  const targetVolume = soundConfig.enabled ? musicLevel : 0; // background music level
 
   // Create audio element once
   useEffect(() => {
