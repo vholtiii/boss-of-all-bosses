@@ -981,6 +981,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           onMouseEnter={() => { setHoveredHex(tile); }}
                           onMouseLeave={() => setHoveredHex(null)}
                         />
+                        {isPlayerTerritory && !tile.isHeadquarters && (
+                          <polygon
+                            points={getHexPoints(x, y, baseHexRadius - 2)}
+                            fill="none"
+                            stroke={familyColors[playerFamily] || '#D4AF37'}
+                            strokeOpacity={0.3}
+                            strokeWidth={1}
+                            className="pointer-events-none"
+                          />
+                        )}
                         {showBuiltIndicator && (
                           <>
                             <polygon
