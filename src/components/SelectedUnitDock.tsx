@@ -53,10 +53,10 @@ const SelectedUnitDock: React.FC<SelectedUnitDockProps> = ({
       {show && (
         <motion.div
           key="selected-unit-dock"
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 10 }}
-          transition={{ duration: 0.15 }}
+          exit={{ opacity: 0, y: 8 }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           className="absolute bottom-4 left-4 z-30 bg-noir-dark/95 backdrop-blur-sm border border-mafia-gold/40 rounded-lg px-3 py-2 text-white shadow-lg min-w-[240px] max-w-[320px]"
           style={{ marginBottom: 'calc(var(--hex-card-h, 0px))' }}
         >
