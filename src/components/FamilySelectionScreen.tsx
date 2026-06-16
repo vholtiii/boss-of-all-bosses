@@ -715,13 +715,20 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
           })}
         </div>
 
-        {/* Map Size Selector — mini hex-grid previews */}
-        <div className="flex items-center justify-center gap-3 mt-6">
+        {/* Map Size Selector — tactical dossier */}
+        <div className="mt-8 mb-3 flex items-center justify-center gap-3 relative z-[3]">
+          <span className="h-px w-10 bg-primary/40" />
+          <span className="font-mono text-[10px] tracking-[0.32em] uppercase text-primary/80">
+            Map Size · Theatre of Operations
+          </span>
+          <span className="h-px w-10 bg-primary/40" />
+        </div>
+        <div className="flex items-stretch justify-center gap-5">
           {(['small', 'medium', 'large'] as const).map(s => {
             const meta = {
-              small:  { label: 'Small',  desc: '~169 hexes · Fast',     radius: 2, count: 19 },
-              medium: { label: 'Medium', desc: '~331 hexes · Classic',  radius: 3, count: 37 },
-              large:  { label: 'Large',  desc: '~547 hexes · Epic',     radius: 4, count: 61 },
+              small:  { label: 'Small',  desc: '~169 hexes · Fast',     radius: 2, refTag: 'REF_SML_01' },
+              medium: { label: 'Medium', desc: '~331 hexes · Classic',  radius: 3, refTag: 'REF_MED_04' },
+              large:  { label: 'Large',  desc: '~547 hexes · Epic',     radius: 4, refTag: 'REF_LRG_07' },
             }[s];
             const isActive = mapSize === s;
             return (
@@ -729,36 +736,40 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
                 key={s}
                 onClick={() => { setMapSize(s); playSound('click'); }}
                 className={cn(
-                  'relative flex flex-col items-center gap-1 w-[140px] px-3 pt-3 pb-2 rounded-md transition-all duration-200',
-                  'bg-card/80 backdrop-blur-sm outline-none',
+                  'group relative flex flex-col items-stretch w-[168px] p-3 rounded-none transition-all duration-200 outline-none text-left',
                   'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                  isActive
+                    ? 'bg-card/70 border-2 border-primary shadow-[0_0_25px_hsl(var(--primary)/0.18),inset_0_0_0_1px_hsl(var(--primary)/0.08)]'
+                    : 'bg-card/40 border border-border/50 hover:border-border hover:bg-card/55',
+                  !isActive && !prefersReducedMotion && 'hover:-translate-y-0.5',
                 )}
-                style={{
-                  border: isActive ? '2px solid rgb(251,191,36)' : '1px solid hsl(var(--border) / 0.5)',
-                  boxShadow: isActive
-                    ? '0 0 18px rgba(251,191,36,0.4), inset 0 0 0 1px rgba(251,191,36,0.1)'
-                    : '0 2px 8px rgba(0,0,0,0.25)',
-                }}
                 title={meta.desc}
+                aria-pressed={isActive}
               >
                 {isActive && (
                   <span
-                    className="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-                    style={{ background: 'rgb(251,191,36)', color: '#0a0a0a' }}
+                    className="absolute -top-2.5 -right-2 z-10 px-1.5 py-[2px] text-[8px] font-bold uppercase tracking-[0.18em] font-mono shadow-md"
+                    style={{ background: 'hsl(var(--primary))', color: 'hsl(var(--background))' }}
                   >
-                    ✓
+                    ✓ Approved
                   </span>
                 )}
-                <MapSizeHexPreview gridRadius={meta.radius} highlighted={isActive} />
-                <div
-                  className={cn(
-                    'text-xs font-bold uppercase tracking-widest font-mono',
-                    isActive ? 'text-amber-400' : 'text-muted-foreground'
-                  )}
-                >
-                  {meta.label}
+                <MapSizeHexPreview gridRadius={meta.radius} highlighted={isActive} refTag={meta.refTag} />
+                <div className="mt-2.5 flex items-baseline gap-1.5">
+                  <span className={cn(
+                    'font-mono text-[11px] font-bold uppercase tracking-[0.28em]',
+                    isActive ? 'text-primary' : 'text-foreground/70',
+                  )}>
+                    {meta.label}
+                  </span>
+                  <span className="flex-1 border-b border-dotted border-border/40 mb-1" />
                 </div>
-                <div className="text-[9px] text-muted-foreground/70 font-mono">{meta.desc}</div>
+                <div className={cn(
+                  'mt-0.5 text-[9px] font-mono uppercase tracking-wider',
+                  isActive ? 'text-primary/70' : 'text-muted-foreground/70',
+                )}>
+                  {meta.desc}
+                </div>
               </button>
             );
           })}
