@@ -1,32 +1,24 @@
-# Refine Map Size selector — Noir Tactical Dossier
+# Fix overlapping music on the select screen
 
-Going with the **Noir Tactical Dossier** direction: squared cards with tactical crosshair corners, true hex-mask preview windows, condensed Oswald labels, and Courier meta — matches the dossier cards directly above (FILE №001/002/003).
+## Root cause
 
-## Scope — `src/components/FamilySelectionScreen.tsx` only
+In `src/hooks/useBgMusic.ts`, the mount effect (lines 61–88) handles autoplay-blocked browsers by registering `click`/`keydown` listeners that call `audio.play()` later. The cleanup function pauses the audio but does **not** remove those listeners.
 
-**`MapSizeHexPreview` (lines 244–300)**
-- Drop the circular clip. Square preview window with tactical corner brackets (top-left + bottom-right L-marks) and a thin inner border. Inactive border `border-border/40`, active `border-primary/60`.
-- Per-size hex density: small = 4 large hexes, medium = 7 (current radius=3 layout, kept), large = denser grid filling the frame.
-- Inactive: muted slate fill, ~30% opacity, brightens on hover. Active: amber-tinted hexes with soft inset glow.
-- Tiny mono "REF_SML_01 / REF_MED_04 / REF_LRG_07" tag in the bottom-left corner of the preview window for tactical-document feel.
+Under React StrictMode (dev) the effect runs twice on mount, and even in production any remount (HMR, parent re-render path) leaves orphan listeners behind. When the user later clicks, the orphaned listener resumes the paused/old audio at the same time a fresh `Audio` instance from the new mount is also playing → two looping tracks overlapping.
 
-**Card buttons (lines 711–758)**
-- Square-cornered (`rounded-none`) to match dossier cards above. Width 176px, vertical stack: preview window → label → meta.
-- Inactive: `bg-card/40 border border-border/50`. Hover: `border-border` + `-translate-y-0.5`.
-- Active: `bg-card/70`, 2px amber border (`border-primary`), soft amber glow `shadow-[0_0_25px_hsl(var(--primary)/0.15)]`. Replace the floating ✓ pill with a small stamped **"APPROVED"** chip in amber (top-right, slight overlap) — same vocabulary as the FILE №002 STANDARD card.
-- Labels: switch from font-mono to **Oswald** (already used by the THE FIVE FAMILIES title family), uppercase, tracking-[0.25em]. Active label `text-primary` with subtle glow; inactive `text-muted-foreground`.
-- Meta: Courier Prime (load via Google Fonts in `index.html` or rely on existing mono stack) — `~331 HEXES · CLASSIC` uppercase, tighter tracking.
+A secondary contributor: the `targetVolume` effect (lines 91–101) calls `audio.play()` whenever `soundConfig` changes and the audio is currently paused, which can race with the mount effect's `tryPlay` and double-start.
 
-**Section heading (new, just above the row)**
-- Tiny centered "— MAP SIZE —" in mono uppercase widest tracking, matching the existing "STEP 1 · CHOOSE YOUR GAME" treatment, so the row reads as a deliberate dossier section.
+## Fix — `src/hooks/useBgMusic.ts` only
 
-**Token discipline**
-- Replace inline `rgb(251,191,36)` literals with `hsl(var(--primary))` references and Tailwind `primary` classes. No new hardcoded hex.
-- Honor `prefersReducedMotion` already in scope: skip translate-y hover for those users.
+1. Track the unlock listeners in refs so cleanup can remove them: store `clickHandler` / `keyHandler` on a ref, and in the mount-effect cleanup call `document.removeEventListener` for both before pausing.
+2. Guard the unlock handler with a `disposedRef` flag set to `true` in cleanup, so a stale handler that already fired-and-removed itself can't still call `.play()` on a torn-down audio.
+3. Guard the `targetVolume` effect: skip the `.play()` branch if `disposedRef.current` is true or the audio is already attempting to play (track with a `playingRef` boolean set in the mount effect's `tryPlay`).
+4. Make the mount effect depend on `src` (already does via the create effect) but keep it `[]` for autoplay logic — combine both effects into a single one keyed on `src` so one mount = one audio = one set of listeners. Cleanup tears down audio + listeners atomically.
 
-## Out of scope
-No changes to behavior, the family roster, difficulty cards, advanced/seed panel, title, or starting-balance test fixtures. Three sizes and `setMapSize` wiring untouched.
+No behavior change to `useSoundSystem`, `FamilySelectionScreen`, or `mafia-theme.mp3`. No new dependencies.
 
 ## Verification
-- Visual: load `/`, confirm the three squared cards render with crosshair corners, hex window previews, APPROVED chip on active, and Oswald labels.
-- Run `bunx vitest run src/components/__tests__/FamilySelectionScreen.starting-balance.test.tsx`.
+
+- Hard-reload `/`, listen for a single theme track. Toggle the mute button off/on, confirm one track resumes (no overlap).
+- Force autoplay-blocked path (DevTools → Application → block media autoplay, or just reload without prior interaction), click once, confirm one track.
+- In dev StrictMode (default), confirm only one audible loop.
