@@ -4,6 +4,7 @@ export interface SoundConfig {
   enabled: boolean;
   sfxVolume: number;    // 0-1, synthesized voices
   voiceVolume: number;  // 0-1, recorded mp3 clips
+  musicVolume?: number; // 0-1, background music (optional, defaults to sfxVolume * 0.7)
 }
 
 const STORAGE_KEY = 'mafia-sound-settings';
