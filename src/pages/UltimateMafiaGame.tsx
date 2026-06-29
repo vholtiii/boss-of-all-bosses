@@ -1168,21 +1168,38 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         >
           <LogOut className="h-4 w-4" />
         </Button>
-        <Button
-          onClick={() => {
-            if (gameState.turnPhase !== 'waiting') {
-              if (!window.confirm('End your turn early? You still have actions remaining.')) return;
+        <SmartEndTurnButton
+          gameState={gameState}
+          jailed={gameState.legalStatus.jailTime > 0}
+          jailTime={gameState.legalStatus.jailTime}
+          onEndTurn={() => { playSound('notification'); endTurn(); }}
+          onResolveItem={(item: PendingItem) => {
+            playSound('select' as any);
+            if (item.kind === 'incoming_sitdown' || item.kind === 'ready_sitdown') {
+              // Open / scroll the sitdowns panel
+              window.dispatchEvent(new CustomEvent('focus-sitdowns-panel'));
+              if (item.hex) {
+                const tile = (gameState.hexMap || []).find((t: any) => t.q === item.hex!.q && t.r === item.hex!.r && t.s === item.hex!.s);
+                if (tile) selectTerritory(tile);
+              }
+              return;
             }
-            playSound('notification');
-            endTurn();
+            if (item.kind === 'capo_promote') {
+              window.dispatchEvent(new CustomEvent('focus-promotion-panel'));
+              if (item.unit) selectUnit(item.unit.type, { q: item.unit.q, r: item.unit.r, s: item.unit.s });
+              return;
+            }
+            if (item.kind === 'unit_orders' && item.unit) {
+              selectUnit(item.unit.type, { q: item.unit.q, r: item.unit.r, s: item.unit.s });
+              return;
+            }
+            if (item.kind === 'threat' && item.hex) {
+              const tile = (gameState.hexMap || []).find((t: any) => t.q === item.hex!.q && t.r === item.hex!.r && t.s === item.hex!.s);
+              if (tile) selectTerritory(tile);
+              return;
+            }
           }}
-          size="sm"
-          className="bg-primary text-primary-foreground font-bold font-playfair hover:bg-primary/90"
-          disabled={gameState.legalStatus.jailTime > 0}
-        >
-          <SkipForward className="h-4 w-4 mr-2" />
-          {gameState.legalStatus.jailTime > 0 ? `JAILED (${gameState.legalStatus.jailTime})` : 'END TURN'}
-        </Button>
+        />
       </div>
     </div>
   );
