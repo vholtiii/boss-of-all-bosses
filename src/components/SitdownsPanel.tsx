@@ -278,7 +278,7 @@ const SitdownsPanel: React.FC<SitdownsPanelProps> = ({
   const treacheryActive = ((gameState as any).treacheryDebuff?.turnsRemaining || 0) > 0;
 
   return (
-    <div className="rounded-lg border-2 border-mafia-gold/50 bg-mafia-gold/5 overflow-hidden">
+    <div ref={rootRef} className="rounded-lg border-2 border-mafia-gold/50 bg-mafia-gold/5 overflow-hidden transition-shadow">
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-3 py-2 hover:bg-mafia-gold/10 transition-colors"
