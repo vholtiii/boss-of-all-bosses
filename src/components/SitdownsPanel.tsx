@@ -242,6 +242,7 @@ const SitdownsPanel: React.FC<SitdownsPanelProps> = ({
   const total = ready.length + inFlight.length + incoming.length;
   const [open, setOpen] = useState<boolean>(false);
   const lastSignatureRef = useRef<string>('');
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-expand once when something new and actionable appears (ready or incoming).
   useEffect(() => {
@@ -253,6 +254,21 @@ const SitdownsPanel: React.FC<SitdownsPanelProps> = ({
       lastSignatureRef.current = sig;
     }
   }, [ready, incoming]);
+
+  // SmartEndTurnButton dispatches `focus-sitdowns-panel` when the cycler
+  // jumps to a sitdown — open the panel and scroll it into view.
+  useEffect(() => {
+    const onFocus = () => {
+      setOpen(true);
+      requestAnimationFrame(() => {
+        rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        rootRef.current?.classList.add('ring-2', 'ring-mafia-gold');
+        setTimeout(() => rootRef.current?.classList.remove('ring-2', 'ring-mafia-gold'), 1200);
+      });
+    };
+    window.addEventListener('focus-sitdowns-panel', onFocus);
+    return () => window.removeEventListener('focus-sitdowns-panel', onFocus);
+  }, []);
 
   if (total === 0) return null;
 
