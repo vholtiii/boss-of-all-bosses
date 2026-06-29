@@ -2,6 +2,8 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import NegotiationDialog from '@/components/NegotiationDialog';
 import TurnStepRail from '@/components/TurnStepRail';
+import SmartEndTurnButton from '@/components/SmartEndTurnButton';
+import type { PendingItem } from '@/lib/pending-actions';
 import ResourceStrip from '@/components/ResourceStrip';
 import { NotificationProvider, useMafiaNotifications } from '@/components/ui/notification-system';
 import { AnimatedCard, AnimatedCardHeader, AnimatedCardTitle, AnimatedCardContent } from '@/components/ui/animated-card';
@@ -19,6 +21,7 @@ import EnemyHexActionDialog from '@/components/EnemyHexActionDialog';
 import GameGuide from '@/components/GameGuide';
 import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
 import AlertsLogPanel from '@/components/AlertsLogPanel';
+import JustHappenedFeed from '@/components/JustHappenedFeed';
 import TurnSummaryModal from '@/components/TurnSummaryModal';
 import CommissionVoteModal from '@/components/CommissionVoteModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
@@ -1166,21 +1169,38 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         >
           <LogOut className="h-4 w-4" />
         </Button>
-        <Button
-          onClick={() => {
-            if (gameState.turnPhase !== 'waiting') {
-              if (!window.confirm('End your turn early? You still have actions remaining.')) return;
+        <SmartEndTurnButton
+          gameState={gameState}
+          jailed={gameState.legalStatus.jailTime > 0}
+          jailTime={gameState.legalStatus.jailTime}
+          onEndTurn={() => { playSound('notification'); endTurn(); }}
+          onResolveItem={(item: PendingItem) => {
+            playSound('select' as any);
+            if (item.kind === 'incoming_sitdown' || item.kind === 'ready_sitdown') {
+              // Open / scroll the sitdowns panel
+              window.dispatchEvent(new CustomEvent('focus-sitdowns-panel'));
+              if (item.hex) {
+                const tile = (gameState.hexMap || []).find((t: any) => t.q === item.hex!.q && t.r === item.hex!.r && t.s === item.hex!.s);
+                if (tile) selectTerritory(tile);
+              }
+              return;
             }
-            playSound('notification');
-            endTurn();
+            if (item.kind === 'capo_promote') {
+              window.dispatchEvent(new CustomEvent('focus-promotion-panel'));
+              if (item.unit) selectUnit(item.unit.type, { q: item.unit.q, r: item.unit.r, s: item.unit.s });
+              return;
+            }
+            if (item.kind === 'unit_orders' && item.unit) {
+              selectUnit(item.unit.type, { q: item.unit.q, r: item.unit.r, s: item.unit.s });
+              return;
+            }
+            if (item.kind === 'threat' && item.hex) {
+              const tile = (gameState.hexMap || []).find((t: any) => t.q === item.hex!.q && t.r === item.hex!.r && t.s === item.hex!.s);
+              if (tile) selectTerritory(tile);
+              return;
+            }
           }}
-          size="sm"
-          className="bg-primary text-primary-foreground font-bold font-playfair hover:bg-primary/90"
-          disabled={gameState.legalStatus.jailTime > 0}
-        >
-          <SkipForward className="h-4 w-4 mr-2" />
-          {gameState.legalStatus.jailTime > 0 ? `JAILED (${gameState.legalStatus.jailTime})` : 'END TURN'}
-        </Button>
+        />
       </div>
     </div>
   );
@@ -1773,6 +1793,19 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           />
         </div>
       </ResponsiveLayout>
+
+      {/* Civ-style "Just Happened" feed — surfaces this turn's events as dismissible cards */}
+      <JustHappenedFeed
+        alerts={gameState.alertsLog || []}
+        currentTurn={gameState.turn}
+        gameState={gameState}
+        onJumpHex={(hex) => {
+          const tile = (gameState.hexMap || []).find((t: any) => t.q === hex.q && t.r === hex.r && t.s === hex.s);
+          if (tile) selectTerritory(tile);
+        }}
+        onJumpUnit={(u) => selectUnit(u.type, { q: u.q, r: u.r, s: u.s })}
+      />
+
 
       {/* Headquarters Info Panel */}
       {selectedHeadquarters && (() => {
