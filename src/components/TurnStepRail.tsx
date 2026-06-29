@@ -32,55 +32,94 @@ const TurnStepRail: React.FC<TurnStepRailProps> = ({ phase, jailed, jailTime, on
     onAdvance();
   };
 
+  const nextStep: StepKey | null =
+    phase === 'deploy' ? 'move' :
+    phase === 'move' ? 'action' :
+    phase === 'action' ? 'end' :
+    null;
+
+  const nextLabel =
+    nextStep === 'move' ? 'Tactical' :
+    nextStep === 'action' ? 'Action' :
+    nextStep === 'end' ? 'End Turn' :
+    'Waiting';
+
+  const handleNext = () => {
+    if (jailed || !nextStep) return;
+    if (nextStep === 'end') { onEndTurn(); return; }
+    if (nextStep === 'action') { onSkipToAction(); return; }
+    onAdvance();
+  };
+
   return (
-    <div
-      role="group"
-      aria-label="Turn step indicator"
-      className="flex items-center bg-background/80 rounded-lg border border-noir-light overflow-hidden"
-    >
-      {ORDER.map((step, i) => {
-        const isCurrent = i === currentIdx;
-        const isPast = i < currentIdx;
-        const isFuture = i > currentIdx;
-        const isEnd = step === 'end';
-        const clickable = isFuture && !jailed;
-        const hint = isEnd
-          ? (jailed ? `Jailed (${jailTime})` : (isPast || isCurrent ? '' : 'Click to end turn'))
-          : isPast ? 'Completed' : isCurrent ? 'Current step' : (step === 'action' ? 'Skip to Action' : 'Advance');
-        return (
-          <React.Fragment key={step}>
-            {i > 0 && (
-              <span
-                className={cn(
-                  'text-sm select-none px-0.5',
-                  i <= currentIdx ? 'text-primary/70' : 'text-muted-foreground/40'
-                )}
-                aria-hidden
-              >
-                ›
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => clickable && handleJump(step)}
-              disabled={!clickable}
-              title={hint}
-              aria-current={isCurrent ? 'step' : undefined}
-              className={cn(
-                'px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider transition-all flex items-center gap-1',
-                isCurrent && 'bg-primary text-primary-foreground shadow-[0_0_10px_hsl(var(--primary)/0.45)]',
-                isCurrent && !isEnd && 'animate-pulse',
-                isPast && 'text-emerald-400/80',
-                isFuture && !clickable && 'text-muted-foreground/40 cursor-not-allowed',
-                isFuture && clickable && 'text-muted-foreground hover:text-foreground hover:bg-primary/10 cursor-pointer',
+    <div className="flex items-center gap-2">
+      <div
+        role="group"
+        aria-label="Turn step indicator"
+        className="flex items-center bg-background/80 rounded-lg border border-noir-light overflow-hidden"
+      >
+        {ORDER.map((step, i) => {
+          const isCurrent = i === currentIdx;
+          const isPast = i < currentIdx;
+          const isFuture = i > currentIdx;
+          const isEnd = step === 'end';
+          const clickable = isFuture && !jailed;
+          const hint = isEnd
+            ? (jailed ? `Jailed (${jailTime})` : (isPast || isCurrent ? '' : 'Click to end turn'))
+            : isPast ? 'Completed' : isCurrent ? 'Current step' : (step === 'action' ? 'Skip to Action' : 'Advance');
+          return (
+            <React.Fragment key={step}>
+              {i > 0 && (
+                <span
+                  className={cn(
+                    'text-sm select-none px-0.5',
+                    i <= currentIdx ? 'text-primary/70' : 'text-muted-foreground/40'
+                  )}
+                  aria-hidden
+                >
+                  ›
+                </span>
               )}
-            >
-              <span className="text-[11px] leading-none">{isPast ? '✓' : ICONS[step]}</span>
-              <span>{LABELS[step]}</span>
-            </button>
-          </React.Fragment>
-        );
-      })}
+              <button
+                type="button"
+                onClick={() => clickable && handleJump(step)}
+                disabled={!clickable}
+                title={hint}
+                aria-current={isCurrent ? 'step' : undefined}
+                className={cn(
+                  'px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider transition-all flex items-center gap-1',
+                  isCurrent && 'bg-primary text-primary-foreground shadow-[0_0_10px_hsl(var(--primary)/0.45)]',
+                  isCurrent && !isEnd && 'animate-pulse',
+                  isPast && 'text-emerald-400/80',
+                  isFuture && !clickable && 'text-muted-foreground/40 cursor-not-allowed',
+                  isFuture && clickable && 'text-muted-foreground hover:text-foreground hover:bg-primary/10 cursor-pointer',
+                )}
+              >
+                <span className="text-[11px] leading-none">{isPast ? '✓' : ICONS[step]}</span>
+                <span>{LABELS[step]}</span>
+              </button>
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      <button
+        type="button"
+        onClick={handleNext}
+        disabled={jailed || !nextStep}
+        title={jailed ? `Jailed (${jailTime})` : `Advance to ${nextLabel}`}
+        className={cn(
+          'px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg border transition-all flex items-center gap-1.5',
+          (jailed || !nextStep)
+            ? 'bg-muted/30 border-noir-light text-muted-foreground/40 cursor-not-allowed'
+            : nextStep === 'end'
+              ? 'bg-amber-500/20 border-amber-500/50 text-amber-200 hover:bg-amber-500/30 hover:border-amber-400 shadow-[0_0_10px_hsl(var(--primary)/0.25)]'
+              : 'bg-primary/15 border-primary/50 text-primary hover:bg-primary/25 hover:border-primary'
+        )}
+      >
+        <span>Next: {nextLabel}</span>
+        <span aria-hidden>▶</span>
+      </button>
     </div>
   );
 };
