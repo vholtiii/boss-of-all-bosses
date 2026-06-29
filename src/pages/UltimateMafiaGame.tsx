@@ -2,6 +2,8 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import NegotiationDialog from '@/components/NegotiationDialog';
 import TurnStepRail from '@/components/TurnStepRail';
+import SmartEndTurnButton from '@/components/SmartEndTurnButton';
+import type { PendingItem } from '@/lib/pending-actions';
 import ResourceStrip from '@/components/ResourceStrip';
 import { NotificationProvider, useMafiaNotifications } from '@/components/ui/notification-system';
 import { AnimatedCard, AnimatedCardHeader, AnimatedCardTitle, AnimatedCardContent } from '@/components/ui/animated-card';
