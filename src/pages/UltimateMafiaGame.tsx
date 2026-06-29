@@ -21,6 +21,7 @@ import EnemyHexActionDialog from '@/components/EnemyHexActionDialog';
 import GameGuide from '@/components/GameGuide';
 import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
 import AlertsLogPanel from '@/components/AlertsLogPanel';
+import JustHappenedFeed from '@/components/JustHappenedFeed';
 import TurnSummaryModal from '@/components/TurnSummaryModal';
 import CommissionVoteModal from '@/components/CommissionVoteModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
