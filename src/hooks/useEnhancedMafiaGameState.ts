@@ -6217,6 +6217,10 @@ export const useEnhancedMafiaGameState = (
       const moneyRunway = opponent.resources.money / upkeepForRunway;
       const myRank = rankByTerritory(myTerritoryNow, [...rivalHexCounts, playerHexCount]);
       const victoryGap = TERRITORY_TARGET_AI - myTerritoryNow;
+      const rivalRespectArr = state.aiOpponents
+        .filter(o => o.family !== fam)
+        .map(o => o.resources?.respect || 0)
+        .concat([state.resources.respect || 0]);
       const posture: AIPosture = computeAIPosture({
         aiPhase,
         heatTier,
@@ -6231,7 +6235,10 @@ export const useEnhancedMafiaGameState = (
         basePersonality,
         dynamicMood,
         strategicOverride,
+        myRespect: opponent.resources.respect || 0,
+        rivalRespect: rivalRespectArr,
       });
+
       oppAny.posture = posture;
       const policy = posturePolicy(posture);
 
