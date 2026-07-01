@@ -6581,8 +6581,33 @@ export const useEnhancedMafiaGameState = (
             return unitsHere.length < 2;
           });
           if (validTargets.length > 0) {
-            const target = validTargets[Math.floor(Math.random() * validTargets.length)];
-            const newId = `${fam}-soldier-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+            // Score deploy neighbors instead of picking at random.
+            const deployScores = validTargets.map(n => {
+              const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+              const hostilesAdjacent = getHexNeighbors(n.q, n.r, n.s).reduce((acc, adj) => {
+                const has = state.deployedUnits.some(u => u.family !== fam && u.q === adj.q && u.r === adj.r && u.s === adj.s);
+                return acc + (has ? 1 : 0);
+              }, 0);
+              const friendliesHere = state.deployedUnits.filter(u => u.family === fam && u.q === n.q && u.r === n.r && u.s === n.s).length;
+              const ownedByUs = tile?.controllingFamily === fam;
+              const onOwnSupplyRoute = ownedByUs && !!tile?.business;
+              const adjacentToEnemyBiz = getHexNeighbors(n.q, n.r, n.s).some(adj => {
+                const at = state.hexMap.find(t => t.q === adj.q && t.r === adj.r && t.s === adj.s);
+                return !!(at && at.business && at.controllingFamily !== fam && at.controllingFamily !== 'neutral');
+              });
+              return scoreDeployNeighbor({
+                distanceToOwnHQ: hexDistance(n, hq),
+                hostilesAdjacent,
+                friendliesHere,
+                ownedByUs,
+                onOwnSupplyRoute,
+                adjacentToEnemyBiz,
+                jitter: turnRng() * 2 - 1,
+              });
+            });
+            const pickIdx = softmaxPick(deployScores, turnRng, undefined, difficultySoftmaxTemperature(state.difficulty || 'normal'));
+            const target = validTargets[pickIdx >= 0 ? pickIdx : 0];
+            const newId = `${fam}-soldier-${state.turn}-${Math.floor(turnRng() * 1e9).toString(36)}`;
             state.deployedUnits.push({
               id: newId, type: 'soldier', family: fam,
               q: target.q, r: target.r, s: target.s,
@@ -7876,7 +7901,28 @@ export const useEnhancedMafiaGameState = (
         const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
         const availableTargets = playerCapos.filter(c => !alreadyTargeted.has(c.id));
         if (availableTargets.length > 0) {
-          const target = availableTargets[Math.floor(Math.random() * availableTargets.length)];
+          // Score each candidate capo instead of uniform random pick.
+          const myBorderHexes = state.hexMap.filter(t => t.controllingFamily === fam);
+          const targetScores = availableTargets.map(c => {
+            const targetHex = state.hexMap.find(t => t.q === c.q && t.r === c.r && t.s === c.s);
+            const isFort = isHexFortified(state.fortifiedHexes || [], c.q, c.r, c.s, c.family);
+            const isSh = (state.safehouses || []).some(s => c.q === s.q && c.r === s.r && c.s === s.s);
+            const distToBorder = myBorderHexes.length === 0 ? 99
+              : Math.min(...myBorderHexes.map(b => hexDistance({ q: b.q, r: b.r, s: b.s }, c)));
+            const playerHQ = state.headquarters[c.family];
+            const distToOwnHQ = playerHQ ? hexDistance({ q: playerHQ.q, r: playerHQ.r, s: playerHQ.s }, c) : 5;
+            return scorePlanHitTarget({
+              level: c.level || 1,
+              distanceToBorder: distToBorder,
+              atWar: (state.activeWars || []).some(w => (w.family1 === fam && w.family2 === c.family) || (w.family2 === fam && w.family1 === c.family)),
+              distanceToOwnHQ: distToOwnHQ,
+              isFortified: !!isFort,
+              isSafehouse: isSh,
+              jitter: turnRng() * 2 - 1,
+            });
+          });
+          const tIdx = softmaxPick(targetScores, turnRng, undefined, difficultySoftmaxTemperature(state.difficulty || 'normal'));
+          const target = availableTargets[tIdx >= 0 ? tIdx : 0];
           // Determine intel source for detection
           const targetUnit = state.deployedUnits.find(u => u.id === target.id);
           let detectedVia: import('@/types/game-mechanics').IntelSource | undefined;
@@ -8108,16 +8154,25 @@ export const useEnhancedMafiaGameState = (
         const taken = new Set((state.hitmanContracts || []).map(c => c.targetUnitId));
         const candidates = playerCapos.filter(c => !taken.has(c.id));
         if (candidates.length > 0) {
-          // Prefer capos in the open (faster contract resolution = HITMAN_OPEN_TURNS)
-          const scored = candidates.map(c => {
+          // Score capos by exposure + strategic value; softmax-pick so it's not always #1.
+          const scoredCands = candidates.map(c => {
             const ch = state.hexMap.find(t => t.q === c.q && t.r === c.r && t.s === c.s);
             const atHQ = ch?.isHeadquarters === c.family;
             const atSh = (state.safehouses || []).some(s => c.q === s.q && c.r === s.r && c.s === s.s);
             const isFort = isHexFortified(state.fortifiedHexes || [], c.q, c.r, c.s, c.family);
             const exposure = atHQ ? 0 : atSh ? 0.3 : isFort ? 0.5 : 1.0;
-            return { capo: c, exposure };
-          }).sort((a, b) => b.exposure - a.exposure);
-          const target = scored[0].capo;
+            const inContestedDistrict = !!ch?.district && state.hexMap.some(t => t.district === ch.district && t.controllingFamily === fam);
+            const score = scoreHitmanTarget({
+              exposure,
+              level: c.level || 1,
+              hexIncome: ch?.business?.income || 0,
+              inContestedDistrict,
+              jitter: turnRng() * 2 - 1,
+            });
+            return { capo: c, score };
+          });
+          const hIdx = softmaxPick(scoredCands.map(s => s.score), turnRng, undefined, difficultySoftmaxTemperature(state.difficulty || 'normal'));
+          const target = scoredCands[hIdx >= 0 ? hIdx : 0].capo;
           const tHex = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
           const isAtHQ = tHex?.isHeadquarters === target.family;
           const isAtSh = (state.safehouses || []).some(s => target.q === s.q && target.r === s.r && target.s === s.s);
