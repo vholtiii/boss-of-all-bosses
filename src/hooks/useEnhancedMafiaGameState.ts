@@ -7901,7 +7901,28 @@ export const useEnhancedMafiaGameState = (
         const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
         const availableTargets = playerCapos.filter(c => !alreadyTargeted.has(c.id));
         if (availableTargets.length > 0) {
-          const target = availableTargets[Math.floor(Math.random() * availableTargets.length)];
+          // Score each candidate capo instead of uniform random pick.
+          const myBorderHexes = state.hexMap.filter(t => t.controllingFamily === fam);
+          const targetScores = availableTargets.map(c => {
+            const targetHex = state.hexMap.find(t => t.q === c.q && t.r === c.r && t.s === c.s);
+            const isFort = isHexFortified(state.fortifiedHexes || [], c.q, c.r, c.s, c.family);
+            const isSh = (state.safehouses || []).some(s => c.q === s.q && c.r === s.r && c.s === s.s);
+            const distToBorder = myBorderHexes.length === 0 ? 99
+              : Math.min(...myBorderHexes.map(b => hexDistance({ q: b.q, r: b.r, s: b.s }, c)));
+            const playerHQ = state.headquarters[c.family];
+            const distToOwnHQ = playerHQ ? hexDistance({ q: playerHQ.q, r: playerHQ.r, s: playerHQ.s }, c) : 5;
+            return scorePlanHitTarget({
+              level: c.level || 1,
+              distanceToBorder: distToBorder,
+              atWar: (state.activeWars || []).some(w => (w.family1 === fam && w.family2 === c.family) || (w.family2 === fam && w.family1 === c.family)),
+              distanceToOwnHQ: distToOwnHQ,
+              isFortified: !!isFort,
+              isSafehouse: isSh,
+              jitter: turnRng() * 2 - 1,
+            });
+          });
+          const tIdx = softmaxPick(targetScores, turnRng, undefined, difficultySoftmaxTemperature(state.difficulty || 'normal'));
+          const target = availableTargets[tIdx >= 0 ? tIdx : 0];
           // Determine intel source for detection
           const targetUnit = state.deployedUnits.find(u => u.id === target.id);
           let detectedVia: import('@/types/game-mechanics').IntelSource | undefined;
