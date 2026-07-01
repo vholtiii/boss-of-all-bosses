@@ -8154,16 +8154,25 @@ export const useEnhancedMafiaGameState = (
         const taken = new Set((state.hitmanContracts || []).map(c => c.targetUnitId));
         const candidates = playerCapos.filter(c => !taken.has(c.id));
         if (candidates.length > 0) {
-          // Prefer capos in the open (faster contract resolution = HITMAN_OPEN_TURNS)
-          const scored = candidates.map(c => {
+          // Score capos by exposure + strategic value; softmax-pick so it's not always #1.
+          const scoredCands = candidates.map(c => {
             const ch = state.hexMap.find(t => t.q === c.q && t.r === c.r && t.s === c.s);
             const atHQ = ch?.isHeadquarters === c.family;
             const atSh = (state.safehouses || []).some(s => c.q === s.q && c.r === s.r && c.s === s.s);
             const isFort = isHexFortified(state.fortifiedHexes || [], c.q, c.r, c.s, c.family);
             const exposure = atHQ ? 0 : atSh ? 0.3 : isFort ? 0.5 : 1.0;
-            return { capo: c, exposure };
-          }).sort((a, b) => b.exposure - a.exposure);
-          const target = scored[0].capo;
+            const inContestedDistrict = !!ch?.district && state.hexMap.some(t => t.district === ch.district && t.controllingFamily === fam);
+            const score = scoreHitmanTarget({
+              exposure,
+              level: c.level || 1,
+              hexIncome: ch?.business?.income || 0,
+              inContestedDistrict,
+              jitter: turnRng() * 2 - 1,
+            });
+            return { capo: c, score };
+          });
+          const hIdx = softmaxPick(scoredCands.map(s => s.score), turnRng, undefined, difficultySoftmaxTemperature(state.difficulty || 'normal'));
+          const target = scoredCands[hIdx >= 0 ? hIdx : 0].capo;
           const tHex = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
           const isAtHQ = tHex?.isHeadquarters === target.family;
           const isAtSh = (state.safehouses || []).some(s => target.q === s.q && target.r === s.r && target.s === s.s);
