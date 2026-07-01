@@ -110,8 +110,10 @@ import {
   rollFamilyPersonality, rollFamilyStrategy, computeDynamicMood, blendMoodWithPersonality,
   scoreHexForAI, softmaxPick, familySignaturePreference,
   difficultySoftmaxTemperature, difficultyMoodSensitivity,
+  scorePlanHitTarget, scoreHitmanTarget, scoreDeployNeighbor,
   type FamilyId, type AIPersonality, type DynamicMood,
 } from '@/lib/ai-strategy';
+
 import { computeAIPosture, posturePolicy, rankByTerritory, type AIPosture } from '@/lib/ai-posture';
 import {
   getAggressionScale, getHQAssaultBase, getPlanHitBase, getHitmanChance,
