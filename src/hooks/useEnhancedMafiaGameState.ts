@@ -6120,7 +6120,19 @@ export const useEnhancedMafiaGameState = (
     state.aiAlertState = state.aiAlertState || {};
     const diffMods = state.difficultyModifiers || DIFFICULTY_MODIFIERS.normal;
 
-    state.aiOpponents.forEach(opponent => {
+    // Fisher-Yates shuffle of AI opponents each turn so no single family always
+    // acts first (eliminates the index-0 first-mover advantage). Seeded per-turn
+    // so replays are reproducible.
+    const orderRng = mulberry32((state.mapSeed || 0) + state.turn * 97 + 4242);
+    const shuffled = state.aiOpponents.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(orderRng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    (state as any)._aiTurnOrder = shuffled.map(o => o.family);
+
+    shuffled.forEach(opponent => {
+
       const fam = opponent.family as any;
       const hq = state.headquarters[fam];
       if (!hq) return;
