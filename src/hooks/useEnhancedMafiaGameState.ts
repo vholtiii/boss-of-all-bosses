@@ -6581,8 +6581,33 @@ export const useEnhancedMafiaGameState = (
             return unitsHere.length < 2;
           });
           if (validTargets.length > 0) {
-            const target = validTargets[Math.floor(Math.random() * validTargets.length)];
-            const newId = `${fam}-soldier-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+            // Score deploy neighbors instead of picking at random.
+            const deployScores = validTargets.map(n => {
+              const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
+              const hostilesAdjacent = getHexNeighbors(n.q, n.r, n.s).reduce((acc, adj) => {
+                const has = state.deployedUnits.some(u => u.family !== fam && u.family !== 'neutral' && u.q === adj.q && u.r === adj.r && u.s === adj.s);
+                return acc + (has ? 1 : 0);
+              }, 0);
+              const friendliesHere = state.deployedUnits.filter(u => u.family === fam && u.q === n.q && u.r === n.r && u.s === n.s).length;
+              const ownedByUs = tile?.controllingFamily === fam;
+              const onOwnSupplyRoute = ownedByUs && !!tile?.business;
+              const adjacentToEnemyBiz = getHexNeighbors(n.q, n.r, n.s).some(adj => {
+                const at = state.hexMap.find(t => t.q === adj.q && t.r === adj.r && t.s === adj.s);
+                return !!(at && at.business && at.controllingFamily !== fam && at.controllingFamily !== 'neutral');
+              });
+              return scoreDeployNeighbor({
+                distanceToOwnHQ: hexDistance(n, hq),
+                hostilesAdjacent,
+                friendliesHere,
+                ownedByUs,
+                onOwnSupplyRoute,
+                adjacentToEnemyBiz,
+                jitter: turnRng() * 2 - 1,
+              });
+            });
+            const pickIdx = softmaxPick(deployScores, turnRng, undefined, difficultySoftmaxTemperature(state.difficulty || 'normal'));
+            const target = validTargets[pickIdx >= 0 ? pickIdx : 0];
+            const newId = `${fam}-soldier-${state.turn}-${Math.floor(turnRng() * 1e9).toString(36)}`;
             state.deployedUnits.push({
               id: newId, type: 'soldier', family: fam,
               q: target.q, r: target.r, s: target.s,
