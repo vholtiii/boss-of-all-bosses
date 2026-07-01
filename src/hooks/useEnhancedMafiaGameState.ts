@@ -6585,7 +6585,7 @@ export const useEnhancedMafiaGameState = (
             const deployScores = validTargets.map(n => {
               const tile = state.hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
               const hostilesAdjacent = getHexNeighbors(n.q, n.r, n.s).reduce((acc, adj) => {
-                const has = state.deployedUnits.some(u => u.family !== fam && u.family !== 'neutral' && u.q === adj.q && u.r === adj.r && u.s === adj.s);
+                const has = state.deployedUnits.some(u => u.family !== fam && u.q === adj.q && u.r === adj.r && u.s === adj.s);
                 return acc + (has ? 1 : 0);
               }, 0);
               const friendliesHere = state.deployedUnits.filter(u => u.family === fam && u.q === n.q && u.r === n.r && u.s === n.s).length;
