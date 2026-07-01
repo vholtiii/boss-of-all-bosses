@@ -1161,14 +1161,17 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           variant="outline"
           size="sm"
           onClick={() => {
-            if (window.confirm('Return to main menu? Unsaved progress will be lost.')) {
+            if (window.confirm('Exit to main menu? Unsaved progress will be lost.')) {
               onExitToMenu();
             }
           }}
-          className="text-destructive hover:text-destructive"
+          className="text-destructive hover:text-destructive border-destructive/40 hover:bg-destructive/10 gap-1.5"
+          title="Exit game and return to family selection"
         >
           <LogOut className="h-4 w-4" />
+          <span className="hidden sm:inline text-xs font-semibold">Exit</span>
         </Button>
+
         <SmartEndTurnButton
           gameState={gameState}
           jailed={gameState.legalStatus.jailTime > 0}
