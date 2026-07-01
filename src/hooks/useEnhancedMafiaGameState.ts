@@ -8506,8 +8506,11 @@ export const useEnhancedMafiaGameState = (
             const isBuilt = !t.business!.isExtorted;
             aiHeatFromBiz += isBuilt ? 0.5 : 1; // built biz = half heat
           });
-          const aiPassiveHeat = Math.floor(aiHeatFromBiz / 3);
+          // Ceil (not floor) so 1-2 illegal biz still generates 1 heat/turn.
+          // Previous floor(x/3) let AI run 2 illegal biz indefinitely at zero heat.
+          const aiPassiveHeat = Math.max(aiHeatFromBiz > 0 ? 1 : 0, Math.ceil(aiHeatFromBiz / 3));
           if (aiPassiveHeat > 0) addAIHeatRaw(state, fam, aiPassiveHeat);
+
         }
 
         // 2. Heat decay — mirrors player decay (state.policeHeat.reductionPerTurn, default 2)
