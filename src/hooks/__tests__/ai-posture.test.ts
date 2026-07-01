@@ -45,9 +45,37 @@ describe('computeAIPosture', () => {
     expect(computeAIPosture({ ...baseInputs, aiPhase: 4, victoryGap: 2 })).toBe('CLOSE_OUT');
   });
 
-  it('PRESSURE_LEADER in Phase 3+ when ranked #1', () => {
-    expect(computeAIPosture({ ...baseInputs, aiPhase: 3, myRank: 1 })).toBe('PRESSURE_LEADER');
+  it('PRESSURE_LEADER in Phase 3+ when ranked #1 with real margin (≥3 hex lead)', () => {
+    expect(computeAIPosture({
+      ...baseInputs,
+      aiPhase: 3,
+      myRank: 1,
+      myHexes: 15,
+      rivalHexCounts: [10, 8, 8, 6],
+    })).toBe('PRESSURE_LEADER');
   });
+
+  it('does NOT PRESSURE_LEADER when #1 by only 1 hex (no real margin)', () => {
+    expect(computeAIPosture({
+      ...baseInputs,
+      aiPhase: 3,
+      myRank: 1,
+      myHexes: 11,
+      rivalHexCounts: [10, 10, 10, 10],
+    })).toBe('EXPAND');
+  });
+
+  it('UNDERDOG in Phase 2+ when rank 3+ and top rival is 1.8× our size', () => {
+    expect(computeAIPosture({
+      ...baseInputs,
+      aiPhase: 3,
+      myRank: 4,
+      myHexes: 5,
+      rivalHexCounts: [15, 10, 8, 6],
+      moneyRunway: 4,
+    })).toBe('UNDERDOG');
+  });
+
 
   it('EXPAND in Phase 2+ with cool heat and healthy treasury', () => {
     expect(computeAIPosture({ ...baseInputs, aiPhase: 2, heatTier: 'cool', moneyRunway: 10 })).toBe('EXPAND');

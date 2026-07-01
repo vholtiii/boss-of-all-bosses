@@ -16,6 +16,7 @@ export type AIPosture =
   | 'WAR'              // active war: prioritize war targets
   | 'CLOSE_OUT'        // endgame within reach: focus the last few hexes
   | 'PRESSURE_LEADER'  // we are #1: punch down at #2 to stay #1
+  | 'UNDERDOG'         // rank 3+ and far behind top: harass leader, seek allies, cheap ops
   | 'EXPAND'           // healthy + cool: claim/extort/scout new hexes
   | 'BUILD_ECONOMY';   // default: build businesses, racketeer, low-risk only
 
@@ -35,6 +36,9 @@ export interface PostureInputs {
   basePersonality: AIPersonality;
   dynamicMood: DynamicMood;
   strategicOverride: boolean; // existing escape hatch from processAITurn
+  /** Player's respect at this moment (0-100). Optional for back-compat. */
+  myRespect?: number;
+  rivalRespect?: number[];
 }
 
 export interface PosturePolicy {
@@ -60,6 +64,10 @@ export interface PosturePolicy {
   economyFocusMul: number;
   /** Multiplier on scoring bonus for reachable rival supply nodes. Higher = more eager to cut supply lines. */
   supplyNodeMul: number;
+  /** Multiplier on plan-hit / hitman firing chance. UNDERDOG >1 (harass), TURTLE <1 (hunker). Default 1. */
+  offensiveHitMul?: number;
+  /** Prefer proposing alliances/ceasefires this turn (UNDERDOG seeks numbers). Default false. */
+  seekAllies?: boolean;
 }
 
 export function computeAIPosture(i: PostureInputs): AIPosture {
@@ -69,9 +77,10 @@ export function computeAIPosture(i: PostureInputs): AIPosture {
   }
 
   // 2. Cash runway crisis — bankruptcy is more dangerous than rivals.
-  // Threshold lowered to <2.5 so that the [2.5, 3) band falls through to
-  // BUILD_ECONOMY (tight runway, no expansion) instead of full CONSOLIDATE.
+  // Full crisis at <2.5. Also treat 2.5-3.2 as CONSOLIDATE when heat is warm+
+  // (bleeding cash to bribes on top of thin runway is the real trap).
   if (i.moneyRunway < 2.5) return 'CONSOLIDATE';
+  if (i.moneyRunway < 3.2 && (i.heatTier === 'warm' || i.heatTier === 'hot')) return 'CONSOLIDATE';
 
   // 3. Just took heavy losses — turtle to recover
   if (i.hqAssaultedRecently || i.recentCapoLosses >= 2) return 'TURTLE';
@@ -79,19 +88,33 @@ export function computeAIPosture(i: PostureInputs): AIPosture {
   // 4. Active war takes priority over expansion
   if (i.atWar) return 'WAR';
 
-  // 5. Endgame: close it out
-  if (i.aiPhase >= 4 && i.victoryGap <= 3 && i.victoryGap > 0) return 'CLOSE_OUT';
+  // 5. Endgame: close it out. Loosened: gap up to 5 when we have real runway.
+  if (i.aiPhase >= 4) {
+    if (i.victoryGap <= 3 && i.victoryGap > 0) return 'CLOSE_OUT';
+    if (i.victoryGap <= 5 && i.victoryGap > 0 && i.moneyRunway > 4) return 'CLOSE_OUT';
+  }
 
-  // 6. We are the leader in Phase 3+ — pressure #2 instead of generically expanding
-  if (i.aiPhase >= 3 && i.myRank === 1) return 'PRESSURE_LEADER';
+  // 6. We are the clear leader in Phase 3+ — pressure #2 instead of generically expanding.
+  //    Margin gate: need real lead (≥3 hexes OR ≥15 respect over rank 2), not just #1 by 1 hex.
+  if (i.aiPhase >= 3 && i.myRank === 1) {
+    const rivals = i.rivalHexCounts.slice().sort((a, b) => b - a);
+    const rank2Hexes = rivals[0] ?? 0;
+    const hexLead = i.myHexes - rank2Hexes;
+    const respectLead = (i.myRespect ?? 0) - Math.max(0, ...(i.rivalRespect ?? [0]));
+    if (hexLead >= 3 || respectLead >= 15) return 'PRESSURE_LEADER';
+  }
 
-  // 7. Phase 1+, cool heat, comfortable treasury → expand.
-  // Threshold is >3 (must be a full turn clear of the CONSOLIDATE floor of <2.5),
-  // so the [2.5, 3] band falls through to BUILD_ECONOMY: enough cash to keep
-  // operating, not enough to fund expansion or speculative offense.
+  // 7. Outnumbered but healthy → UNDERDOG. Rank 3+ AND top rival is at least
+  //    1.8× our size AND we have some runway. Aggressive harassment + alliance-seeking.
+  if (i.aiPhase >= 2 && i.myRank >= 3 && i.moneyRunway >= 2.5) {
+    const topRival = i.rivalHexCounts.length ? Math.max(...i.rivalHexCounts) : 0;
+    if (i.myHexes > 0 && topRival > i.myHexes * 1.8) return 'UNDERDOG';
+  }
+
+  // 8. Phase 1+, cool heat, comfortable treasury → expand.
   if (i.heatTier === 'cool' && i.moneyRunway > 3) return 'EXPAND';
 
-  // 8. Default: build economy, low-risk only
+  // 9. Default: build economy, low-risk only
   return 'BUILD_ECONOMY';
 }
 
@@ -103,6 +126,7 @@ export function posturePolicy(p: AIPosture): PosturePolicy {
         forceBribe: true, preferLayLow: true, preferMattresses: false,
         acceptSitdownsForCash: true, refuseNewWars: true,
         warTargetMul: 0, economyFocusMul: 1.5, supplyNodeMul: 0,
+        offensiveHitMul: 0.1,
       };
     case 'CONSOLIDATE':
       return {
@@ -110,6 +134,7 @@ export function posturePolicy(p: AIPosture): PosturePolicy {
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: true, refuseNewWars: true,
         warTargetMul: 0, economyFocusMul: 2.0, supplyNodeMul: 0,
+        offensiveHitMul: 0.2,
       };
     case 'TURTLE':
       return {
@@ -117,6 +142,7 @@ export function posturePolicy(p: AIPosture): PosturePolicy {
         forceBribe: false, preferLayLow: false, preferMattresses: true,
         acceptSitdownsForCash: false, refuseNewWars: true,
         warTargetMul: 0, economyFocusMul: 1.2, supplyNodeMul: 0,
+        offensiveHitMul: 0.3,
       };
     case 'WAR':
       return {
@@ -124,6 +150,7 @@ export function posturePolicy(p: AIPosture): PosturePolicy {
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: false, refuseNewWars: false,
         warTargetMul: 2.0, economyFocusMul: 0.5, supplyNodeMul: 1.5,
+        offensiveHitMul: 1.5,
       };
     case 'CLOSE_OUT':
       return {
@@ -131,6 +158,7 @@ export function posturePolicy(p: AIPosture): PosturePolicy {
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: false, refuseNewWars: true,
         warTargetMul: 1.0, economyFocusMul: 0.8, supplyNodeMul: 1.3,
+        offensiveHitMul: 1.3,
       };
     case 'PRESSURE_LEADER':
       return {
@@ -138,6 +166,15 @@ export function posturePolicy(p: AIPosture): PosturePolicy {
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: false, refuseNewWars: false,
         warTargetMul: 1.5, economyFocusMul: 1.0, supplyNodeMul: 1.4,
+        offensiveHitMul: 1.2,
+      };
+    case 'UNDERDOG':
+      return {
+        heatCeiling: 55, suppressOffense: false, suppressExpansion: true,
+        forceBribe: false, preferLayLow: false, preferMattresses: false,
+        acceptSitdownsForCash: true, refuseNewWars: false,
+        warTargetMul: 1.3, economyFocusMul: 0.9, supplyNodeMul: 1.5,
+        offensiveHitMul: 1.4, seekAllies: true,
       };
     case 'EXPAND':
       return {
@@ -145,6 +182,7 @@ export function posturePolicy(p: AIPosture): PosturePolicy {
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: false, refuseNewWars: false,
         warTargetMul: 1.0, economyFocusMul: 1.0, supplyNodeMul: 1.0,
+        offensiveHitMul: 1.0,
       };
     case 'BUILD_ECONOMY':
     default:
@@ -156,6 +194,7 @@ export function posturePolicy(p: AIPosture): PosturePolicy {
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: false, refuseNewWars: false,
         warTargetMul: 0.5, economyFocusMul: 1.8, supplyNodeMul: 0.7,
+        offensiveHitMul: 0.7,
       };
   }
 }

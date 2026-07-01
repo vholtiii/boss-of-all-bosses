@@ -243,23 +243,115 @@ export function scoreHexForAI(i: ScoreHexInputs): number {
 /**
  * Softmax-pick from candidates. Returns index of selected candidate.
  * Top-K filters first to avoid silly low-score picks.
+ *
+ * When `topK` is omitted, a dynamic cap is used: keeps things greedy on tiny pools
+ * (2-4 candidates) and gets more exploratory as the pool grows.
  */
-export function softmaxPick(scores: number[], rng: () => number, topK = 4, temperature = 1.5): number {
+export function softmaxPick(scores: number[], rng: () => number, topK?: number, temperature = 1.5): number {
   if (scores.length === 0) return -1;
   if (scores.length === 1) return 0;
+  const k = topK !== undefined
+    ? Math.min(topK, scores.length)
+    : Math.min(scores.length, 3 + Math.floor(scores.length / 4));
   // Sort indices by score desc and keep topK
-  const idxs = scores.map((_, i) => i).sort((a, b) => scores[b] - scores[a]).slice(0, topK);
+  const idxs = scores.map((_, i) => i).sort((a, b) => scores[b] - scores[a]).slice(0, k);
   const top = idxs.map(i => scores[i]);
   const max = Math.max(...top);
   const exps = top.map(s => Math.exp((s - max) / temperature));
   const sum = exps.reduce((a, b) => a + b, 0);
   let r = rng() * sum;
-  for (let k = 0; k < exps.length; k++) {
-    r -= exps[k];
-    if (r <= 0) return idxs[k];
+  for (let k2 = 0; k2 < exps.length; k2++) {
+    r -= exps[k2];
+    if (r <= 0) return idxs[k2];
   }
   return idxs[0];
 }
+
+// ─── 4. Target-scoring helpers (plan hit / hitman / deploy) ─────────
+export interface PlanHitTargetInputs {
+  /** Capo level (1+). Higher = more valuable target. */
+  level: number;
+  /** Chebyshev/hex distance from any of AI's border hexes. */
+  distanceToBorder: number;
+  /** Is AI at war with owner? */
+  atWar: boolean;
+  /** Distance from the target capo to its own HQ (harder to kill near HQ = penalty). */
+  distanceToOwnHQ: number;
+  /** Is the target on a fortified hex? */
+  isFortified: boolean;
+  /** Is the target on a safehouse hex? */
+  isSafehouse: boolean;
+  /** Small jitter for tie-breaking. */
+  jitter: number;
+}
+
+export function scorePlanHitTarget(i: PlanHitTargetInputs): number {
+  let s = 0;
+  s += i.level * 2.5;                                  // level scales
+  s += Math.max(0, 6 - i.distanceToBorder) * 1.2;      // closer to us = better
+  if (i.atWar) s += 4;
+  s -= Math.max(0, 3 - i.distanceToOwnHQ) * 1.5;       // near their HQ = harder
+  if (i.isFortified) s -= 3;
+  if (i.isSafehouse) s -= 2;
+  s += i.jitter * 0.8;
+  return s;
+}
+
+export interface HitmanTargetInputs {
+  /** Exposure: 1.0 open, 0.5 fortified, 0.3 safehouse, 0 HQ. */
+  exposure: number;
+  /** Capo level. */
+  level: number;
+  /** Income of the hex the capo is standing on (proxy for strategic value). */
+  hexIncome: number;
+  /** Is the capo currently on a district border the AI cares about? */
+  inContestedDistrict: boolean;
+  jitter: number;
+}
+
+export function scoreHitmanTarget(i: HitmanTargetInputs): number {
+  // Exposure gates everything — you can't hit what's in HQ.
+  if (i.exposure <= 0) return -100;
+  let s = i.exposure * 10;
+  s += i.level * 2;
+  s += Math.min(6, i.hexIncome / 800);
+  if (i.inContestedDistrict) s += 2;
+  s += i.jitter * 0.5;
+  return s;
+}
+
+export interface DeployNeighborInputs {
+  /** Distance from the AI's HQ. Closer = safer, but stalls forward pressure. */
+  distanceToOwnHQ: number;
+  /** Number of hostile-family units within 1 hex of the candidate hex. */
+  hostilesAdjacent: number;
+  /** Friendly units already stacked on the candidate hex (0-1). */
+  friendliesHere: number;
+  /** Does the candidate hex belong to us? */
+  ownedByUs: boolean;
+  /** Is the candidate on a supply-line route we own? */
+  onOwnSupplyRoute: boolean;
+  /** Is the candidate adjacent to an enemy business we could pressure next turn? */
+  adjacentToEnemyBiz: boolean;
+  jitter: number;
+}
+
+export function scoreDeployNeighbor(i: DeployNeighborInputs): number {
+  let s = 0;
+  // Forward pressure — prefer intermediate distance over hugging HQ
+  s -= Math.abs(i.distanceToOwnHQ - 2) * 0.6;
+  // Border defense: place near threats but not into a bloodbath
+  if (i.hostilesAdjacent === 1) s += 2;
+  else if (i.hostilesAdjacent >= 2) s -= 1;
+  // Don't stack unless we need to
+  s -= i.friendliesHere * 3;
+  if (i.ownedByUs) s += 1;
+  if (i.onOwnSupplyRoute) s += 1.5;
+  if (i.adjacentToEnemyBiz) s += 2.5;
+  s += i.jitter * 0.5;
+  return s;
+}
+
 
 // ─── 5. Family signature preferences ─────────────────────────────────
 export interface FamilySignature {

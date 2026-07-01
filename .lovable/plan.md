@@ -1,136 +1,133 @@
+# AI Overhaul — Smarter, More Dynamic, Medium-Threat Opponents
 
-# Civ V Management Polish + Combat & AI Rebalance — Combined Plan
+## Goals
 
-Same goal as before (make the game *feel* like a 4X management sim) **plus** sharpened combat math and smarter AI woven into the same passes. No new mechanics — tuning and decision-quality only. Noir aesthetic preserved.
-
----
-
-## Pass A — Smart End-Turn Button + AI Posture Hint
-
-**UI (unchanged from prior plan)**
-Cycler states in priority order: `INCOMING SITDOWN` → `UNIT NEEDS ORDERS` → `CAPO READY TO PROMOTE` → `READY SITDOWN` → `END TURN` → `AI THINKING…`. Hover shows full pending-items list; spacebar ends turn only in `END TURN` state.
-
-**AI work folded in**
-- Add a `pendingThreats` derivation: for each rival, surface "telegraphed" hostile setups (scouted hex adjacent to player, capo flown into striking range, Plan Hit prep visible) so the cycler can include `THREAT DETECTED — <family> staging in <district>` as a state above `END TURN`. Uses existing intel state, no new mechanics.
-
-**Files**
-- New: `SmartEndTurnButton.tsx`, `lib/pending-actions.ts`, `lib/ai-threat-signals.ts`
-- Edit: `TurnStepRail.tsx`
+- **Dynamic**: AI reacts to *why* it's in a posture, not just *that* it is — same posture on different boards produces different action mixes.
+- **Reproducible**: same seed → same AI moves. Currently 70 unseeded `Math.random()` calls make replays diverge.
+- **Medium-threat baseline**: Normal difficulty should feel like a competent opponent that *pressures* the player without steamrolling. Easy stays learnable, Hard stays punishing.
+- **No new mechanics**: this is a decision-quality pass, not new AI abilities.
 
 ---
 
-## Pass B — Just Happened Feed + AI Posture Transparency
+## Diagnosed problems (from audit)
 
-**UI (unchanged)** — sliding event cards top-right at turn start, dismissible, replayable.
-
-**AI work folded in**
-- Each rival's posture transition (e.g. `Genovese: BUILD_ECONOMY → PRESSURE_LEADER`) becomes a feed card with the *reason* ("you're #1 in Respect; they will harass") drawn from the posture decision inputs. Pure surfacing, no behavior change.
-- Heat-tier crossings for rivals (when visible via intel) also feed in.
-
-**Files**
-- New: `JustHappenedFeed.tsx`, `lib/turn-events-feed.ts`, `lib/ai-posture-reasoner.ts` (pure: posture → human-readable cause)
-
----
-
-## Pass C — Demographics Panel + Combat Math Pass 1
-
-**UI (unchanged)** — Civ-style standings table with rank pills, vs-last-turn arrows.
-
-**Combat math rebalance (Pass 1: hit success curves)**
-Tune the unscouted/scouted/planned matrices to give scouting and planning their intended teeth:
-
-| Action | Current feel | Target |
-|---|---|---|
-| Blind hit | Too swingy; sometimes one-shot, sometimes whiff | Wider casualty floor, lower critical-success ceiling; civilian-casualty trigger band widened |
-| Scouted hit | Marginal upgrade over blind | Clear +15–20% success delta; intel staleness (>3 turns) decays bonus linearly |
-| Planned hit | Already guaranteed kill, but cheap | Keep guarantee; add Phase 2 cost floor scaling with target toughness; +1 heat if target is fortified |
-| Fortify defender | Modifier feels invisible | Bump defensive bonus and make it show in tooltip yield card (Pass E) |
-| Safehouse defender | Strong; correct | No change to numbers, just surface in HUD |
-| Capo wound penalty | 2-turn movement debuff sometimes ignored | Add −1 effective toughness during the wound window |
-
-All changes are constant edits in the existing combat resolver — extract into `src/lib/balance/combat-tuning.ts` so the breakdown helper from Pass E reads the same source.
-
-**Files**
-- New: `DemographicsPanel.tsx`, `src/lib/balance/combat-tuning.ts`
-- Edit: combat resolver (constants → import from tuning file)
+1. **Non-deterministic** — 70 raw `Math.random()` calls inside `processAITurn` (heat bribes, plan hits, hitman, family dinner, HQ assault, combat willingness, deploy positions). Seeds don't reproduce.
+2. **Fixed action waterfall** — every posture runs income → recruit → deploy → move → claim → extort → … in the same order. AI is predictable turn-to-turn.
+3. **First-mover advantage** — `aiOpponents.forEach` in array order; family at index 0 always acts on stalest board state.
+4. **Phase-cap is cosmetic** — `aiPhase` (behavior) advances even when `cachedPhase` (rubber-band) is capped. Rubber-band doesn't actually gate action unlocks.
+5. **Passive targeting** — Plan Hit picks random capo; soldier deploy picks random neighbor; softmax `topK` hardcoded to 4 regardless of pool size.
+6. **Posture dead-zones** — money runway 2.5–3.0 falls to BUILD_ECONOMY (silent). PRESSURE_LEADER fires at rank 1 with even 1-hex margin (hair-trigger). No "outnumbered but healthy" posture.
+7. **No proactive scouting** — AI only attacks with intel if player or a family power gave it. Blind hits dominate.
+8. **Economic safety net** — guaranteed income floor (`max(earned, 2000 + turn*500)`) removes consequence for bad economy.
+9. **Double-fire** — Plan Hit and Hitman can both target the same capo the same turn.
 
 ---
 
-## Pass D — Minimap + AI Smarter Decision-Making
+## Plan (6 passes, folded into 1 slice)
 
-**UI (unchanged)** — floating 180×180 minimap, viewport rect, click-to-pan, overlays for heat/supply/combat.
+### Pass 1 — Seeded determinism (foundation)
 
-**AI sharpening (the big one)**
-Inside the existing 8-posture tree — no new postures, smarter choices *within* each:
+Replace `Math.random()` inside `processAITurn` with the existing seeded PRNG (`mulberry32(mapSeed + turn*31 + family.charCodeAt(0))`), already used for hex scoring.
 
-1. **Target selection**
-   - Score candidate hexes by: net income · adjacency to existing rival territory · defender toughness · supply-line cut potential · player Respect/Influence value lost. Today's AI tends to pick whatever's reachable.
-   - In `PRESSURE_LEADER`, weight hexes that flip Respect rankings (denying the leader, not just gaining for self).
-2. **Sitdown pricing**
-   - Replace flat-price heuristic with a value function: `offer ≈ targetHexNetIncome × turnsRemaining × tensionDiscount`. Caps at current Phase ceiling.
-   - AI accepts/rejects player offers using same function ± personality variance.
-3. **Heat management**
-   - Below `hot`: free to act. At `hot`: skip blind hits, prefer scouted/planned. At `critical`: spend on bribes/PR before any heat-positive action. At `RICO`: full `COOL_OFF` override regardless of posture preference.
-   - Wires into existing bribery/lawyer/PR actions — no new actions.
-4. **Phase 3+ expansion play**
-   - AI now actively places fortify/safehouse to *block* player erosion attempts on contested borders; previously reactive only.
-5. **Capo usage**
-   - AI flies capos toward high-EV targets instead of patrol-style local moves. Respects Plan Hit's Phase 2 unlock.
-6. **Personality variance** preserved (existing per-family weights), just modulating the new scoring functions instead of replacing them.
+- Extend `turnRng` usage to: lay-low roll, mattresses roll, bribe roll, deploy neighbor pick, fortify chance, combat willingness, plan-hit roll & target pick, wiretap roll, family dinner roll, HQ assault roll, hitman roll, personality drift.
+- Keep the existing `turnRng` factory; just pipe it through more branches.
+- Add a test in `src/hooks/__tests__/ai-determinism.test.ts`: same seed + same starting board → identical AI action log across 20 turns.
 
-**Files**
-- New: `src/lib/ai/target-scoring.ts`, `src/lib/ai/sitdown-pricing.ts`, `src/lib/ai/heat-gates.ts`
-- Edit: existing AI turn driver — replaces inline heuristics with calls to the above
-- Test: snapshot a deterministic seed mid-game to confirm AI doesn't regress into passivity
+**Value:** replays reproduce, sim regressions become bisectable, difficulty tuning becomes measurable.
 
 ---
 
-## Pass E — Rich Hex Tooltips + Combat Math Pass 2
+### Pass 2 — Priority-queued action budget
 
-**UI (unchanged)** — full yield breakdown card with line items, plus "what if I claim/extort/hit here?" projection.
+Replace the fixed if-chain waterfall with a per-turn **weighted action queue**. Each block that currently fires becomes a candidate action with:
+- `weight` (base × posture multiplier × personality × urgency)
+- `costEstimate` (money + heat)
+- `prerequisite` (phase, targets exist, etc.)
 
-**Combat math rebalance (Pass 2: projections honest)**
-The projection lines must reflect the new tuning from Pass C and Pass D. Extract:
-- `lib/hex-yield-breakdown.ts` (income lines)
-- `lib/combat-projection.ts` (success% + casualty range for the currently selected unit attacking this hex, reading from `balance/combat-tuning.ts`)
+Per turn, AI:
+1. Enumerates all eligible actions.
+2. Sorts by weight × urgency.
+3. Executes top-N until money/heat/AP budget exhausted.
 
-This forces the combat tuning to be inspectable — no hidden modifiers. Any number shown in the tooltip comes from the same constants the resolver uses.
+Concrete posture-driven weight tables live in `src/lib/ai-action-weights.ts` (new). Example: WAR posture weights hit/plan-hit/hitman 3× higher and build-business 0.2×; TURTLE weights fortify/safehouse/dinner 3× and hit 0.3×.
 
-**Files**
-- New: `HexYieldTooltip.tsx`, `lib/hex-yield-breakdown.ts`, `lib/combat-projection.ts`
-- Edit: existing hover tooltip component
-
----
-
-## Files summary
-
-**New (UI)** — `SmartEndTurnButton`, `JustHappenedFeed`, `DemographicsPanel`, `Minimap`, `HexYieldTooltip`
-**New (pure helpers)** — `pending-actions`, `ai-threat-signals`, `turn-events-feed`, `ai-posture-reasoner`, `hex-yield-breakdown`, `combat-projection`
-**New (balance/AI)** — `balance/combat-tuning.ts`, `ai/target-scoring.ts`, `ai/sitdown-pricing.ts`, `ai/heat-gates.ts`
-**Edited** — combat resolver (constants extraction), AI turn driver (heuristic replacement), `TurnStepRail`, `ResponsiveLayout`, `UltimateMafiaGame`, existing hover tooltip
-
-**Untouched** — save format, hex grid, dialog chrome, fonts, palette, panel components
+**Value:** same posture on different boards picks different actions. AI feels *reactive* instead of scripted.
 
 ---
 
-## Sequencing
+### Pass 3 — Smarter target selection
 
-1. **Pass A** — Smart End-Turn + threat signal
-2. **Pass B** — Feed + posture reasons
-3. **Pass C** — Demographics + combat math Pass 1 (tuning constants)
-4. **Pass D** — Minimap + AI scoring/pricing/heat-gates
-5. **Pass E** — Rich tooltips + combat math Pass 2 (honest projections)
+- **Plan Hit target scoring** (`src/lib/ai-strategy.ts`): score each rival capo by `threatScore = level*2 + adjacencyToMyTerritory + inWarBonus - hqProximityPenalty`. Softmax pick with temperature by difficulty (Easy = flat, Hard = greedy).
+- **Hitman target scoring**: extend exposure score with `strategicValue = income of hex + district control contribution`. Prefer capos whose death actually hurts the rival, not just exposed ones.
+- **Soldier deploy scoring**: score spawn neighbors by `borderPressure - stackingPenalty + supplyLineDefense`. No more `Math.random()` pick.
+- **Softmax topK** dynamic: `min(pool.length, 3 + floor(pool.length/4))` — small pools stay greedy, large pools stay diverse.
+- **Plan Hit / Hitman dedupe**: track `_targetsThisTurn` set per AI; second system skips if first already queued the same capo.
 
-Recommend approving A+B first (lowest risk, biggest "feels different" payoff), playtesting, then green-lighting C–E.
+**Value:** hits land on capos that matter. AI doesn't waste $30k hitman on a level-1 capo hiding at HQ.
 
 ---
 
-## Out of scope (still)
+### Pass 4 — Posture reasoner fixes
 
-- No new combat mechanics (no ambush rolls, no counter-attacks, no retreat orders — you marked these out)
-- No economy rebalance pass
-- No alliance-against-leader AI behavior
-- No new fonts, palette, or panel chrome
-- No save format changes
-- No new dependencies
+Update `src/lib/ai-posture.ts` `computeAIPosture()`:
 
+- **Fill 2.5–3.0 money runway gap**: extend CONSOLIDATE trigger to `moneyRunway < 3.2` when heat ≥ warm.
+- **PRESSURE_LEADER margin gate**: require `myHexes >= rank2Hexes + 3` OR `myRespect >= rank2Respect + 15`. No more 1-hex trigger.
+- **Add UNDERDOG posture**: fires when `myRank >= 3` AND `topRivalHexes > 1.8 * myHexes` AND Phase ≥ 2. Policy: aggressive diplomacy (propose alliances to other underdogs), sabotage rank-1 hexes, cheap harassment hits — no expansion.
+- **CLOSE_OUT loosen**: fire at `victoryGap ≤ 5` when in Phase 4 with `moneyRunway > 4`.
+- **Bind `aiPhase` to `cachedPhase`**: after rubber-band cap, use the capped phase for all action gates, not the raw `aiPhase`. Fixes the cosmetic-cap bug.
+
+Add `src/lib/__tests__/ai-posture-edges.test.ts` covering: 2.5 runway warm heat → CONSOLIDATE, rank-1 by 1 hex → not PRESSURE_LEADER, rank-3 outnumbered → UNDERDOG, capped phase → gated actions.
+
+---
+
+### Pass 5 — Proactive scout + intel-driven combat
+
+- Add scout as a scored action in the queue (Pass 2): weight × 2 when a candidate attack target has no fresh intel and AI has a capo within 3 hexes of it.
+- Refuse blind hits when scoutable within 2 turns unless posture is WAR/PRESSURE_LEADER + aggressive personality.
+- Combat willingness (`6924`) becomes: `baseWillingness + intelBonus (0.15 if scouted) + strengthRatioBonus`. Removes the hardcoded `defensive: strength >= enemy+2 ? 0.7 : 0.15` cliff.
+
+**Value:** AI feels like it *plans* attacks. Player observing gets telegraphed threats (scout ping → attack next turn).
+
+---
+
+### Pass 6 — Fairness + first-mover fix
+
+- **Randomize AI turn order** per round using `turnRng`. Store computed order on state for the "Just Happened" feed to display consistently.
+- **Income floor tapered**: keep the floor for Easy at 100%, taper to 50% on Normal (only kicks in below `1000 + turn*250`), disable on Hard. Bad economy actually costs the AI.
+- **Fix `floor(illegalBiz/3)` heat hole**: switch to `ceil(illegalBiz/3)` for 1–2 businesses — 1 illegal biz → 1 heat/turn passive, matching intent.
+
+---
+
+## Files to change
+
+- `src/hooks/useEnhancedMafiaGameState.ts` — pipe `turnRng` through `processAITurn`; swap waterfall for queue executor; wire capped phase to action gates; randomize AI order.
+- `src/lib/ai-posture.ts` — new UNDERDOG posture; fixed CONSOLIDATE / PRESSURE_LEADER / CLOSE_OUT triggers.
+- `src/lib/ai-strategy.ts` — target scoring functions (`scorePlanHitTarget`, `scoreHitmanTarget`, `scoreDeployNeighbor`), dynamic `softmaxPick` topK.
+- `src/lib/ai-action-weights.ts` — **new** — posture × action weight table.
+- `src/lib/ai-difficulty.ts` — income floor taper values.
+
+## New tests
+
+- `src/hooks/__tests__/ai-determinism.test.ts` — reproducibility harness.
+- `src/lib/__tests__/ai-posture-edges.test.ts` — posture trigger edges.
+- `src/lib/__tests__/ai-target-scoring.test.ts` — plan-hit / hitman / deploy scoring picks the "right" target on fixtures.
+
+Existing `simulation.test.ts` and `strategy-simulation.test.ts` catch regressions in the aggregate.
+
+---
+
+## What we're NOT touching
+
+- No new AI abilities (no ambush, no counter-attack, no AI-vs-AI alliances against player).
+- No combat math changes (casualty ranges, fortify %, capo wound turns) — pure decision layer.
+- No difficulty rebalance beyond the income floor taper — Normal stays medium-threat.
+- No UI changes to how AI is displayed.
+
+---
+
+## Sequencing & checkpoints
+
+Pass order matters. Ship 1 → 2 → 3 → 4 → 5 → 6, each behind the same commit. After each pass, run `simulation.test.ts` and `strategy-simulation.test.ts` to catch regressions before layering the next.
+
+After all 6 passes: run a 20-turn seeded sim on Easy / Normal / Hard × 3 seeds and eyeball final standings. Target: on Normal, player and top AI within 25% of each other on hexes at turn 40 in ~60% of seeds.

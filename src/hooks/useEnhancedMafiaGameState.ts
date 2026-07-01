@@ -110,8 +110,10 @@ import {
   rollFamilyPersonality, rollFamilyStrategy, computeDynamicMood, blendMoodWithPersonality,
   scoreHexForAI, softmaxPick, familySignaturePreference,
   difficultySoftmaxTemperature, difficultyMoodSensitivity,
+  scorePlanHitTarget, scoreHitmanTarget, scoreDeployNeighbor,
   type FamilyId, type AIPersonality, type DynamicMood,
 } from '@/lib/ai-strategy';
+
 import { computeAIPosture, posturePolicy, rankByTerritory, type AIPosture } from '@/lib/ai-posture';
 import {
   getAggressionScale, getHQAssaultBase, getPlanHitBase, getHitmanChance,
@@ -6118,7 +6120,19 @@ export const useEnhancedMafiaGameState = (
     state.aiAlertState = state.aiAlertState || {};
     const diffMods = state.difficultyModifiers || DIFFICULTY_MODIFIERS.normal;
 
-    state.aiOpponents.forEach(opponent => {
+    // Fisher-Yates shuffle of AI opponents each turn so no single family always
+    // acts first (eliminates the index-0 first-mover advantage). Seeded per-turn
+    // so replays are reproducible.
+    const orderRng = mulberry32((state.mapSeed || 0) + state.turn * 97 + 4242);
+    const shuffled = state.aiOpponents.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(orderRng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    (state as any)._aiTurnOrder = shuffled.map(o => o.family);
+
+    shuffled.forEach(opponent => {
+
       const fam = opponent.family as any;
       const hq = state.headquarters[fam];
       if (!hq) return;
@@ -6203,6 +6217,10 @@ export const useEnhancedMafiaGameState = (
       const moneyRunway = opponent.resources.money / upkeepForRunway;
       const myRank = rankByTerritory(myTerritoryNow, [...rivalHexCounts, playerHexCount]);
       const victoryGap = TERRITORY_TARGET_AI - myTerritoryNow;
+      const rivalRespectArr = state.aiOpponents
+        .filter(o => o.family !== fam)
+        .map(o => o.resources?.respect || 0)
+        .concat([state.resources.respect || 0]);
       const posture: AIPosture = computeAIPosture({
         aiPhase,
         heatTier,
@@ -6217,7 +6235,10 @@ export const useEnhancedMafiaGameState = (
         basePersonality,
         dynamicMood,
         strategicOverride,
+        myRespect: opponent.resources.respect || 0,
+        rivalRespect: rivalRespectArr,
       });
+
       oppAny.posture = posture;
       const policy = posturePolicy(posture);
 
@@ -8485,8 +8506,11 @@ export const useEnhancedMafiaGameState = (
             const isBuilt = !t.business!.isExtorted;
             aiHeatFromBiz += isBuilt ? 0.5 : 1; // built biz = half heat
           });
-          const aiPassiveHeat = Math.floor(aiHeatFromBiz / 3);
+          // Ceil (not floor) so 1-2 illegal biz still generates 1 heat/turn.
+          // Previous floor(x/3) let AI run 2 illegal biz indefinitely at zero heat.
+          const aiPassiveHeat = Math.max(aiHeatFromBiz > 0 ? 1 : 0, Math.ceil(aiHeatFromBiz / 3));
           if (aiPassiveHeat > 0) addAIHeatRaw(state, fam, aiPassiveHeat);
+
         }
 
         // 2. Heat decay — mirrors player decay (state.policeHeat.reductionPerTurn, default 2)
