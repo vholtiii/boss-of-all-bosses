@@ -1730,21 +1730,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })}
 
-            {/* ═══ STRATEGIC OVERLAYS (district borders, war fronts, vulnerability, supply support) ═══ */}
-            {showDistrictBorders && (
-              <g className="pointer-events-none">
-                {districtBorderSegments.map((seg, i) => (
-                  <line
-                    key={`district-border-${i}`}
-                    x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2}
-                    stroke="#E8D5A3"
-                    strokeWidth="2.5"
-                    strokeOpacity="0.45"
-                    strokeLinecap="round"
-                  />
-                ))}
-              </g>
-            )}
+            {/* ═══ STRATEGIC OVERLAYS (war fronts, vulnerability, supply support) ═══ */}
             {showThreats && overlays && (
               <g className="pointer-events-none">
                 {/* War front hexes — red dashed outline */}
