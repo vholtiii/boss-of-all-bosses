@@ -105,7 +105,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [showSupplyLines, setShowSupplyLines] = useState(true);
   const [showThreats, setShowThreats] = useState(true);
-  const [showDistrictBorders, setShowDistrictBorders] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [pinnedHex, setPinnedHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; canAssaultHQ?: boolean; canFlipSoldier?: boolean; negotiateCapoId?: string; pendingNegotiationId?: string; reasons?: Record<string, string> } | null>(null);
@@ -248,38 +247,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return points.join(' ');
   };
 
-  // Compute district boundary segments for border outlines
-  const districtBorderSegments = useMemo(() => {
-    const dirs = [
-      { dq: 1, dr: 0, ds: -1 },
-      { dq: 1, dr: -1, ds: 0 },
-      { dq: 0, dr: -1, ds: 1 },
-      { dq: -1, dr: 0, ds: 1 },
-      { dq: -1, dr: 1, ds: 0 },
-      { dq: 0, dr: 1, ds: -1 },
-    ];
-    const dMap = new Map<string, string>();
-    hexMap.forEach(t => dMap.set(`${t.q},${t.r},${t.s}`, t.district));
-    const segs: { x1: number; y1: number; x2: number; y2: number }[] = [];
-    const seen = new Set<string>();
-    hexMap.forEach(tile => {
-      const { x: cx, y: cy } = getHexPosition(tile.q, tile.r);
-      dirs.forEach((dir, ei) => {
-        const nd = dMap.get(`${tile.q + dir.dq},${tile.r + dir.dr},${tile.s + dir.ds}`);
-        if (nd !== tile.district) {
-          const a1 = (Math.PI / 3) * ei;
-          const a2 = (Math.PI / 3) * ((ei + 1) % 6);
-          const x1 = Math.round((cx + baseHexRadius * Math.cos(a1)) * 100) / 100;
-          const y1 = Math.round((cy + baseHexRadius * Math.sin(a1)) * 100) / 100;
-          const x2 = Math.round((cx + baseHexRadius * Math.cos(a2)) * 100) / 100;
-          const y2 = Math.round((cy + baseHexRadius * Math.sin(a2)) * 100) / 100;
-          const key = [Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2), Math.max(y1, y2)].join(',');
-          if (!seen.has(key)) { seen.add(key); segs.push({ x1, y1, x2, y2 }); }
-        }
-      });
-    });
-    return segs;
-  }, [hexMap]);
 
   // District background tint colors (subtle sepia inks, for region identification)
   const districtTints: Record<string, string> = {
@@ -791,15 +758,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         >
           {showThreats ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
           Threats
-        </Button>
-        <Button
-          variant={showDistrictBorders ? "default" : "outline"}
-          size="sm"
-          onClick={() => setShowDistrictBorders(s => !s)}
-          className="font-medium"
-        >
-          {showDistrictBorders ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-          Districts
         </Button>
       </div>
 
@@ -1772,21 +1730,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })}
 
-            {/* ═══ STRATEGIC OVERLAYS (district borders, war fronts, vulnerability, supply support) ═══ */}
-            {showDistrictBorders && (
-              <g className="pointer-events-none">
-                {districtBorderSegments.map((seg, i) => (
-                  <line
-                    key={`district-border-${i}`}
-                    x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2}
-                    stroke="#E8D5A3"
-                    strokeWidth="2.5"
-                    strokeOpacity="0.45"
-                    strokeLinecap="round"
-                  />
-                ))}
-              </g>
-            )}
+            {/* ═══ STRATEGIC OVERLAYS (war fronts, vulnerability, supply support) ═══ */}
             {showThreats && overlays && (
               <g className="pointer-events-none">
                 {/* War front hexes — red dashed outline */}
