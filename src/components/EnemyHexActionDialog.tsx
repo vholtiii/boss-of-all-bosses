@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Swords, Bomb, X, Target, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Swords, Bomb, X, Target, AlertTriangle, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
+import { SABOTAGE_COST } from '@/types/game-mechanics';
+import type { ActionPreview } from '@/lib/action-previews';
+import ActionPreviewCard from '@/components/ActionPreviewCard';
+import { cn } from '@/lib/utils';
 
 interface EnemyHexActionProps {
   open: boolean;
@@ -23,12 +27,69 @@ interface EnemyHexActionProps {
   } | null;
   playerMoney: number;
   gamePhase: number;
+  /** Live consequence previews (shared math with the executors). */
+  hitPreview?: ActionPreview | null;
+  pushOutPreview?: ActionPreview | null;
+  sabotagePreview?: ActionPreview | null;
   onAction: (action: 'hit' | 'sabotage' | 'cancel' | 'plan_hit' | 'push_out') => void;
 }
 
-const SABOTAGE_COST = 12000;
+const chanceColor = (c: number): string =>
+  c >= 0.7 ? 'text-green-400' : c >= 0.45 ? 'text-yellow-400' : 'text-red-400';
 
-const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({ open, targetInfo, playerMoney, gamePhase, onAction }) => {
+/** Action button with an optional chance badge + expandable consequence preview. */
+const PreviewableAction: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  sublabel: string;
+  variant?: 'default' | 'destructive' | 'outline';
+  disabled?: boolean;
+  preview?: ActionPreview | null;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onClick: () => void;
+}> = ({ icon, label, sublabel, variant = 'destructive', disabled, preview, expanded, onToggleExpand, onClick }) => (
+  <div className="space-y-1">
+    <div className="flex items-stretch gap-1">
+      <Button
+        className="flex-1 justify-start gap-3 h-auto py-2"
+        variant={variant}
+        disabled={disabled}
+        onClick={onClick}
+      >
+        {icon}
+        <div className="text-left flex-1">
+          <div className="text-sm font-semibold flex items-center justify-between gap-2">
+            <span>{label}</span>
+            {preview?.valid && typeof preview.successChance === 'number' && (
+              <span className={cn('text-sm font-bold tabular-nums', chanceColor(preview.successChance))}>
+                {Math.round(preview.successChance * 100)}%
+              </span>
+            )}
+          </div>
+          <div className="text-xs opacity-80">{sublabel}</div>
+        </div>
+      </Button>
+      {preview && (
+        <button
+          onClick={onToggleExpand}
+          className="px-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+          title={expanded ? 'Hide consequences' : 'Show consequences'}
+        >
+          {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
+      )}
+    </div>
+    {expanded && preview && <ActionPreviewCard preview={preview} compact />}
+  </div>
+);
+
+const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({
+  open, targetInfo, playerMoney, gamePhase,
+  hitPreview, pushOutPreview, sabotagePreview,
+  onAction,
+}) => {
+  const [expandedAction, setExpandedAction] = useState<string | null>(null);
   if (!open || !targetInfo) return null;
 
   const canSabotage = targetInfo.hasBusiness && playerMoney >= SABOTAGE_COST;
@@ -36,6 +97,8 @@ const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({ open, targetInfo,
   // The dialog only surfaces the EXECUTE option when a plannedHit already exists for this hex.
   const canExecutePlan = !!(targetInfo.planMatchesHere || targetInfo.planRelocatedHere);
   const familyName = targetInfo.controllingFamily.charAt(0).toUpperCase() + targetInfo.controllingFamily.slice(1);
+
+  const toggle = (key: string) => setExpandedAction(prev => (prev === key ? null : key));
 
   // Defender status message
   const getDefenderStatus = () => {
@@ -64,7 +127,7 @@ const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({ open, targetInfo,
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-card border border-border rounded-lg shadow-2xl p-5 w-[380px]"
+            className="bg-card border border-border rounded-lg shadow-2xl p-5 w-[400px] max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -99,79 +162,64 @@ const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({ open, targetInfo,
             </div>
 
             <p className="text-xs text-muted-foreground mb-4">
-              You've entered {familyName} territory. Choose an action or retreat.
+              You've entered {familyName} territory. Choose an action or retreat. Click <ChevronDown className="h-3 w-3 inline" /> for full consequences.
             </p>
 
             <div className="space-y-2">
               {canExecutePlan && (
-                <Button
-                  className="w-full justify-start gap-3"
+                <PreviewableAction
+                  icon={<Target className="h-4 w-4" />}
+                  label={targetInfo.planMatchesHere ? 'Execute Plan Hit' : 'Execute Plan Hit (Relocated)'}
+                  sublabel={`${targetInfo.planMatchesHere
+                    ? '+20% bonus · 0 casualties on success'
+                    : '+10% bonus · +5 heat · cooldown'}${typeof targetInfo.planTurnsRemaining === 'number' ? ` · ${targetInfo.planTurnsRemaining}t left` : ''}`}
                   variant="default"
+                  preview={hitPreview}
+                  expanded={expandedAction === 'plan_hit'}
+                  onToggleExpand={() => toggle('plan_hit')}
                   onClick={() => onAction('plan_hit')}
-                >
-                  <Target className="h-4 w-4" />
-                  <div className="text-left">
-                    <div className="text-sm font-semibold">
-                      {targetInfo.planMatchesHere ? 'Execute Plan Hit' : 'Execute Plan Hit (Relocated)'}
-                    </div>
-                    <div className="text-xs opacity-80">
-                      {targetInfo.planMatchesHere
-                        ? '+20% bonus · 0 casualties on success'
-                        : '+10% bonus · +5 heat · cooldown'}
-                      {typeof targetInfo.planTurnsRemaining === 'number' && ` · ${targetInfo.planTurnsRemaining}t left`}
-                    </div>
-                  </div>
-                </Button>
+                />
               )}
 
               {!targetInfo.hasBusiness ? (
-                <Button
-                  className="w-full justify-start gap-3"
-                  variant="destructive"
+                <PreviewableAction
+                  icon={<Swords className="h-4 w-4" />}
+                  label="👊 Push Out"
+                  sublabel={targetInfo.defendersCount > 0
+                    ? `Light combat${targetInfo.isScouted ? '' : ' · unknown defenders'}`
+                    : 'Auto-success · no civilian risk'}
+                  preview={pushOutPreview}
+                  expanded={expandedAction === 'push_out'}
+                  onToggleExpand={() => toggle('push_out')}
                   onClick={() => onAction('push_out')}
-                >
-                  <Swords className="h-4 w-4" />
-                  <div className="text-left">
-                    <div className="text-sm font-semibold">👊 Push Out</div>
-                    <div className="text-xs opacity-80">
-                      {targetInfo.defendersCount > 0
-                        ? `Light combat · +4 heat${targetInfo.isScouted ? '' : ' · unknown defenders'}`
-                        : 'Auto-success · +2 heat · no civilian risk'}
-                    </div>
-                  </div>
-                </Button>
+                />
               ) : (
-                <Button
-                  className="w-full justify-start gap-3"
-                  variant="destructive"
+                <PreviewableAction
+                  icon={<Swords className="h-4 w-4" />}
+                  label="Hit Territory"
+                  sublabel="Combat for control · heat scales with combatants"
+                  preview={hitPreview}
+                  expanded={expandedAction === 'hit'}
+                  onToggleExpand={() => toggle('hit')}
                   onClick={() => onAction('hit')}
-                >
-                  <Swords className="h-4 w-4" />
-                  <div className="text-left">
-                    <div className="text-sm font-semibold">Hit Territory</div>
-                    <div className="text-xs opacity-80">Combat for control · +10 heat</div>
-                  </div>
-                </Button>
+                />
               )}
 
-              <Button
-                className="w-full justify-start gap-3"
+              <PreviewableAction
+                icon={<Bomb className="h-4 w-4" />}
+                label="Sabotage Business"
+                sublabel={!targetInfo.hasBusiness
+                  ? 'No business to sabotage'
+                  : playerMoney < SABOTAGE_COST
+                    ? `Need $${SABOTAGE_COST.toLocaleString()} (you have $${playerMoney.toLocaleString()})`
+                    : `Cost: $${SABOTAGE_COST.toLocaleString()}`}
                 variant="outline"
                 disabled={!canSabotage}
+                preview={targetInfo.hasBusiness ? sabotagePreview : null}
+                expanded={expandedAction === 'sabotage'}
+                onToggleExpand={() => toggle('sabotage')}
                 onClick={() => onAction('sabotage')}
-              >
-                <Bomb className="h-4 w-4" />
-                <div className="text-left">
-                  <div className="text-sm font-semibold">Sabotage Business</div>
-                  <div className="text-xs opacity-80">
-                    {!targetInfo.hasBusiness
-                      ? 'No business to sabotage'
-                      : playerMoney < SABOTAGE_COST
-                        ? `Need $${SABOTAGE_COST.toLocaleString()} (you have $${playerMoney.toLocaleString()})`
-                        : `Cost: $${SABOTAGE_COST.toLocaleString()} · +15 heat`}
-                  </div>
-                </div>
-              </Button>
+              />
 
               {!canExecutePlan && gamePhase >= 2 && targetInfo.isScouted && (
                 <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground flex items-start gap-2">

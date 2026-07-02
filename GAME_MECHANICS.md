@@ -157,7 +157,7 @@ All families also start with 1 Capo and 1 Boss. Each HQ + 6 adjacent hexes are p
 | Auto-claim | Claims neutral territory automatically on arrival |
 | Combat immunity | Cannot die in regular combat — wounded instead |
 
-**Wound Mechanic**: If a capo would be killed in combat, they are instead wounded: -10 loyalty, -1 move penalty for 1 turn. Capos can only be permanently killed via hitman contract or planned hit.
+**Wound Mechanic**: If a capo would be killed in combat, they are instead wounded: -10 loyalty, -1 move penalty for 2 turns. Capos can only be permanently killed via hitman contract or planned hit.
 
 **Capo Personalities:**
 - **Diplomat** 🕊️ — +20% Ceasefire, +10% Alliance
@@ -171,7 +171,7 @@ All families also start with 1 Capo and 1 Boss. Each HQ + 6 adjacent hexes are p
 
 ### 4.4 Hitman Contracts
 
-External contract killers. **$30,000** per contract, max 3 active. Duration 3-5 turns based on target location. Success rate 40-90%. No heat, no stat gains. Hitman kills raise **global tension** across all family pairs (+5 for soldier kills, +15 for capo kills). Assassinations are anonymous — no pair tension is generated.
+External contract killers. **$40,000** per contract, max 3 active. Duration 3-5 turns based on target location. Success rate 40-90%. No heat, no stat gains. Hitman kills raise **global tension** across all family pairs (+5 for soldier kills, +15 for capo kills). Assassinations are anonymous — no pair tension is generated.
 
 ### 4.5 Soldier Stats
 
@@ -258,7 +258,7 @@ Clamped: 10%–95%
 **Defeat**: 40% attacker casualties (min 1).
 **Heat**: min(25, 8 + totalUnits × 2).
 
-**Capo combat immunity**: Capos cannot die in regular combat. They are wounded instead (-10 loyalty, -1 move for 1 turn).
+**Capo combat immunity**: Capos cannot die in regular combat. They are wounded instead (-10 loyalty, -1 move for 2 turns).
 
 ### 8.2 Extort
 
@@ -268,11 +268,11 @@ Clamped: 10%–95%
 | On success | Claims territory + money | Steals income only |
 | Money | $3,000 × respect multiplier | Business income × respect multiplier |
 
-Failure: -3 respect, -2 fear, +5 heat. **No casualties.**
+Failure: -3 respect, -2 fear, heat +13 (neutral) or +17 (enemy), scaled by difficulty. **No casualties.**
 
 ### 8.3 Claim Territory
 
-Neutral hexes only. Automatic success. +1 respect, +1 influence. No combat, no heat.
+Neutral hexes only. Starts a **pending claim** (+3 heat, +6 if the hex has a business) that finalizes at the end of the NEXT turn if a friendly unit is on or adjacent to the hex � otherwise the claim collapses. Rewards on finalization use diminishing returns: hexes 1-10 grant +1 respect/+1 influence each, 11-20 grant +0.5/+0.5, 21+ grant nothing.
 
 ---
 
@@ -282,7 +282,7 @@ Requires a capo. Success is rolled against base chance + personality bonus + inf
 
 | Type | Base Success | Cost | Effect |
 |---|---|---|---|
-| Ceasefire | 50% | $3,000 + 5 respect | Non-aggression 3-5 turns |
+| Ceasefire | 50% | $8,000 + 5 respect | Non-aggression 3-5 turns |
 | Bribe for Territory | 40% | $8,000+ | Peacefully claim hex |
 | Alliance | 30% | $5,000 | Conditional pact 5-8 turns |
 
@@ -393,7 +393,7 @@ Tier transitions, RICO warnings, indictments, and arrests are surfaced via notif
 ### 14.1 Assault HQ
 - **Who**: Soldiers only, must be adjacent to enemy HQ
 - **Requirements**: Toughness ≥ 4, loyalty ≥ 70
-- **Base success**: 15%, max 50%. HQ defense: -30%.
+- **Base success**: 28% (Normal difficulty), max 50%. HQ defense: -30%.
 - **Flipped soldier bonus**: -10% defense per flipped enemy soldier at HQ
 - **Success**: Family eliminated, +$25,000, +30 respect, +40 fear
 - **Failure**: Attacking soldier killed, all participating units lose 30 loyalty. No heat.

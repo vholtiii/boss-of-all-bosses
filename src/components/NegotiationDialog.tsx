@@ -35,6 +35,10 @@ interface NegotiationDialogProps {
   lockedDealType?: NegotiationType;       // forces this single negotiation type, hides picker
   proposedAmount?: number;                 // overrides computed cost
   proposerLabel?: string;                  // e.g. "Vito Corleone (Genovese)" — replaces capo header
+  /** Player's relationship with the target family (-100..100). Grudges reduce odds. */
+  relationshipWithTarget?: number;
+  /** True when the player is the runaway territory leader — rivals refuse to shield the winner. */
+  playerIsRunawayLeader?: boolean;
 }
 
 const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
@@ -42,6 +46,7 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
   enemyFamily, playerReputation, playerInfluence = 0, playerFear, playerMoney, enemyStrength, hexIncome,
   negotiationUsedThisTurn, treacheryTurnsRemaining, availableEnemyFamilies, onSelectTargetFamily,
   successBonus = 0, lockedDealType, proposedAmount, proposerLabel,
+  relationshipWithTarget, playerIsRunawayLeader,
 }) => {
   const [selectedType, setSelectedType] = useState<NegotiationType | null>(null);
   const [rolling, setRolling] = useState(false);
@@ -109,6 +114,13 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
     if (type === 'bribe_territory') chance -= enemyStrength * 5;
     chance += successBonus;
     chance -= treacheryDebuff;
+    // Relationship sway + leader wariness — mirrors processNegotiation / negotiation-odds.ts
+    if (typeof relationshipWithTarget === 'number') {
+      chance += Math.max(-10, Math.min(10, Math.round(relationshipWithTarget / 10)));
+    }
+    if (playerIsRunawayLeader && ['ceasefire', 'alliance', 'safe_passage', 'supply_deal'].includes(type)) {
+      chance -= 15;
+    }
     // Price modifier — matches reducer formula in processNegotiation
     const defaultCost = getDefaultCost(type);
     const offered = getCost(type);
@@ -117,7 +129,7 @@ const NegotiationDialog: React.FC<NegotiationDialogProps> = ({
       chance += mod;
     }
     return Math.max(5, Math.min(95, chance));
-  }, [personalityBonuses, playerReputation, playerInfluence, playerFear, enemyStrength, scope, successBonus, treacheryDebuff, getDefaultCost, getCost]);
+  }, [personalityBonuses, playerReputation, playerInfluence, playerFear, enemyStrength, scope, successBonus, treacheryDebuff, getDefaultCost, getCost, relationshipWithTarget, playerIsRunawayLeader]);
 
 
   const handleRoll = useCallback((type: NegotiationType) => {

@@ -16,6 +16,9 @@ export default {
       fontFamily: {
         'playfair': ['Playfair Display', 'serif'],
         'source': ['Source Sans Pro', 'sans-serif'],
+        'headline': ['Playfair Display', 'serif'],
+        'typewriter': ['Special Elite', 'Courier Prime', 'monospace'],
+        'courier': ['Courier Prime', 'monospace'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -66,6 +69,15 @@ export default {
           gold: "hsl(var(--vintage-gold))",
           blood: "hsl(var(--blood-red))",
           smoke: "hsl(var(--smoke-gray))",
+        },
+        period: {
+          paper: "hsl(var(--paper))",
+          "paper-aged": "hsl(var(--paper-aged))",
+          ink: "hsl(var(--ink))",
+          "ink-faded": "hsl(var(--ink-faded))",
+          brick: "hsl(var(--brick))",
+          brass: "hsl(var(--brass))",
+          felt: "hsl(var(--felt))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

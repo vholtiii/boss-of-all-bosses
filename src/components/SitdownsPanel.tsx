@@ -378,6 +378,7 @@ const SitdownsPanel: React.FC<SitdownsPanelProps> = ({
                 const odds = getNegotiationSuccessChance({
                   type: sample, scope: 'territory', capoPersonality: p.capoPersonality,
                   playerReputation: playerRep, enemyStrength: enemyOnHex, treacheryActive,
+                  relationshipWithTarget: gameState.reputation?.familyRelationships?.[p.targetFamily] || 0,
                 });
                 const cost = getNegotiationCost({ type: sample, enemyStrength: enemyOnHex, hexIncome });
                 return (

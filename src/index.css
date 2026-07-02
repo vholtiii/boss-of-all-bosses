@@ -37,12 +37,13 @@ All colors MUST be HSL.
     --input: 20 12% 15%;
     --ring: 45 85% 55%;
 
-    /* Five Families Colors */
-    --gambino-gold: 193 86% 60%;
-    --genovese-green: 128 61% 40%;
-    --lucchese-blue: 220 70% 50%;
-    --bonanno-red: 0 70% 55%;
-    --colombo-purple: 270 60% 55%;
+    /* Five Families Colors — desaturated 1920s inks.
+       Keep in sync with FAMILY_COLORS in src/lib/period-theme.ts. */
+    --gambino-gold: 194 36% 57%;    /* steel teal */
+    --genovese-green: 98 25% 45%;   /* olive green */
+    --lucchese-blue: 223 32% 56%;   /* slate blue */
+    --bonanno-red: 5 48% 48%;       /* brick red */
+    --colombo-purple: 286 24% 53%;  /* faded plum */
     
     /* Mafia specific colors */
     --noir-dark: 20 12% 12%;
@@ -50,6 +51,17 @@ All colors MUST be HSL.
     --blood-red: 0 70% 45%;
     --vintage-gold: 45 85% 55%;
     --smoke-gray: 0 0% 40%;
+
+    /* 1920s period palette — Gangsters: Organized Crime look.
+       Keep in sync with PERIOD in src/lib/period-theme.ts. */
+    --paper: 42 47% 89%;           /* aged-paper cream */
+    --paper-aged: 42 39% 78%;      /* darker paper edge */
+    --ink: 27 27% 13%;             /* ink brown-black */
+    --ink-faded: 32 18% 31%;       /* faded ink */
+    --brick: 8 49% 42%;            /* grease pencil / stamp red */
+    --brass: 41 54% 54%;           /* brass / gold accent */
+    --felt: 157 31% 21%;           /* deep green felt */
+    --sepia-shadow: 30 33% 6%;     /* deepest shadow */
     
     /* Gradients */
     --gradient-mafia: linear-gradient(135deg, hsl(var(--vintage-gold)), hsl(var(--blood-red)));
@@ -175,6 +187,156 @@ All colors MUST be HSL.
   @keyframes stockpilePulse {
     0%, 100% { opacity: 0.3; r: 1.5; }
     50% { opacity: 0.9; r: 2.2; }
+  }
+
+  /* ────────────────────────────────────────────────────────────────────
+     1920s PERIOD TEXTURES — shared artifact styles.
+     Every panel/dialog picks these up so the period look stays consistent.
+     ──────────────────────────────────────────────────────────────────── */
+
+  /* Aged paper sheet: cream base + subtle grain + vignetted edges + ink border */
+  .paper-panel {
+    background-color: hsl(var(--paper));
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 2px, hsl(var(--paper-aged) / 0.14) 2px, hsl(var(--paper-aged) / 0.14) 3px),
+      repeating-linear-gradient(90deg, transparent, transparent 3px, hsl(var(--paper-aged) / 0.08) 3px, hsl(var(--paper-aged) / 0.08) 4px),
+      radial-gradient(ellipse at center, transparent 55%, hsl(var(--paper-aged) / 0.55) 100%);
+    color: hsl(var(--ink));
+    border: 1px solid hsl(var(--ink) / 0.55);
+    box-shadow: 2px 3px 8px hsl(var(--sepia-shadow) / 0.5), inset 0 0 40px hsl(var(--paper-aged) / 0.35);
+  }
+
+  /* Ledger page: paper + ruled accounting lines + red margin rule */
+  .ledger-lines {
+    background-image:
+      linear-gradient(90deg, transparent 0, transparent 26px, hsl(var(--brick) / 0.35) 26px, hsl(var(--brick) / 0.35) 27px, transparent 27px),
+      repeating-linear-gradient(0deg, transparent, transparent 21px, hsl(var(--ink-faded) / 0.22) 21px, hsl(var(--ink-faded) / 0.22) 22px);
+  }
+
+  /* Rubber ink stamp: rotated, bordered, uppercase (e.g. CONFIDENTIAL, PAID) */
+  .ink-stamp {
+    display: inline-block;
+    font-family: 'Special Elite', 'Courier Prime', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: hsl(var(--brick) / 0.85);
+    border: 2px solid hsl(var(--brick) / 0.7);
+    border-radius: 2px;
+    padding: 0.1em 0.45em;
+    transform: rotate(-4deg);
+    mask-image: repeating-linear-gradient(45deg, black, black 2px, rgba(0,0,0,0.82) 2px, rgba(0,0,0,0.82) 3px);
+  }
+
+  /* Photo corners: four brass corner brackets around a mugshot / portrait */
+  .photo-corners {
+    position: relative;
+    background:
+      linear-gradient(to bottom right, hsl(var(--paper-aged)) 50%, transparent 50%) top left / 10px 10px no-repeat,
+      linear-gradient(to bottom left, hsl(var(--paper-aged)) 50%, transparent 50%) top right / 10px 10px no-repeat,
+      linear-gradient(to top right, hsl(var(--paper-aged)) 50%, transparent 50%) bottom left / 10px 10px no-repeat,
+      linear-gradient(to top left, hsl(var(--paper-aged)) 50%, transparent 50%) bottom right / 10px 10px no-repeat;
+    padding: 4px;
+  }
+
+  /* Case file: manila folder tone with a stamped top rule */
+  .case-file {
+    background-color: hsl(45 38% 74%);
+    background-image:
+      radial-gradient(ellipse at center, transparent 60%, hsl(var(--paper-aged) / 0.6) 100%);
+    color: hsl(var(--ink));
+    border: 1px solid hsl(var(--ink) / 0.5);
+    border-top: 3px double hsl(var(--brick) / 0.6);
+  }
+
+  /* Telegram / memo: cream strip, courier text, dashed cut edges */
+  .telegram {
+    background-color: hsl(var(--paper));
+    color: hsl(var(--ink));
+    font-family: 'Courier Prime', monospace;
+    border-top: 1px dashed hsl(var(--ink) / 0.5);
+    border-bottom: 1px dashed hsl(var(--ink) / 0.5);
+  }
+
+  /* Ink overrides: inside any paper artifact, dark-theme text utilities
+     re-map to period inks so existing components read correctly on paper. */
+  .paper-panel [class*="text-muted-foreground"],
+  .case-file [class*="text-muted-foreground"],
+  .newsprint [class*="text-muted-foreground"] {
+    color: hsl(var(--ink-faded));
+  }
+  .paper-panel [class*="text-foreground"],
+  .case-file [class*="text-foreground"],
+  .newsprint [class*="text-foreground"] {
+    color: hsl(var(--ink));
+  }
+  .paper-panel [class*="border-border"],
+  .case-file [class*="border-border"],
+  .newsprint [class*="border-border"] {
+    border-color: hsl(var(--ink) / 0.35);
+  }
+  /* Bright status colors re-inked as period accounting inks on paper */
+  .paper-panel [class*="text-green-"],
+  .case-file [class*="text-green-"],
+  .newsprint [class*="text-green-"],
+  .paper-panel [class*="text-emerald-"],
+  .case-file [class*="text-emerald-"],
+  .newsprint [class*="text-emerald-"] {
+    color: hsl(150 50% 24%); /* bookkeeper's green ink */
+  }
+  .paper-panel [class*="text-red-"],
+  .case-file [class*="text-red-"],
+  .newsprint [class*="text-red-"],
+  .paper-panel [class*="text-orange-"],
+  .case-file [class*="text-orange-"],
+  .newsprint [class*="text-orange-"],
+  .paper-panel [class*="text-destructive"],
+  .case-file [class*="text-destructive"],
+  .newsprint [class*="text-destructive"] {
+    color: hsl(var(--brick)); /* debit red */
+  }
+  .paper-panel [class*="text-blue-"],
+  .case-file [class*="text-blue-"],
+  .newsprint [class*="text-blue-"] {
+    color: hsl(223 45% 34%); /* fountain-pen blue */
+  }
+  .paper-panel [class*="text-yellow-"],
+  .case-file [class*="text-yellow-"],
+  .newsprint [class*="text-yellow-"],
+  .paper-panel [class*="text-amber-"],
+  .case-file [class*="text-amber-"],
+  .newsprint [class*="text-amber-"],
+  .paper-panel [class*="text-mafia-gold"],
+  .case-file [class*="text-mafia-gold"],
+  .newsprint [class*="text-mafia-gold"] {
+    color: hsl(38 60% 30%); /* aged brass ink */
+  }
+  .paper-panel [class*="text-purple-"],
+  .case-file [class*="text-purple-"],
+  .newsprint [class*="text-purple-"],
+  .paper-panel [class*="text-cyan-"],
+  .case-file [class*="text-cyan-"],
+  .newsprint [class*="text-cyan-"] {
+    color: hsl(270 25% 35%); /* violet ink */
+  }
+
+  /* Newsprint: slightly gray paper for the newspaper turn summary */
+  .newsprint {
+    background-color: hsl(44 25% 84%);
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 2px, hsl(var(--ink) / 0.025) 2px, hsl(var(--ink) / 0.025) 3px),
+      radial-gradient(ellipse at center, transparent 50%, hsl(var(--paper-aged) / 0.5) 100%);
+    color: hsl(var(--ink));
+  }
+  .newsprint-rule {
+    border-top: 1px solid hsl(var(--ink) / 0.65);
+    border-bottom: 3px double hsl(var(--ink) / 0.65);
+  }
+
+  /* Engraved atlas label for district names on the map */
+  .atlas-label {
+    font-family: 'Playfair Display', serif;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
   }
 
   /* Ken-Burns drift for select-screen background. CSS keyframes stay on the

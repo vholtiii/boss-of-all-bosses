@@ -2,24 +2,24 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { FAMILY_COLORS } from '@/lib/period-theme';
 
-const familyColors: Record<string, string> = {
-  gambino: '#42D3F2',
-  genovese: '#2AA63E',
-  lucchese: '#4169E1',
-  bonanno: '#DC143C',
-  colombo: '#8A2BE2',
-};
+const familyColors: Record<string, string> = FAMILY_COLORS;
 
+/* Mugshot-style portrait: height-chart lines behind the subject, framed with
+   photo corners like a police dossier photograph. */
 const UnitPortrait: React.FC<{ family: string; type: 'soldier' | 'capo' }> = ({ family, type }) => (
-  <div
-    className="w-10 h-10 rounded-full flex items-center justify-center text-lg border-2 shrink-0"
-    style={{
-      backgroundColor: `${familyColors[family] || '#555'}33`,
-      borderColor: familyColors[family] || '#555',
-    }}
-  >
-    {type === 'capo' ? '👔' : '👤'}
+  <div className="photo-corners shrink-0">
+    <div
+      className="w-10 h-11 flex items-center justify-center text-lg border"
+      style={{
+        borderColor: familyColors[family] || '#555',
+        background: `repeating-linear-gradient(0deg, #C9BCA2, #C9BCA2 5px, #BEB097 5px, #BEB097 6px)`,
+        filter: 'sepia(0.3)',
+      }}
+    >
+      {type === 'capo' ? '👔' : '👤'}
+    </div>
   </div>
 );
 
@@ -57,7 +57,7 @@ const SelectedUnitDock: React.FC<SelectedUnitDockProps> = ({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute bottom-4 left-4 z-30 bg-noir-dark/95 backdrop-blur-sm border border-mafia-gold/40 rounded-lg px-3 py-2 text-white shadow-lg min-w-[240px] max-w-[320px]"
+          className="case-file absolute bottom-4 left-4 z-30 rounded-sm px-3 py-2 shadow-lg min-w-[240px] max-w-[320px] font-courier"
           style={{ marginBottom: 'calc(var(--hex-card-h, 0px))' }}
         >
           {deployMode ? (
@@ -108,6 +108,7 @@ const SelectedUnitDock: React.FC<SelectedUnitDockProps> = ({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="ink-stamp text-[7px]">Dossier</span>
                     <p className="text-sm font-semibold truncate">
                       {isCapo ? `👔 ${unit.name || 'Capo'}` : '👤 Soldier'}
                     </p>

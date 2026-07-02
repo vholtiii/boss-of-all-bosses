@@ -41,7 +41,11 @@ import PhaseInfographic from '@/components/PhaseInfographic';
 import ThreatBoardPanel from '@/components/ThreatBoardPanel';
 import SitdownsPanel from '@/components/SitdownsPanel';
 import RivalComparisonStrip from '@/components/RivalComparisonStrip';
-import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType, SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, Safehouse, getTensionPairKey, WAR_TENSION_THRESHOLD, FAMILY_POWERS, PendingNegotiation, IncomingSitdown } from '@/types/game-mechanics';
+import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType, SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, Safehouse, getTensionPairKey, WAR_TENSION_THRESHOLD, FAMILY_POWERS, PendingNegotiation, IncomingSitdown, COMMISSION_VOTE_COST, PROSECUTION_LAWYER_REDUCTION } from '@/types/game-mechanics';
+import { computeCommissionVoteProjection } from '@/lib/action-formulas';
+import { computeLegalBreakdown } from '@/lib/legal-breakdown';
+import { previewRecruitMercenary, previewRecruitLocal, previewBuildBusiness, type ActionPreview } from '@/lib/action-previews';
+import ActionPreviewCard from '@/components/ActionPreviewCard';
 import { Anchor, Wrench, Truck, Wine, Fish, Package, Link2 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 
@@ -50,6 +54,85 @@ interface GameSidePanelProps {
   onAction: (action: any) => void;
   onEventChoice: (eventId: string, choiceId: string) => void;
 }
+
+// ─── LEGAL PRESSURE BREAKDOWN ─────────────────────────────────────────
+// Expandable panel under the Prosecution Risk bar explaining every term
+// in the risk formula, RICO/indictment timers, lawyer effects, and the
+// bribe/charity tradeoffs available to reduce pressure.
+
+const LegalPressureBreakdown: React.FC<{ gameState: EnhancedMafiaGameState }> = ({ gameState }) => {
+  const [open, setOpen] = useState(false);
+  const bd = computeLegalBreakdown(gameState);
+
+  const riskColor = (r: number) => r >= 90 ? 'text-red-400' : r >= 60 ? 'text-orange-400' : r >= 50 ? 'text-amber-400' : 'text-emerald-400';
+
+  return (
+    <div className="case-file rounded-sm font-courier">
+      <button
+        className="w-full flex items-center justify-between px-2 py-1 text-[10px] text-muted-foreground hover:brightness-90 transition-all"
+        onClick={() => setOpen(o => !o)}
+      >
+        <span className="flex items-center gap-1.5">
+          <span className="ink-stamp text-[8px]">Case File</span>
+          ⚖️ Why is my risk {bd.currentRisk}?
+        </span>
+        <span>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-2 pb-2 space-y-1.5">
+          {/* Formula terms */}
+          <div className="space-y-0.5">
+            {bd.terms.length === 0 && (
+              <p className="text-[10px] text-muted-foreground italic">No pressure sources — you're clean.</p>
+            )}
+            {bd.terms.map((t, i) => (
+              <div key={i} className="flex justify-between text-[10px]">
+                <span className="text-muted-foreground">{t.label}</span>
+                <span className={cn('font-mono font-semibold', t.delta > 0 ? 'text-red-400' : 'text-emerald-400')}>
+                  {t.delta > 0 ? '+' : ''}{t.delta}
+                </span>
+              </div>
+            ))}
+            <div className="flex justify-between text-[10px] pt-0.5 border-t border-border/40 font-bold">
+              <span>Projected next turn</span>
+              <span className={cn('font-mono', riskColor(bd.projectedRisk))}>{bd.projectedRisk}</span>
+            </div>
+          </div>
+
+          {/* Thresholds */}
+          <div className="text-[9px] text-muted-foreground/80 space-y-0.5">
+            <div>50+: soldier arrest after 3 turns {bd.prosecutionTimer > 0 && <span className="text-orange-400 font-semibold">({bd.prosecutionTimer}/3 now)</span>}</div>
+            <div>60+: grand jury cuts illegal income -30%</div>
+            <div>90+: federal indictment after 3 turns {bd.federalIndictmentTimer > 0 && <span className="text-red-400 font-semibold">({bd.federalIndictmentTimer}/3 now)</span>}</div>
+          </div>
+
+          {/* RICO state */}
+          {bd.ricoActive && (
+            <p className="text-[10px] text-red-400 font-semibold">
+              🚨 RICO investigation: {bd.ricoTimer}/3 turns at critical heat — drop below 90 heat to suspend.
+            </p>
+          )}
+
+          {/* Lawyer effects */}
+          {bd.lawyer ? (
+            <p className="text-[10px] text-blue-300">
+              ⚖️ {bd.lawyer.tier === 'consigliere' ? 'Consigliere Counsel' : bd.lawyer.tier === 'firm' ? 'Defense Firm' : 'Street Lawyer'} ({bd.lawyer.turnsRemaining}t left{bd.lawyer.feePerTurn > 0 ? `, $${bd.lawyer.feePerTurn.toLocaleString()}/t` : ''}): {bd.lawyer.effects.join(' · ')}
+            </p>
+          ) : (
+            <p className="text-[9px] text-muted-foreground italic">No lawyer retained — hire one to cut risk by {`${PROSECUTION_LAWYER_REDUCTION}`}+ and shorten sentences.</p>
+          )}
+
+          {/* Tradeoffs */}
+          <div className="text-[9px] text-muted-foreground/80 border-t border-border/40 pt-1 space-y-0.5">
+            <div>💰 Bribes: patrol -10 · captain -10 · chief -15 · mayor -20 risk (per-turn cost, can be exposed)</div>
+            <div>❤️ Charity: -heat now, +1 heat regen for 2 turns{bd.charityActive ? ' (active)' : ''} — costs money and an action</div>
+            <div>🤫 Lay Low: zero illegal income but arrest immunity and no rats</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ─── LEFT PANEL: Resources + Actions ──────────────────────────────────
 
@@ -148,6 +231,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           })()} max={100} color="bg-primary" />
           <StatusBar label="Police Heat" value={policeHeat.level} max={100} color="bg-destructive" />
           <StatusBar label="Prosecution Risk" value={legalStatus.prosecutionRisk} max={100} color="bg-orange-500" />
+          <LegalPressureBreakdown gameState={gameState} />
         </div>
 
         {/* ── Cop Flip (Rat) Warnings ── */}
@@ -340,24 +424,62 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           phaseLocked={actionsLocked}
         >
           <div className="space-y-1.5">
-            <ActionButton
-              icon={<Eye className="h-4 w-4" />}
-              label="Sabotage Rival"
-              sublabel={`$12,000`}
-              disabled={resources.money < 12000 || legalStatus.jailTime > 0}
-              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : resources.money < 12000 ? `Need $12,000` : undefined}
-              phaseLocked={actionsLocked}
-              onClick={() => onAction({ type: 'sabotage', cost: 12000 })}
-            />
-            <ActionButton
-              icon={<HandCoins className="h-4 w-4" />}
-              label="Extort Business"
-              sublabel={(gameState as any).gamePhase >= 3 ? '🔒 Influence Era' : `Free · +Heat`}
-              disabled={legalStatus.jailTime > 0 || (gameState as any).gamePhase >= 3}
-              disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : (gameState as any).gamePhase >= 3 ? '🔒 Phase 3 — Territory shifts through influence' : undefined}
-              phaseLocked={actionsLocked}
-              onClick={() => onAction({ type: 'extort_business', amount: 5000 })}
-            />
+            <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+              💡 Extortion and sabotage happen on the map — move a soldier onto a business hex to extort, or next to a rival business to sabotage it.
+            </div>
+
+            {/* ── Commission Vote (Coronation) — Phase 4 endgame ── */}
+            {((gameState as any).gamePhase || 1) >= 4 && (() => {
+              const projection = computeCommissionVoteProjection(gameState);
+              const cooldownLeft = Math.max(0, ((gameState as any).commissionVoteCooldownUntil || 0) - gameState.turn);
+              const disabled = actionsLocked || legalStatus.jailTime > 0 || !projection.ok || gameState.actionsRemaining <= 0;
+              return (
+                <div className={cn(
+                  'rounded-md border p-2.5 space-y-1.5',
+                  projection.wouldWin ? 'border-mafia-gold/60 bg-mafia-gold/10' : 'border-border bg-muted/30'
+                )}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold flex items-center gap-1.5">
+                      <Crown className="h-3.5 w-3.5 text-mafia-gold" /> Commission Vote
+                    </span>
+                    <Badge variant={projection.wouldWin ? 'default' : 'outline'} className="text-[10px] h-5">
+                      {projection.yesVotes}/{projection.needed} votes
+                    </Badge>
+                  </div>
+                  <div className="space-y-0.5">
+                    {projection.votes.map(v => (
+                      <div key={v.family} className="flex items-center justify-between text-[10px]">
+                        <span className="capitalize text-muted-foreground">{v.family}</span>
+                        <span className={v.vote ? 'text-green-400' : 'text-red-400'} title={v.reason}>
+                          {v.vote ? '✓ YES' : '✗ NO'} <span className="text-muted-foreground/70">— {v.reason}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    size="sm"
+                    className="w-full h-7 text-xs"
+                    variant={projection.wouldWin ? 'default' : 'outline'}
+                    disabled={disabled}
+                    onClick={() => onAction({ type: 'commission_vote' })}
+                    title={projection.blockedReason || (projection.wouldWin
+                      ? 'The Commission will crown you Boss of All Bosses.'
+                      : `Failing costs $${COMMISSION_VOTE_COST.toLocaleString()}, -10 relationship with each NO voter, and a 10-turn cooldown.`)}
+                  >
+                    {cooldownLeft > 0
+                      ? `On cooldown (${cooldownLeft}t)`
+                      : projection.blockedReason
+                        ? projection.blockedReason
+                        : `Call the Vote — $${COMMISSION_VOTE_COST.toLocaleString()} · 1 action`}
+                  </Button>
+                  {!projection.wouldWin && cooldownLeft === 0 && !projection.blockedReason && (
+                    <p className="text-[10px] text-yellow-500/90">
+                      ⚠️ Projection says this vote FAILS. NO voters lose 10 relationship and the vote locks for 10 turns.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ── Purge Ranks ── */}
             {(() => {
@@ -574,6 +696,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               disabled={resources.money < 20000 || legalStatus.jailTime > 0 || gameState.actionsRemaining <= 0}
               disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 20000 ? 'Need $20,000' : undefined}
               phaseLocked={actionsLocked}
+              preview={previewBuildBusiness(gameState, 'restaurant')}
               onClick={() => onAction({ type: 'build_business', businessType: 'restaurant' })}
             />
             <ActionButton
@@ -583,6 +706,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               disabled={resources.money < 12000 || legalStatus.jailTime > 0 || gameState.actionsRemaining <= 0}
               disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 12000 ? 'Need $12,000' : undefined}
               phaseLocked={actionsLocked}
+              preview={previewBuildBusiness(gameState, 'store')}
               onClick={() => onAction({ type: 'build_business', businessType: 'store' })}
             />
             <ActionButton
@@ -592,12 +716,13 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               disabled={resources.money < 35000 || legalStatus.jailTime > 0 || gameState.actionsRemaining <= 0}
               disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < 35000 ? 'Need $35,000' : undefined}
               phaseLocked={actionsLocked}
+              preview={previewBuildBusiness(gameState, 'construction')}
               onClick={() => onAction({ type: 'build_business', businessType: 'construction' })}
             />
             <ActionButton
               icon={<DollarSign className="h-4 w-4" />}
               label="Launder Money"
-              sublabel={`20% fee · 1 action`}
+              sublabel={`Capacity: 50% of legal income · 1 action`}
               disabled={gameState.finances.dirtyMoney < 1000 || legalStatus.jailTime > 0 || gameState.actionsRemaining <= 0}
               disabledReason={legalStatus.jailTime > 0 ? 'Jailed' : gameState.actionsRemaining <= 0 ? 'No actions left' : gameState.finances.dirtyMoney < 1000 ? 'No dirty money' : undefined}
               phaseLocked={actionsLocked}
@@ -611,6 +736,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               disabled={resources.money < discountedMercCost || gameState.actionsRemaining <= 0}
               disabledReason={gameState.actionsRemaining <= 0 ? 'No actions left' : resources.money < discountedMercCost ? `Need $${discountedMercCost.toLocaleString()}` : undefined}
               phaseLocked={actionsLocked}
+              preview={previewRecruitMercenary(gameState)}
               onClick={() => onAction({ type: 'recruit_soldiers', cost: SOLDIER_COST })}
             />
             <ActionButton
@@ -622,6 +748,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               disabled={!canRecruit || resources.money < discountedRecruitCost || gameState.actionsRemaining <= 0}
               disabledReason={gameState.actionsRemaining <= 0 ? 'No actions left' : !canRecruit ? `Need ${RECRUIT_TERRITORY_REQUIREMENT} hexes (have ${playerTerritoryCount})` : resources.money < discountedRecruitCost ? `Need $${discountedRecruitCost.toLocaleString()}` : undefined}
               phaseLocked={actionsLocked}
+              preview={previewRecruitLocal(gameState)}
               onClick={() => onAction({ type: 'recruit_local_soldier' })}
             />
           </div>
@@ -1596,6 +1723,15 @@ export const RightSidePanel: React.FC<{
                     .filter(([, deps]) => deps.includes(node.type as SupplyNodeType))
                     .map(([bType]) => bType);
 
+                  // Route diagnostics: player businesses depending on this node + income at stake
+                  const dependentBiz = isPlayerOwned
+                    ? hMap.filter((t: any) =>
+                        t.controllingFamily === gameState.playerFamily &&
+                        t.business &&
+                        (SUPPLY_DEPENDENCIES[t.business.type] || []).includes(node.type as SupplyNodeType))
+                    : [];
+                  const incomeAtStake = dependentBiz.reduce((sum: number, t: any) => sum + (t.business?.income || 0), 0);
+
                   const isHighlighted = highlightedSupplyHex && highlightedSupplyHex.q === node.q && highlightedSupplyHex.r === node.r && highlightedSupplyHex.s === node.s;
 
                   return (
@@ -1651,6 +1787,19 @@ export const RightSidePanel: React.FC<{
                       {depBizTypes.length > 0 && (
                         <p className="text-[10px] font-semibold text-muted-foreground mt-0.5">
                           Supplies: {depBizTypes.map(t => t.replace('_', ' ')).join(', ')}
+                        </p>
+                      )}
+                      {isPlayerOwned && dependentBiz.length > 0 && (
+                        <p className={cn(
+                          "text-[10px] mt-0.5",
+                          ownerConnected ? "text-muted-foreground" : "text-amber-400"
+                        )}>
+                          {ownerConnected ? '🔗' : '⚠️'} Feeds {dependentBiz.length} of your business{dependentBiz.length !== 1 ? 'es' : ''} (${incomeAtStake.toLocaleString()}/turn {ownerConnected ? 'secured' : 'at risk'})
+                        </p>
+                      )}
+                      {isPlayerOwned && ownerConnected && dependentBiz.length === 0 && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5 italic">
+                          Route connected — no businesses currently depend on it
                         </p>
                       )}
                       {!isPlayerOwned && !isNeutral && (
@@ -1980,9 +2129,11 @@ const ActionButton: React.FC<{
   phaseLocked?: boolean;
   disabledReason?: string;
   tooltip?: string;
+  /** Full consequence preview rendered in the hover tooltip. */
+  preview?: ActionPreview | null;
   variant?: 'default' | 'destructive' | 'outline';
   onClick: () => void;
-}> = ({ icon, label, sublabel, disabled, phaseLocked, disabledReason, tooltip, variant = 'outline', onClick }) => {
+}> = ({ icon, label, sublabel, disabled, phaseLocked, disabledReason, tooltip, preview, variant = 'outline', onClick }) => {
   const isDisabled = disabled || phaseLocked;
   const tooltipText = phaseLocked ? 'Available in a different phase' : disabledReason || tooltip;
 
@@ -2005,6 +2156,21 @@ const ActionButton: React.FC<{
       )}
     </Button>
   );
+
+  if (preview && !phaseLocked) {
+    return (
+      <TooltipProvider delayDuration={250}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="w-full block">{button}</span>
+          </TooltipTrigger>
+          <TooltipContent side="left" className="max-w-[300px] p-0 bg-transparent border-0 shadow-none">
+            <ActionPreviewCard preview={preview} className="w-[280px] shadow-xl" />
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
 
   if (tooltipText) {
     return (

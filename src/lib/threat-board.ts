@@ -132,7 +132,7 @@ export function buildThreatSections(gameState: EnhancedMafiaGameState): ThreatSe
   if (heat >= 90) {
     lawRows.push({
       id: 'heat-rico',
-      label: `RICO investigation — ${Math.max(1, 5 - ricoTimer)}t fuse`,
+      label: `RICO investigation — ${Math.max(1, 3 - ricoTimer)}t fuse`,
       sub: `Heat ${Math.round(heat)}/100 — federal indictment imminent`,
       badge: { text: 'RICO', tone: 'danger' },
       severity: 'critical',

@@ -46,11 +46,13 @@ const notificationIcons = {
   info: Info,
 };
 
-const notificationColors = {
-  success: 'bg-green-500 border-green-500 text-white',
-  error: 'bg-red-500 border-red-500 text-white',
-  warning: 'bg-yellow-500 border-yellow-500 text-black',
-  info: 'bg-blue-500 border-blue-500 text-white',
+/* Telegram styling: ink color + stamp word per severity (paper base comes
+   from the .telegram class). */
+const notificationInks = {
+  success: { icon: 'text-[hsl(150,50%,24%)]', stamp: 'RECEIVED' },
+  error: { icon: 'text-[hsl(8,49%,42%)]', stamp: 'URGENT' },
+  warning: { icon: 'text-[hsl(38,60%,30%)]', stamp: 'NOTICE' },
+  info: { icon: 'text-[hsl(223,45%,34%)]', stamp: 'MEMO' },
 };
 
 const GROUP_WINDOW_MS = 800;
@@ -61,7 +63,7 @@ const NotificationItem: React.FC<{ notification: Notification; onRemove: (id: st
   onRemove,
 }) => {
   const Icon = notificationIcons[notification.type];
-  const colorClass = notificationColors[notification.type];
+  const ink = notificationInks[notification.type];
   const [expanded, setExpanded] = useState(false);
   const items = notification.items || [];
   const isGroup = items.length > 1;
@@ -74,13 +76,14 @@ const NotificationItem: React.FC<{ notification: Notification; onRemove: (id: st
       animate={{ opacity: 1, x: 0, y: 0 }}
       exit={{ opacity: 0, x: 16, y: 4 }}
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-      className={cn(
-        "relative flex items-start gap-3 p-4 rounded-lg border shadow-lg w-full pointer-events-auto",
-        colorClass
-      )}
+      className="telegram relative flex items-start gap-3 p-3 shadow-lg w-full pointer-events-auto"
     >
-      <Icon className="h-5 w-5 mt-0.5 flex-shrink-0" />
+      <Icon className={cn('h-5 w-5 mt-4 flex-shrink-0', ink.icon)} />
       <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between text-[8px] tracking-[0.25em] uppercase opacity-60 border-b border-current/20 pb-0.5 mb-1">
+          <span>City Wire Service</span>
+          <span className={cn('font-bold', ink.icon)}>{ink.stamp}</span>
+        </div>
         <h4 className="font-semibold text-sm flex items-center gap-1.5">
           {isGroup ? `${items.length}× ${notification.title}` : notification.title}
           {isGroup && (
@@ -94,7 +97,7 @@ const NotificationItem: React.FC<{ notification: Notification; onRemove: (id: st
           )}
         </h4>
         {!isGroup && notification.message && (
-          <p className="text-sm opacity-90 mt-1">{notification.message}</p>
+          <p className="text-xs opacity-90 mt-1">{notification.message}</p>
         )}
         {isGroup && (
           <ul className="mt-1 space-y-0.5 text-xs opacity-90">

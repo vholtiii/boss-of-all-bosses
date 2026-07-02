@@ -103,7 +103,17 @@ import {
   FED_BUG_AGE_RISK_PER_TURN, FED_BUG_AGE_RISK_CAP, FED_BUG_RISK_BONUS_CAP,
   FED_BUG_RICO_ACCEL_HEAT, FED_BUG_RICO_ACCEL_AGE, FED_BUG_CONSIGLIERE_REVEAL_CHANCE,
   FED_BUG_CHANCE_BY_TIER, FED_BUG_SPIKE_COP_FLIP, FED_BUG_SPIKE_RISK_CROSSING, FED_BUG_RISK_CROSSING_THRESHOLD,
+  // Consolidated constants (single source of truth)
+  HEAT_GAIN_MULT, RICO_TIMER_LIMIT,
+  CAPO_FLY_RANGE_P1, CAPO_FLY_RANGE_P2_PLUS, CAPO_MOVES_PER_TURN, getCapoFlyRange,
+  SABOTAGE_COST, SABOTAGE_HEAT, SABOTAGE_RELATIONSHIP_PENALTY, SABOTAGE_FRONT_BOSS_FAIL_CHANCE,
+  CLAIM_HEAT_PLAIN, CLAIM_HEAT_BUSINESS,
+  BUILDABLE_BUSINESS_DEFS, BUILD_CONSTRUCTION_GOAL,
+  DISTRICT_CONTROL_THRESHOLD, DISTRICT_BONUSES,
 } from '@/types/game-mechanics';
+
+// Re-export for existing consumers that import these from the hook module.
+export { HEAT_GAIN_MULT };
 
 import { generateCapoName } from '@/lib/capo-names';
 import {
@@ -115,11 +125,17 @@ import {
 } from '@/lib/ai-strategy';
 
 import { computeAIPosture, posturePolicy, rankByTerritory, type AIPosture } from '@/lib/ai-posture';
+import { fireGate, fireOffensiveGate, fireDiplomacyGate, offensePersonalityMul } from '@/lib/ai-action-scoring';
+import {
+  computeHitCore, computePushOutCore, computeExtortCore,
+  computeHQAssaultCore, computeFlipCore, computeBribeCore,
+  computeCommissionVoteProjection,
+} from '@/lib/action-formulas';
 import {
   getAggressionScale, getHQAssaultBase, getPlanHitBase, getHitmanChance,
   getSupplyNodeScoreBonus, getSupplyNodeRoutingChance, getSupplyStrikeRadius,
 } from '@/lib/ai-difficulty';
-import { computeSupplyDealPrice } from '@/lib/negotiation-odds';
+import { computeSupplyDealPrice, relationshipSway, LEADER_WARINESS_PENALTY } from '@/lib/negotiation-odds';
 
 // ============ SEEDED PRNG (Mulberry32) ============
 function mulberry32(seed: number): () => number {
@@ -218,9 +234,7 @@ const DIFFICULTY_MODIFIERS: Record<Difficulty, DifficultyModifiers> = {
 // Applies a heat increment scaled by the active difficulty's policeHeatMult.
 // Use for all player-action-driven heat (claim/extort/hit/sabotage/etc.).
 // Passive/loyalty/informant heat is intentionally NOT scaled here.
-// Global multiplier on player heat gains (action + ambient).
-// Heat decay (reductionPerTurn) is intentionally NOT touched.
-export const HEAT_GAIN_MULT = 1.30;
+// HEAT_GAIN_MULT lives in @/types/game-mechanics (single source of truth).
 export const isLayingLow = (state: EnhancedMafiaGameState): boolean =>
   ((state as any).layLowActiveUntil || 0) >= state.turn;
 export const isLayLowAfterglow = (state: EnhancedMafiaGameState): boolean =>
@@ -230,6 +244,8 @@ export const applyPlayerHeat = (state: EnhancedMafiaGameState, amount: number): 
   const mult = state.difficultyModifiers?.policeHeatMult ?? 1;
   const scaled = Math.max(0, Math.round(amount * mult * HEAT_GAIN_MULT));
   state.policeHeat.level = Math.min(100, (state.policeHeat.level || 0) + scaled);
+  // Accumulate mid-turn action heat so the end-of-turn report can attribute it
+  (state as any)._actionHeatThisTurn = ((state as any)._actionHeatThisTurn || 0) + scaled;
 };
 
 // ============ AI LAY LOW / MATTRESSES HELPERS ============
@@ -421,6 +437,26 @@ export interface HexTile {
 
 export type TurnPhase = 'deploy' | 'move' | 'action' | 'waiting';
 
+export interface TurnReportReason { reason: string; delta: number; }
+
+export interface TurnReportIncomeBreakdown {
+  legalGross: number;
+  illegalGross: number;
+  shareProfits: number;
+  penalties: Array<{ label: string; amount: number }>;
+  expenses: Array<{ label: string; amount: number }>;
+  net: number;
+}
+
+export interface TurnReportTerritoryChange {
+  hex: string;              // "q,r,s"
+  district: string;
+  change: 'gained' | 'lost';
+  from: string;             // previous controlling family (or 'neutral')
+  to: string;               // new controlling family (or 'neutral')
+  cause: string;            // human-readable inference, e.g. "Taken by Genovese"
+}
+
 export interface TurnReport {
   turn: number;
   income: number;
@@ -432,6 +468,16 @@ export interface TurnReport {
   territoriesLost: string[];
   territoriesGained: string[];
   boldActions?: Array<{ family: string; action: string; respect: number; detail: string }>;
+  // ── Structured explanatory sections (why things changed) ──
+  incomeBreakdown?: TurnReportIncomeBreakdown;
+  heatReasons?: TurnReportReason[];
+  prosecutionReasons?: TurnReportReason[];
+  loyaltyReasons?: TurnReportReason[];
+  territoryChanges?: TurnReportTerritoryChange[];
+  supplyChanges?: Array<{ nodeType: string; event: 'connected' | 'disconnected'; detail: string }>;
+  warUpdates?: Array<{ families: string; event: 'started' | 'ended' | 'ongoing'; detail: string }>;
+  relationshipChanges?: Array<{ family: string; delta: number; reason: string }>;
+  aiMotives?: Array<{ family: string; posture: string; motive: string }>;
 }
 
 export interface EnhancedMafiaGameState {
@@ -799,13 +845,7 @@ const checkEncroachment = (state: EnhancedMafiaGameState, q: number, r: number, 
 };
 
 // ============ A1/A3/A4 + B3: PENDING CLAIM HELPERS ============
-// Capo fly range: phase-gated to slow early expansion.
-// Phase 1: 2 hexes/move (short-range scout). Phase 2+: 4 hexes/move.
-const CAPO_FLY_RANGE_P1 = 2;
-const CAPO_FLY_RANGE_P2_PLUS = 4;
-const CAPO_MOVES_PER_TURN = 2;
-const getCapoFlyRange = (gamePhase: number): number =>
-  (gamePhase || 1) >= 2 ? CAPO_FLY_RANGE_P2_PLUS : CAPO_FLY_RANGE_P1;
+// Capo movement constants live in @/types/game-mechanics (single source of truth).
 // Legacy alias (defaults to most permissive range for non-phase-aware callers like deployment).
 const CAPO_FLY_RANGE = CAPO_FLY_RANGE_P2_PLUS;
 
@@ -837,7 +877,7 @@ const applyPendingClaim = (
   tile.pendingClaim = { family, sinceTurn: state.turn };
   // A3: heat applies on claim initiation. Player only.
   if (isPlayer) {
-    const heatGain = tile.business ? 6 : 3;
+    const heatGain = tile.business ? CLAIM_HEAT_BUSINESS : CLAIM_HEAT_PLAIN;
     applyPlayerHeat(state, heatGain);
   }
   return true;
@@ -1279,9 +1319,13 @@ export const createInitialGameState = (
         respect: startingResources?.respect ?? 15,
         reputation: 20, loyalty: 75, fear: 15,
       streetInfluence: startingResources?.influence ?? 10,
-      familyRelationships: Object.fromEntries(
-        allFamilies.filter(f => f !== family).map(f => [f, Math.floor(Math.random() * 30) - 15])
-      ),
+      familyRelationships: (() => {
+        // Seeded by mapSeed so the starting diplomatic landscape is reproducible
+        const relRng = mulberry32(mapSeed + 24671);
+        return Object.fromEntries(
+          allFamilies.filter(f => f !== family).map(f => [f, Math.floor(relRng() * 30) - 15])
+        );
+      })(),
       publicPerception: { criminal: 60, businessman: 30, philanthropist: 10 },
       reputationHistory: [], achievements: [],
     },
@@ -1687,63 +1731,13 @@ export const useEnhancedMafiaGameState = (
     
     state.resources.money -= COMMISSION_VOTE_COST;
     state.actionsRemaining = Math.max(0, state.actionsRemaining - 1);
-    
-    // Unanimous minus one: need all minus one
-    const needed = Math.max(survivingRivals.length - 1, survivingRivals.length === 2 ? 2 : survivingRivals.length - 1);
-    const hasTreachery = !!(state.treacheryDebuff && state.treacheryDebuff.turnsRemaining > 0);
 
-    let yesVotes = 0;
-    const voteResults: Array<{ family: string; vote: boolean; reason: string }> = [];
-
-    // Subjugated families always vote YES for their subjugator
-    const subjMap = state.subjugatedFamilies || {};
-
-    for (const rival of survivingRivals) {
-      if (subjMap[rival.family] === state.playerFamily) {
-        yesVotes++;
-        voteResults.push({ family: rival.family, vote: true, reason: 'Subjugated vassal — automatic YES' });
-        continue;
-      }
-      if (hasTreachery) {
-        voteResults.push({ family: rival.family, vote: false, reason: 'Treachery debuff — automatic NO' });
-        continue;
-      }
-      const relationship = state.reputation.familyRelationships[rival.family] || 0;
-      const hasAlliance = (state.alliances || []).some(a => a.active && a.alliedFamily === rival.family);
-      const hasCeasefire = (state.ceasefires || []).some(c => c.active && c.family === rival.family);
-      const hasPact = hasAlliance || hasCeasefire;
-
-      if (relationship >= COMMISSION_VOTE_RELATIONSHIP_THRESHOLD && hasPact) {
-        yesVotes++;
-        voteResults.push({ family: rival.family, vote: true, reason: `Relationship ${relationship} + active pact` });
-      } else {
-        const reason = relationship < COMMISSION_VOTE_RELATIONSHIP_THRESHOLD
-          ? `Relationship too low (${relationship}/${COMMISSION_VOTE_RELATIONSHIP_THRESHOLD})`
-          : 'No active alliance or ceasefire';
-        voteResults.push({ family: rival.family, vote: false, reason });
-      }
-    }
-
-    // ── CORONATION QUALIFIER BUFF ──
-    // Each qualifier currently met flips one NEUTRAL rival's NO into a YES.
-    // Neutral = relationship 30–59, no pact, not treachery-blocked.
-    let qualifierBuff = Math.min((state.qualifyingConditions || []).length, CORONATION_QUALIFIER_BUFF_CAP);
-    if (qualifierBuff > 0 && !hasTreachery) {
-      const flippable = voteResults
-        .map((vr, idx) => ({ vr, idx }))
-        .filter(({ vr }) => {
-          if (vr.vote) return false;
-          if (vr.reason.startsWith('Subjugated')) return false;
-          const rel = state.reputation.familyRelationships[vr.family] || 0;
-          return rel >= 30 && rel < COMMISSION_VOTE_RELATIONSHIP_THRESHOLD;
-        });
-      for (const { idx } of flippable) {
-        if (qualifierBuff <= 0) break;
-        voteResults[idx] = { ...voteResults[idx], vote: true, reason: `Coronation buff — overwhelming power conceded` };
-        yesVotes++;
-        qualifierBuff--;
-      }
-    }
+    // Vote tally lives in @/lib/action-formulas — shared with the pre-vote
+    // projection UI so the player sees exactly the votes that will be cast.
+    const projection = computeCommissionVoteProjection(state);
+    const needed = projection.needed;
+    const yesVotes = projection.yesVotes;
+    const voteResults = projection.votes;
 
     // Update victory progress
     state.victoryProgress.commission = { supporting: yesVotes, needed, met: yesVotes >= needed };
@@ -3434,7 +3428,8 @@ export const useEnhancedMafiaGameState = (
             type: 'error' as const, title: '🎧⚖️ Fed Wire Discovered',
             message: `${via} — Fed bug ran ${age} turn${age === 1 ? '' : 's'}. Prosecution risk +${riskAdd}${ricoTick > 0 ? `, RICO timer rushed +${ricoTick}.` : '.'}`,
           });
-          if (turnReport) turnReport.events.push(`🎧⚖️ Fed wire found (age ${age}) — prosecution +${riskAdd}${ricoTick > 0 ? `, RICO +${ricoTick}` : ''}.`);
+          // Note: turnReport isn't created yet at this point in endTurn — combatLog is flushed into it later.
+          newState.combatLog = [...(newState.combatLog || []), `🎧⚖️ Fed wire found (age ${age}) — prosecution +${riskAdd}${ricoTick > 0 ? `, RICO +${ricoTick}` : ''}.`];
         } else {
           // AI family — bump their heat as proxy for prosecution pressure
           const opp = newState.aiOpponents.find(o => o.family === wt.targetFamily);
@@ -3693,6 +3688,12 @@ export const useEnhancedMafiaGameState = (
       const prevPlayerHexes = new Set(
         newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily).map(t => `${t.q},${t.r},${t.s}`)
       );
+      // Snapshot full ownership map so territory changes can report who took what from whom
+      const prevHexOwners = new Map<string, string>(
+        newState.hexMap.map(t => [`${t.q},${t.r},${t.s}`, t.controllingFamily])
+      );
+      const prevRelationships: Record<string, number> = { ...(newState.reputation.familyRelationships || {}) };
+      const prevWarKeys = new Set((newState.activeWars || []).map(w => getTensionPairKey(w.family1, w.family2)));
 
       // Initialize turn report
       const turnReport: TurnReport = {
@@ -3706,12 +3707,29 @@ export const useEnhancedMafiaGameState = (
         territoriesLost: [],
         territoriesGained: [],
         boldActions: [],
+        heatReasons: [],
+        prosecutionReasons: [],
+        loyaltyReasons: [],
+        territoryChanges: [],
+        supplyChanges: [],
+        warUpdates: [],
+        relationshipChanges: [],
+        aiMotives: [],
       };
 
       // Flush mid-turn combat log into turn report events
       if (newState.combatLog && newState.combatLog.length > 0) {
         turnReport.events.push(...newState.combatLog);
         newState.combatLog = [];
+      }
+
+      // Attribute heat accumulated from player actions taken during this turn
+      {
+        const actionHeat = (newState as any)._actionHeatThisTurn || 0;
+        if (actionHeat > 0) {
+          turnReport.heatReasons!.push({ reason: 'Your actions this turn (hits, extortion, claims…)', delta: actionHeat });
+        }
+        (newState as any)._actionHeatThisTurn = 0;
       }
 
       // Reset to deploy phase for next turn
@@ -4385,7 +4403,7 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
-      processEconomy(newState);
+      processEconomy(newState, turnReport);
       turnReport.income = newState.finances.totalIncome;
       turnReport.maintenance = newState.finances.totalExpenses;
       turnReport.netIncome = newState.finances.totalProfit;
@@ -4510,8 +4528,14 @@ export const useEnhancedMafiaGameState = (
               title: '🕊️ War Ended',
               message: `The war between ${fA} and ${fB} has ended after ${WAR_DURATION} turns. Tensions remain high.`,
             });
+            turnReport.warUpdates!.push({ families: `${fA} vs ${fB}`, event: 'ended', detail: `War ended after ${WAR_DURATION} turns. Tension resets to ${WAR_POST_TENSION}.` });
             return false; // Remove war
           }
+          turnReport.warUpdates!.push({
+            families: `${w.family1} vs ${w.family2}`,
+            event: prevWarKeys.has(getTensionPairKey(w.family1, w.family2)) ? 'ongoing' : 'started',
+            detail: `${w.turnsRemaining} turn(s) remaining. Income drops -20% on hexes bordering the enemy.`,
+          });
           return true;
         });
       }
@@ -4522,20 +4546,26 @@ export const useEnhancedMafiaGameState = (
       // --- Dynamic Loyalty Calculation ---
       {
         let loyaltyDelta = 0.5; // baseline recovery
+        turnReport.loyaltyReasons!.push({ reason: 'Baseline recovery', delta: 0.5 });
         
         // District control bonus: Little Italy +20% loyalty retention (reduce decay)
         if (hasPlayerDistrictBonus(newState, 'loyalty')) {
           loyaltyDelta += 0.7; // extra baseline = less net decay (boosted from +0.5)
+          turnReport.loyaltyReasons!.push({ reason: 'Little Italy district control', delta: 0.7 });
         }
         
         // +0.5 per successful extortion this turn (check turn report events)
         const extortionCount = turnReport.events.filter(e => e.toLowerCase().includes('extort')).length;
         loyaltyDelta += extortionCount * 0.5;
+        if (extortionCount > 0) turnReport.loyaltyReasons!.push({ reason: `${extortionCount} extortion(s) — crew got paid`, delta: extortionCount * 0.5 });
         
         // Soldiers lost this turn
         const afterSoldierCountForLoyalty = newState.deployedUnits.filter(u => u.family === newState.playerFamily).length;
         const soldiersLost = prevSoldierCount - afterSoldierCountForLoyalty;
-        if (soldiersLost > 0) loyaltyDelta -= soldiersLost * 2;
+        if (soldiersLost > 0) {
+          loyaltyDelta -= soldiersLost * 2;
+          turnReport.loyaltyReasons!.push({ reason: `${soldiersLost} soldier(s) lost this turn`, delta: -soldiersLost * 2 });
+        }
         
         // Territories lost this turn
         const currentPlayerHexes = new Set(
@@ -4543,12 +4573,18 @@ export const useEnhancedMafiaGameState = (
         );
         let territoriesLostCount = 0;
         prevPlayerHexes.forEach(h => { if (!currentPlayerHexes.has(h)) territoriesLostCount++; });
-        if (territoriesLostCount > 0) loyaltyDelta -= territoriesLostCount * 3;
+        if (territoriesLostCount > 0) {
+          loyaltyDelta -= territoriesLostCount * 3;
+          turnReport.loyaltyReasons!.push({ reason: `${territoriesLostCount} territor${territoriesLostCount === 1 ? 'y' : 'ies'} lost`, delta: -territoriesLostCount * 3 });
+        }
         
         // Can't afford soldier maintenance?
         const playerSoldiersForMaint = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
         const totalMaint = playerSoldiersForMaint.length * SOLDIER_MAINTENANCE;
-        if (newState.resources.money < totalMaint) loyaltyDelta -= 5;
+        if (newState.resources.money < totalMaint) {
+          loyaltyDelta -= 5;
+          turnReport.loyaltyReasons!.push({ reason: "Can't cover soldier maintenance", delta: -5 });
+        }
         
         newState.reputation.loyalty = Math.min(100, Math.max(0, newState.reputation.loyalty + loyaltyDelta));
       }
@@ -4565,6 +4601,7 @@ export const useEnhancedMafiaGameState = (
           if (Math.random() < 0.15) {
             newState.policeHeat.level = Math.min(100, newState.policeHeat.level + 10);
             turnReport.events.push('🐀 Low loyalty! Someone in your crew talked to the police (+10 Heat)');
+            turnReport.heatReasons!.push({ reason: 'Low crew loyalty — someone talked to the police', delta: 10 });
           }
         }
         
@@ -4586,6 +4623,7 @@ export const useEnhancedMafiaGameState = (
           if (Math.random() < 0.15) {
             newState.policeHeat.level = Math.min(100, newState.policeHeat.level + 10);
             turnReport.events.push('🐀 Critically low loyalty! Someone ratted you out (+10 Heat)');
+            turnReport.heatReasons!.push({ reason: 'Critically low loyalty — a rat talked', delta: 10 });
           }
         }
         
@@ -4610,6 +4648,8 @@ export const useEnhancedMafiaGameState = (
             newState.reputation.loyalty = Math.max(0, newState.reputation.loyalty - 15);
             newState.reputation.respect = Math.max(0, newState.reputation.respect - 10);
             turnReport.events.push('🐀 MUTINY! Someone ratted to the feds! (+25 Heat, -15 Loyalty, -10 Respect)');
+            turnReport.heatReasons!.push({ reason: 'Mutiny — someone ratted to the feds', delta: 25 });
+            turnReport.loyaltyReasons!.push({ reason: 'Mutiny fallout', delta: -15 });
           }
         }
       }
@@ -4936,6 +4976,21 @@ export const useEnhancedMafiaGameState = (
         // Firm/Consigliere additionally halve total prosecution risk
         if (firmOrBetter) risk = Math.floor(risk * 0.5);
         risk = Math.min(100, Math.max(0, risk));
+
+        // Structured breakdown of every term in the prosecution formula
+        {
+          const pr = turnReport.prosecutionReasons!;
+          if (heat > 0) pr.push({ reason: `Police heat ${heat} × 0.4`, delta: Math.floor(heat * 0.4) });
+          if (informantCount > 0) pr.push({ reason: `${informantCount} informant(s) testifying`, delta: informantCount * 10 });
+          if (recentArrests > 0) pr.push({ reason: `${recentArrests} recent arrest(s)`, delta: recentArrests * 5 });
+          if (hasPatrol) pr.push({ reason: 'Patrol officer bribed', delta: -10 });
+          if (hasCaptain) pr.push({ reason: 'Police captain bribed', delta: -10 });
+          if (hasChief) pr.push({ reason: 'Police chief bribed', delta: -15 });
+          if (hasMayor) pr.push({ reason: 'Mayor bribed', delta: -20 });
+          if (hasLawyer) pr.push({ reason: 'Lawyer on retainer', delta: -PROSECUTION_LAWYER_REDUCTION });
+          if ((newState.fedBugProsecutionBonus || 0) > 0) pr.push({ reason: 'Federal wiretap evidence', delta: newState.fedBugProsecutionBonus || 0 });
+          if (firmOrBetter) pr.push({ reason: `${newState.lawyerTier === 'consigliere' ? 'Consigliere counsel' : 'Defense firm'} halves total risk`, delta: -risk });
+        }
         // One-shot Fed-bug spike when prosecutionRisk first crosses 40
         if (risk >= FED_BUG_RISK_CROSSING_THRESHOLD && !newState.fedBugRiskCrossingFired) {
           newState.fedBugRiskCrossingFired = true;
@@ -5181,17 +5236,23 @@ export const useEnhancedMafiaGameState = (
       
       // --- Heat decay (after arrests) ---
       let heatReduction = newState.policeHeat.reductionPerTurn;
+      const hasPatrolBribe = newState.activeBribes.some(b => b.tier === 'patrol_officer' && b.active);
+      turnReport.heatReasons!.push({ reason: 'Natural cooldown', delta: -2 });
+      if (hasPatrolBribe) turnReport.heatReasons!.push({ reason: 'Patrol officer on the payroll', delta: -2 });
       // District control bonus: Brooklyn -5 heat/turn
       if (hasPlayerDistrictBonus(newState, 'heat')) {
         heatReduction += 5;
+        turnReport.heatReasons!.push({ reason: 'Brooklyn district control', delta: -5 });
       }
       // Charitable donation lingering effect: +1 heat regen for 2 turns
       if ((newState.charityActiveUntil || 0) >= newState.turn) {
         heatReduction += 1;
+        turnReport.heatReasons!.push({ reason: 'Charitable donation goodwill', delta: -1 });
       }
       // Consigliere passive: -1 heat/turn while retained
       if (newState.lawyerTier === 'consigliere' && (newState.lawyerActiveUntil || 0) >= newState.turn) {
         heatReduction += 1;
+        turnReport.heatReasons!.push({ reason: 'Consigliere counsel retained', delta: -1 });
       }
       newState.policeHeat.level = Math.max(0, newState.policeHeat.level - heatReduction);
 
@@ -5284,6 +5345,7 @@ export const useEnhancedMafiaGameState = (
           const heatIncrease = playerInformantCount * COP_FLIP_HEAT_PER_TURN;
           newState.policeHeat.level = Math.min(100, newState.policeHeat.level + heatIncrease);
           turnReport.events.push(`🔥 Police informants in your ranks: +${heatIncrease} heat from ${playerInformantCount} rat(s).`);
+          turnReport.heatReasons!.push({ reason: `${playerInformantCount} police informant(s) in your ranks`, delta: heatIncrease });
         }
         
         // Step 4: Bribe-based counter-intelligence for player family
@@ -5506,6 +5568,45 @@ export const useEnhancedMafiaGameState = (
       );
       afterPlayerHexes.forEach(h => { if (!prevPlayerHexes.has(h)) turnReport.territoriesGained.push(h); });
       prevPlayerHexes.forEach(h => { if (!afterPlayerHexes.has(h)) turnReport.territoriesLost.push(h); });
+
+      // Structured territory changes with who-took-what-from-whom
+      {
+        const capitalize = (f: string) => f.charAt(0).toUpperCase() + f.slice(1);
+        newState.hexMap.forEach(t => {
+          const key = `${t.q},${t.r},${t.s}`;
+          const before = prevHexOwners.get(key) || 'neutral';
+          const after = t.controllingFamily;
+          if (before === after) return;
+          const playerInvolved = before === newState.playerFamily || after === newState.playerFamily;
+          if (!playerInvolved) return; // only report changes touching the player
+          const gained = after === newState.playerFamily;
+          const cause = gained
+            ? (before === 'neutral' ? 'Claimed from neutral ground' : `Taken from the ${capitalize(before)} family`)
+            : (after === 'neutral' ? 'Lost — influence eroded to neutral' : `Seized by the ${capitalize(after)} family`);
+          turnReport.territoryChanges!.push({
+            hex: key,
+            district: t.district || 'Unknown',
+            change: gained ? 'gained' : 'lost',
+            from: before,
+            to: after,
+            cause,
+          });
+        });
+      }
+
+      // Relationship changes vs. start of end-turn processing
+      {
+        const rels = newState.reputation.familyRelationships || {};
+        Object.keys(rels).forEach(fam => {
+          const before = prevRelationships[fam] ?? rels[fam];
+          const delta = Math.round((rels[fam] - before) * 10) / 10;
+          if (delta === 0) return;
+          const atWar = (newState.activeWars || []).some(w =>
+            (w.family1 === fam || w.family2 === fam) && (w.family1 === newState.playerFamily || w.family2 === newState.playerFamily));
+          const reason = atWar ? 'Open war' : delta > 0 ? 'Tensions cooling / favorable dealings' : 'Aggression and territorial friction';
+          turnReport.relationshipChanges!.push({ family: fam, delta, reason });
+        });
+      }
       
       const afterSoldierCount = newState.deployedUnits.filter(u => u.family === newState.playerFamily).length;
       turnReport.resourceDeltas = {
@@ -5550,16 +5651,7 @@ export const useEnhancedMafiaGameState = (
   }, []);
 
   // ============ DISTRICT CONTROL BONUSES ============
-  const DISTRICT_CONTROL_THRESHOLD = 0.6;
-  const DISTRICT_BONUSES: Record<string, { bonusType: string; description: string; secondaryBonusType: string; secondaryDescription: string }> = {
-    'Manhattan': { bonusType: 'income', description: '+25% business income in Manhattan', secondaryBonusType: 'extra_ap', secondaryDescription: '+1 max action point per turn' },
-    'Little Italy': { bonusType: 'loyalty', description: '+20% loyalty retention', secondaryBonusType: 'fast_safehouse', secondaryDescription: 'Soldiers return from hiding 1 turn faster' },
-    'Brooklyn': { bonusType: 'heat', description: '-5 heat/turn', secondaryBonusType: 'combat_defense', secondaryDescription: '+10% combat defense in Brooklyn' },
-    'Bronx': { bonusType: 'recruit_discount', description: '$750 off recruitment', secondaryBonusType: 'free_recruit', secondaryDescription: 'Free soldier recruit every 3 turns' },
-    'Queens': { bonusType: 'extortion', description: '+15% extortion success', secondaryBonusType: 'hit_bonus', secondaryDescription: '+5% hit success on all attacks' },
-    'Staten Island': { bonusType: 'respect', description: '+3 respect/turn', secondaryBonusType: 'influence_gain', secondaryDescription: '+1 influence/turn' },
-  };
-
+  // DISTRICT_CONTROL_THRESHOLD and DISTRICT_BONUSES live in @/types/game-mechanics.
   const computeDistrictBonuses = (state: EnhancedMafiaGameState, turnReport?: TurnReport) => {
     const districts = ['Manhattan', 'Little Italy', 'Brooklyn', 'Bronx', 'Queens', 'Staten Island'];
     const prevBonuses = [...(state.activeDistrictBonuses || [])];
@@ -5664,17 +5756,13 @@ export const useEnhancedMafiaGameState = (
   };
 
   // ============ ECONOMY (with family bonuses) ============
-  const processEconomy = (state: EnhancedMafiaGameState) => {
+  const processEconomy = (state: EnhancedMafiaGameState, turnReport?: TurnReport) => {
     let income = 0;
     const units = state.deployedUnits || [];
     const bonuses = state.familyBonuses;
 
     // Tick construction timers on ALL hexes (player-owned)
-    const LEGAL_BIZ_DEFS: Record<string, { income: number; launderingCapacity: number }> = {
-      restaurant: { income: 3000, launderingCapacity: 2000 },
-      store: { income: 1800, launderingCapacity: 1500 },
-      construction: { income: 5000, launderingCapacity: 4000 },
-    };
+    const LEGAL_BIZ_DEFS = BUILDABLE_BUSINESS_DEFS;
     (state.hexMap || []).forEach(tile => {
       if (tile.controllingFamily === state.playerFamily && tile.business && tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal) {
         // Check unit presence on this hex
@@ -5728,6 +5816,22 @@ export const useEnhancedMafiaGameState = (
         connectedNodeTypes.add(node.type);
       }
     });
+
+    // Report supply connectivity changes vs. last turn (stored on state between turns)
+    const prevConnected: string[] = (state as any)._prevConnectedSupply || [];
+    if (turnReport?.supplyChanges) {
+      connectedNodeTypes.forEach(t => {
+        if (!prevConnected.includes(t)) {
+          turnReport.supplyChanges!.push({ nodeType: t, event: 'connected', detail: `${t} supply now reaches your HQ network.` });
+        }
+      });
+      prevConnected.forEach(t => {
+        if (!connectedNodeTypes.has(t as SupplyNodeType)) {
+          turnReport.supplyChanges!.push({ nodeType: t, event: 'disconnected', detail: `${t} supply cut off — dependent businesses will decay after the stockpile buffer runs out.` });
+        }
+      });
+    }
+    (state as any)._prevConnectedSupply = [...connectedNodeTypes];
 
     let legalIncome = 0;
     let illegalIncome = 0;
@@ -5958,6 +6062,31 @@ export const useEnhancedMafiaGameState = (
     state.finances.arrestPenalty = arrestPenaltyAmount;
     state.finances.heatPenalty = heatPenaltyAmount;
     state.finances.copFlipPenalty = copFlipPenaltyAmount;
+    state.finances.grandJuryPenalty = grandJuryPenaltyAmount;
+
+    // ── Structured income breakdown for the turn report ──
+    if (turnReport) {
+      const penalties: Array<{ label: string; amount: number }> = [];
+      if (arrestPenaltyAmount > 0) penalties.push({ label: `Arrests (${activeArrests.length} active sentence${activeArrests.length === 1 ? '' : 's'})`, amount: -arrestPenaltyAmount });
+      if (heatPenaltyAmount > 0) penalties.push({ label: `Police heat ${state.policeHeat.level >= 70 ? '70+ (-35% illegal)' : '40+ (-25% illegal)'}`, amount: -heatPenaltyAmount });
+      if (copFlipPenaltyAmount > 0) penalties.push({ label: 'Police informants skimming illegal income', amount: -copFlipPenaltyAmount });
+      if (grandJuryPenaltyAmount > 0) penalties.push({ label: 'Grand jury subpoena (-30% illegal at risk 60+)', amount: -grandJuryPenaltyAmount });
+      if ((state.mattressesState || {}).active) penalties.push({ label: 'Hitting the mattresses (-50% territory income)', amount: 0 });
+      if (isLayingLow(state)) penalties.push({ label: 'Laying low — illegal income zeroed', amount: 0 });
+
+      const expenses: Array<{ label: string; amount: number }> = [];
+      if (soldierMaintenance > 0) expenses.push({ label: `Soldier maintenance (${playerSoldiers.length} × $${SOLDIER_MAINTENANCE})`, amount: -soldierMaintenance });
+      if (communityUpkeep > 0) expenses.push({ label: `Community upkeep (${communityHexCount} empty hexes × $150)`, amount: -communityUpkeep });
+
+      turnReport.incomeBreakdown = {
+        legalGross: grossLegalIncome,
+        illegalGross: grossIllegalIncome,
+        shareProfits: shareProfitsIncome,
+        penalties,
+        expenses,
+        net: totalProfit,
+      };
+    }
   };
 
   // ============ PROCESS BRIBES ============
@@ -6179,7 +6308,7 @@ export const useEnhancedMafiaGameState = (
         : personality === 'diplomatic' ? 1.3
         : personality === 'opportunistic' ? 1.0
         : personality === 'aggressive' ? 0.4
-        : /* unpredictable */ 0.8 + (Math.random() * 0.8 - 0.4);
+        : /* unpredictable */ 0.8 + (turnRng() * 0.8 - 0.4);
 
       const aiHeat = opponent.resources.heat || 0;
       // Reuse counters captured above for mood
@@ -6204,6 +6333,17 @@ export const useEnhancedMafiaGameState = (
       const myTerritoryNow = state.hexMap.filter(t => t.controllingFamily === fam).length;
       const allTerritoryCounts = [...rivalHexCounts, playerHexCount, myTerritoryNow];
       const isTopTerritory = allTerritoryCounts.every(c => c <= myTerritoryNow);
+
+      // ── BOARD LEADER TRACKING (leader-progress targeting) ──
+      const territoryByFamily: Array<{ family: string; count: number }> = [
+        { family: state.playerFamily as string, count: playerHexCount },
+        ...(state.aiOpponents || [])
+          .filter(o => !(state.eliminatedFamilies || []).includes(o.family))
+          .map(o => ({ family: o.family as string, count: state.hexMap.filter(t => t.controllingFamily === o.family).length })),
+      ];
+      const boardLeader = territoryByFamily.reduce((best, c) => (c.count > best.count ? c : best), territoryByFamily[0]);
+      const leaderIsRival = boardLeader.family !== fam;
+      const boardLeaderProgress = Math.min(1, boardLeader.count / TERRITORY_TARGET_AI);
       const atWarNow = (state.activeWars || []).some(w => w.family1 === fam || w.family2 === fam);
       const strategicOverride =
         myTerritoryNow >= TERRITORY_TARGET_AI - 2 // endgame closing move
@@ -6242,6 +6382,24 @@ export const useEnhancedMafiaGameState = (
       oppAny.posture = posture;
       const policy = posturePolicy(posture);
 
+      // Report the family's strategic motive for this turn
+      if (turnReport?.aiMotives) {
+        const motiveParts: string[] = [];
+        if (strategicOverride) motiveParts.push('pushing through heat for a strategic goal');
+        else if (heatTier === 'critical' || heatTier === 'rico') motiveParts.push('cooling off under heavy police attention');
+        else if (heatTier === 'hot') motiveParts.push('wary of police attention');
+        if (atWarNow) motiveParts.push('fighting an open war');
+        if (victoryGap <= 5) motiveParts.push('closing in on territorial dominance');
+        else if (myRank === 1) motiveParts.push('defending the top position');
+        else if (moneyRunway < 3) motiveParts.push('short on cash, prioritizing income');
+        if (motiveParts.length === 0) motiveParts.push(`following a ${basePersonality} playbook`);
+        turnReport.aiMotives.push({
+          family: fam,
+          posture,
+          motive: motiveParts.join('; '),
+        });
+      }
+
       // Heat-tier boost to the existing Lay Low fire chance
       const heatBoost = heatTier === 'critical' ? 0.40 : heatTier === 'hot' ? 0.20 : heatTier === 'warm' ? 0.05 : 0;
 
@@ -6251,9 +6409,7 @@ export const useEnhancedMafiaGameState = (
         const heatTrigger = aiHeat >= 60;
         const lossTrigger = recentSoldierLosses >= 2;
         if ((heatTrigger || lossTrigger) && !strategicOverride) {
-          const baseChance = 0.5;
-          const fireChance = Math.min(0.95, Math.max(0.05, baseChance * personalityMult + heatBoost));
-          if (Math.random() < fireChance) {
+          if (fireGate(turnRng, { base: 0.5, personalityMul: personalityMult, boost: heatBoost, min: 0.05 })) {
             oppAny.layLowActiveUntil = state.turn + 2; // 3 turns
             oppAny.layLowCooldownUntil = state.turn + 7;
             opponent.resources.respect = Math.max(0, opponent.resources.respect - 5);
@@ -6281,9 +6437,7 @@ export const useEnhancedMafiaGameState = (
           });
         });
         if (hqAssaultedRecently || recentCapoLosses >= 1 || (atWar && aiHasUnitNearEnemy)) {
-          const baseChance = 0.5;
-          const fireChance = Math.min(0.95, Math.max(0.05, baseChance * personalityMult));
-          if (Math.random() < fireChance) {
+          if (fireGate(turnRng, { base: 0.5, personalityMul: personalityMult, min: 0.05 })) {
             oppAny.mattressesActiveUntil = state.turn + 2; // 3 turns
             oppAny.mattressesCooldownUntil = state.turn + 8;
             state.pendingNotifications.push({
@@ -6310,7 +6464,7 @@ export const useEnhancedMafiaGameState = (
         // Parity tuning: warm/hot get a 1-turn cooldown (player can also bribe ~every turn via tactical step).
         // Critical/rico keep the 2-turn cooldown to prevent runaway free spend.
         const cdTurns = (heatTier === 'warm' || heatTier === 'hot') ? 1 : 2;
-        if (spendChance > 0 && Math.random() < spendChance) {
+        if (spendChance > 0 && turnRng() < spendChance) {
           aiSpendOnHeatReduction(state, fam, heatDrop, turnReport, cdTurns);
         }
       }
@@ -6322,14 +6476,14 @@ export const useEnhancedMafiaGameState = (
       }
       // Posture COOL_OFF: also prefer lay-low even before heat hits critical.
       const layLowOnCDNow = (oppAny.layLowCooldownUntil || 0) > state.turn;
-      if (policy.preferLayLow && !strategicOverride && !isAILayingLow(opponent, state.turn) && !layLowOnCDNow && Math.random() < 0.7) {
+      if (policy.preferLayLow && !strategicOverride && !isAILayingLow(opponent, state.turn) && !layLowOnCDNow && turnRng() < 0.7) {
         oppAny.layLowActiveUntil = state.turn + 2;
         oppAny.layLowCooldownUntil = state.turn + 7;
         if (turnReport) turnReport.aiActions.push({ family: fam, action: 'lay_low', detail: `Posture cool-off stand-down` });
       }
       // Posture TURTLE: prefer mattresses (Phase 3+, defensive hunker)
       const mattressesOnCDNow = (oppAny.mattressesCooldownUntil || 0) > state.turn;
-      if (policy.preferMattresses && aiPhase >= 3 && !strategicOverride && !isAIAtMattresses(opponent, state.turn) && !mattressesOnCDNow && Math.random() < 0.65) {
+      if (policy.preferMattresses && aiPhase >= 3 && !strategicOverride && !isAIAtMattresses(opponent, state.turn) && !mattressesOnCDNow && turnRng() < 0.65) {
         oppAny.mattressesActiveUntil = state.turn + 2;
         oppAny.mattressesCooldownUntil = state.turn + 8;
         state.pendingNotifications.push({
@@ -6551,7 +6705,7 @@ export const useEnhancedMafiaGameState = (
         // Personality-driven recruitment batch size
         const personalityRecruitBonus = (opponent.personality === 'aggressive') ? 1
           : (opponent.personality === 'defensive' || opponent.personality === 'diplomatic') ? -1
-          : (opponent.personality === 'unpredictable') ? (Math.random() < 0.5 ? 1 : -1)
+          : (opponent.personality === 'unpredictable') ? (turnRng() < 0.5 ? 1 : -1)
           : 0;
         const toRecruit = Math.min(wantToRecruit, canAfford, Math.max(1, 3 + alertBonus + atWarBonus + personalityRecruitBonus));
         opponent.resources.soldiers += toRecruit;
@@ -6614,7 +6768,7 @@ export const useEnhancedMafiaGameState = (
               movesRemaining: 2, maxMoves: 2, level: 1,
             });
             state.soldierStats[newId] = {
-              loyalty: 40 + Math.floor(Math.random() * 30), training: 0,
+              loyalty: 40 + Math.floor(turnRng() * 30), training: 0,
               hits: 0, extortions: 0, victories: 0, toughness: 0, racketeering: 0, turnsDeployed: 0, toughnessProgress: 0,
               turnsIdle: 0, isMercenary: true, actedThisTurn: false, suspiciousTurns: 0, suspicious: false, confirmedRat: false,
               extortedHexTurns: 0,
@@ -6676,7 +6830,7 @@ export const useEnhancedMafiaGameState = (
       if (contestedInMyTerritory.length > 0) {
         const defenseChance = aggression >= 60 ? 0.85 : aggression >= 30 ? 0.6 : 0.4;
         for (const contested of contestedInMyTerritory) {
-          if (Math.random() > defenseChance) continue;
+          if (turnRng() > defenseChance) continue;
           // Find nearby AI soldier within 2 hexes
           const nearbySoldier = state.deployedUnits.find(u =>
             u.family === fam && u.type === 'soldier' && u.movesRemaining > 0 &&
@@ -6765,13 +6919,13 @@ export const useEnhancedMafiaGameState = (
           const supplyRouteOK = personality === 'aggressive' || personality === 'opportunistic' || personality === 'unpredictable';
           const supplyRoutingChance = getSupplyNodeRoutingChance(state.difficulty) * aggressionScale;
 
-          if (warTargetHexes.length > 0 && Math.random() < 0.85) {
+          if (warTargetHexes.length > 0 && turnRng() < 0.85) {
             // War: heavily prioritize attacking the war target
             targetPool = warTargetHexes;
-          } else if (supplyNodeHexes.length > 0 && supplyRouteOK && policy.supplyNodeMul > 0.5 && Math.random() < supplyRoutingChance) {
+          } else if (supplyNodeHexes.length > 0 && supplyRouteOK && policy.supplyNodeMul > 0.5 && turnRng() < supplyRoutingChance) {
             // Supply-line strike: cut the rival's supply nodes
             targetPool = supplyNodeHexes;
-          } else if (safehouseHexes.length > 0 && Math.random() < 0.7) {
+          } else if (safehouseHexes.length > 0 && turnRng() < 0.7) {
             targetPool = safehouseHexes;
           } else if ((hasBounty || isAlerted) && playerHexes.length > 0) {
             targetPool = playerHexes;
@@ -6795,7 +6949,7 @@ export const useEnhancedMafiaGameState = (
                 break;
               }
               case 'diplomatic':
-                if (Math.random() < 0.4) {
+                if (turnRng() < 0.4) {
                   targetPool = neutralHexes.length > 0 ? neutralHexes : validMoves.filter(n => {
                     const t = state.hexMap.find(t2 => t2.q === n.q && t2.r === n.r && t2.s === n.s);
                     return t && t.controllingFamily === fam;
@@ -6808,7 +6962,7 @@ export const useEnhancedMafiaGameState = (
               case 'unpredictable':
               default: {
                 // Truly unpredictable: randomly pick a behavior mode each turn
-                const unpredictableMode = Math.random();
+                const unpredictableMode = turnRng();
                 if (unpredictableMode < 0.30) {
                   // Act aggressive: target enemy hexes
                   targetPool = warTargetFamily
@@ -6858,7 +7012,7 @@ export const useEnhancedMafiaGameState = (
               : personality === 'opportunistic' ? 0.20
               : personality === 'unpredictable' ? 0.30
               : 0.10; // aggressive
-            const shouldFortify = isAlerted ? Math.random() < 0.3 : Math.random() < proactiveFortifyChance;
+            const shouldFortify = isAlerted ? turnRng() < 0.3 : turnRng() < proactiveFortifyChance;
             if (shouldFortify) {
               state.fortifiedHexes = [...(state.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: fam, fortifiedOnTurn: state.turn }];
               unit.movesRemaining = 0;
@@ -6915,10 +7069,12 @@ export const useEnhancedMafiaGameState = (
               supplyNodeInFocusDistrict: supplyInFocus,
               supplyNodeFeedsPlayerDeal: supplyFeedsPlayerDeal,
               isVulnerableRivalHex: isVulnerable,
+              isLeaderHex: leaderIsRival && tile?.controllingFamily === boardLeader.family,
+              leaderProgress: boardLeaderProgress,
             });
           });
           const pickIdx = softmaxPick(scores, turnRng, 4, difficultySoftmaxTemperature(state.difficulty || 'normal'));
-          const target = pickIdx >= 0 ? targetPool[pickIdx] : targetPool[Math.floor(Math.random() * targetPool.length)];
+          const target = pickIdx >= 0 ? targetPool[pickIdx] : targetPool[Math.floor(turnRng() * targetPool.length)];
           
           // Save original position — only commit move after combat resolution
           const origQ = unit.q, origR = unit.r, origS = unit.s;
@@ -6964,10 +7120,10 @@ export const useEnhancedMafiaGameState = (
                 case 'defensive': combatWillingness = aiStrength >= enemyUnitsHere.length + 2 ? 0.7 : 0.15; break;
                 case 'diplomatic': combatWillingness = 0.2; break;
                 case 'opportunistic': combatWillingness = aiStrength >= enemyUnitsHere.length ? 0.6 : 0.2; break;
-                default: combatWillingness = Math.random(); break;
+                default: combatWillingness = turnRng(); break;
               }
 
-              if (aiStrength >= enemyUnitsHere.length || Math.random() < combatWillingness) {
+              if (aiStrength >= enemyUnitsHere.length || turnRng() < combatWillingness) {
                 // ===== AI HIT PARITY: classify scout state for this attack =====
                 const isAIScoutedHit = aiHasScoutIntel(state, fam, target.q, target.r, target.s);
                 const aiHitType: 'scouted' | 'blind' = isAIScoutedHit ? 'scouted' : 'blind';
@@ -6999,7 +7155,7 @@ export const useEnhancedMafiaGameState = (
                   if (eu.type === 'capo') {
                     const isDefHexFort = isHexFortified(state.fortifiedHexes || [], eu.q, eu.r, eu.s, eu.family);
                     const woundChance = isDefHexFort ? baseKillChance - (FORTIFY_DEFENSE_BONUS / 100) : baseKillChance;
-                    if (Math.random() < woundChance) {
+                    if (turnRng() < woundChance) {
                       // Wound the capo instead of killing
                       if (state.soldierStats[eu.id]) {
                         state.soldierStats[eu.id].loyalty = Math.max(0, state.soldierStats[eu.id].loyalty - CAPO_WOUND_LOYALTY_PENALTY);
@@ -7026,7 +7182,7 @@ export const useEnhancedMafiaGameState = (
                   if (eu.family === state.playerFamily && (state.mattressesState || {}).active) {
                     killChance -= MATTRESSES_DEFENSE_BONUS / 100;
                   }
-                  if (Math.random() < killChance) {
+                  if (turnRng() < killChance) {
                     const idx = state.deployedUnits.indexOf(eu);
                     if (idx !== -1) {
                       state.deployedUnits.splice(idx, 1);
@@ -7097,10 +7253,10 @@ export const useEnhancedMafiaGameState = (
                   // Combat didn't clear the hex — revert AI unit position
                   unit.q = origQ; unit.r = origR; unit.s = origS;
                 }
-                if (Math.random() < 0.3) {
+                if (turnRng() < 0.3) {
                   const aiHere = state.deployedUnits.filter(u => u.family === fam && u.q === target.q && u.r === target.r && u.s === target.s);
                   if (aiHere.length > 1) {
-                    const casualty = aiHere[Math.floor(Math.random() * aiHere.length)];
+                    const casualty = aiHere[Math.floor(turnRng() * aiHere.length)];
                     const idx = state.deployedUnits.indexOf(casualty);
                     if (idx !== -1) state.deployedUnits.splice(idx, 1);
                   }
@@ -7323,11 +7479,11 @@ export const useEnhancedMafiaGameState = (
           
           for (const enemyTile of adjacentEnemyBiz) {
             if (aiActionsRemaining <= 0) break;
-            if (Math.random() > aggressionThreshold) continue;
+            if (turnRng() > aggressionThreshold) continue;
             
             // Attempt extortion: ~50% base chance
             const successChance = 0.5 + (opponent.resources.influence || 50) / 1000;
-            if (Math.random() < successChance) {
+            if (turnRng() < successChance) {
               // Hole #6: AI extortion → tension
               addPairTension(state, fam, enemyTile.controllingFamily as string, TENSION_EXTORT_RIVAL);
               const basePayout = enemyTile.business!.isLegal ? 1500 : 3000;
@@ -7409,7 +7565,7 @@ export const useEnhancedMafiaGameState = (
           promUnit.type = 'capo' as any;
           promUnit.maxMoves = 2;
           promUnit.movesRemaining = 2;
-          (promUnit as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
+          (promUnit as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(turnRng() * 3)];
           (promUnit as any).name = generateCapoName();
           opponent.resources.money -= CAPO_PROMOTION_COST;
           if (turnReport) {
@@ -7429,7 +7585,7 @@ export const useEnhancedMafiaGameState = (
             anyAiSoldier.type = 'capo' as any;
             anyAiSoldier.maxMoves = 2;
             anyAiSoldier.movesRemaining = 2;
-            (anyAiSoldier as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(Math.random() * 3)];
+            (anyAiSoldier as any).personality = (['diplomat', 'enforcer', 'schemer'] as const)[Math.floor(turnRng() * 3)];
             (anyAiSoldier as any).name = generateCapoName();
             opponent.resources.money -= CAPO_PROMOTION_COST * 2; // Costs double for forced promotion
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'promote', detail: `Force-promoted a soldier to Capo` });
@@ -7468,20 +7624,22 @@ export const useEnhancedMafiaGameState = (
         
         // Posture acceptSitdownsForCash (CONSOLIDATE/COOL_OFF) → boost proposal odds so
         // a struggling AI actively seeks peace/cash deals instead of waiting on personality.
-        const sitdownBoost = policy.acceptSitdownsForCash ? 2.0 : 1.0;
+        // Leader wariness: don't offer peace to a player who's about to win on territory.
+        const playerIsRunawayLeader = boardLeader.family === (state.playerFamily as string) && boardLeaderProgress >= 0.7;
+        const sitdownBoost = (policy.acceptSitdownsForCash ? 2.0 : 1.0) * (playerIsRunawayLeader ? 0.3 : 1.0);
         // Diplomatic: ceasefire at Phase 2+, alliance at Phase 3+ if relationship > 30
         if (personality === 'diplomatic' && !hasIncoming) {
-          if (aiPhase >= 2 && !hasCeasefire && Math.random() < (cooperation / 150) * sitdownBoost) {
+          if (aiPhase >= 2 && !hasCeasefire && turnRng() < (cooperation / 150) * sitdownBoost) {
             pushSitdown('ceasefire');
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire' });
-          } else if (aiPhase >= 3 && !hasAlliance && hasCeasefire && (opponent.relationships?.[state.playerFamily] || 0) > 30 && Math.random() < 0.2) {
+          } else if (aiPhase >= 3 && !hasAlliance && hasCeasefire && (opponent.relationships?.[state.playerFamily] || 0) > 30 && turnRng() < 0.2 * (playerIsRunawayLeader ? 0.3 : 1)) {
             pushSitdown('alliance');
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for alliance' });
           }
         }
         // Defensive: ceasefire at Phase 3+
         else if (personality === 'defensive' && !hasIncoming) {
-          if (aiPhase >= 3 && !hasCeasefire && Math.random() < (cooperation / 200) * sitdownBoost) {
+          if (aiPhase >= 3 && !hasCeasefire && turnRng() < (cooperation / 200) * sitdownBoost) {
             pushSitdown('ceasefire');
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire' });
           }
@@ -7489,7 +7647,7 @@ export const useEnhancedMafiaGameState = (
         // Opportunistic: ceasefire if losing territory
         else if (personality === 'opportunistic' && !hasIncoming) {
           const aiHexCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
-          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < 6 && Math.random() < 0.3 * sitdownBoost) {
+          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < 6 && turnRng() < 0.3 * sitdownBoost) {
             pushSitdown('ceasefire');
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire (losing ground)' });
           }
@@ -7498,7 +7656,7 @@ export const useEnhancedMafiaGameState = (
         else if (personality === 'aggressive' && !hasIncoming) {
           const aiHexCount = state.hexMap.filter(t => t.controllingFamily === fam).length;
           const aggCeasefireThresh = policy.acceptSitdownsForCash ? 8 : 4;
-          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < aggCeasefireThresh && Math.random() < 0.2 * sitdownBoost) {
+          if (aiPhase >= 2 && !hasCeasefire && aiHexCount < aggCeasefireThresh && turnRng() < 0.2 * sitdownBoost) {
             pushSitdown('ceasefire');
             if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: 'Requested sitdown for ceasefire (desperate)' });
           }
@@ -7517,14 +7675,21 @@ export const useEnhancedMafiaGameState = (
         for (const other of otherRivals) {
           const otherHexes = state.hexMap.filter(t => t.controllingFamily === other.family).length;
           const rel = (opponent.relationships?.[other.family] || 0);
+          const otherIsRunawayLeader = boardLeader.family === other.family && boardLeaderProgress >= 0.7;
           // Hostility roll: aggressive/dominant push tension on weaker neighbors
           if ((dynamicMood === 'dominant' || personality === 'aggressive') && otherHexes < myHexCount * 0.85) {
             if (turnRng() < 0.35) {
               addPairTension(state, fam, other.family, TENSION_ENCROACHMENT);
             }
           }
-          // Diplomatic mood with positive relations dampens tension
-          if (personality === 'diplomatic' && rel > 10) {
+          // Leader containment: everyone (even diplomats) piles tension onto a
+          // rival AI that's closing in on territorial victory.
+          if (otherIsRunawayLeader && turnRng() < 0.5) {
+            addPairTension(state, fam, other.family, TENSION_ENCROACHMENT);
+          }
+          // Diplomatic mood with positive relations dampens tension — but never
+          // toward a runaway leader (no shielding the winner).
+          if (personality === 'diplomatic' && rel > 10 && !otherIsRunawayLeader) {
             if (turnRng() < 0.4) {
               addPairTension(state, fam, other.family, -TENSION_REDUCE_CEASEFIRE);
             }
@@ -7554,7 +7719,7 @@ export const useEnhancedMafiaGameState = (
             diplomatic: 2, defensive: 1, opportunistic: 1.5, aggressive: 0.5, unpredictable: 1,
           };
           const baseProb = 0.05 * (personalityMult[personality] || 1);
-          if (Math.random() >= baseProb) continue;
+          if (turnRng() >= baseProb) continue;
 
           let bestTile: any = null;
           let bestScore = 0;
@@ -7577,7 +7742,7 @@ export const useEnhancedMafiaGameState = (
           let deal: 'bribe_territory' | 'share_profits';
           if (capoPersonality === 'enforcer') deal = 'bribe_territory';
           else if (capoPersonality === 'diplomat' || capoPersonality === 'schemer') {
-            deal = Math.random() < 0.5 ? 'share_profits' : 'bribe_territory';
+            deal = turnRng() < 0.5 ? 'share_profits' : 'bribe_territory';
           } else deal = 'share_profits';
 
           const playerUnitsOnHex = state.deployedUnits.filter(
@@ -7639,7 +7804,7 @@ export const useEnhancedMafiaGameState = (
           const otherPersonality = otherOpp.personality || 'aggressive';
           const bothDiplomatic = (personality === 'diplomatic' || personality === 'defensive') && 
                                 (otherPersonality === 'diplomatic' || otherPersonality === 'defensive');
-          if (bothDiplomatic && Math.random() < 0.08) {
+          if (bothDiplomatic && turnRng() < 0.08) {
             // Auto-resolve: form ceasefire between AI families (reduce tension)
             addPairTension(state, fam, otherFam, -TENSION_REDUCE_CEASEFIRE);
             state.tensionCooldowns[pairKey] = 3;
@@ -7702,8 +7867,8 @@ export const useEnhancedMafiaGameState = (
 
         // Roll gates
         const rollPasses = isDesperate
-          || (renewalSoon && Math.random() < 0.75)
-          || (wantsNewDeal && Math.random() < 0.60);
+          || (renewalSoon && turnRng() < 0.75)
+          || (wantsNewDeal && turnRng() < 0.60);
 
         if (rollPasses) {
           // Pick supplier preference: in desperation, who took the cut?
@@ -7736,7 +7901,7 @@ export const useEnhancedMafiaGameState = (
 
           if (potentialSuppliers.length > 0) {
             // Prefer the player when they're the one who cut us, else random.
-            let supplier = potentialSuppliers[Math.floor(Math.random() * potentialSuppliers.length)];
+            let supplier = potentialSuppliers[Math.floor(turnRng() * potentialSuppliers.length)];
             if (isDesperate) {
               const playerOpt = potentialSuppliers.find(s => s.isPlayer);
               if (playerOpt) supplier = playerOpt;
@@ -7754,7 +7919,7 @@ export const useEnhancedMafiaGameState = (
             });
 
             if (opponent.resources.money >= price) {
-              const duration = 5 + Math.floor(Math.random() * 3);
+              const duration = 5 + Math.floor(turnRng() * 3);
               const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
               const supplierLabel = supplier.family.charAt(0).toUpperCase() + supplier.family.slice(1);
 
@@ -7896,7 +8061,12 @@ export const useEnhancedMafiaGameState = (
       const postureBlocksNewHit = policy.refuseNewWars && !strategicOverride && !atWarNow;
       if (hasCeasefireWithPlayer || hasAllianceWithPlayer || aiOffenseDisabled || postureBlocksNewHit) {
         // Skip plan hit — active pact, hiding, or posture refuses new aggression
-      } else if (aiPhase >= 2 && planHitPersonalityAllowed && Math.random() < getPlanHitBase(state.difficulty) * planHitChanceMultiplier * aggressionScale) {
+      } else if (aiPhase >= 2 && planHitPersonalityAllowed && fireGate(turnRng, {
+        base: getPlanHitBase(state.difficulty),
+        personalityMul: planHitChanceMultiplier,
+        postureMul: policy.offensiveHitMul ?? 1,
+        aggressionScale,
+      })) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         const alreadyTargeted = new Set((state.aiPlannedHits || []).map(h => h.targetUnitId));
         const availableTargets = playerCapos.filter(c => !alreadyTargeted.has(c.id));
@@ -7919,6 +8089,8 @@ export const useEnhancedMafiaGameState = (
               isFortified: !!isFort,
               isSafehouse: isSh,
               jitter: turnRng() * 2 - 1,
+              targetIsLeader: leaderIsRival && boardLeader.family === c.family,
+              leaderProgress: boardLeaderProgress,
             });
           });
           const tIdx = softmaxPick(targetScores, turnRng, undefined, difficultySoftmaxTemperature(state.difficulty || 'normal'));
@@ -7977,7 +8149,7 @@ export const useEnhancedMafiaGameState = (
         (basePersonality === 'defensive' || basePersonality === 'diplomatic' || basePersonality === 'opportunistic')
       ) {
         const myActiveWiretaps = (state.wiretaps || []).filter(w => w.plantedBy === fam).length;
-        if (myActiveWiretaps < WIRETAP_MAX_PER_FAMILY && Math.random() < 0.18) {
+        if (myActiveWiretaps < WIRETAP_MAX_PER_FAMILY && turnRng() < 0.18) {
           // Pick a player-owned hex within range of any of this AI's units, that doesn't already have our bug.
           const myUnits = state.deployedUnits.filter(u => u.family === fam);
           const candidates = state.hexMap.filter(t =>
@@ -8014,14 +8186,14 @@ export const useEnhancedMafiaGameState = (
         const bugsOnMe = (state.wiretaps || []).filter(w => w.targetFamily === fam).length;
         const csActive = (state.counterSurveillance || []).some(c => c.family === fam);
         const sweepChance = csActive ? 0 : (bugsOnMe > 0 ? 0.55 : 0.06);
-        if (sweepChance > 0 && Math.random() < sweepChance) {
+        if (sweepChance > 0 && turnRng() < sweepChance) {
           opponent.resources.money -= SWEEP_COST;
           aiTacticalRemaining -= SWEEP_TACTICAL_COST;
           const survivors: Wiretap[] = [];
           let caught = 0;
           for (const w of (state.wiretaps || [])) {
             if (w.targetFamily !== fam) { survivors.push(w); continue; }
-            if (Math.random() < SWEEP_DISCOVERY_CHANCE) {
+            if (turnRng() < SWEEP_DISCOVERY_CHANCE) {
               caught++;
               if (w.plantedBy === FED_BUG_PLANTED_BY) {
                 // AI parity: discovered Fed bug bumps the family's heat proportional to age
@@ -8058,7 +8230,7 @@ export const useEnhancedMafiaGameState = (
             const nearby = state.deployedUnits.filter(u => u.family === fam && hexDistance(u, aiHq) <= FAMILY_DINNER_RANGE);
             if (nearby.length > 0) {
               const avgLoy = nearby.reduce((s, u) => s + (state.soldierStats[u.id]?.loyalty ?? 75), 0) / nearby.length;
-              if (avgLoy < 55 && Math.random() < 0.6) {
+              if (avgLoy < 55 && turnRng() < 0.6) {
                 opponent.resources.money -= FAMILY_DINNER_COST;
                 aiTacticalRemaining -= FAMILY_DINNER_TACTICAL_COST;
                 state.lastFamilyDinnerTurn = { ...(state.lastFamilyDinnerTurn || {}), [fam]: state.turn };
@@ -8099,7 +8271,7 @@ export const useEnhancedMafiaGameState = (
           opponent.resources.money >= aiBuildBudget &&
           aiBuildRunway >= 5 &&
           aiHasBuildableHex &&
-          Math.random() < aiBuildChance
+          turnRng() < aiBuildChance
         ) {
           const buildCandidates = state.hexMap.filter(t =>
             t.controllingFamily === fam && !t.business && !t.isHeadquarters &&
@@ -8147,7 +8319,11 @@ export const useEnhancedMafiaGameState = (
         aiHitmanRunway >= 8 &&
         (aiAtWarWithPlayer || aiPlayerRel <= -30) &&
         !state.ceasefires.some(c => c.active && c.family === fam) &&
-        Math.random() < getHitmanChance(state.difficulty, aiAtWarWithPlayer) * aggressionScale
+        fireGate(turnRng, {
+          base: getHitmanChance(state.difficulty, aiAtWarWithPlayer),
+          postureMul: policy.offensiveHitMul ?? 1,
+          aggressionScale,
+        })
       ) {
         const playerCapos = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'capo');
         // Avoid double-targeting capos already under another hitman contract
@@ -8207,11 +8383,11 @@ export const useEnhancedMafiaGameState = (
         const aiPowerUsed = aiPower.oneTimeUse && (state.familyPowerUsedForever || {})[fam];
         if (aiPowerCD <= 0 && !aiPowerUsed) {
           let usedPower = false;
-          if (fam === 'gambino' && Math.random() < 0.30) {
+          if (fam === 'gambino' && turnRng() < 0.30) {
             // Area scout a border hex
             const borderHexes = state.hexMap.filter(t => t.controllingFamily !== fam && t.controllingFamily !== 'neutral' && !t.isHeadquarters);
             if (borderHexes.length >= 2) {
-              const target = borderHexes[Math.floor(Math.random() * borderHexes.length)];
+              const target = borderHexes[Math.floor(turnRng() * borderHexes.length)];
               const scoutTargets = [target, ...getHexNeighbors(target.q, target.r, target.s)];
               scoutTargets.forEach(loc => {
                 const tile = state.hexMap.find(t => t.q === loc.q && t.r === loc.r && t.s === loc.s);
@@ -8225,7 +8401,7 @@ export const useEnhancedMafiaGameState = (
               usedPower = true;
               if (turnReport) turnReport.aiActions.push({ family: fam, action: 'family_power', detail: 'Activated Dellacroce Network (area scout)' });
             }
-          } else if (fam === 'genovese' && Math.random() < 0.25) {
+          } else if (fam === 'genovese' && turnRng() < 0.25) {
             // Hide highest-value hex
             const ownHexes = state.hexMap.filter(t => t.controllingFamily === fam && t.business && !t.isHeadquarters);
             const notHidden = ownHexes.filter(t => !(state.frontBossHexes || []).some(h => h.q === t.q && h.r === t.r && h.s === t.s));
@@ -8237,7 +8413,7 @@ export const useEnhancedMafiaGameState = (
               usedPower = true;
               if (turnReport) turnReport.aiActions.push({ family: fam, action: 'family_power', detail: 'Activated Front Boss (hex hidden)' });
             }
-          } else if (fam === 'lucchese' && Math.random() < 0.40) {
+          } else if (fam === 'lucchese' && turnRng() < 0.40) {
             const distCounts: Record<string, number> = {};
             state.hexMap.forEach(t => { if (t.controllingFamily === fam) distCounts[t.district] = (distCounts[t.district] || 0) + 1; });
             const best = Object.entries(distCounts).sort((a, b) => b[1] - a[1])[0];
@@ -8255,7 +8431,7 @@ export const useEnhancedMafiaGameState = (
               usedPower = true;
               if (turnReport) turnReport.aiActions.push({ family: fam, action: 'family_power', detail: `Garment District Shakedown on ${best[0]}` });
             }
-          } else if (fam === 'bonanno' && Math.random() < 0.50) {
+          } else if (fam === 'bonanno' && turnRng() < 0.50) {
             const aiSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
             const lowLoyalty = aiSoldiers.filter(u => (state.soldierStats[u.id]?.loyalty || 50) < 50);
             if (lowLoyalty.length >= 2) {
@@ -8309,7 +8485,11 @@ export const useEnhancedMafiaGameState = (
       // ── AI FLIP SOLDIER (weaken enemy HQ defenses) — Capo within 3 hexes of enemy HQ ──
       const aiFlippedCount = (state.flippedSoldiers || []).filter(f => f.flippedByFamily === fam).length;
       const aiFlipCost = FLIP_SOLDIER_BASE_COST + aiFlippedCount * FLIP_SOLDIER_COST_ESCALATION;
-      if (!aiOffenseDisabled && aiPhase >= 3 && opponent.resources.money >= aiFlipCost && Math.random() < (personality === 'aggressive' ? 0.25 : personality === 'opportunistic' ? 0.20 : personality === 'unpredictable' ? 0.18 : 0.12)) {
+      if (!aiOffenseDisabled && aiPhase >= 3 && opponent.resources.money >= aiFlipCost && fireGate(turnRng, {
+        base: 0.16,
+        personalityMul: offensePersonalityMul(personality),
+        postureMul: policy.offensiveHitMul ?? 1,
+      })) {
         const otherFamilies = [state.playerFamily, ...state.aiOpponents.filter(o => o.family !== fam).map(o => o.family)];
         let flipped = false;
         for (const victimFamily of otherFamilies) {
@@ -8331,7 +8511,7 @@ export const useEnhancedMafiaGameState = (
             return uStats && uStats.loyalty < 80 && !(state.flippedSoldiers || []).some(f => f.unitId === u.id);
           });
           if (flippableTargets.length === 0) continue;
-          const target = flippableTargets[Math.floor(Math.random() * flippableTargets.length)];
+          const target = flippableTargets[Math.floor(turnRng() * flippableTargets.length)];
           const tStats = state.soldierStats[target.id];
           opponent.resources.money -= aiFlipCost;
           let chance = FLIP_SOLDIER_BASE_CHANCE;
@@ -8340,7 +8520,7 @@ export const useEnhancedMafiaGameState = (
           // Schemer capo bonus
           if (aiCapo.personality === 'schemer') chance += 0.10;
           chance = Math.min(0.60, Math.max(0.05, chance));
-          if (Math.random() < chance) {
+          if (turnRng() < chance) {
             state.flippedSoldiers = [...(state.flippedSoldiers || []), { unitId: target.id, family: victimFamily, flippedByFamily: fam, hqQ: victimHQ.q, hqR: victimHQ.r, hqS: victimHQ.s }];
             if (victimFamily === state.playerFamily) {
               state.pendingNotifications.push({ type: 'warning', title: '🐀 Soldier Compromised!', message: `The ${fam} family's capo has flipped one of your soldiers! Your HQ defense is weakened.` });
@@ -8366,7 +8546,10 @@ export const useEnhancedMafiaGameState = (
         : personality === 'unpredictable' ? 0.12
         : personality === 'opportunistic' ? ((state.flippedSoldiers || []).length >= 2 ? 0.08 : 0)
         : 0.10) * aggressionScale;
-      if (!aiOffenseDisabled && aiPhase >= 4 && hqAssaultAllowed && Math.random() < hqAssaultChance) {
+      if (!aiOffenseDisabled && aiPhase >= 4 && hqAssaultAllowed && fireGate(turnRng, {
+        base: hqAssaultChance,
+        postureMul: policy.offensiveHitMul ?? 1,
+      })) {
         // Find enemy HQs adjacent to AI soldiers with high toughness
         const aiSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
         for (const soldier of aiSoldiers) {
@@ -8399,7 +8582,7 @@ export const useEnhancedMafiaGameState = (
             const flippedCount = (state.flippedSoldiers || []).filter(f => f.family === victimFamily).length;
             chance += flippedCount * 0.10;
             chance = Math.min(HQ_ASSAULT_MAX_CHANCE, Math.max(0.05, chance));
-            if (Math.random() < chance) {
+            if (turnRng() < chance) {
               state.eliminatedFamilies = [...(state.eliminatedFamilies || []), victimFamily];
               state.deployedUnits = state.deployedUnits.filter(u => u.family !== victimFamily);
               state.hexMap.forEach(t => { if (t.controllingFamily === victimFamily && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
@@ -8455,17 +8638,30 @@ export const useEnhancedMafiaGameState = (
         const totalSurvivors = survivingRivals.length + (playerAlive ? 1 : 0);
         
         if (totalSurvivors >= COMMISSION_MIN_SURVIVORS && state.turn >= aiCooldown) {
-          // AI decides to call vote if diplomatic or if it has high relationships
-          const shouldCallVote = (personality === 'diplomatic' && Math.random() < 0.4) ||
-            (personality === 'opportunistic' && Math.random() < 0.2) ||
-            (Math.random() < 0.1);
-          
+          // AI calls a vote when it actually has the relationships to win:
+          // count likely yes-voters (relationship above threshold) and only
+          // gamble when the projected support is close to the needed majority.
+          const neededProjected = totalSurvivors === 2 ? 2 : totalSurvivors - 1;
+          const likelySupporters = survivingRivals
+            .filter(o => (o.relationships[fam] || 0) >= COMMISSION_VOTE_RELATIONSHIP_THRESHOLD).length
+            + (playerAlive && (state.reputation.familyRelationships[fam] || 0) >= COMMISSION_VOTE_RELATIONSHIP_THRESHOLD ? 1 : 0);
+          const supportRatio = neededProjected > 0 ? likelySupporters / neededProjected : 0;
+          const shouldCallVote = supportRatio >= 0.5 && fireDiplomacyGate(
+            turnRng,
+            0.1 + 0.35 * Math.min(1, supportRatio),
+            personality,
+            policy,
+          );
+
           if (shouldCallVote) {
             opponent.resources.money -= COMMISSION_VOTE_COST;
             const needed = totalSurvivors === 2 ? 2 : totalSurvivors - 1;
             let yesVotes = 0;
             const voteResults: Array<{ family: string; vote: boolean }> = [];
             
+            // Leader block: no family crowns a caller who's already running away
+            // with the board — they'd be voting themselves into servitude.
+            const callerIsRunawayLeader = boardLeader.family === fam && boardLeaderProgress >= 0.7;
             // Other AI families vote
             for (const otherAi of survivingRivals) {
               const rel = otherAi.relationships[fam] || 0;
@@ -8474,7 +8670,7 @@ export const useEnhancedMafiaGameState = (
                  (a.alliedFamily === otherAi.family))) ||
                 state.ceasefires.some(c => c.active && c.family === fam);
               // AI-to-AI: use relationship threshold
-              if (rel >= COMMISSION_VOTE_RELATIONSHIP_THRESHOLD && hasPact) {
+              if (rel >= COMMISSION_VOTE_RELATIONSHIP_THRESHOLD && hasPact && !callerIsRunawayLeader) {
                 yesVotes++;
                 voteResults.push({ family: otherAi.family, vote: true });
               } else {
@@ -8506,9 +8702,11 @@ export const useEnhancedMafiaGameState = (
                 vote: r.vote,
                 reason: r.vote 
                   ? `Relationship ${rel} + active pact`
-                  : rel < COMMISSION_VOTE_RELATIONSHIP_THRESHOLD
-                    ? `Relationship too low (${rel}/${COMMISSION_VOTE_RELATIONSHIP_THRESHOLD})`
-                    : 'No active alliance or ceasefire',
+                  : callerIsRunawayLeader && r.family !== state.playerFamily && rel >= COMMISSION_VOTE_RELATIONSHIP_THRESHOLD
+                    ? 'Refuses to crown the runaway leader'
+                    : rel < COMMISSION_VOTE_RELATIONSHIP_THRESHOLD
+                      ? `Relationship too low (${rel}/${COMMISSION_VOTE_RELATIONSHIP_THRESHOLD})`
+                      : 'No active alliance or ceasefire',
               };
             });
 
@@ -8626,11 +8824,11 @@ export const useEnhancedMafiaGameState = (
         // 5. Prosecution risk: roll for AI soldier arrest (mirrors player path, soldiers only)
         if (heatNow >= 30) {
           const arrestRisk = Math.max(0, Math.floor(heatNow * 0.4) - 10); // -10 base mitigation
-          if (Math.random() * 100 < arrestRisk) {
+          if (turnRng() * 100 < arrestRisk) {
             const aiSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier');
             if (aiSoldiers.length > 0) {
-              const arrested = aiSoldiers[Math.floor(Math.random() * aiSoldiers.length)];
-              const sentence = 4 + Math.floor(Math.random() * 4); // 4–7 turns
+              const arrested = aiSoldiers[Math.floor(turnRng() * aiSoldiers.length)];
+              const sentence = 4 + Math.floor(turnRng() * 4); // 4–7 turns
               state.arrestedSoldiers = [...(state.arrestedSoldiers || []), {
                 unitId: arrested.id,
                 returnTurn: state.turn + sentence,
@@ -8684,6 +8882,8 @@ export const useEnhancedMafiaGameState = (
 
     // ── EXECUTE PENDING AI PLANNED HITS ──
     if (state.aiPlannedHits && state.aiPlannedHits.length > 0) {
+      // Seeded rng for hit resolution (outside the per-family loop, so it gets its own stream)
+      const hitExecRng = mulberry32((state.mapSeed || 0) + state.turn * 53 + 7919);
       const remaining: typeof state.aiPlannedHits = [];
       for (const hit of state.aiPlannedHits) {
         hit.turnsRemaining -= 1;
@@ -8706,7 +8906,7 @@ export const useEnhancedMafiaGameState = (
           if (targetUnit) {
             // ===== AI HEAT PARITY: plan-hit execution heat (planned tier — mirrors player) =====
             applyAIHeat(state, hit.family, 1, 'planned');
-            if (Math.random() < AI_PLAN_HIT_SUCCESS_RATE) {
+            if (hitExecRng() < AI_PLAN_HIT_SUCCESS_RATE) {
               // Success — capo is killed
               const capoQ = targetUnit.q, capoR = targetUnit.r, capoS = targetUnit.s;
               const capoFam = targetUnit.family;
@@ -9228,7 +9428,7 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'info' as const,
               title: '💰 Mercenary Hired',
-              message: `A hired gun joins the family for $${finalCost.toLocaleString()}. Loyalty -3 (outsider).${bronxDiscount > 0 ? ' (Bronx discount applied)' : ''}${respectDiscount > 0.01 ? ` Respect saved $${(Math.floor(SOLDIER_COST * (1 - discount)) - cost).toLocaleString()}.` : ''}`,
+              message: `A hired gun joins the family for $${finalCost.toLocaleString()}. Family loyalty -10 (outsider).${bronxDiscount > 0 ? ' (Bronx discount applied)' : ''}${respectDiscount > 0.01 ? ` Respect saved $${(Math.floor(SOLDIER_COST * (1 - discount)) - cost).toLocaleString()}.` : ''}`,
             }];
           }
           return newState;
@@ -9540,13 +9740,8 @@ export const useEnhancedMafiaGameState = (
           // Check if already active
           if (newState.activeBribes.some(b => b.tier === tier && b.active)) return newState;
           
-          // Calculate success
-          let successChance = config.baseSuccess;
-          successChance += Math.floor(newState.reputation.reputation / 10);
-          // Influence bonus: up to +12% at 100 influence
-          successChance += Math.floor(newState.resources.influence / 8);
-          successChance -= Math.floor(newState.policeHeat.level / 5);
-          successChance = Math.max(5, Math.min(95, successChance));
+          // Success math lives in @/lib/action-formulas (shared with previews).
+          const successChance = computeBribeCore(newState, tier).chance;
           
           newState.resources.money -= config.cost;
           newState.tacticalActionsRemaining = Math.max(0, newState.tacticalActionsRemaining - 1);
@@ -9973,12 +10168,7 @@ export const useEnhancedMafiaGameState = (
         }
         case 'build_business': {
           // Enter placement mode — player must click a valid hex on the map
-          const businessDefs: Record<string, { cost: number; income: number; launderingCapacity: number; icon: string }> = {
-            restaurant: { cost: 20000, income: 3000, launderingCapacity: 2000, icon: '🍝' },
-            store: { cost: 12000, income: 1800, launderingCapacity: 1500, icon: '🏪' },
-            construction: { cost: 35000, income: 5000, launderingCapacity: 4000, icon: '🏗️' },
-          };
-          const def = businessDefs[action.businessType];
+          const def = BUILDABLE_BUSINESS_DEFS[action.businessType];
           if (!def) return newState;
           if (newState.resources.money < def.cost) {
             newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -10055,12 +10245,6 @@ export const useEnhancedMafiaGameState = (
             }
             newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
           }
-          const allDefs: Record<string, { income: number; launderingCapacity: number }> = {
-            restaurant: { income: 3000, launderingCapacity: 2000 },
-            store: { income: 1800, launderingCapacity: 1500 },
-            construction: { income: 5000, launderingCapacity: 4000 },
-          };
-          const bDef = allDefs[pending.businessType] || { income: 2000, launderingCapacity: 1000 };
           newState.resources.money -= pending.cost;
           targetTile.business = {
             type: pending.businessType,
@@ -10069,7 +10253,7 @@ export const useEnhancedMafiaGameState = (
             heatLevel: 0,
             launderingCapacity: 0,
             constructionProgress: 0,
-            constructionGoal: 3,
+            constructionGoal: BUILD_CONSTRUCTION_GOAL,
           };
           newState.pendingBusinessBuild = null;
           newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -10897,11 +11081,11 @@ export const useEnhancedMafiaGameState = (
     const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
     if (!tile || !tile.business || tile.controllingFamily === state.playerFamily || tile.isHeadquarters) return state;
 
-    // Require $12,000
-    if (state.resources.money < 12000) {
+    // Require sabotage funds
+    if (state.resources.money < SABOTAGE_COST) {
       state.pendingNotifications = [...state.pendingNotifications, {
         type: 'warning', title: '💣 Sabotage Failed',
-        message: `Not enough money. Sabotage costs $12,000.`,
+        message: `Not enough money. Sabotage costs $${SABOTAGE_COST.toLocaleString()}.`,
       }];
       return state;
     }
@@ -10922,16 +11106,16 @@ export const useEnhancedMafiaGameState = (
     }
 
     // Deduct cost
-    state.resources.money -= 12000;
+    state.resources.money -= SABOTAGE_COST;
 
-    // Front Boss sabotage penalty: 30% chance of failure on hidden hexes
+    // Front Boss sabotage penalty: chance of failure on hidden hexes
     const isSabFrontBoss = (state.frontBossHexes || []).some(h => 
       h.q === targetQ && h.r === targetR && h.s === targetS && h.ownerFamily !== state.playerFamily
     );
-    if (isSabFrontBoss && Math.random() < 0.30) {
+    if (isSabFrontBoss && Math.random() < SABOTAGE_FRONT_BOSS_FAIL_CHANCE) {
       state.pendingNotifications = [...state.pendingNotifications, {
         type: 'warning', title: '💣 Sabotage Failed',
-        message: `The operation was foiled — the target appears to be a front. -$12,000.`,
+        message: `The operation was foiled — the target appears to be a front. -$${SABOTAGE_COST.toLocaleString()}.`,
       }];
       return state;
     }
@@ -10946,17 +11130,17 @@ export const useEnhancedMafiaGameState = (
       q: targetQ, r: targetR, s: targetS, family: sabotagedFamily as string,
     }];
 
-    // Increase police heat (+15)
-    applyPlayerHeat(state, 15);
+    // Increase police heat
+    applyPlayerHeat(state, SABOTAGE_HEAT);
 
     // Damage relationship with owning family
     if (state.reputation.familyRelationships[tile.controllingFamily] !== undefined) {
-      state.reputation.familyRelationships[tile.controllingFamily] -= 10;
+      state.reputation.familyRelationships[tile.controllingFamily] -= SABOTAGE_RELATIONSHIP_PENALTY;
     }
 
     state.pendingNotifications = [...state.pendingNotifications, {
       type: 'success', title: '💣 Sabotage Successful!',
-      message: `${tile.controllingFamily}'s ${destroyedType} ($${destroyedIncome.toLocaleString()}/turn) has been permanently destroyed! -$12,000. +15 Heat.`,
+      message: `${tile.controllingFamily}'s ${destroyedType} ($${destroyedIncome.toLocaleString()}/turn) has been permanently destroyed! -$${SABOTAGE_COST.toLocaleString()}. +${SABOTAGE_HEAT} Heat.`,
     }];
 
     syncLegacyUnits(state);
@@ -11078,29 +11262,14 @@ export const useEnhancedMafiaGameState = (
       return state;
     }
 
-    // Compute total defense penalty against assault, then cap at 60%
-    let defensePenalty = HQ_DEFENSE_BONUS;
-    if (isHexFortified(state.fortifiedHexes || [], targetQ, targetR, targetS, targetFamily)) {
-      defensePenalty += FORTIFY_DEFENSE_BONUS / 100;
-    }
-    const targetOpp = state.aiOpponents.find(o => o.family === targetFamily) as any;
-    if (targetOpp && targetOpp.mattressesActiveUntil && targetOpp.mattressesActiveUntil >= state.turn) {
-      defensePenalty += MATTRESSES_HQ_BONUS / 100;
-    }
-    defensePenalty = Math.min(0.60, defensePenalty);
-
-    let chance = HQ_ASSAULT_BASE_CHANCE - defensePenalty;
+    // Chance math lives in @/lib/action-formulas (shared with previews).
+    const hqCalc = computeHQAssaultCore(state, { targetQ, targetR, targetS, selectedUnitId });
+    const chance = hqCalc.ok ? hqCalc.chance : 0.05;
     const hqNeighbors = getHexNeighbors(targetQ, targetR, targetS);
     const friendlyAdjacent = state.deployedUnits.filter(u =>
       u.family === state.playerFamily && u.id !== attacker.id &&
       hqNeighbors.some(n => n.q === u.q && n.r === u.r && n.s === u.s)
     );
-    chance += friendlyAdjacent.length * 0.05;
-    const bonuses = FAMILY_BONUSES[state.playerFamily] || FAMILY_BONUSES.gambino;
-    chance += bonuses.combatBonus / 100 * 0.1;
-    const flippedCount = (state.flippedSoldiers || []).filter(f => f.family === targetFamily).length;
-    chance += flippedCount * 0.10;
-    chance = Math.min(HQ_ASSAULT_MAX_CHANCE, Math.max(0.05, chance));
 
     if (Math.random() < chance) {
       const result = tryEliminateOrSubjugate(state, targetFamily, state.playerFamily);
@@ -11182,15 +11351,9 @@ export const useEnhancedMafiaGameState = (
     const target = chosenTarget || flippableTargets[Math.floor(Math.random() * flippableTargets.length)];
     const targetStats = state.soldierStats[target.id]!;
 
-    let chance = FLIP_SOLDIER_BASE_CHANCE;
-    // Low loyalty = easier to flip, high loyalty = harder
-    if (targetStats.loyalty < 60) chance += 0.15;
-    else if (targetStats.loyalty > 70) chance -= 0.10;
-    const playerInfluence = state.resources.influence || 0;
-    if (playerInfluence > 50) chance += (playerInfluence - 50) * 0.005;
-    const schemerAdjacent = actingCapo.personality === 'schemer';
-    if (schemerAdjacent) chance += 0.10;
-    chance = Math.min(0.70, Math.max(0.05, chance));
+    // Chance math lives in @/lib/action-formulas (shared with previews).
+    const flipCalc = computeFlipCore(state, { targetQ, targetR, targetS, targetUnitId: target.id });
+    const chance = flipCalc.ok ? flipCalc.chance : 0.05;
 
     if (Math.random() < chance) {
       state.flippedSoldiers = [...(state.flippedSoldiers || []), { unitId: target.id, family: targetFamily, flippedByFamily: state.playerFamily, hqQ: targetQ, hqR: targetR, hqS: targetS }];
@@ -11368,101 +11531,21 @@ export const useEnhancedMafiaGameState = (
       }
 
       // ============ COMBAT RESOLUTION ============
+      // Chance + heat math lives in @/lib/action-formulas — shared with the
+      // pre-commit preview so what the player sees is exactly what executes.
+      const hitCalc = computeHitCore(state, { targetQ, targetR, targetS, selectedUnitId, executingPlan: _isExecPlan });
       const attackers = playerUnits.length;
       const defenders = enemyUnits.length;
-      let chance = 0.5 + (attackers - defenders) * 0.15;
-      
-      // Unscouted penalty
-      if (!isScouted) {
-        chance -= BLIND_HIT_PENALTY;
-      }
-      
-      // Fortification modifiers (hex-based) — Plan Hit bypasses fortification defense
-      const defenderHexFortified = isHexFortified(state.fortifiedHexes || [], targetQ, targetR, targetS, tile.controllingFamily);
-      const isExecutingPlanHit = !!(state.plannedHit && (action._executingPlan || (state.plannedHit.q === targetQ && state.plannedHit.r === targetR && state.plannedHit.s === targetS)));
-      if (defenderHexFortified && !isExecutingPlanHit) {
-        chance -= FORTIFY_DEFENSE_BONUS / 100;
-      }
-      // Safehouse defense bonus for defenders
-      const isDefenderSafehouse = state.safehouses.some(s => s.q === targetQ && s.r === targetR && s.s === targetS);
-      if (isDefenderSafehouse) {
-        chance -= SAFEHOUSE_DEFENSE_BONUS / 100;
-      }
-      // Built business defense bonus for defenders
-      const isDefenderBuiltBiz = tile.business && !tile.business.isExtorted && tile.controllingFamily !== state.playerFamily;
-      if (isDefenderBuiltBiz) {
-        chance -= BUILT_BUSINESS_DEFENSE_BONUS / 100;
-      }
-      // Secondary: Brooklyn +10% combat defense — defender bonus when attacking INTO Brooklyn
-      if (tile.district === 'Brooklyn' && hasFamilyDistrictBonus(state, tile.controllingFamily, 'combat_defense')) {
-        chance -= 0.10;
-      }
-      // Secondary: Brooklyn +10% combat defense — attacker bonus when attacking FROM Brooklyn
-      if (tile.district === 'Brooklyn' && hasPlayerDistrictBonus(state, 'combat_defense')) {
-        // Player units in Brooklyn get defense bonus, not attack bonus — handled above
-      }
-      // Attacker bonus: attacking FROM a fortified hex
-      const attackerUnit = playerUnits[0];
-      const attackerHexFortified = attackerUnit && isHexFortified(state.fortifiedHexes || [], attackerUnit.q, attackerUnit.r, attackerUnit.s, state.playerFamily);
-      if (attackerHexFortified) {
-        chance += FORTIFY_DEFENSE_BONUS / 200;
-      }
-      
-      // War Summit combat bonus (+15% when active)
-      if ((state.warSummitState || {}).active) {
-        chance += WAR_SUMMIT_COMBAT_BONUS / 100;
-      }
-      // Mattresses defense bonus for defender (if defender's family has mattresses active — AI will use this too)
-      // For player attacks on enemies, check if enemy has mattresses (N/A — AI doesn't use mattresses)
-      // For enemies attacking player, check player mattresses
-      if ((state.mattressesState || {}).active && tile.controllingFamily !== state.playerFamily) {
-        // Player is attacking while at mattresses — this shouldn't happen (units are locked), but safety
-      }
-      
-      // Family bonuses (hitmen no longer provide combat bonuses — they are external contractors)
-      chance += state.familyBonuses.combatBonus / 100;
-      chance += state.familyBonuses.hitSuccess / 100;
-      // Secondary: Queens +5% hit success on all attacks
-      if (hasPlayerDistrictBonus(state, 'hit_bonus')) {
-        chance += 0.05;
-      }
-      
-      // Front Boss penalty: -30% hit chance on hidden hexes
-      const isFrontBossHex = (state.frontBossHexes || []).some(h => 
-        h.q === targetQ && h.r === targetR && h.s === targetS && h.ownerFamily !== state.playerFamily
-      );
-      if (isFrontBossHex) {
-        chance -= 0.30;
-      }
+      const isExecutingPlanHit = hitCalc.executingPlanHit;
 
-      if (isScouted) {
-        const scoutInfo = state.scoutedHexes.find(s => s.q === tile.q && s.r === tile.r && s.s === tile.s);
-        if (scoutInfo && state.turn <= scoutInfo.freshUntilTurn) {
-          chance += SCOUT_INTEL_BONUS / 100;
-        } else {
-          chance += SCOUT_STALE_BONUS / 100;
-        }
-      }
-
-      // Plan Hit bonus — target tracking system
+      // Plan Hit side effects — keyed on the shared plan-bonus resolution
       if (state.plannedHit && (action._executingPlan || (state.plannedHit.q === targetQ && state.plannedHit.r === targetR && state.plannedHit.s === targetS))) {
-        const targetOnOriginalHex = state.deployedUnits.some(u => 
-          u.id === state.plannedHit!.targetUnitId && u.q === state.plannedHit!.q && u.r === state.plannedHit!.r && u.s === state.plannedHit!.s
-        );
-        const targetOnCurrentHex = state.deployedUnits.some(u =>
-          u.id === state.plannedHit!.targetUnitId && u.q === targetQ && u.r === targetR && u.s === targetS
-        );
-
-        if (targetOnOriginalHex) {
-          // Best case — target stayed on planned hex → full +20% bonus
-          chance += PLAN_HIT_BONUS / 100;
+        if (hitCalc.planBonus === 'full') {
           state.pendingNotifications = [...state.pendingNotifications, {
             type: 'info', title: '🎯 Plan Hit Executed!',
             message: `+${PLAN_HIT_BONUS}% bonus applied — target was right where expected.`,
           }];
-        } else if (targetOnCurrentHex) {
-          // Target relocated but we followed them → reduced +10% bonus + penalties
-          chance += PLAN_HIT_RELOCATED_BONUS / 100;
+        } else if (hitCalc.planBonus === 'relocated') {
           applyPlayerHeat(state, PLAN_HIT_RELOCATED_HEAT);
           state.planHitCooldownUntil = state.turn + PLAN_HIT_COOLDOWN;
           state.pendingNotifications = [...state.pendingNotifications, {
@@ -11487,21 +11570,9 @@ export const useEnhancedMafiaGameState = (
         }
         state.plannedHit = null; // Consume the plan either way
       }
-      
-      // Difficulty modifier: Easy +10pp, Hard -10pp on hit success
-      chance += state.difficultyModifiers?.hitSuccessBonus ?? 0;
-      chance = Math.max(0.05, Math.min(0.99, chance));
 
-      // Heat scales with battle size — modified by hit type
-      const totalUnitsInvolved = attackers + defenders;
-      let heatGain = Math.min(25, 8 + totalUnitsInvolved * 2);
-      // Scouted hit: 50% reduced heat (clean, informed operation)
-      // Blind hit: 150% heat (reckless = more attention)
-      if (isScouted && !isExecutingPlanHit) {
-        heatGain = Math.floor(heatGain / 2);
-      } else if (!isScouted) {
-        heatGain = Math.floor(heatGain * 1.5);
-      }
+      const chance = hitCalc.chance;
+      const heatGain = hitCalc.rawHeat;
 
       if (Math.random() < chance) {
         // ============ VICTORY ============
@@ -12022,30 +12093,11 @@ export const useEnhancedMafiaGameState = (
     }
 
     // ---- BRANCH B: Defended — light combat ----
+    // Chance math lives in @/lib/action-formulas (shared with previews).
     const attackers = playerUnits.length;
     const defenders = enemyUnits.length;
-    let chance = 0.5 + (attackers - defenders) * 0.15;
-    chance += 0.05; // Push Out modifier (softer than business-hex Hit)
-    // No blind-hit penalty for push out
-    if (isScouted) {
-      const scoutInfo = state.scoutedHexes.find(s => s.q === tile.q && s.r === tile.r && s.s === tile.s);
-      if (scoutInfo && state.turn <= (scoutInfo as any).freshUntilTurn) {
-        chance += SCOUT_INTEL_BONUS / 100;
-      } else {
-        chance += SCOUT_STALE_BONUS / 100;
-      }
-    }
-    // Fortify defense
-    const defenderHexFortified = isHexFortified(state.fortifiedHexes || [], targetQ, targetR, targetS, targetFamily);
-    if (defenderHexFortified) chance -= FORTIFY_DEFENSE_BONUS / 100;
-    // Safehouse defense
-    if (state.safehouses.some(s => s.q === targetQ && s.r === targetR && s.s === targetS)) {
-      chance -= SAFEHOUSE_DEFENSE_BONUS / 100;
-    }
-    // Family + difficulty modifiers (same baseline as Hit)
-    chance += state.familyBonuses.combatBonus / 100;
-    chance += state.difficultyModifiers?.hitSuccessBonus ?? 0;
-    chance = Math.max(0.05, Math.min(0.95, chance));
+    const pushCalc = computePushOutCore(state, { targetQ, targetR, targetS, selectedUnitId });
+    const chance = pushCalc.ok ? pushCalc.chance : 0.05;
 
     if (Math.random() < chance) {
       // ============ PUSH OUT VICTORY ============
@@ -12182,22 +12234,9 @@ export const useEnhancedMafiaGameState = (
       }
 
       // Neutral: 90% success, claims territory. Enemy: 50% success, steals income only.
-      let chance = isNeutral ? 0.9 : 0.5;
-      chance += state.familyBonuses.extortion / 100;
-      // District control bonus: Queens +15% extortion success
-      if (hasPlayerDistrictBonus(state, 'extortion')) {
-        chance += 0.15;
-      }
-      chance -= state.policeHeat.level / 1000;
-      chance += (state.resources.influence / 100) * 0.15;
-      if (tile.district === 'Manhattan') {
-        chance *= 0.8;
-      }
-      const hasRecruitedUnit = allPlayerUnits.some(u => u.recruited);
-      if (hasRecruitedUnit) {
-        chance += 0.10;
-      }
-      chance = Math.min(0.99, chance);
+      // Chance math lives in @/lib/action-formulas (shared with previews).
+      const extortCalc = computeExtortCore(state, { targetQ, targetR, targetS });
+      const chance = extortCalc.ok ? extortCalc.chance : 0;
 
       if (Math.random() < chance) {
         if (isNeutral) {
@@ -12413,6 +12452,20 @@ export const useEnhancedMafiaGameState = (
       totalChance -= TREACHERY_NEGOTIATION_PENALTY;
     }
     if (action.successBonus) totalChance += action.successBonus;
+    // Relationship sway + leader wariness — mirrors negotiation-odds.ts so previews match.
+    totalChance += relationshipSway(state.reputation.familyRelationships[enemyFamily] || 0);
+    {
+      const TERR_TARGET = state.mapSize === 'small' ? 40 : state.mapSize === 'large' ? 80 : 60;
+      const playerHexesNow = state.hexMap.filter(t => t.controllingFamily === state.playerFamily).length;
+      const maxRivalHexes = Math.max(0, ...state.aiOpponents
+        .filter(o => !(state.eliminatedFamilies || []).includes(o.family))
+        .map(o => state.hexMap.filter(t => t.controllingFamily === o.family).length));
+      const playerIsRunawayLeader = playerHexesNow > maxRivalHexes && playerHexesNow / TERR_TARGET >= 0.7;
+      const leaderWaryDeals = ['ceasefire', 'alliance', 'safe_passage', 'supply_deal'];
+      if (playerIsRunawayLeader && leaderWaryDeals.includes(negotiationType)) {
+        totalChance -= LEADER_WARINESS_PENALTY;
+      }
+    }
     // Price modifier — pay more, succeed more (and vice versa)
     if (defaultCost > 0 && cost !== defaultCost) {
       const priceMod = Math.max(-25, Math.min(25, Math.round(((cost / defaultCost) - 1) * 20)));

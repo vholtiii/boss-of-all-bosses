@@ -997,3 +997,68 @@ export const EROSION_RESPECT_LOSS = 2;        // absolute value — subtracted
 export const EROSION_INFLUENCE_LOSS = 3;      // absolute value — subtracted
 export const EXPANSION_RESPECT_GAIN = 2;
 export const EXPANSION_INFLUENCE_GAIN = 3;
+
+// ============ GLOBAL HEAT SCALING ============
+// Global multiplier on player heat gains (action + ambient).
+// Heat decay (reductionPerTurn) is intentionally NOT touched.
+export const HEAT_GAIN_MULT = 1.30;
+
+// ============ RICO TIMER ============
+export const RICO_HEAT_THRESHOLD = 90;   // heat level that starts/advances the RICO clock
+export const RICO_TIMER_LIMIT = 3;       // consecutive turns at 90+ heat → federal indictment (game over)
+
+// ============ CAPO MOVEMENT ============
+// Capo fly range is phase-gated to slow early expansion.
+// Phase 1: 2 hexes/move (short-range scout). Phase 2+: 4 hexes/move.
+export const CAPO_FLY_RANGE_P1 = 2;
+export const CAPO_FLY_RANGE_P2_PLUS = 4;
+export const CAPO_MOVES_PER_TURN = 2;
+export const getCapoFlyRange = (gamePhase: number): number =>
+  (gamePhase || 1) >= 2 ? CAPO_FLY_RANGE_P2_PLUS : CAPO_FLY_RANGE_P1;
+
+// ============ SABOTAGE ============
+export const SABOTAGE_COST = 12000;
+export const SABOTAGE_HEAT = 15;
+export const SABOTAGE_RELATIONSHIP_PENALTY = 10;
+export const SABOTAGE_FRONT_BOSS_FAIL_CHANCE = 0.30; // hidden Genovese front hexes can foil sabotage
+
+// ============ CLAIM TERRITORY (pending claim) ============
+export const CLAIM_HEAT_PLAIN = 3;      // heat on initiating a pending claim (empty hex)
+export const CLAIM_HEAT_BUSINESS = 6;   // heat on initiating a pending claim (hex with business)
+
+// ============ PLAYER-BUILDABLE LEGAL BUSINESSES ============
+export interface BuildableBusinessDef {
+  cost: number;
+  income: number;
+  launderingCapacity: number;
+  icon: string;
+  label: string;
+}
+
+export const BUILDABLE_BUSINESS_DEFS: Record<string, BuildableBusinessDef> = {
+  restaurant:   { cost: 20000, income: 3000, launderingCapacity: 2000, icon: '🍝', label: 'Restaurant' },
+  store:        { cost: 12000, income: 1800, launderingCapacity: 1500, icon: '🏪', label: 'Store' },
+  construction: { cost: 35000, income: 5000, launderingCapacity: 4000, icon: '🏗️', label: 'Construction Co.' },
+};
+export const BUILD_CONSTRUCTION_GOAL = 3; // progress needed to complete construction
+
+// ============ DISTRICT CONTROL ============
+export const DISTRICT_CONTROL_THRESHOLD = 0.6; // own ≥60% of district hexes for its bonuses
+
+export interface DistrictBonusDef {
+  bonusType: string;
+  description: string;
+  secondaryBonusType: string;
+  secondaryDescription: string;
+  /** One-line strategic identity shown in tooltips/panels. */
+  identity: string;
+}
+
+export const DISTRICT_BONUSES: Record<string, DistrictBonusDef> = {
+  'Manhattan':     { bonusType: 'income', description: '+25% business income in Manhattan', secondaryBonusType: 'extra_ap', secondaryDescription: '+1 max action point per turn', identity: 'High income, high legal pressure, high competition' },
+  'Little Italy':  { bonusType: 'loyalty', description: '+20% loyalty retention', secondaryBonusType: 'fast_safehouse', secondaryDescription: 'Soldiers return from hiding 1 turn faster', identity: 'Loyalty and family-core stability' },
+  'Brooklyn':      { bonusType: 'heat', description: '-5 heat/turn', secondaryBonusType: 'combat_defense', secondaryDescription: '+10% combat defense in Brooklyn', identity: 'Industrial strength — built for holding territory' },
+  'Bronx':         { bonusType: 'recruit_discount', description: '$750 off recruitment', secondaryBonusType: 'free_recruit', secondaryDescription: 'Free soldier recruit every 3 turns', identity: 'Recruitment strength — cheap local soldiers' },
+  'Queens':        { bonusType: 'extortion', description: '+15% extortion success', secondaryBonusType: 'hit_bonus', secondaryDescription: '+5% hit success on all attacks', identity: 'Racketeering, extortion, and influence growth' },
+  'Staten Island': { bonusType: 'respect', description: '+3 respect/turn', secondaryBonusType: 'influence_gain', secondaryDescription: '+1 influence/turn', identity: 'Respect and political influence' },
+};

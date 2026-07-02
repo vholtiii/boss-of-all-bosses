@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { cn } from '@/lib/utils';
-import { PHASE_CONFIGS } from '@/types/game-mechanics';
+import { PHASE_CONFIGS, DISTRICT_CONTROL_THRESHOLD, HITMAN_CONTRACT_COST } from '@/types/game-mechanics';
 import { Crown, MapPin, Users, Store, Clock, Map as MapIcon, ArrowUp, Check } from 'lucide-react';
 
 interface PhaseInfographicProps {
@@ -17,13 +17,11 @@ interface PhaseInfographicProps {
   familyBonuses?: any;
 }
 
-const DISTRICT_CONTROL_THRESHOLD = 0.6;
-
 // One-line summary of each phase's defining unlocks
 const PHASE_UNLOCKS: Record<number, string[]> = {
   1: ['Claim & extort hexes', 'Recruit soldiers', 'Scout terrain'],
   2: ['Plan Hits unlocked', 'Diplomacy & sitdowns', 'Capo recruitment opens'],
-  3: ['Manual claim/extort locked', 'Influence erosion & expansion', 'Hitman contracts ($30k)'],
+  3: ['Manual claim/extort locked', 'Influence erosion & expansion', `Hitman contracts ($${(HITMAN_CONTRACT_COST / 1000).toFixed(0)}k)`],
   4: ['Assault Rival HQ', 'Commission Vote victory path', 'Endgame stakes'],
 };
 

@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { FAMILY_COLORS } from '@/lib/period-theme';
 import bossIcon from '@/assets/boss-icon.png';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +49,7 @@ interface HexBusiness {
   collectionReason?: string;
   supplyConnected?: boolean;
   supplyDependency?: string; // e.g. 'liquor_route', 'docks'
+  launderingCapacity?: number;
 }
 
 interface HeadquartersInfoPanelProps {
@@ -64,7 +66,7 @@ interface HeadquartersInfoPanelProps {
     boss: { q: number; r: number; s: number; id: string };
   };
   hexBusinesses?: HexBusiness[];
-  finances?: { totalIncome: number; totalExpenses: number; legalProfit: number; illegalProfit: number; totalProfit: number; dirtyMoney: number; cleanMoney: number; legalCosts: number; soldierMaintenance?: number; communityUpkeep?: number; arrestPenalty?: number; heatPenalty?: number };
+  finances?: { totalIncome: number; totalExpenses: number; legalProfit: number; illegalProfit: number; totalProfit: number; dirtyMoney: number; cleanMoney: number; legalCosts: number; soldierMaintenance?: number; communityUpkeep?: number; arrestPenalty?: number; heatPenalty?: number; copFlipPenalty?: number; grandJuryPenalty?: number };
   totalMoney?: number;
   territoryCount?: number;
   onClose: () => void;
@@ -110,13 +112,7 @@ interface HeadquartersInfoPanelProps {
   onEliminateSoldier?: (soldierId: string) => void;
 }
 
-const familyColors: Record<string, string> = {
-  gambino: '#42D3F2',
-  genovese: '#2AA63E', 
-  lucchese: '#4169E1',
-  bonanno: '#DC143C',
-  colombo: '#8A2BE2',
-};
+const familyColors: Record<string, string> = FAMILY_COLORS;
 
 const familyNames: Record<string, string> = {
   gambino: 'Gambino',
@@ -289,7 +285,12 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                   <ChevronDown className={`h-4 w-4 transition-transform ${openSections.financial ? 'rotate-180' : ''}`} />
                 </span>
               </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-2">
+              <CollapsibleContent>
+              <div className="paper-panel ledger-lines rounded-sm p-2 pl-4 space-y-2 font-courier">
+              <div className="flex items-center justify-between">
+                <span className="ink-stamp text-[9px]">Family Ledger</span>
+                <span className="text-[9px] text-muted-foreground italic">strictly private</span>
+              </div>
 
               {/* Cash on Hand */}
               {totalMoney !== undefined && (
@@ -350,8 +351,43 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                       <span className="text-red-400 font-semibold">-${(finances.heatPenalty ?? 0).toLocaleString()}</span>
                     </div>
                   )}
+                  {(finances.copFlipPenalty ?? 0) > 0 && (
+                    <div className="flex justify-between text-[9px]">
+                      <span className="text-red-300/80">🐀 Informants Skimming</span>
+                      <span className="text-red-400 font-semibold">-${(finances.copFlipPenalty ?? 0).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {(finances.grandJuryPenalty ?? 0) > 0 && (
+                    <div className="flex justify-between text-[9px]">
+                      <span className="text-red-300/80">⚖️ Grand Jury Subpoena</span>
+                      <span className="text-red-400 font-semibold">-${(finances.grandJuryPenalty ?? 0).toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Laundering capacity vs dirty money */}
+              {(() => {
+                const totalLaundering = hexBusinesses
+                  .filter(b => !b.underConstruction && (b.launderingCapacity ?? 0) > 0)
+                  .reduce((sum, b) => sum + (b.launderingCapacity ?? 0), 0);
+                if (totalLaundering === 0 && finances.dirtyMoney === 0) return null;
+                const shortfall = finances.dirtyMoney > totalLaundering;
+                return (
+                  <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-1.5">
+                    <div className="text-[10px] text-purple-400 font-medium mb-0.5">🧺 Laundering Capacity</div>
+                    <div className="flex justify-between text-[9px]">
+                      <span className="text-purple-300/80">Fronts can wash</span>
+                      <span className="text-purple-300 font-semibold">${totalLaundering.toLocaleString()}/turn</span>
+                    </div>
+                    {shortfall && (
+                      <p className="text-[9px] text-amber-400 mt-0.5">
+                        ⚠️ Dirty money exceeds capacity — build legal fronts or launder manually
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Dirty / Clean Money */}
               <div className="grid grid-cols-2 gap-1.5">
@@ -363,6 +399,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                   <div className="text-[10px] text-emerald-400 font-medium">Clean $</div>
                   <div className="text-xs font-bold text-emerald-400">${finances.cleanMoney.toLocaleString()}</div>
                 </div>
+              </div>
               </div>
               </CollapsibleContent>
             </Collapsible>
@@ -498,13 +535,18 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
               whileTap={isPlayerFamily ? { scale: 0.98 } : {}}
               onClick={() => isPlayerFamily && setBossExpanded(!bossExpanded)}
             >
-              <div className="w-10 h-10 rounded-full border-2 border-mafia-gold overflow-hidden bg-noir-dark flex items-center justify-center shadow-[0_0_8px_rgba(212,175,55,0.4)]">
-                <img
-                  src={bossIcon}
-                  alt="The Boss"
-                  className="w-8 h-8 object-contain"
-                  style={{ mixBlendMode: 'multiply' }}
-                />
+              <div className="photo-corners shrink-0">
+                <div
+                  className="w-10 h-11 border border-mafia-gold/70 overflow-hidden flex items-center justify-center"
+                  style={{ background: 'repeating-linear-gradient(0deg, #C9BCA2, #C9BCA2 5px, #BEB097 5px, #BEB097 6px)' }}
+                >
+                  <img
+                    src={bossIcon}
+                    alt="The Boss"
+                    className="w-8 h-8 object-contain"
+                    style={{ mixBlendMode: 'multiply', filter: 'sepia(0.5)' }}
+                  />
+                </div>
               </div>
               <div className="flex-1">
                 <div className="text-xs font-semibold text-mafia-gold font-playfair">The Boss</div>
@@ -676,6 +718,11 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                                             </Tooltip>
                                           </TooltipProvider>
                                         )
+                                      )}
+                                      {(biz.launderingCapacity ?? 0) > 0 && !biz.underConstruction && (
+                                        <Badge variant="outline" className="text-[9px] h-4 text-purple-400 border-purple-400/30" title={`Washes up to $${(biz.launderingCapacity ?? 0).toLocaleString()} dirty money per turn`}>
+                                          🧺 ${(biz.launderingCapacity ?? 0) >= 1000 ? `${Math.round((biz.launderingCapacity ?? 0) / 1000)}k` : biz.launderingCapacity}
+                                        </Badge>
                                       )}
                                     </div>
                                     <div className="text-[10px] text-muted-foreground flex items-center gap-1">

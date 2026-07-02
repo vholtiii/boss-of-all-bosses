@@ -149,7 +149,7 @@ Permanently at HQ. Never moves.
 - Attacking unit: **Soldier only** (not capo)
 - Position: Must be on a hex **adjacent** to enemy HQ
 - Stats: Toughness ≥ 4, Loyalty ≥ 70
-- Base success: 15%, max cap: 50%
+- Base success: 28% (Normal difficulty), max cap: 50%
 
 ### 7.2 Defense Modifiers
 - Built-in HQ defense: -30%
@@ -188,7 +188,7 @@ Weaken enemy HQ defenses by compromising a rival soldier.
 |---|---|
 | Cost | $5,000 |
 | Requirement | Unit adjacent to enemy HQ |
-| Target | Enemy soldier at/near HQ with loyalty > 60 |
+| Target | Enemy soldier within 2 hexes of your capo with loyalty < 80 |
 | Base success | 25% |
 | On success | Target flipped (hidden). -10% HQ defense per flipped soldier. |
 | On failure | -15 influence, target gains +10 loyalty, enemy notified |

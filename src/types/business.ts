@@ -56,6 +56,7 @@ export interface BusinessFinances {
   arrestPenalty?: number;
   heatPenalty?: number;
   copFlipPenalty?: number;
+  grandJuryPenalty?: number;
 }
 
 export interface PoliceHeat {

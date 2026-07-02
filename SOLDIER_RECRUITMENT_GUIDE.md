@@ -128,14 +128,14 @@ Each promoted capo receives a random personality:
 
 | Property | Value |
 |---|---|
-| Movement | Up to 5 hexes (flying), 3 moves per turn |
+| Movement | Up to 2 hexes (Phase 1) or 4 hexes (Phase 2+) per move (flying), 2 moves per turn |
 | Income | 100% territory income (vs soldiers' 30%) |
 | Scout range | 2 hexes (vs soldiers' 1 hex) |
 | Auto-claim | Claims neutral territory automatically on arrival |
 | Combat immunity | Cannot die in regular combat — wounded instead |
 | Abilities | Negotiate, establish safehouses, escort soldiers |
 
-**Wound Mechanic**: If a capo would be killed in combat, they are instead wounded: -10 loyalty and -1 move penalty for 1 turn. Capos can only be permanently eliminated via hitman contract or planned hit.
+**Wound Mechanic**: If a capo would be killed in combat, they are instead wounded: -10 loyalty and -1 move penalty for 2 turns. Capos can only be permanently eliminated via hitman contract or planned hit.
 
 ---
 
@@ -147,7 +147,7 @@ External contract killers — not family members.
 
 | Property | Value |
 |---|---|
-| Cost | **$30,000** per contract |
+| Cost | **$40,000** per contract |
 | Max active | 3 |
 | Heat | None |
 | Bonuses gained | None (no respect, fear, or stat gains) |
@@ -189,7 +189,7 @@ Auto-fails after 5 turns total.
 | Soldier (Local Recruit) | $600 | $600/turn **(deployed only)** |
 | Soldier (Undeployed) | — | **Free** |
 | Capo (Promotion) | $10,000 | — |
-| Hitman contract | **$30,000** | — (one-time) |
+| Hitman contract | **$40,000** | — (one-time) |
 | Empty claimed hex | — | $150/turn (community upkeep) |
 
 **Note**: Soldiers only incur maintenance costs once deployed to the map. Undeployed soldiers in the recruitment pool are free. Once deployed (including if recalled to HQ via Sitdown or manual movement), they continue to cost $600/turn.

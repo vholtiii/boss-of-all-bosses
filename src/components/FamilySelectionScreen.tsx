@@ -9,6 +9,7 @@ import { DollarSign, Shield, Swords, Users, Eye, Volume2, VolumeX, Crown, Dices,
 import { useBgMusic } from '@/hooks/useBgMusic';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import AtmosphericParticles from '@/components/AtmosphericParticles';
+import { FAMILY_COLORS } from '@/lib/period-theme';
 
 type FamilyId = 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
 
@@ -41,7 +42,7 @@ export const FAMILIES: FamilyInfo[] = [
     name: 'Gambino',
     motto: '"The man who controls the money controls everything."',
     description: 'The most powerful family in New York. Masters of business and political connections with a strong starting economy — but that power makes you a target.',
-    color: '#42D3F2',
+    color: FAMILY_COLORS.gambino,
     difficulty: 'Medium',
     traits: [
       { label: 'Economy', icon: <DollarSign className="h-3.5 w-3.5" />, value: 5 },
@@ -61,7 +62,7 @@ export const FAMILIES: FamilyInfo[] = [
     name: 'Genovese',
     motto: '"The best move is the one nobody sees."',
     description: 'The shadow empire. Masters of legitimate business fronts and money laundering. Their economic engine funds everything while staying hidden in plain sight.',
-    color: '#2AA63E',
+    color: FAMILY_COLORS.genovese,
     difficulty: 'Hard',
     traits: [
       { label: 'Economy', icon: <DollarSign className="h-3.5 w-3.5" />, value: 3 },
@@ -81,7 +82,7 @@ export const FAMILIES: FamilyInfo[] = [
     name: 'Lucchese',
     motto: '"One clean hit is worth a hundred soldiers."',
     description: 'The silent killers. Superior intelligence networks and surgical precision make them deadly. Lower heat and higher hit rates let them strike without consequences.',
-    color: '#4169E1',
+    color: FAMILY_COLORS.lucchese,
     difficulty: 'Easy',
     traits: [
       { label: 'Economy', icon: <DollarSign className="h-3.5 w-3.5" />, value: 4 },
@@ -101,7 +102,7 @@ export const FAMILIES: FamilyInfo[] = [
     name: 'Bonanno',
     motto: '"Respect is earned, not given."',
     description: 'The old guard. Deeply loyal soldiers and impenetrable defenses. Hard to attack but slow to expand your territory.',
-    color: '#DC143C',
+    color: FAMILY_COLORS.bonanno,
     difficulty: 'Medium',
     traits: [
       { label: 'Economy', icon: <DollarSign className="h-3.5 w-3.5" />, value: 2 },
@@ -121,7 +122,7 @@ export const FAMILIES: FamilyInfo[] = [
     name: 'Colombo',
     motto: '"We don\'t need much. Just enough to bury you."',
     description: 'The scrappy survivors. Start with the least but fight the hardest for every dollar. Low resources force creative play — recruitment discounts and fear keep you in the game.',
-    color: '#8A2BE2',
+    color: FAMILY_COLORS.colombo,
     difficulty: 'Hard',
     traits: [
       { label: 'Attack', icon: <Swords className="h-3.5 w-3.5" />, value: 5 },

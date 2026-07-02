@@ -12,7 +12,19 @@ interface OddsInput {
   enemyStrength?: number;
   successBonus?: number;
   treacheryActive?: boolean;
+  /** Player's relationship with the target family (-100..100). Betrayals lower this, so grudges reduce acceptance. */
+  relationshipWithTarget?: number;
+  /** True when the player is the runaway territory leader (≥70% of the victory target and #1). */
+  playerIsRunawayLeader?: boolean;
 }
+
+/** Peace-type deals a wary rival won't sign with a boss about to take the city. */
+const LEADER_WARY_DEALS: NegotiationType[] = ['ceasefire', 'alliance', 'safe_passage', 'supply_deal'];
+export const LEADER_WARINESS_PENALTY = 15;
+
+/** Relationship sway on acceptance: -10..+10 from standing with the target family. */
+export const relationshipSway = (rel: number): number =>
+  Math.max(-10, Math.min(10, Math.round(rel / 10)));
 
 interface CostInput {
   type: NegotiationType;
@@ -44,6 +56,12 @@ export function getNegotiationSuccessChance(input: OddsInput): number {
   }
   chance += input.successBonus || 0;
   if (input.treacheryActive) chance -= 20;
+  if (typeof input.relationshipWithTarget === 'number') {
+    chance += relationshipSway(input.relationshipWithTarget);
+  }
+  if (input.playerIsRunawayLeader && LEADER_WARY_DEALS.includes(input.type)) {
+    chance -= LEADER_WARINESS_PENALTY;
+  }
   return Math.max(5, Math.min(95, chance));
 }
 

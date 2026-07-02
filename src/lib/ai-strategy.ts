@@ -155,6 +155,10 @@ export interface ScoreHexInputs {
   supplyNodeFeedsPlayerDeal?: boolean;
   /** True if the owning family is currently flagged "vulnerable" (recent losses or critical/rico heat). */
   isVulnerableRivalHex?: boolean;
+  /** True if this hex is owned by the current territory leader (and the leader isn't us). */
+  isLeaderHex?: boolean;
+  /** Leader's progress toward the territory-victory target (0..1). Scales the pile-on bonus. */
+  leaderProgress?: number;
 }
 
 export function scoreHexForAI(i: ScoreHexInputs): number {
@@ -197,6 +201,13 @@ export function scoreHexForAI(i: ScoreHexInputs): number {
   }
   // Vulnerable-rival pile-on: hexes belonging to a flagged-vulnerable rival get a flat bonus.
   if (i.isVulnerableRivalHex) add(6);
+  // Leader containment: as the board leader closes on the territory-victory
+  // target, everyone's scoring tilts toward taking the leader's hexes.
+  // Ramps from 0 at 50% progress to +8 at 100%.
+  if (i.isLeaderHex) {
+    const prog = Math.min(1, Math.max(0, i.leaderProgress ?? 0));
+    if (prog >= 0.5) add((prog - 0.5) * 16);
+  }
   // Phase 4 endgame: lean toward player when winning
   if (i.phase >= 4 && i.isPlayerHex && i.mood === 'dominant') add(4);
 
@@ -283,6 +294,10 @@ export interface PlanHitTargetInputs {
   isSafehouse: boolean;
   /** Small jitter for tie-breaking. */
   jitter: number;
+  /** True if the target's family is the board leader (and the leader isn't us). */
+  targetIsLeader?: boolean;
+  /** Leader's progress toward territory victory (0..1). */
+  leaderProgress?: number;
 }
 
 export function scorePlanHitTarget(i: PlanHitTargetInputs): number {
@@ -293,6 +308,11 @@ export function scorePlanHitTarget(i: PlanHitTargetInputs): number {
   s -= Math.max(0, 3 - i.distanceToOwnHQ) * 1.5;       // near their HQ = harder
   if (i.isFortified) s -= 3;
   if (i.isSafehouse) s -= 2;
+  // Leader containment: capos of a runaway leader are priority targets.
+  if (i.targetIsLeader) {
+    const prog = Math.min(1, Math.max(0, i.leaderProgress ?? 0));
+    if (prog >= 0.5) s += (prog - 0.5) * 10;
+  }
   s += i.jitter * 0.8;
   return s;
 }

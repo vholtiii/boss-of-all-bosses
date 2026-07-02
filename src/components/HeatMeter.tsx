@@ -27,7 +27,7 @@ const TIER_META: Record<Tier, { label: string; color: string; bg: string; border
   warm:    { label: 'WARM',      color: 'text-amber-300',   bg: 'bg-amber-500/10',   border: 'border-amber-500/40',   bar: 'from-amber-500 to-amber-400',   desc: 'Police are noticing. Minor income penalties begin.' },
   hot:     { label: 'HOT',       color: 'text-orange-300',  bg: 'bg-orange-500/10',  border: 'border-orange-500/40',  bar: 'from-orange-500 to-orange-400',  desc: 'Active investigation. Higher arrest & prosecution risk.' },
   critical:{ label: 'CRITICAL',  color: 'text-red-300',     bg: 'bg-red-500/15',     border: 'border-red-500/50',     bar: 'from-red-600 to-red-400',        desc: 'RICO timer ticks each turn at this level. Cool down NOW.' },
-  rico:    { label: 'RICO',      color: 'text-red-200',     bg: 'bg-red-700/25',     border: 'border-red-500/70',     bar: 'from-red-700 to-red-500',        desc: 'Federal indictment imminent. 5 consecutive turns = GAME OVER.' },
+  rico:    { label: 'RICO',      color: 'text-red-200',     bg: 'bg-red-700/25',     border: 'border-red-500/70',     bar: 'from-red-700 to-red-500',        desc: 'Federal indictment imminent. 3 consecutive turns = GAME OVER.' },
 };
 
 const Sparkline: React.FC<{ values: number[]; tier: Tier }> = ({ values, tier }) => {
@@ -149,7 +149,7 @@ const HeatMeter: React.FC<HeatMeterProps> = ({ heat, history, ricoTimer = 0, fed
           </div>
           <p className="text-muted-foreground">{meta.desc}</p>
           {ricoTimer > 0 && (
-            <p className="text-red-300 font-semibold">🚨 RICO timer: {ricoTimer}/5 — game over at 5.</p>
+            <p className="text-red-300 font-semibold">🚨 RICO timer: {ricoTimer}/3 — game over at 3.</p>
           )}
           {fedBugCount > 0 && (
             <p className="text-amber-300">

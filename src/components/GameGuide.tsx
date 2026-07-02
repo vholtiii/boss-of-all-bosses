@@ -358,7 +358,7 @@ const sections: GuideSection[] = [
     content: (
       <div className="space-y-3">
         <div className="space-y-1">
-          <Stat label="🗡️ Hitman Contract" value="$30,000, Phase 3, kill any known unit" />
+          <Stat label="🗡️ Hitman Contract" value="$40,000, Phase 3, kill any known unit" />
           <Stat label="💀 HQ Assault" value="Phase 4 — eliminate a rival family" />
           <Stat label="📋 Boss Sitdown" value="$2,000 — teleport soldiers to HQ" />
           <Stat label="🛏️ Go to the Mattresses" value="Defensive war stance" />

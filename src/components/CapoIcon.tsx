@@ -18,13 +18,9 @@ interface CapoIconProps {
   onClick?: (e: React.MouseEvent) => void;
 }
 
-const familyColors = {
-  gambino: '#42D3F2',
-  genovese: '#2AA63E',
-  lucchese: '#4169E1',
-  bonanno: '#DC143C',
-  colombo: '#8A2BE2',
-};
+import { FAMILY_COLORS } from '@/lib/period-theme';
+
+const familyColors = FAMILY_COLORS;
 
 const capoImages = {
   gambino: capoGambino,

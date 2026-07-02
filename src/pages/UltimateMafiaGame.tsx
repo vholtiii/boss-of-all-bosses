@@ -47,6 +47,7 @@ import { PHASE_CONFIGS, COMMISSION_VOTE_COST, SUPPLY_DEPENDENCIES, SupplyNodeTyp
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { buildThreatSections } from '@/lib/threat-board';
+import { previewHit, previewPushOut, previewSabotage } from '@/lib/action-previews';
 import SoundSettingsDialog from '@/components/SoundSettingsDialog';
 import HeatMeter from '@/components/HeatMeter';
 
@@ -837,7 +838,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 transition={{ duration: 0.8, repeat: Infinity }}
                 className="px-2.5 py-0.5 rounded-full bg-destructive/20 border border-destructive/40"
               >
-                <span className="text-[11px] font-bold text-destructive">🚨 RICO {gameState.ricoTimer}/5</span>
+                <span className="text-[11px] font-bold text-destructive">🚨 RICO {gameState.ricoTimer}/3</span>
               </motion.div>
             )}
             {((gameState as any).prosecutionTimer || 0) > 0 && (
@@ -1856,6 +1857,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 collectionReason: underConstruction ? 'Under construction' : '',
                 supplyConnected,
                 supplyDependency,
+                launderingCapacity: tile.business.launderingCapacity,
               };
             }
 
@@ -1926,6 +1928,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               collectionReason,
               supplyConnected,
               supplyDependency,
+              launderingCapacity: tile.business.launderingCapacity,
             };
           });
         const territoryCount = (gameState.hexMap || []).filter((tile: any) => tile.controllingFamily === hqFamily).length;
@@ -1983,6 +1986,13 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
 
       {/* Negotiation Dialog */}
       {negotiationState && (() => {
+        // Leader wariness inputs — mirrors processNegotiation so displayed odds match the roll
+        const terrTargetNeg = (gameState as any).mapSize === 'small' ? 40 : (gameState as any).mapSize === 'large' ? 80 : 60;
+        const playerHexesNeg = gameState.hexMap.filter((t: any) => t.controllingFamily === gameState.playerFamily).length;
+        const maxRivalHexesNeg = Math.max(0, ...gameState.aiOpponents
+          .filter((o: any) => !((gameState as any).eliminatedFamilies || []).includes(o.family))
+          .map((o: any) => gameState.hexMap.filter((t: any) => t.controllingFamily === o.family).length));
+        const playerIsRunawayLeaderNeg = playerHexesNeg > maxRivalHexesNeg && playerHexesNeg / terrTargetNeg >= 0.7;
         if (negotiationState.scope === 'territory') {
           const tile = gameState.hexMap.find((t: any) => t.q === negotiationState.targetQ && t.r === negotiationState.targetR && t.s === negotiationState.targetS);
           if (!tile) return null;
@@ -2037,6 +2047,8 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               proposedAmount={(negotiationState as any).proposedAmount}
               proposerLabel={(negotiationState as any).proposerLabel}
               successBonus={(negotiationState as any).successBonus || 0}
+              relationshipWithTarget={gameState.reputation.familyRelationships[enemyFamily] || 0}
+              playerIsRunawayLeader={playerIsRunawayLeaderNeg}
             />
           );
         } else {
@@ -2085,6 +2097,8 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               lockedDealType={(negotiationState as any).lockedDealType}
               proposedAmount={(negotiationState as any).proposedAmount}
               proposerLabel={(negotiationState as any).proposerLabel}
+              relationshipWithTarget={gameState.reputation.familyRelationships[targetFam] || 0}
+              playerIsRunawayLeader={playerIsRunawayLeaderNeg}
             />
           );
         }
@@ -2290,6 +2304,24 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
         })()}
         playerMoney={gameState.resources.money}
         gamePhase={gameState.gamePhase || 1}
+        hitPreview={(() => {
+          const p = gameState.pendingEnemyHexAction;
+          if (!p) return null;
+          const ph = (gameState as any).plannedHit;
+          const execPlan = !!(ph && ((ph.q === p.toQ && ph.r === p.toR && ph.s === p.toS) ||
+            (gameState.deployedUnits || []).some((u: any) => u.id === ph.targetUnitId && u.q === p.toQ && u.r === p.toR && u.s === p.toS)));
+          return previewHit(gameState, { targetQ: p.toQ, targetR: p.toR, targetS: p.toS, selectedUnitId: p.unitId, executingPlan: execPlan });
+        })()}
+        pushOutPreview={(() => {
+          const p = gameState.pendingEnemyHexAction;
+          if (!p) return null;
+          return previewPushOut(gameState, { targetQ: p.toQ, targetR: p.toR, targetS: p.toS, selectedUnitId: p.unitId });
+        })()}
+        sabotagePreview={(() => {
+          const p = gameState.pendingEnemyHexAction;
+          if (!p) return null;
+          return previewSabotage(gameState, { targetQ: p.toQ, targetR: p.toR, targetS: p.toS });
+        })()}
         onAction={resolveEnemyHexAction}
       />
     </>

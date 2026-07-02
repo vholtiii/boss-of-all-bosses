@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Crown, CheckCircle, XCircle } from 'lucide-react';
+import { FAMILY_COLORS } from '@/lib/period-theme';
 
 export interface CommissionVoteResult {
   callerFamily: string;
@@ -14,13 +15,7 @@ export interface CommissionVoteResult {
   totalVoters: number;
 }
 
-const familyColors: Record<string, string> = {
-  gambino: '#42D3F2',
-  genovese: '#2AA63E',
-  lucchese: '#E8E847',
-  bonanno: '#E85C47',
-  colombo: '#B347E8',
-};
+const familyColors: Record<string, string> = FAMILY_COLORS;
 
 const familyNames: Record<string, string> = {
   gambino: 'Gambino',

@@ -8,6 +8,8 @@ import CapoIcon from '@/components/CapoIcon';
 import SelectedUnitDock from '@/components/SelectedUnitDock';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
 import { ScoutedHex, Safehouse, PlannedHit, SupplyNode, SUPPLY_NODE_CONFIG, SupplyNodeType, FortifiedHex, FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, FLIP_SOLDIER_BASE_COST, FLIP_SOLDIER_COST_ESCALATION, FLIP_SOLDIER_BASE_CHANCE, SUPPLY_DEPENDENCIES } from '@/types/game-mechanics';
+import { computeMapOverlays, computeRouteBreakingHexes, MapOverlays } from '@/lib/map-overlays';
+import { FAMILY_COLORS, FAMILY_INK_WASH, TERRAIN_FILLS } from '@/lib/period-theme';
 
 interface EnhancedMafiaHexGridProps {
   width: number;
@@ -33,14 +35,7 @@ interface EnhancedMafiaHexGridProps {
   onClearHighlight?: () => void;
 }
 
-const familyColors: Record<string, string> = {
-  gambino: '#42D3F2',
-  genovese: '#2AA63E',
-  lucchese: '#4169E1',
-  bonanno: '#DC143C',
-  colombo: '#8A2BE2',
-  neutral: '#555555',
-};
+const familyColors: Record<string, string> = FAMILY_COLORS;
 
 const businessIcons: Record<string, string> = {
   casino: '🎰', restaurant: '🍝', laundromat: '🧽', construction: '🏗️',
@@ -109,6 +104,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   };
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [showSupplyLines, setShowSupplyLines] = useState(true);
+  const [showThreats, setShowThreats] = useState(true);
+  const [showDistrictBorders, setShowDistrictBorders] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [pinnedHex, setPinnedHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; canAssaultHQ?: boolean; canFlipSoldier?: boolean; negotiateCapoId?: string; pendingNegotiationId?: string; reasons?: Record<string, string> } | null>(null);
@@ -148,6 +145,16 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const bribedOfficials = gameState?.policeHeat?.bribedOfficials || [];
 
   const activeBribes = gameState?.activeBribes || [];
+
+  // Strategic overlays (war fronts, vulnerability, supply support, district ownership…)
+  const overlays: MapOverlays | null = useMemo(
+    () => (gameState ? computeMapOverlays(gameState) : null),
+    [gameState?.hexMap, gameState?.deployedUnits, gameState?.activeWars, gameState?.safehouses, gameState?.fortifiedHexes, gameState?.supplyNodes, playerFamily]
+  );
+  const routeBreakingHexes: Set<string> = useMemo(
+    () => (gameState ? computeRouteBreakingHexes(gameState) : new Set<string>()),
+    [gameState?.hexMap, playerFamily]
+  );
 
   // Hex distance helper (cube coords)
   const hexDistance = (a: { q: number; r: number; s: number }, b: { q: number; r: number; s: number }): number =>
@@ -274,14 +281,14 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return segs;
   }, [hexMap]);
 
-  // District background tint colors (subtle, for region identification)
+  // District background tint colors (subtle sepia inks, for region identification)
   const districtTints: Record<string, string> = {
-    'Little Italy': 'rgba(255, 180, 100, 0.12)',
-    'Bronx': 'rgba(255, 100, 100, 0.10)',
-    'Brooklyn': 'rgba(100, 160, 255, 0.10)',
-    'Queens': 'rgba(100, 255, 160, 0.10)',
-    'Manhattan': 'rgba(255, 215, 0, 0.10)',
-    'Staten Island': 'rgba(200, 130, 255, 0.10)',
+    'Little Italy': 'rgba(201, 162, 75, 0.12)',   // brass
+    'Bronx': 'rgba(158, 68, 54, 0.11)',           // brick
+    'Brooklyn': 'rgba(107, 127, 179, 0.10)',      // slate blue ink
+    'Queens': 'rgba(107, 143, 86, 0.11)',         // olive ink
+    'Manhattan': 'rgba(220, 190, 120, 0.12)',     // gold leaf
+    'Staten Island': 'rgba(151, 107, 165, 0.10)', // plum ink
   };
 
   // District abbreviations for hex labels
@@ -306,6 +313,19 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
         : true)
     );
   }, [pendingBuild, hexMap, deployedUnits, playerFamily]);
+
+  /** True if the tile is in an interaction-highlight state (placement/deploy/move/selection). */
+  const isHexHighlighted = (tile: HexTile): boolean => {
+    if (isBusinessPlacementMode && validPlacementHexes.some(h => h.q === tile.q && h.r === tile.r && h.s === tile.s)) return true;
+    if (gameState?.deployMode && gameState.availableDeployHexes?.some(
+      (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s)) return true;
+    if (gameState?.selectedUnitId) {
+      if (gameState.availableMoveHexes?.some((h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s)) return true;
+      const unit = deployedUnits.find(u => u.id === gameState.selectedUnitId);
+      if (unit && unit.q === tile.q && unit.r === tile.r && unit.s === tile.s) return true;
+    }
+    return false;
+  };
 
   const getHexColor = (tile: HexTile): string => {
     // Business placement highlight
@@ -341,13 +361,19 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       }
     }
 
-    return familyColors[tile.controllingFamily] || '#555555';
+    // Family control as period ink-wash tint (terrain pattern shows through below)
+    return FAMILY_INK_WASH[tile.controllingFamily] || FAMILY_INK_WASH.neutral;
   };
 
   const getHexOpacity = (tile: HexTile): number => {
-    if (tile.controllingFamily === playerFamily) return 0.85;
-    if (tile.controllingFamily === 'neutral') return 0.35;
-    return 0.65;
+    // Interaction highlights need to punch through the ink wash
+    if (isHexHighlighted(tile)) return 0.85;
+    if (tile.isHeadquarters) return 0.9;
+    // Ink-wash control tints: player strongest, rivals readable, neutral is
+    // just an ordinary city block with the faintest wash.
+    if (tile.controllingFamily === playerFamily) return 0.62;
+    if (tile.controllingFamily === 'neutral') return 0.10;
+    return 0.52;
   };
 
   const handleHexClick = (tile: HexTile) => {
@@ -682,7 +708,14 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   }, [hexMap]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-gradient-to-br from-noir-dark/50 to-background/50" onClick={e => e.stopPropagation()}>
+    <div
+      className="relative w-full h-full overflow-hidden"
+      style={{
+        // Aged survey-map table: warm sepia vignette instead of flat noir
+        background: 'radial-gradient(ellipse at center, hsl(32 22% 15%) 0%, hsl(30 28% 10%) 55%, hsl(30 33% 6%) 100%)',
+      }}
+      onClick={e => e.stopPropagation()}
+    >
       {/* Business placement banner */}
       {isBusinessPlacementMode && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-6 py-2 rounded-full bg-green-600/90 backdrop-blur-sm border border-green-400/30 shadow-lg flex items-center gap-3">
@@ -750,6 +783,24 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           {showSupplyLines ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
           Supply Lines
         </Button>
+        <Button
+          variant={showThreats ? "default" : "outline"}
+          size="sm"
+          onClick={() => setShowThreats(s => !s)}
+          className="font-medium"
+        >
+          {showThreats ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+          Threats
+        </Button>
+        <Button
+          variant={showDistrictBorders ? "default" : "outline"}
+          size="sm"
+          onClick={() => setShowDistrictBorders(s => !s)}
+          className="font-medium"
+        >
+          {showDistrictBorders ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+          Districts
+        </Button>
       </div>
 
       {/* Grid */}
@@ -770,6 +821,51 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           onTouchEnd={endPan}
           onTouchCancel={endPan}
         >
+          {/* 1920s city-block terrain patterns (sepia palette, drawn once, tiled per hex) */}
+          <defs>
+            {/* Urban: dense rooftops with tar seams */}
+            <pattern id="terrain-urban" width="14" height="14" patternUnits="userSpaceOnUse">
+              <rect width="14" height="14" fill={TERRAIN_FILLS.urban} />
+              <rect x="1" y="1" width="5" height="5" fill="#463C2F" />
+              <rect x="8" y="2" width="4.5" height="6" fill="#42382C" />
+              <rect x="2" y="8" width="6" height="4.5" fill="#443A2E" />
+              <rect x="9.5" y="9.5" width="3.5" height="3.5" fill="#40362B" />
+            </pattern>
+            {/* Industrial: warehouse sheet-metal diagonals */}
+            <pattern id="terrain-industrial" width="12" height="12" patternUnits="userSpaceOnUse">
+              <rect width="12" height="12" fill={TERRAIN_FILLS.industrial} />
+              <path d="M0 12 L12 0" stroke="#4C4536" strokeWidth="1.4" />
+              <path d="M-3 9 L9 -3" stroke="#48412FAA" strokeWidth="1" />
+              <path d="M3 15 L15 3" stroke="#48412FAA" strokeWidth="1" />
+            </pattern>
+            {/* Residential: brownstone row houses */}
+            <pattern id="terrain-residential" width="16" height="12" patternUnits="userSpaceOnUse">
+              <rect width="16" height="12" fill={TERRAIN_FILLS.residential} />
+              <rect x="1" y="4" width="4" height="7" fill="#52432F" />
+              <rect x="6" y="3" width="4" height="8" fill="#4E402D" />
+              <rect x="11" y="4.5" width="4" height="6.5" fill="#50412E" />
+              <path d="M1 4 L3 2 L5 4 Z" fill="#5A4A34" />
+              <path d="M6 3 L8 1 L10 3 Z" fill="#57472F" />
+              <path d="M11 4.5 L13 2.5 L15 4.5 Z" fill="#584833" />
+            </pattern>
+            {/* Docks: wet pier planks and pilings */}
+            <pattern id="terrain-docks" width="14" height="10" patternUnits="userSpaceOnUse">
+              <rect width="14" height="10" fill={TERRAIN_FILLS.docks} />
+              <line x1="0" y1="2.5" x2="14" y2="2.5" stroke="#3A4441" strokeWidth="1.2" />
+              <line x1="0" y1="5.5" x2="14" y2="5.5" stroke="#37413E" strokeWidth="1.2" />
+              <line x1="0" y1="8.5" x2="14" y2="8.5" stroke="#3A4441" strokeWidth="1.2" />
+              <circle cx="3" cy="4" r="0.8" fill="#46514D" />
+              <circle cx="10.5" cy="7" r="0.8" fill="#46514D" />
+            </pattern>
+            {/* Commercial: storefront awning stripes */}
+            <pattern id="terrain-commercial" width="12" height="12" patternUnits="userSpaceOnUse">
+              <rect width="12" height="12" fill={TERRAIN_FILLS.commercial} />
+              <rect x="0" y="0" width="2" height="5" fill="#514A33" />
+              <rect x="4" y="0" width="2" height="5" fill="#514A33" />
+              <rect x="8" y="0" width="2" height="5" fill="#514A33" />
+              <rect x="0" y="8" width="12" height="1.2" fill="#4E4732" />
+            </pattern>
+          </defs>
           {/* Invisible background rect to capture clicks on empty area */}
           <rect x={viewBox.split(' ').map(Number)[0]} y={viewBox.split(' ').map(Number)[1]} width={viewBox.split(' ').map(Number)[2]} height={viewBox.split(' ').map(Number)[3]} fill="transparent" onClick={() => { if (suppressBgClickRef.current) { suppressBgClickRef.current = false; return; } onClearHighlight?.(); setPinnedHex(null); }} />
           <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
@@ -969,6 +1065,14 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       : isPlayerTerritory ? 2 : 1;
                     return (
                       <>
+                        {/* City-block terrain base (period sepia pattern) */}
+                        <polygon
+                          points={getHexPoints(x, y, baseHexRadius)}
+                          fill={`url(#terrain-${tile.terrain || 'urban'})`}
+                          stroke="none"
+                          className="pointer-events-none"
+                        />
+                        {/* Family control ink-wash tint + interactive layer */}
                         <polygon
                           points={getHexPoints(x, y, baseHexRadius)}
                           fill={getHexColor(tile)}
@@ -1122,9 +1226,9 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     );
                   })()}
 
-                  {/* District abbreviation label */}
+                  {/* District abbreviation label — engraved atlas lettering */}
                   {!tile.isHeadquarters && !tile.business && (
-                    <text x={x} y={y + 3} textAnchor="middle" fontSize="7" fill="#ffffff" fillOpacity="0.3" fontWeight="600" className="pointer-events-none select-none">
+                    <text x={x} y={y + 3} textAnchor="middle" fontSize="7" fill="#E8D5A3" fillOpacity="0.38" fontWeight="600" fontFamily="'Playfair Display', serif" letterSpacing="1" className="pointer-events-none select-none">
                       {districtAbbreviations[tile.district] || ''}
                     </text>
                   )}
@@ -1332,7 +1436,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     const isOwn = fbEntry.ownerFamily === playerFamily;
                     if (isOwn) {
                       return (
-                        <circle cx={x} cy={y} r={baseHexRadius - 2} fill="none" stroke="#8A2BE2" strokeWidth="1.5" strokeDasharray="5,3" opacity="0.6" className="pointer-events-none" />
+                        <circle cx={x} cy={y} r={baseHexRadius - 2} fill="none" stroke="#976BA5" strokeWidth="1.5" strokeDasharray="5,3" opacity="0.6" className="pointer-events-none" />
                       );
                     }
                     // Enemy front boss hex visible via scout
@@ -1667,6 +1771,121 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 </g>
               );
             })}
+
+            {/* ═══ STRATEGIC OVERLAYS (district borders, war fronts, vulnerability, supply support) ═══ */}
+            {showDistrictBorders && (
+              <g className="pointer-events-none">
+                {districtBorderSegments.map((seg, i) => (
+                  <line
+                    key={`district-border-${i}`}
+                    x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2}
+                    stroke="#E8D5A3"
+                    strokeWidth="2.5"
+                    strokeOpacity="0.45"
+                    strokeLinecap="round"
+                  />
+                ))}
+              </g>
+            )}
+            {showThreats && overlays && (
+              <g className="pointer-events-none">
+                {/* War front hexes — red dashed outline */}
+                {hexMap.map(tile => {
+                  const tk = `${tile.q},${tile.r},${tile.s}`;
+                  if (!overlays.warFrontHexes.has(tk)) return null;
+                  const { x, y } = getHexPosition(tile.q, tile.r);
+                  return (
+                    <polygon
+                      key={`warfront-${tk}`}
+                      points={getHexPoints(x, y, baseHexRadius * 0.92)}
+                      fill="#DC2626"
+                      fillOpacity="0.08"
+                      stroke="#DC2626"
+                      strokeWidth="2"
+                      strokeOpacity="0.75"
+                      strokeDasharray="5 3"
+                    />
+                  );
+                })}
+                {/* Vulnerable player hexes — amber outline scaled by pressure */}
+                {hexMap.map(tile => {
+                  const tk = `${tile.q},${tile.r},${tile.s}`;
+                  const vuln = overlays.vulnerability.get(tk);
+                  if (!vuln || overlays.warFrontHexes.has(tk)) return null;
+                  const { x, y } = getHexPosition(tile.q, tile.r);
+                  const severity = Math.min(1, (vuln.pressure * 0.25) + (vuln.unprotected ? 0.35 : 0) + (vuln.erosionCounter * 0.2));
+                  if (severity < 0.35) return null;
+                  return (
+                    <g key={`vuln-${tk}`}>
+                      <polygon
+                        points={getHexPoints(x, y, baseHexRadius * 0.88)}
+                        fill="none"
+                        stroke="#F59E0B"
+                        strokeWidth={1.5 + severity}
+                        strokeOpacity={0.35 + severity * 0.4}
+                        strokeDasharray="3 2"
+                      />
+                      {vuln.erosionCounter > 0 && (
+                        <text x={x + baseHexRadius * 0.5} y={y - baseHexRadius * 0.45} fontSize="8" textAnchor="middle" className="select-none" style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.9))' }}>
+                          🫠
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+                {/* Unsupported (cut off from HQ) player hexes */}
+                {hexMap.map(tile => {
+                  const tk = `${tile.q},${tile.r},${tile.s}`;
+                  if (!overlays.unsupportedHexes.has(tk)) return null;
+                  const { x, y } = getHexPosition(tile.q, tile.r);
+                  return (
+                    <text
+                      key={`unsupported-${tk}`}
+                      x={x - baseHexRadius * 0.5} y={y - baseHexRadius * 0.4}
+                      fontSize="9" textAnchor="middle"
+                      className="select-none"
+                      style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.9))' }}
+                    >
+                      ⛓️
+                    </text>
+                  );
+                })}
+                {/* Businesses disconnected from required supply */}
+                {hexMap.map(tile => {
+                  const tk = `${tile.q},${tile.r},${tile.s}`;
+                  if (!overlays.disconnectedBusinesses.has(tk)) return null;
+                  const { x, y } = getHexPosition(tile.q, tile.r);
+                  return (
+                    <text
+                      key={`biz-cutoff-${tk}`}
+                      x={x + baseHexRadius * 0.5} y={y + baseHexRadius * 0.75}
+                      fontSize="9" textAnchor="middle"
+                      className="select-none"
+                      style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.9))' }}
+                    >
+                      📦
+                    </text>
+                  );
+                })}
+                {/* Route-breaking hexes — losing these disconnects other territory */}
+                {hexMap.map(tile => {
+                  const tk = `${tile.q},${tile.r},${tile.s}`;
+                  if (!routeBreakingHexes.has(tk)) return null;
+                  const { x, y } = getHexPosition(tile.q, tile.r);
+                  return (
+                    <text
+                      key={`route-key-${tk}`}
+                      x={x} y={y - baseHexRadius * 0.72}
+                      fontSize="8" textAnchor="middle"
+                      className="select-none"
+                      style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.9))' }}
+                    >
+                      🔗
+                    </text>
+                  );
+                })}
+              </g>
+            )}
 
             {/* Supply route connecting polylines — rendered AFTER hex tiles so they appear on top */}
             {showSupplyLines && (() => {
@@ -2209,6 +2428,28 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
             </AnimatePresence>
           </g>
         </svg>
+
+        {/* Paper-map framing: compass rose + engraved border (fixed, not panned/zoomed) */}
+        <div className="absolute inset-2 rounded-sm border border-[#C9A24B]/25 pointer-events-none" />
+        <div className="absolute inset-3 rounded-sm border border-[#C9A24B]/15 pointer-events-none" />
+        <svg
+          className="absolute bottom-6 right-6 pointer-events-none select-none opacity-50"
+          width="76" height="76" viewBox="0 0 100 100"
+        >
+          <circle cx="50" cy="50" r="44" fill="none" stroke="#C9A24B" strokeWidth="1.5" />
+          <circle cx="50" cy="50" r="36" fill="none" stroke="#C9A24B" strokeWidth="0.75" strokeDasharray="2 3" />
+          {/* Cardinal star */}
+          <path d="M50 10 L54 46 L50 50 L46 46 Z" fill="#C9A24B" />
+          <path d="M50 90 L46 54 L50 50 L54 54 Z" fill="#8C7434" />
+          <path d="M10 50 L46 46 L50 50 L46 54 Z" fill="#8C7434" />
+          <path d="M90 50 L54 54 L50 50 L54 46 Z" fill="#8C7434" />
+          {/* Intercardinal points */}
+          <path d="M50 50 L68 32 L58 42 Z" fill="#8C7434" opacity="0.7" />
+          <path d="M50 50 L32 32 L42 42 Z" fill="#8C7434" opacity="0.7" />
+          <path d="M50 50 L68 68 L58 58 Z" fill="#8C7434" opacity="0.7" />
+          <path d="M50 50 L32 68 L42 58 Z" fill="#8C7434" opacity="0.7" />
+          <text x="50" y="8" textAnchor="middle" fontSize="11" fill="#C9A24B" fontFamily="'Playfair Display', serif" fontWeight="700">N</text>
+        </svg>
       </div>
 
       {gameState?.turnPhase === 'deploy' && expandedHQKey && (() => {
@@ -2574,6 +2815,117 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                   </p>
                 ));
               })()}
+              {/* ═══ Strategic overview (pending claims, safehouse, pressure, expansion, route keystone) ═══ */}
+              {(() => {
+                const hk = `${displayHex.q},${displayHex.r},${displayHex.s}`;
+                const isPlayerHex = displayHex.controllingFamily === playerFamily;
+                const rows: React.ReactNode[] = [];
+
+                // Pending claim
+                if (displayHex.pendingClaim) {
+                  const pc = displayHex.pendingClaim;
+                  const isMine = pc.family === playerFamily;
+                  rows.push(
+                    <p key="claim" className={cn('text-xs', isMine ? 'text-yellow-300' : 'text-red-400')}>
+                      ⏳ {isMine ? 'Your claim' : `${pc.family.toUpperCase()} claim`} pending — finalizes end of next turn if uncontested
+                    </p>
+                  );
+                }
+
+                // Safehouse details
+                const sh = (gameState?.safehouses || []).find((s: any) => s.q === displayHex.q && s.r === displayHex.r && s.s === displayHex.s);
+                if (sh && isPlayerHex) {
+                  rows.push(
+                    <p key="safehouse" className="text-xs text-amber-300">
+                      🏠 Safehouse — {sh.turnsRemaining} turn{sh.turnsRemaining !== 1 ? 's' : ''} left · forward deploy point · +defense nearby
+                    </p>
+                  );
+                }
+
+                // Enemy pressure + protection (player hexes)
+                if (isPlayerHex && overlays) {
+                  const vuln = overlays.vulnerability.get(hk);
+                  if (vuln) {
+                    if (vuln.pressure > 0) {
+                      rows.push(
+                        <p key="pressure" className="text-xs text-red-400">
+                          ⚔️ Enemy pressure: {vuln.pressure} adjacent source{vuln.pressure !== 1 ? 's' : ''}
+                        </p>
+                      );
+                    }
+                    if (vuln.unprotected) {
+                      rows.push(
+                        <p key="unprot" className="text-xs text-amber-400">
+                          🛑 Unprotected — no unit, built business, supply node, or safehouse in range. Erodes under rival influence.
+                        </p>
+                      );
+                    }
+                  } else {
+                    rows.push(<p key="prot" className="text-xs text-emerald-400/80">🛡️ Protected — influence sources in range</p>);
+                  }
+                  if (overlays.unsupportedHexes.has(hk)) {
+                    rows.push(
+                      <p key="cutoff" className="text-xs text-red-400">
+                        ⛓️ Cut off from HQ — no route for supply; dependent businesses will decay
+                      </p>
+                    );
+                  }
+                  if (routeBreakingHexes.has(hk)) {
+                    rows.push(
+                      <p key="keystone" className="text-xs text-yellow-300">
+                        🔗 Route keystone — losing this hex would cut off other territory
+                      </p>
+                    );
+                  }
+                }
+
+                // Expansion progress on neutral hexes
+                if (displayHex.controllingFamily === 'neutral') {
+                  const expCounter = (displayHex as any).expansionCounter || 0;
+                  const expFam = (displayHex as any).expansionInfluencer;
+                  if (expCounter > 0 && expFam) {
+                    rows.push(
+                      <p key="expansion" className={cn('text-xs', expFam === playerFamily ? 'text-emerald-400' : 'text-red-400')}>
+                        📈 {expFam === playerFamily ? 'Your' : `${String(expFam).toUpperCase()}`} influence spreading here ({expCounter}/3 turns to absorb)
+                      </p>
+                    );
+                  }
+                  const cand = overlays?.expansionCandidates.find(c => c.key === hk);
+                  if (cand && cand.reasons.length > 0) {
+                    rows.push(
+                      <p key="candidate" className="text-xs text-blue-300">
+                        🎯 Expansion value: {cand.reasons.join(' · ')}
+                      </p>
+                    );
+                  }
+                }
+
+                // Strategic importance summary (any hex)
+                {
+                  const importance: string[] = [];
+                  if (displayHex.supplyNode) importance.push('supply node');
+                  if (displayHex.isHeadquarters) importance.push('headquarters');
+                  if (overlays?.warFrontHexes.has(hk)) importance.push('war front');
+                  const distStat = overlays?.districtOwnership.find(d => d.district === displayHex.district);
+                  if (distStat && !distStat.owner && distStat.playerHexesToControl > 0 && distStat.playerHexesToControl <= 3) {
+                    importance.push(`${distStat.playerHexesToControl} more hex${distStat.playerHexesToControl !== 1 ? 'es' : ''} for district control`);
+                  }
+                  if (importance.length > 0) {
+                    rows.push(
+                      <p key="importance" className="text-xs text-mafia-gold/90">
+                        ⭐ Strategic: {importance.join(' · ')}
+                      </p>
+                    );
+                  }
+                }
+
+                if (rows.length === 0) return null;
+                return (
+                  <div className="mt-1 p-1.5 rounded border bg-slate-800/40 border-slate-500/30 space-y-0.5">
+                    {rows}
+                  </div>
+                );
+              })()}
               <p className="text-[10px] text-muted-foreground/60 mt-2 italic">Click for actions</p>
             </div>
           </motion.div>
@@ -2591,12 +2943,12 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       <div className="absolute bottom-3 left-3 z-30">
         <button
           onClick={() => setShowLegend(prev => !prev)}
-          className="bg-card/90 backdrop-blur-sm border border-border rounded px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+          className="paper-panel rounded px-2 py-1 text-[10px] font-typewriter hover:brightness-105 transition-all"
         >
           {showLegend ? '▼ Legend' : '▶ Legend'}
         </button>
         {showLegend && (
-          <div className="mt-1 bg-card/95 backdrop-blur-sm border border-border rounded p-2.5 space-y-1.5 min-w-[160px]">
+          <div className="paper-panel mt-1 rounded p-2.5 space-y-1.5 min-w-[160px]">
             <div className="text-[10px] font-bold text-foreground/80 uppercase tracking-wider mb-1">Hex Outlines</div>
             {[
               { color: '#D4AF37', label: 'Headquarters', style: 'solid', width: 3 },
@@ -2604,7 +2956,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               { color: '#3B82F6', label: 'Legal Business', style: 'solid', width: 2.5 },
               { color: '#D4AF3780', label: 'Your Territory', style: 'solid', width: 2 },
               { color: '#F97316', label: 'Contested', style: 'dashed', width: 2.5 },
-              { color: '#8A2BE2', label: 'Front Boss (Hidden)', style: 'dashed', width: 1.5 },
+              { color: '#976BA5', label: 'Front Boss (Hidden)', style: 'dashed', width: 1.5 },
               { color: '#D4AF37', label: 'Boosted District', style: 'dashed', width: 1.5 },
             ].map(item => (
               <div key={item.label} className="flex items-center gap-2">
@@ -2614,6 +2966,32 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 <span className="text-[10px] text-muted-foreground">{item.label}</span>
               </div>
             ))}
+            <div className="border-t border-border pt-1.5 mt-1.5">
+              <div className="text-[10px] font-bold text-foreground/80 uppercase tracking-wider mb-1">Threat Overlays</div>
+              {[
+                { color: '#DC2626', label: 'War front (bordering enemy at war)', style: 'dashed', width: 2 },
+                { color: '#F59E0B', label: 'Vulnerable (erosion risk / pressure)', style: 'dashed', width: 2 },
+                { color: '#E8D5A3', label: 'District border', style: 'solid', width: 2.5 },
+              ].map(item => (
+                <div key={item.label} className="flex items-center gap-2">
+                  <svg width="20" height="12" className="flex-shrink-0">
+                    <line x1="0" y1="6" x2="20" y2="6" stroke={item.color} strokeWidth={item.width} strokeDasharray={item.style === 'dashed' ? '4 2' : undefined} />
+                  </svg>
+                  <span className="text-[10px] text-muted-foreground">{item.label}</span>
+                </div>
+              ))}
+              {[
+                { icon: '⛓️', label: 'Cut off from HQ (no supply route)' },
+                { icon: '📦', label: 'Business missing its supply node' },
+                { icon: '🔗', label: 'Route keystone (loss cuts territory off)' },
+                { icon: '🫠', label: 'Eroding (rival influence building)' },
+              ].map(item => (
+                <div key={item.label} className="flex items-center gap-2">
+                  <span className="text-[10px] w-4 text-center flex-shrink-0">{item.icon}</span>
+                  <span className="text-[10px] text-muted-foreground">{item.label}</span>
+                </div>
+              ))}
+            </div>
             <div className="border-t border-border pt-1.5 mt-1.5">
               <div className="text-[10px] font-bold text-foreground/80 uppercase tracking-wider mb-1">Badges</div>
               {[

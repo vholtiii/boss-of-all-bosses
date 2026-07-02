@@ -74,7 +74,7 @@ chance = 50% + (attackers - defenders) × 15%
         + planned hit bonus (+20% if planned, +10% if target relocated)
         [Plan Hit bypasses fortified defender penalty entirely]
 
-Clamped: 10%–95%
+Clamped: 5%–99% (push-out: 5%–95%)
 ```
 
 ### 2.4 Plan Hit Victory Bonuses
@@ -204,7 +204,7 @@ Neutral hexes only. Automatic success.
 - Fortified: 50% fewer casualties
 - **Extortion failures: NO casualties**
 - **Claim: NO casualties**
-- **Capos cannot die in regular combat** — they are wounded instead (-10 loyalty, -1 move for 1 turn). Capos can only be permanently killed via hitman contract or planned hit.
+- **Capos cannot die in regular combat** — they are wounded instead (-10 loyalty, -1 move for 2 turns). Capos can only be permanently killed via hitman contract or planned hit.
 
 ---
 
@@ -217,7 +217,7 @@ The endgame elimination mechanic. Destroy an enemy headquarters to remove that f
 | Who | Soldiers only (not capos) |
 | Position | Must be **adjacent** to enemy HQ (not on it) |
 | Requirements | Toughness ≥ 4, Loyalty ≥ 70 |
-| Base success | 15% |
+| Base success | 28% (Normal difficulty) |
 | Max chance | 50% |
 | HQ defense penalty | -30% |
 | Friendly adjacent bonus | +5% per friendly unit adjacent to HQ |
@@ -245,9 +245,9 @@ Weaken enemy HQ defenses by turning a rival soldier.
 |---|---|
 | Cost | $5,000 |
 | Position | Must have unit adjacent to enemy HQ |
-| Target | Enemy soldier at/near HQ with loyalty > 60 |
+| Target | Enemy soldier within 2 hexes of your capo with loyalty < 80 |
 | Base success | 25% |
-| Modifiers | +10% if target loyalty 60-70, +5% per influence above 50, +schemer capo bonus |
+| Modifiers | +15% if target loyalty < 60, −10% if loyalty > 70, +0.5% per influence above 50, +10% schemer capo (cap 70%) |
 
 **On Success:** Target marked as flipped (hidden from enemy). Reduces HQ defense by 10%.
 **On Failure:** Scheming family loses **15 influence**. Target soldier gains +10 loyalty. Enemy notified.
