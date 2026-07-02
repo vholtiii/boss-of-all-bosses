@@ -759,15 +759,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           {showThreats ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
           Threats
         </Button>
-        <Button
-          variant={showDistrictBorders ? "default" : "outline"}
-          size="sm"
-          onClick={() => setShowDistrictBorders(s => !s)}
-          className="font-medium"
-        >
-          {showDistrictBorders ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-          Districts
-        </Button>
       </div>
 
       {/* Grid */}
