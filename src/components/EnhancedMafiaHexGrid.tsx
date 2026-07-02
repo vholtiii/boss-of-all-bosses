@@ -105,7 +105,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [showSupplyLines, setShowSupplyLines] = useState(true);
   const [showThreats, setShowThreats] = useState(true);
-  const [showDistrictBorders, setShowDistrictBorders] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [pinnedHex, setPinnedHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; canAssaultHQ?: boolean; canFlipSoldier?: boolean; negotiateCapoId?: string; pendingNegotiationId?: string; reasons?: Record<string, string> } | null>(null);
