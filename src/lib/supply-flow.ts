@@ -52,6 +52,48 @@ export interface SupplyFlowGameState {
 
 export const supplyHexKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
 
+/** Per-type moved/lost counts when transferring safehouse stockpile to HQ. */
+export type SupplyTransferResult = Partial<Record<SupplyNodeType, { moved: number; lost: number }>>;
+
+export function emptyTransferResult(): SupplyTransferResult {
+  return {};
+}
+
+function mergeTransferEntry(
+  result: SupplyTransferResult,
+  nodeType: SupplyNodeType,
+  moved: number,
+  lost: number,
+) {
+  if (moved <= 0 && lost <= 0) return;
+  const prev = result[nodeType] || { moved: 0, lost: 0 };
+  result[nodeType] = { moved: prev.moved + moved, lost: prev.lost + lost };
+}
+
+export function formatTransferSummary(result: SupplyTransferResult): string {
+  const parts: string[] = [];
+  for (const nodeType of ALL_SUPPLY_NODE_TYPES) {
+    const entry = result[nodeType];
+    if (!entry || (entry.moved <= 0 && entry.lost <= 0)) continue;
+    const label = SUPPLY_NODE_CONFIG[nodeType].label.toLowerCase();
+    if (entry.moved > 0 && entry.lost > 0) {
+      parts.push(`${entry.moved} ${label} to HQ, ${entry.lost} lost`);
+    } else if (entry.moved > 0) {
+      parts.push(`${entry.moved} ${label} to HQ`);
+    } else {
+      parts.push(`${entry.lost} ${label} lost`);
+    }
+  }
+  return parts.join('; ');
+}
+
+export function hasTransferActivity(result: SupplyTransferResult): boolean {
+  return ALL_SUPPLY_NODE_TYPES.some(t => {
+    const e = result[t];
+    return e && (e.moved > 0 || e.lost > 0);
+  });
+}
+
 export const defaultSupplyRoutingConfig = (): SupplyRoutingConfig => ({
   haltedBusinessHexKeys: [],
   hqPriorityTypes: [],
@@ -325,31 +367,52 @@ export function transferSafehouseUnitsToHq(
   state: SupplyFlowGameState,
   sh: Safehouse,
   ownerFamily: string,
-) {
+): SupplyTransferResult {
+  const result = emptyTransferResult();
   for (const nodeType of ALL_SUPPLY_NODE_TYPES) {
     const units = sh.stockpile[nodeType] || 0;
     if (units <= 0) continue;
     const hqCur = getHqStorage(state, ownerFamily, nodeType);
     const room = HQ_SUPPLY_CAPACITY - hqCur;
     const transferred = Math.min(units, room);
+    const lost = units - transferred;
     if (transferred > 0) setHqStorage(state, ownerFamily, nodeType, hqCur + transferred);
     sh.stockpile[nodeType] = 0;
+    mergeTransferEntry(result, nodeType, transferred, lost);
   }
+  return result;
 }
 
 export function seizeSafehouseStockpileToFamily(
   state: SupplyFlowGameState,
   sh: Safehouse,
   captorFamily: string,
-) {
+): SupplyTransferResult {
+  const result = emptyTransferResult();
   for (const nodeType of ALL_SUPPLY_NODE_TYPES) {
     const units = Math.floor(sh.stockpile[nodeType] || 0);
     if (units <= 0) continue;
     const hqCur = getHqStorage(state, captorFamily, nodeType);
     const room = HQ_SUPPLY_CAPACITY - hqCur;
     const seized = Math.min(units, room);
+    const lost = units - seized;
     if (seized > 0) setHqStorage(state, captorFamily, nodeType, hqCur + seized);
+    sh.stockpile[nodeType] = 0;
+    mergeTransferEntry(result, nodeType, seized, lost);
   }
+  return result;
+}
+
+export function destroySafehouseWithTransfer(
+  state: SupplyFlowGameState,
+  sh: Safehouse,
+  mode: 'expiry_to_owner' | 'capture_to_captor',
+  recipientFamily: string,
+): SupplyTransferResult {
+  if (mode === 'expiry_to_owner') {
+    return transferSafehouseUnitsToHq(state, sh, recipientFamily);
+  }
+  return seizeSafehouseStockpileToFamily(state, sh, recipientFamily);
 }
 
 export function getBusinessSupplyDecayMultiplier(

@@ -56,7 +56,7 @@ import {
   BUILT_BUSINESS_DEFENSE_BONUS, BUILT_BUSINESS_HEAT_REDUCTION, BUILT_BUSINESS_RESPECT_THRESHOLD, BUILT_BUSINESS_RESPECT_BONUS, BUILT_BUSINESS_LOYALTY_BONUS,
   BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION, BUILT_BIZ_SEIZURE_INCOME_PENALTY, BUILT_BIZ_SEIZURE_RESPECT_LOSS, BUILT_BIZ_SEIZURE_FEAR_LOSS, BUILT_BIZ_SEIZURE_INFLUENCE_GAIN,
   CEASEFIRE_VIOLATION_RESPECT_LOSS, CEASEFIRE_VIOLATION_FEAR_LOSS, TREACHERY_DEBUFF_DURATION, TREACHERY_NEGOTIATION_PENALTY, TreacheryDebuff,
-  SupplyNode, SupplyNodeType, SupplyStockpileEntry, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES,
+  SupplyNode, SupplyNodeType, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES,
   SUPPLY_DECAY_RATE, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER,
   SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, SAFEHOUSE_STOCKPILE_RATE,
   FamilySupplyStorage, SupplyRoutingConfig, BusinessSupplyStatus, SupplyFlowSnapshot,
@@ -141,7 +141,7 @@ import {
 import { computeSupplyDealPrice, relationshipSway, LEADER_WARINESS_PENALTY } from '@/lib/negotiation-odds';
 import {
   processSupplyFlow, migrateSupplyState, seedInitialFamilySupplyStorage,
-  transferSafehouseUnitsToHq, seizeSafehouseStockpileToFamily,
+  destroySafehouseWithTransfer, formatTransferSummary, hasTransferActivity,
   getBusinessSupplyDecayMultiplier, cancelSupplyDeal, defaultSupplyRoutingConfig,
   supplyHexKey,
 } from '@/lib/supply-flow';
@@ -343,7 +343,6 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   eliminatedFamilies: [...(state.eliminatedFamilies || [])],
   sitdownCooldownUntil: state.sitdownCooldownUntil || 0,
   supplyNodes: (state.supplyNodes || []).map(n => ({ ...n })),
-  supplyStockpile: (state.supplyStockpile || []).map(e => ({ ...e })),
   familySupplyStorage: (state.familySupplyStorage || []).map(e => ({ ...e })),
   supplyRoutingConfig: {
     haltedBusinessHexKeys: [...(state.supplyRoutingConfig?.haltedBusinessHexKeys || [])],
@@ -666,7 +665,6 @@ export interface EnhancedMafiaGameState {
   
   // Supply lines
   supplyNodes: SupplyNode[];
-  supplyStockpile: SupplyStockpileEntry[];
   familySupplyStorage: FamilySupplyStorage[];
   supplyRoutingConfig: SupplyRoutingConfig;
   businessSupplyStatus: Record<string, BusinessSupplyStatus>;
@@ -1295,7 +1293,6 @@ export const createInitialGameState = (
     copFlippedSoldiers: [],
     copFlipImmunityUntil: 0,
     supplyNodes,
-    supplyStockpile: [],
     familySupplyStorage: [],
     supplyRoutingConfig: defaultSupplyRoutingConfig(),
     businessSupplyStatus: {},
@@ -4272,23 +4269,36 @@ export const useEnhancedMafiaGameState = (
       newState.safehouses = (newState.safehouses || [])
         .map(s => ({ ...s, turnsRemaining: s.turnsRemaining - 1 }))
         .filter(s => {
-          if (s.turnsRemaining <= 0) {
-            const shTile = newState.hexMap.find(t => t.q === s.q && t.r === s.r && t.s === s.s);
-            const owner = shTile?.controllingFamily;
-            if (owner && owner !== 'neutral') {
-              transferSafehouseUnitsToHq(newState, s, owner);
-            }
-            newState.pendingNotifications = [...newState.pendingNotifications, {
-              type: 'warning' as const, title: '🏠 Safehouse Expired',
-              message: 'A safehouse was dismantled. Remaining stockpile units moved to HQ (overflow lost).',
-            }];
-            return false;
-          }
-          if (s.turnsRemaining === 1) {
+          const shTile = newState.hexMap.find(t => t.q === s.q && t.r === s.r && t.s === s.s);
+          const owner = shTile?.controllingFamily;
+          const isPlayerOwned = owner === newState.playerFamily;
+
+          if (s.turnsRemaining === 1 && isPlayerOwned) {
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'info' as const, title: '🏠 Safehouse Closing Soon',
-              message: 'A safehouse expires next turn — stockpile will transfer to HQ.',
+              message: `Your safehouse in ${shTile?.district || 'unknown territory'} expires next turn — stockpile will transfer to HQ.`,
             }];
+          }
+
+          if (s.turnsRemaining <= 0) {
+            if (owner && owner !== 'neutral') {
+              const transferResult = destroySafehouseWithTransfer(newState, s, 'expiry_to_owner', owner);
+              if (isPlayerOwned) {
+                const summary = formatTransferSummary(transferResult);
+                newState.pendingNotifications = [...newState.pendingNotifications, {
+                  type: 'warning' as const, title: '🏠 Safehouse Expired',
+                  message: summary
+                    ? `Your safehouse in ${shTile?.district || 'unknown territory'} was dismantled. ${summary}.`
+                    : `Your safehouse in ${shTile?.district || 'unknown territory'} was dismantled.`,
+                }];
+              }
+            } else if (isPlayerOwned) {
+              newState.pendingNotifications = [...newState.pendingNotifications, {
+                type: 'warning' as const, title: '🏠 Safehouse Expired',
+                message: `Your safehouse in ${shTile?.district || 'unknown territory'} was dismantled. Stockpile units were lost (no controlling territory).`,
+              }];
+            }
+            return false;
           }
           return true;
         });
@@ -7122,14 +7132,14 @@ export const useEnhancedMafiaGameState = (
                   const shIdx = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
                   if (shIdx !== -1) {
                     const capturedSh = state.safehouses[shIdx];
-                    seizeSafehouseStockpileToFamily(state, capturedSh, fam);
-                    const stockpileDesc = Object.entries(capturedSh.stockpile || {}).filter(([,v]) => (v as number) > 0).map(([k,v]) => `${Math.floor(v as number)} ${k.replace('_',' ')}`).join(', ');
+                    const transferResult = destroySafehouseWithTransfer(state, capturedSh, 'capture_to_captor', fam);
+                    const seizeSummary = hasTransferActivity(transferResult) ? formatTransferSummary(transferResult) : '';
                     state.safehouses.splice(shIdx, 1);
                     if (prevOwner === state.playerFamily) {
                       state.pendingNotifications.push({
                         type: 'error' as const,
                         title: '🏠 Safehouse Destroyed',
-                        message: `The ${fam} family captured the hex and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} and intel on your operations.${stockpileDesc ? ` Seized stockpile: ${stockpileDesc}.` : ''}`,
+                        message: `The ${fam} family captured the hex and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} and intel on your operations.${seizeSummary ? ` They seized: ${seizeSummary}.` : ''}`,
                       });
                     }
                     const captorOpponent = state.aiOpponents.find(o => o.family === fam);
@@ -7277,14 +7287,14 @@ export const useEnhancedMafiaGameState = (
                 const shIdx2 = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
                 if (shIdx2 !== -1 && tile.controllingFamily === fam) {
                     const capturedSh2 = state.safehouses[shIdx2];
-                    seizeSafehouseStockpileToFamily(state, capturedSh2, fam);
-                    const stockpileDesc2 = Object.entries(capturedSh2.stockpile || {}).filter(([,v]) => (v as number) > 0).map(([k,v]) => `${Math.floor(v as number)} ${k.replace('_',' ')}`).join(', ');
+                    const transferResult2 = destroySafehouseWithTransfer(state, capturedSh2, 'capture_to_captor', fam);
+                    const seizeSummary2 = hasTransferActivity(transferResult2) ? formatTransferSummary(transferResult2) : '';
                     state.safehouses.splice(shIdx2, 1);
                     if (prevOwner === state.playerFamily) {
                       state.pendingNotifications.push({
                         type: 'error' as const,
                         title: '🏠 Safehouse Destroyed',
-                        message: `The ${fam} family captured your territory and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()}.${stockpileDesc2 ? ` Seized stockpile: ${stockpileDesc2}.` : ''}`,
+                        message: `The ${fam} family captured your territory and destroyed your safehouse! They gained $${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()}.${seizeSummary2 ? ` They seized: ${seizeSummary2}.` : ''}`,
                       });
                     }
                     const captorOpp2 = state.aiOpponents.find(o => o.family === fam);
@@ -10849,13 +10859,22 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Business Present', message: 'You cannot abandon a hex with a business. Shut it down first.' });
             return newState;
           }
+          const shIdx = newState.safehouses.findIndex(s => s.q === hex.q && s.r === hex.r && s.s === hex.s);
+          let abandonTransferNote = '';
+          if (shIdx !== -1) {
+            const sh = newState.safehouses[shIdx];
+            const transferResult = destroySafehouseWithTransfer(newState, sh, 'expiry_to_owner', newState.playerFamily);
+            newState.safehouses.splice(shIdx, 1);
+            const summary = formatTransferSummary(transferResult);
+            if (summary) abandonTransferNote = ` Safehouse dismantled — ${summary}.`;
+          }
           // Abandon the hex
           hex.controllingFamily = 'neutral';
           (newState as any).abandonedThisTurn = abandonedCount + 1;
           newState.combatLog = [...(newState.combatLog || []), `🏳️ Abandoned territory at (${hex.q},${hex.r}).`];
           newState.pendingNotifications.push({
             type: 'info', title: '🏳️ Territory Abandoned',
-            message: `Your family has withdrawn from a territory. Maintenance costs reduced.`,
+            message: `Your family has withdrawn from a territory. Maintenance costs reduced.${abandonTransferNote}`,
           });
           break;
         }
@@ -11574,8 +11593,8 @@ export const useEnhancedMafiaGameState = (
         const enemySafehouseIdx = state.safehouses.findIndex(s => s.q === targetQ && s.r === targetR && s.s === targetS);
         if (enemySafehouseIdx !== -1) {
           const capturedSh = state.safehouses[enemySafehouseIdx];
-          const stockpileDesc = Object.entries(capturedSh.stockpile || {}).filter(([,v]) => (v as number) > 0).map(([k,v]) => `${Math.floor(v as number)} ${k.replace('_',' ')}`).join(', ');
-          seizeSafehouseStockpileToFamily(state, capturedSh, state.playerFamily);
+          const transferResult = destroySafehouseWithTransfer(state, capturedSh, 'capture_to_captor', state.playerFamily);
+          const seizeSummary = hasTransferActivity(transferResult) ? formatTransferSummary(transferResult) : '';
           state.safehouses.splice(enemySafehouseIdx, 1);
           state.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
           // Intel: scout all hexes owned by targetFamily for 1 turn
@@ -11601,7 +11620,7 @@ export const useEnhancedMafiaGameState = (
           }
           state.pendingNotifications = [...state.pendingNotifications, {
             type: 'success', title: '🏠 Enemy Safehouse Captured!',
-            message: `You raided their safehouse! +$${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} bounty and full intel on ${targetFamily} operations for 1 turn.${stockpileDesc ? ` Seized stockpile: ${stockpileDesc}!` : ''}`,
+            message: `You raided their safehouse! +$${SAFEHOUSE_CAPTURE_BOUNTY.toLocaleString()} bounty and full intel on ${targetFamily} operations for 1 turn.${seizeSummary ? ` Seized: ${seizeSummary}!` : ''}`,
           }];
           awardBoldRespect(state, state.playerFamily, 3, 'safehouse_capture',
             `Captured ${targetFamily} safehouse`);
