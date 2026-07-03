@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { SUPPLY_NODE_CONFIG, type SupplyFlowSnapshot } from '@/types/game-mechanics';
 
 interface ResourceValues {
   money: number;
@@ -17,6 +18,8 @@ interface Props {
   values: ResourceValues;
   /** Optional projected income for the current turn (for the money tooltip). */
   lastTurnIncome?: number;
+  /** Compact per-type supply status dots. */
+  supplySnapshot?: SupplyFlowSnapshot;
 }
 
 const ITEMS: Array<{
@@ -50,7 +53,7 @@ const formatDelta = (key: keyof ResourceValues, d: number) => {
   return `${sign}${mag}`;
 };
 
-const ResourceStrip: React.FC<Props> = ({ turn, values, lastTurnIncome }) => {
+const ResourceStrip: React.FC<Props> = ({ turn, values, lastTurnIncome, supplySnapshot }) => {
   // Snapshot of values from the previous turn, used to compute deltas shown on
   // the strip. We update it whenever the turn number changes.
   const [prev, setPrev] = useState<ResourceValues>(values);
@@ -139,6 +142,46 @@ const ResourceStrip: React.FC<Props> = ({ turn, values, lastTurnIncome }) => {
           </React.Fragment>
         );
       })}
+      {supplySnapshot && supplySnapshot.types.length > 0 && (
+        <>
+          <span className="text-muted-foreground/30 select-none">·</span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-0.5 px-1 cursor-default">
+                {supplySnapshot.types.map(row => {
+                  const cfg = SUPPLY_NODE_CONFIG[row.nodeType];
+                  const hasBuffer = !row.connected && !row.viaDeal && (row.hqUnits + row.safehouseUnits) > 0;
+                  const dotClass = row.connected || row.viaDeal
+                    ? 'bg-green-500'
+                    : hasBuffer
+                      ? 'bg-amber-400'
+                      : 'bg-red-500/70';
+                  return (
+                    <span
+                      key={row.nodeType}
+                      className={cn('h-2 w-2 rounded-full ring-1 ring-black/20', dotClass)}
+                      title={cfg.label}
+                    />
+                  );
+                })}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs max-w-[240px]">
+              <p className="font-semibold mb-1">Supply Lines</p>
+              {supplySnapshot.types.map(row => {
+                const cfg = SUPPLY_NODE_CONFIG[row.nodeType];
+                const status = row.connected ? 'Connected' : row.viaDeal ? 'Via deal' : (row.hqUnits + row.safehouseUnits) > 0 ? 'Buffered' : 'Severed';
+                return (
+                  <div key={row.nodeType} className="flex justify-between gap-3">
+                    <span>{cfg.icon} {cfg.label}</span>
+                    <span className={row.connected || row.viaDeal ? 'text-green-400' : (row.hqUnits + row.safehouseUnits) > 0 ? 'text-amber-400' : 'text-red-400'}>{status}</span>
+                  </div>
+                );
+              })}
+            </TooltipContent>
+          </Tooltip>
+        </>
+      )}
     </div>
   );
 };

@@ -7,8 +7,9 @@ import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
 import SelectedUnitDock from '@/components/SelectedUnitDock';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
-import { ScoutedHex, Safehouse, PlannedHit, SupplyNode, SUPPLY_NODE_CONFIG, SupplyNodeType, FortifiedHex, FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, FLIP_SOLDIER_BASE_COST, FLIP_SOLDIER_COST_ESCALATION, FLIP_SOLDIER_BASE_CHANCE, SUPPLY_DEPENDENCIES } from '@/types/game-mechanics';
+import { ScoutedHex, Safehouse, PlannedHit, SupplyNode, SUPPLY_NODE_CONFIG, SupplyNodeType, FortifiedHex, FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, FLIP_SOLDIER_BASE_COST, FLIP_SOLDIER_COST_ESCALATION, FLIP_SOLDIER_BASE_CHANCE, SUPPLY_DEPENDENCIES, HQ_SUPPLY_CAPACITY, SUPPLY_STOCKPILE_BUFFER } from '@/types/game-mechanics';
 import { computeMapOverlays, computeRouteBreakingHexes, MapOverlays } from '@/lib/map-overlays';
+import { getBusinessSupplyDecayMultiplier } from '@/lib/supply-flow';
 import { FAMILY_COLORS, FAMILY_INK_WASH, TERRAIN_FILLS } from '@/lib/period-theme';
 
 interface EnhancedMafiaHexGridProps {
@@ -105,7 +106,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const [showSoldiers, setShowSoldiers] = useState(true);
   const [showSupplyLines, setShowSupplyLines] = useState(true);
   const [showThreats, setShowThreats] = useState(true);
-  const [showDistrictBorders, setShowDistrictBorders] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [pinnedHex, setPinnedHex] = useState<HexTile | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; canAssaultHQ?: boolean; canFlipSoldier?: boolean; negotiateCapoId?: string; pendingNegotiationId?: string; reasons?: Record<string, string> } | null>(null);
@@ -248,50 +248,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     return points.join(' ');
   };
 
-  // Compute district boundary segments for border outlines
-  const districtBorderSegments = useMemo(() => {
-    const dirs = [
-      { dq: 1, dr: 0, ds: -1 },
-      { dq: 1, dr: -1, ds: 0 },
-      { dq: 0, dr: -1, ds: 1 },
-      { dq: -1, dr: 0, ds: 1 },
-      { dq: -1, dr: 1, ds: 0 },
-      { dq: 0, dr: 1, ds: -1 },
-    ];
-    const dMap = new Map<string, string>();
-    hexMap.forEach(t => dMap.set(`${t.q},${t.r},${t.s}`, t.district));
-    const segs: { x1: number; y1: number; x2: number; y2: number }[] = [];
-    const seen = new Set<string>();
-    hexMap.forEach(tile => {
-      const { x: cx, y: cy } = getHexPosition(tile.q, tile.r);
-      dirs.forEach((dir, ei) => {
-        const nd = dMap.get(`${tile.q + dir.dq},${tile.r + dir.dr},${tile.s + dir.ds}`);
-        if (nd !== tile.district) {
-          const a1 = (Math.PI / 3) * ei;
-          const a2 = (Math.PI / 3) * ((ei + 1) % 6);
-          const x1 = Math.round((cx + baseHexRadius * Math.cos(a1)) * 100) / 100;
-          const y1 = Math.round((cy + baseHexRadius * Math.sin(a1)) * 100) / 100;
-          const x2 = Math.round((cx + baseHexRadius * Math.cos(a2)) * 100) / 100;
-          const y2 = Math.round((cy + baseHexRadius * Math.sin(a2)) * 100) / 100;
-          const key = [Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2), Math.max(y1, y2)].join(',');
-          if (!seen.has(key)) { seen.add(key); segs.push({ x1, y1, x2, y2 }); }
-        }
-      });
-    });
-    return segs;
-  }, [hexMap]);
-
-  // District background tint colors (subtle sepia inks, for region identification)
-  const districtTints: Record<string, string> = {
-    'Little Italy': 'rgba(201, 162, 75, 0.12)',   // brass
-    'Bronx': 'rgba(158, 68, 54, 0.11)',           // brick
-    'Brooklyn': 'rgba(107, 127, 179, 0.10)',      // slate blue ink
-    'Queens': 'rgba(107, 143, 86, 0.11)',         // olive ink
-    'Manhattan': 'rgba(220, 190, 120, 0.12)',     // gold leaf
-    'Staten Island': 'rgba(151, 107, 165, 0.10)', // plum ink
-  };
-
-  // District abbreviations for hex labels
   const districtAbbreviations: Record<string, string> = {
     'Little Italy': 'LI',
     'Bronx': 'BX',
@@ -792,15 +748,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
           {showThreats ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
           Threats
         </Button>
-        <Button
-          variant={showDistrictBorders ? "default" : "outline"}
-          size="sm"
-          onClick={() => setShowDistrictBorders(s => !s)}
-          className="font-medium"
-        >
-          {showDistrictBorders ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-          Districts
-        </Button>
       </div>
 
       {/* Grid */}
@@ -994,22 +941,6 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       <path d="M0,0 L10,3 L0,6 Z" fill={pColor} fillOpacity="0.7" />
                     </marker>
                   </defs>
-                  {/* District background tint layer */}
-                  <g className="pointer-events-none">
-                    {hexMap.map(tile => {
-                      const { x, y } = getHexPosition(tile.q, tile.r);
-                      const tint = districtTints[tile.district];
-                      if (!tint) return null;
-                      return (
-                        <polygon
-                          key={`tint-${tile.q},${tile.r},${tile.s}`}
-                          points={getHexPoints(x, y, baseHexRadius)}
-                          fill={tint}
-                          stroke="none"
-                        />
-                      );
-                    })}
-                  </g>
                   {/* Supply route hex-chain tint overlay */}
                   {showSupplyLines && <g className="pointer-events-none">
                     {hexMap.map(tile => {
@@ -1092,6 +1023,17 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                             stroke={familyColors[playerFamily] || '#D4AF37'}
                             strokeOpacity={0.3}
                             strokeWidth={1}
+                            className="pointer-events-none"
+                          />
+                        )}
+                        {tile.supplyNode && (
+                          <polygon
+                            points={getHexPoints(x, y, baseHexRadius)}
+                            fill="none"
+                            stroke="#FBBF24"
+                            strokeWidth={2.5}
+                            strokeDasharray="6,4"
+                            strokeOpacity={0.85}
                             className="pointer-events-none"
                           />
                         )}
@@ -1239,6 +1181,19 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       ${tile.business.income >= 1000 ? `${(tile.business.income / 1000).toFixed(1)}k` : tile.business.income}
                     </text>
                   )}
+
+                  {/* Supply halted indicator (player businesses only) */}
+                  {tile.business && tile.controllingFamily === playerFamily && (() => {
+                    const bizKey = `${tile.q},${tile.r},${tile.s}`;
+                    const supplySt = gameState?.businessSupplyStatus?.[bizKey];
+                    if (supplySt?.status !== 'halted') return null;
+                    return (
+                      <g className="pointer-events-none">
+                        <circle cx={x - baseHexRadius * 0.55} cy={y - baseHexRadius * 0.55} r="7" fill="#F59E0B" stroke="#ffffff" strokeWidth="1" />
+                        <text x={x - baseHexRadius * 0.55} y={y - baseHexRadius * 0.55 + 3} textAnchor="middle" fontSize="8" className="select-none">⏸</text>
+                      </g>
+                    );
+                  })()}
 
                   {/* Prompt to click HQ during deploy phase */}
                   {tile.isHeadquarters === playerFamily && gameState?.turnPhase === 'deploy' && expandedHQKey !== key && (
@@ -1516,15 +1471,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     const isPlayerOwned = tile.controllingFamily === playerFamily;
                     return (
                       <g className="pointer-events-none">
-                        <polygon
-                          points={getHexPoints(x, y, baseHexRadius + 4)}
-                          fill="none"
-                          stroke={isConnected ? '#10B981' : isPlayerOwned ? '#EF4444' : '#D4AF37'}
-                          strokeWidth="2.5"
-                          opacity="0.85"
-                          strokeDasharray={isConnected ? 'none' : '4,2'}
-                        />
-                        <circle cx={x} cy={y - baseHexRadius * 0.85} r={8} fill="#1a1a2e" stroke="#D4AF37" strokeWidth="1.5" />
+                        <circle cx={x} cy={y - baseHexRadius * 0.85} r={8} fill="#1a1a2e" stroke="#FBBF24" strokeWidth="1.5" />
                         <text x={x} y={y - baseHexRadius * 0.85 + 4} textAnchor="middle" fontSize="10" className="select-none">
                           {cfg.icon}
                         </text>
@@ -1772,21 +1719,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               );
             })}
 
-            {/* ═══ STRATEGIC OVERLAYS (district borders, war fronts, vulnerability, supply support) ═══ */}
-            {showDistrictBorders && (
-              <g className="pointer-events-none">
-                {districtBorderSegments.map((seg, i) => (
-                  <line
-                    key={`district-border-${i}`}
-                    x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2}
-                    stroke="#E8D5A3"
-                    strokeWidth="2.5"
-                    strokeOpacity="0.45"
-                    strokeLinecap="round"
-                  />
-                ))}
-              </g>
-            )}
+            {/* ═══ STRATEGIC OVERLAYS (war fronts, vulnerability, supply support) ═══ */}
             {showThreats && overlays && (
               <g className="pointer-events-none">
                 {/* War front hexes — red dashed outline */}
@@ -2597,40 +2530,13 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 const bizType = displayHex.business.type || (displayHex.business as any).businessType || '';
                 const deps = SUPPLY_DEPENDENCIES[bizType];
                 const hasSupplyDep = !!(deps && deps.length > 0);
-
-                // Compute family connectivity to supply nodes
-                let supplyConnected: boolean | undefined;
-                if (hasSupplyDep) {
-                  const familyHexSet = new Set((gameState?.hexMap || [])
-                    .filter((t: any) => t.controllingFamily === playerFamily)
-                    .map((t: any) => `${t.q},${t.r},${t.s}`));
-                  const connectedNodeTypes = new Set<SupplyNodeType>();
-                  ((gameState as any)?.supplyNodes || []).forEach((node: any) => {
-                    if (familyHexSet.has(`${node.q},${node.r},${node.s}`)) {
-                      connectedNodeTypes.add(node.type as SupplyNodeType);
-                    }
-                  });
-                  supplyConnected = deps!.some(d => connectedNodeTypes.has(d));
-                }
-
-                // Detect actively decaying severance: supplyConnected === false AND stockpile depleted past buffer
-                let severedDecayActive = false;
-                let decayPct = 0;
-                if (supplyConnected === false) {
-                  const stockEntry = ((gameState as any)?.supplyStockpile || []).find(
-                    (e: any) => e.family === playerFamily && deps!.includes(e.nodeType)
-                  );
-                  const turnsSinceDisconnected = stockEntry?.turnsSinceDisconnected ?? 0;
-                  if (turnsSinceDisconnected > 2) {
-                    severedDecayActive = true;
-                    const decayTurns = turnsSinceDisconnected - 2;
-                    const mult = Math.max(0.2, 1 - (0.1 * decayTurns));
-                    decayPct = Math.round((1 - mult) * 100);
-                  }
-                }
-
-                // Effective income: mirror logic — capo full, soldier 30%, player-built 100%, plus decay
                 const hexKey2 = `${displayHex.q},${displayHex.r},${displayHex.s}`;
+                const supplyStatus = gameState?.businessSupplyStatus?.[hexKey2];
+                const decayMult = hasSupplyDep
+                  ? getBusinessSupplyDecayMultiplier(hexKey2, gameState?.businessSupplyStatus)
+                  : 1;
+                const starvedTurns = supplyStatus?.consecutiveTurnsStarved ?? 0;
+
                 const hexUnits2 = unitsByHex.get(hexKey2) || [];
                 const hasCapo2 = hexUnits2.some(u => u.family === playerFamily && u.type === 'capo');
                 const hasSoldier2 = hexUnits2.some(u => u.family === playerFamily && u.type === 'soldier');
@@ -2639,10 +2545,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 if (isPlayerBuilt) effective = baseIncome;
                 else if (hasCapo2) effective = baseIncome;
                 else if (hasSoldier2) effective = Math.floor(baseIncome * 0.3);
-                if (severedDecayActive) {
-                  const mult = Math.max(0.2, 1 - (0.1 * Math.max(0, decayPct / 10)));
-                  effective = Math.floor(effective * mult);
-                }
+                effective = Math.floor(effective * decayMult);
+                const decayPct = decayMult < 1 ? Math.round((1 - decayMult) * 100) : 0;
 
                 // Heat per turn from illegal business (rough estimate: base 1, bigger biz 2)
                 const isIllegal = displayHex.business.isLegal === false;
@@ -2664,11 +2568,17 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                       <span className="text-muted-foreground">Income:</span> ${effective.toLocaleString()}/turn
                       {effective !== baseIncome && <span className="text-muted-foreground"> (base ${baseIncome.toLocaleString()})</span>}
                     </p>
-                    {hasSupplyDep && supplyConnected === true && (
-                      <p className="text-xs text-green-400">📦 Supply: ✅ Connected</p>
+                    {hasSupplyDep && supplyStatus?.status === 'supplied' && (
+                      <p className="text-xs text-green-400">📦 Supply: ✅ Supplied</p>
                     )}
-                    {hasSupplyDep && severedDecayActive && (
-                      <p className="text-xs text-red-400">📦 Supply: ⚠️ Severed (-{decayPct}%/turn decay)</p>
+                    {hasSupplyDep && supplyStatus?.status === 'halted' && (
+                      <p className="text-xs text-amber-400">📦 Supply: ⏸ Halted (conserving units)</p>
+                    )}
+                    {hasSupplyDep && supplyStatus?.status === 'starved' && starvedTurns <= SUPPLY_STOCKPILE_BUFFER && (
+                      <p className="text-xs text-yellow-400">📦 Supply: ⏳ Buffer ({SUPPLY_STOCKPILE_BUFFER - starvedTurns + 1}t left)</p>
+                    )}
+                    {hasSupplyDep && supplyStatus?.status === 'starved' && starvedTurns > SUPPLY_STOCKPILE_BUFFER && (
+                      <p className="text-xs text-red-400">📦 Supply: ⚠️ Starved (-{decayPct}% income)</p>
                     )}
                     {heatContribution > 0 && (
                       <p className="text-xs text-amber-400">🔥 Heat/turn: +{heatContribution}</p>
@@ -2684,7 +2594,26 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               })()}
               {displayHex.supplyNode && (() => {
                 const cfg = SUPPLY_NODE_CONFIG[displayHex.supplyNode];
-                return <p className="text-yellow-400 font-bold">{cfg.icon} Supply Node: {cfg.label}</p>;
+                const owner = displayHex.controllingFamily || 'neutral';
+                const hqUnits = owner !== 'neutral'
+                  ? (gameState?.familySupplyStorage || []).find(
+                    (e: any) => e.family === owner && e.nodeType === displayHex.supplyNode
+                  )?.hqUnits ?? 0
+                  : 0;
+                const typeSnap = gameState?.supplyFlowSnapshot?.types.find(
+                  (t: any) => t.nodeType === displayHex.supplyNode
+                );
+                return (
+                  <div className="text-yellow-400">
+                    <p className="font-bold">{cfg.icon} Supply Node: {cfg.label}</p>
+                    {owner === playerFamily && (
+                      <p className="text-xs text-muted-foreground">
+                        HQ storage: {hqUnits}/{HQ_SUPPLY_CAPACITY} units
+                        {typeSnap ? ` · ${typeSnap.generatedPerTurn}/turn generated` : ''}
+                      </p>
+                    )}
+                  </div>
+                );
               })()}
               {displayHex.isHeadquarters && (
                 <p className="text-mafia-gold font-bold">🏛️ {displayHex.isHeadquarters.toUpperCase()} HQ</p>

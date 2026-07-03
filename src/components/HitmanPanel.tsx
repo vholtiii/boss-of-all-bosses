@@ -104,7 +104,7 @@ const HitmanPanel: React.FC<HitmanPanelProps> = ({
     if (unit.type === 'capo') {
       return `Capo${unit.name ? ` — ${unit.name}` : ''}`;
     }
-    return `Soldier #${index + 1}`;
+    return unit.name || `Soldier #${index + 1}`;
   };
 
   return (

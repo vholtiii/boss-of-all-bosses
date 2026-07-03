@@ -864,7 +864,59 @@ export interface SupplyStockpileEntry {
   nodeType: SupplyNodeType;
   family: string;
   turnsSinceDisconnected: number; // 0 = connected, 1-2 = buffer, 3+ = decaying
+  /** @deprecated Migrated to FamilySupplyStorage + businessSupplyStatus */
 }
+
+/** Per-family HQ storage for a supply node type (safehouse stockpiles live on Safehouse). */
+export interface FamilySupplyStorage {
+  nodeType: SupplyNodeType;
+  family: string;
+  hqUnits: number;
+}
+
+/** Per-business supply status updated each turn by processSupplyFlow. */
+export interface BusinessSupplyStatus {
+  hexKey: string;
+  family: string;
+  status: 'supplied' | 'halted' | 'starved';
+  consecutiveTurnsStarved: number;
+  supplyTypeUsed?: SupplyNodeType;
+}
+
+/** Player routing preferences for supply allocation. */
+export interface SupplyRoutingConfig {
+  haltedBusinessHexKeys: string[];
+  hqPriorityTypes: SupplyNodeType[];
+  businessFeedOrder: Partial<Record<SupplyNodeType, string[]>>;
+}
+
+/** Turn snapshot for SupplyLedgerPanel (player-facing). */
+export interface SupplyTypeSnapshot {
+  nodeType: SupplyNodeType;
+  connected: boolean;
+  viaDeal: boolean;
+  generatedPerTurn: number;
+  committedToAllies: number;
+  usedByBusinesses: number;
+  hqUnits: number;
+  safehouseUnits: number;
+  netSurplus: number;
+  dependentBusinesses: Array<{ hexKey: string; type: string; district: string; status: string; income: number }>;
+}
+
+export interface SupplyFlowSnapshot {
+  turn: number;
+  types: SupplyTypeSnapshot[];
+}
+
+export const ALL_SUPPLY_NODE_TYPES: SupplyNodeType[] = [
+  'docks', 'union_hall', 'trucking_depot', 'liquor_route', 'food_market',
+];
+
+export const SUPPLY_GENERATION_RATE = 6;
+export const SUPPLY_BUSINESS_COST = 1;
+export const SUPPLY_DEAL_MAX_UNITS = 4;
+export const HQ_SUPPLY_CAPACITY = 4;
 
 export const SUPPLY_DECAY_RATE = 0.10;       // -10% per turn after buffer expires
 export const SUPPLY_DECAY_FLOOR = 0.20;       // minimum 20% of max revenue

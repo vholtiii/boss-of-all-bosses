@@ -110,7 +110,7 @@ const SelectedUnitDock: React.FC<SelectedUnitDockProps> = ({
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="ink-stamp text-[7px]">Dossier</span>
                     <p className="text-sm font-semibold truncate">
-                      {isCapo ? `👔 ${unit.name || 'Capo'}` : '👤 Soldier'}
+                      {isCapo ? `👔 ${unit.name || 'Capo'}` : `👤 ${unit.name || 'Soldier'}`}
                     </p>
                     {isCapo && unit.level != null && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded border border-mafia-gold/40 text-mafia-gold">

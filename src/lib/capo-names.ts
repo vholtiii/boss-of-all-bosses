@@ -38,3 +38,39 @@ const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 export function generateCapoName(): string {
   return `${pick(firstNames)} "${pick(nicknames)}" ${pick(lastNames)}`;
 }
+
+/** Memorable street nicknames for soldiers (e.g. "Fat Sal", "Tommy Two-Guns"). */
+export const SOLDIER_NICKNAMES: string[] = [
+  'Fat Sal', 'Nicky the Nose', 'Tommy Two-Guns', 'Crazy Eddie', 'Benny the Bull',
+  'Joey Knuckles', 'Frankie Bag of Donuts', 'Louie the Lip', 'Vinnie No-Show',
+  'Paulie Walnuts', 'Big Pete', 'Skinny Vinny', 'Lefty Lou', 'The Hammer',
+  'Tony Ducks', 'Sammy the Bull', 'Joey Bag', 'Cheech', 'The Weasel', 'Specs',
+  'Meatball', 'The Whale', 'Half-Nose', 'The Owl', 'The Mooch', 'Buckles',
+  'The Hat', 'Pretty Boy', 'The Snake', 'Three Fingers', 'Ice Pick', 'Bones',
+  'Knuckles', 'The Saint', 'Tough Tony', 'Sally Boy', 'The Ant', 'Curly',
+  'The Chief', 'The Wig', 'Don Cheech', 'Skinny Joey', 'The Genius', 'Funzi',
+  'The Camel', 'Patty Bombs', 'Allie Boy', 'The Quiet Don', 'Two-Knives',
+  'Benny Eggs', 'The Fish', 'The Horse', 'Gas Pipe', 'Big Paulie', 'The Mayor',
+  'No-Nose', 'Crazy Joe', 'Vinny Gorgeous', 'Junior', 'The Clutch Hand',
+  'Joey Bananas', 'Quack-Quack', 'The Beast', 'Tiny', 'Ralphie the Rat',
+  'Danny Boy', 'Mikey the Mole', 'Frankie Five-Angels', 'Sal the Barber',
+];
+
+let soldierNameCounter = 0;
+
+export function generateSoldierName(existingNames: string[] = []): string {
+  const used = new Set(existingNames.filter(Boolean));
+  const available = SOLDIER_NICKNAMES.filter((n) => !used.has(n));
+  if (available.length > 0) {
+    return pick(available);
+  }
+  soldierNameCounter += 1;
+  return `Soldier #${soldierNameCounter}`;
+}
+
+/** Collect all unit names currently in play (soldiers + capos). */
+export function collectExistingUnitNames(
+  units: Array<{ name?: string }> = []
+): string[] {
+  return units.map((u) => u.name).filter((n): n is string => Boolean(n));
+}

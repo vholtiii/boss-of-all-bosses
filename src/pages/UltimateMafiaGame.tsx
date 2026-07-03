@@ -14,6 +14,7 @@ import ResponsiveLayout, { MobileTabBar, MobileFloatingActionButton } from '@/co
 import EnhancedMafiaHexGrid from '@/components/EnhancedMafiaHexGrid';
 import { LeftSidePanel, RightSidePanel } from '@/components/GameSidePanels';
 import { useEnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
+import { getBusinessSupplyDecayMultiplier } from '@/lib/supply-flow';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import SaveLoadDialog from '@/components/SaveLoadDialog';
 import { useGameSaveLoad } from '@/hooks/useGameSaveLoad';
@@ -24,6 +25,7 @@ import AlertsLogPanel from '@/components/AlertsLogPanel';
 import JustHappenedFeed from '@/components/JustHappenedFeed';
 import TurnSummaryModal from '@/components/TurnSummaryModal';
 import CommissionVoteModal from '@/components/CommissionVoteModal';
+import WarDeclarationModal from '@/components/WarDeclarationModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
 import { GameErrorBoundary } from '@/components/GameErrorBoundary';
 import { Button } from '@/components/ui/button';
@@ -83,6 +85,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     deployUnit,
     isWinner,
     clearNotifications,
+    clearWarDeclaration,
     markAlertsRead,
     fortifyUnit,
     setMoveAction,
@@ -1503,6 +1506,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           heat: (gameState as any).policeHeat?.level || 0,
         }}
         lastTurnIncome={gameState.lastTurnIncome}
+        supplySnapshot={gameState.supplyFlowSnapshot}
       />
       
       {/* Right side - Active Pacts */}
@@ -1891,18 +1895,14 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             }
 
             // Apply supply line decay to displayed income (mirrors turn-end calculation)
-            if (supplyConnected === false && deps && deps.length > 0) {
-              const stockEntry = ((gameState as any).supplyStockpile || []).find(
-                (e: any) => e.family === hqFamily && deps!.includes(e.nodeType)
-              );
-              const turnsSinceDisconnected = stockEntry?.turnsSinceDisconnected ?? 0;
-              if (turnsSinceDisconnected > 2) {
-                const decayTurns = turnsSinceDisconnected - 2;
-                const decayMultiplier = Math.max(0.2, 1 - (0.1 * decayTurns));
+            if (deps && deps.length > 0) {
+              const hexKey = `${tile.q},${tile.r},${tile.s}`;
+              const decayMultiplier = getBusinessSupplyDecayMultiplier(hexKey, gameState.businessSupplyStatus);
+              if (decayMultiplier < 1) {
                 tileIncome = Math.floor(tileIncome * decayMultiplier);
                 const decayPct = Math.round((1 - decayMultiplier) * 100);
                 collectionRate = Math.round(collectionRate * decayMultiplier);
-                collectionReason = collectionReason ? `${collectionReason}, No Supply -${decayPct}%` : `No Supply -${decayPct}%`;
+                collectionReason = collectionReason ? `${collectionReason}, Supply -${decayPct}%` : `Supply -${decayPct}%`;
               }
             }
 
@@ -2262,6 +2262,15 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
           );
         })()}
       </AnimatePresence>
+
+      {/* War Declaration Modal */}
+      <WarDeclarationModal
+        open={!!gameState.pendingWarDeclaration}
+        payload={gameState.pendingWarDeclaration ?? null}
+        playerFamily={gameState.playerFamily}
+        onClose={clearWarDeclaration}
+        playSound={playSound}
+      />
 
       {/* Commission Vote Modal */}
       <CommissionVoteModal

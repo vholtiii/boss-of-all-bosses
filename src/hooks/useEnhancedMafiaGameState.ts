@@ -59,6 +59,8 @@ import {
   SupplyNode, SupplyNodeType, SupplyStockpileEntry, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES,
   SUPPLY_DECAY_RATE, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER,
   SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, SAFEHOUSE_STOCKPILE_RATE,
+  FamilySupplyStorage, SupplyRoutingConfig, BusinessSupplyStatus, SupplyFlowSnapshot,
+  ALL_SUPPLY_NODE_TYPES, SUPPLY_GENERATION_RATE, HQ_SUPPLY_CAPACITY,
   // Tension & War
   WarState, getTensionPairKey, getAllFamilyPairKeys,
   WAR_TENSION_THRESHOLD, WAR_DURATION, WAR_MAX_SIMULTANEOUS, TENSION_DECAY_PER_TURN,
@@ -115,7 +117,8 @@ import {
 // Re-export for existing consumers that import these from the hook module.
 export { HEAT_GAIN_MULT };
 
-import { generateCapoName } from '@/lib/capo-names';
+import { generateCapoName, generateSoldierName, collectExistingUnitNames } from '@/lib/capo-names';
+import { pickTensionLine, FAMILY_DISPLAY_NAMES, type FamilyId } from '@/lib/rival-narrative';
 import {
   rollFamilyPersonality, rollFamilyStrategy, computeDynamicMood, blendMoodWithPersonality,
   scoreHexForAI, softmaxPick, familySignaturePreference,
@@ -136,6 +139,12 @@ import {
   getSupplyNodeScoreBonus, getSupplyNodeRoutingChance, getSupplyStrikeRadius,
 } from '@/lib/ai-difficulty';
 import { computeSupplyDealPrice, relationshipSway, LEADER_WARINESS_PENALTY } from '@/lib/negotiation-odds';
+import {
+  processSupplyFlow, migrateSupplyState, seedInitialFamilySupplyStorage,
+  transferSafehouseUnitsToHq, seizeSafehouseStockpileToFamily,
+  getBusinessSupplyDecayMultiplier, cancelSupplyDeal, defaultSupplyRoutingConfig,
+  supplyHexKey,
+} from '@/lib/supply-flow';
 
 // ============ SEEDED PRNG (Mulberry32) ============
 function mulberry32(seed: number): () => number {
@@ -335,6 +344,16 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   sitdownCooldownUntil: state.sitdownCooldownUntil || 0,
   supplyNodes: (state.supplyNodes || []).map(n => ({ ...n })),
   supplyStockpile: (state.supplyStockpile || []).map(e => ({ ...e })),
+  familySupplyStorage: (state.familySupplyStorage || []).map(e => ({ ...e })),
+  supplyRoutingConfig: {
+    haltedBusinessHexKeys: [...(state.supplyRoutingConfig?.haltedBusinessHexKeys || [])],
+    hqPriorityTypes: [...(state.supplyRoutingConfig?.hqPriorityTypes || [])],
+    businessFeedOrder: { ...(state.supplyRoutingConfig?.businessFeedOrder || {}) },
+  },
+  businessSupplyStatus: { ...(state.businessSupplyStatus || {}) },
+  supplyFlowSnapshot: state.supplyFlowSnapshot
+    ? { turn: state.supplyFlowSnapshot.turn, types: state.supplyFlowSnapshot.types.map(t => ({ ...t, dependentBusinesses: [...t.dependentBusinesses] })) }
+    : { turn: state.turn, types: [] },
   hitmanContracts: [...(state.hitmanContracts || [])],
   aiOpponents: (state.aiOpponents || []).map(o => ({
     ...o,
@@ -357,6 +376,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
     businesses: (state.businesses || []).map((b: any) => ({ ...b })),
     // Tension & War
     familyTensions: { ...(state.familyTensions || {}) },
+    tensionWarningsSent: { ...(state.tensionWarningsSent || {}) },
     activeWars: (state.activeWars || []).map(w => ({ ...w })),
     tensionCooldowns: { ...(state.tensionCooldowns || {}) },
     mattressesState: { ...(state.mattressesState || { active: false, turnsRemaining: 0 }) },
@@ -647,10 +667,18 @@ export interface EnhancedMafiaGameState {
   // Supply lines
   supplyNodes: SupplyNode[];
   supplyStockpile: SupplyStockpileEntry[];
+  familySupplyStorage: FamilySupplyStorage[];
+  supplyRoutingConfig: SupplyRoutingConfig;
+  businessSupplyStatus: Record<string, BusinessSupplyStatus>;
+  supplyFlowSnapshot: SupplyFlowSnapshot;
   
   // Tension & War system
   familyTensions: Record<string, number>;       // keyed by sorted pair e.g. "bonanno-gambino"
   activeWars: WarState[];
+  /** Highest tension warning threshold already sent per player-involved pair key. */
+  tensionWarningsSent: Record<string, 60 | 75>;
+  /** Dramatic war declaration interstitial — cleared by UI after dismiss. */
+  pendingWarDeclaration?: { familyA: string; familyB: string; playerInvolved: boolean };
   tensionCooldowns: Record<string, number>;      // pair key → turns remaining (Hole #3 fix)
   
   // Boss actions: Mattresses & War Summit
@@ -762,6 +790,36 @@ const getPairTension = (state: EnhancedMafiaGameState, familyA: string, familyB:
   return state.familyTensions[getTensionPairKey(familyA, familyB)] || 0;
 };
 
+/** Fire one-time flavor notifications when player-involved tension crosses 60 / 75. */
+const checkTensionWarnings = (state: EnhancedMafiaGameState) => {
+  const playerFamily = state.playerFamily;
+  if (!state.tensionWarningsSent) state.tensionWarningsSent = {};
+
+  const rivals = ['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'].filter(f => f !== playerFamily);
+  for (const rival of rivals) {
+    const key = getTensionPairKey(playerFamily, rival);
+    const tension = getPairTension(state, playerFamily, rival);
+    const sent = state.tensionWarningsSent[key];
+    const rivalLabel = FAMILY_DISPLAY_NAMES[rival as FamilyId] || rival;
+
+    if (tension >= 75 && sent !== 75) {
+      state.tensionWarningsSent[key] = 75;
+      state.pendingNotifications.push({
+        type: 'error' as const,
+        title: `⚠️ ${rivalLabel} — War Imminent`,
+        message: pickTensionLine(rival, 75),
+      });
+    } else if (tension >= 60 && !sent) {
+      state.tensionWarningsSent[key] = 60;
+      state.pendingNotifications.push({
+        type: 'warning' as const,
+        title: `👁️ ${rivalLabel} — Tension Rising`,
+        message: pickTensionLine(rival, 60),
+      });
+    }
+  }
+};
+
 const checkAndTriggerWar = (state: EnhancedMafiaGameState, familyA: string, familyB: string, trigger: 'tension' | 'capo_hit') => {
   // Check if already at war
   if ((state.activeWars || []).some(w => 
@@ -794,6 +852,7 @@ const checkAndTriggerWar = (state: EnhancedMafiaGameState, familyA: string, fami
   const fA = familyA.charAt(0).toUpperCase() + familyA.slice(1);
   const fB = familyB.charAt(0).toUpperCase() + familyB.slice(1);
   const isPlayerInvolved = familyA === playerFamily || familyB === playerFamily;
+  state.pendingWarDeclaration = { familyA, familyB, playerInvolved: isPlayerInvolved };
   state.pendingNotifications.push({
     type: 'error' as const,
     title: isPlayerInvolved ? '⚔️ WAR DECLARED!' : '⚔️ War Erupts!',
@@ -1130,6 +1189,7 @@ export const createInitialGameState = (
     gambino: 4, genovese: 4, lucchese: 3, bonanno: 2, colombo: 1,
   };
 
+  const usedSoldierNames: string[] = [];
   allFamilies.forEach(fam => {
     const hq = HQ_POSITIONS[fam];
     const soldierCount = (fam === family && startingResources?.soldiers)
@@ -1137,10 +1197,13 @@ export const createInitialGameState = (
       : (familySoldierCount[fam] || 3);
     for (let i = 0; i < soldierCount; i++) {
       const id = `${fam}-soldier-${i}`;
+      const soldierName = generateSoldierName(usedSoldierNames);
+      usedSoldierNames.push(soldierName);
       deployedUnits.push({
         id, type: 'soldier', family: fam,
         q: hq.q, r: hq.r, s: hq.s,
         movesRemaining: 2, maxMoves: 2, level: 1,
+        name: soldierName,
       });
       soldierStats[id] = {
         loyalty: 50, training: 0,
@@ -1173,7 +1236,7 @@ export const createInitialGameState = (
 
   const bonuses = FAMILY_BONUSES[family] || FAMILY_BONUSES.gambino;
 
-  return {
+  const initialState: EnhancedMafiaGameState = {
     playerFamily: family,
     turn: 1,
     season: 'spring',
@@ -1233,10 +1296,15 @@ export const createInitialGameState = (
     copFlipImmunityUntil: 0,
     supplyNodes,
     supplyStockpile: [],
+    familySupplyStorage: [],
+    supplyRoutingConfig: defaultSupplyRoutingConfig(),
+    businessSupplyStatus: {},
+    supplyFlowSnapshot: { turn: 1, types: [] },
     supplyDealPacts: [],
     // Tension & War system
     familyTensions: Object.fromEntries(getAllFamilyPairKeys().map(k => [k, 0])),
     activeWars: [],
+    tensionWarningsSent: {},
     tensionCooldowns: {},
      mattressesState: { active: false, turnsRemaining: 0 },
      mattressesCooldownUntil: 0,
@@ -1367,6 +1435,8 @@ export const createInitialGameState = (
     familyControl: { gambino: 20, genovese: 20, lucchese: 20, bonanno: 20, colombo: 20 },
     territories,
   };
+  seedInitialFamilySupplyStorage(initialState);
+  return initialState;
 };
 
 function buildLegacyTerritories(hexMap: HexTile[]): EnhancedMafiaGameState['territories'] {
@@ -3154,10 +3224,12 @@ export const useEnhancedMafiaGameState = (
         } else if (prev.resources.soldiers > 0) {
           // Spawn from undeployed reserve pool
           const newId = `${family}-soldier-${Date.now()}-${Math.random().toString(36).substr(2,4)}`;
+          const deployName = generateSoldierName(collectExistingUnitNames(newDeployedUnits));
           newDeployedUnits.push({
             id: newId, type: 'soldier', family: family as any,
             q: targetLocation.q, r: targetLocation.r, s: targetLocation.s,
             movesRemaining: 0, maxMoves: 2, level: 1,
+            name: deployName,
           });
           newSoldierStats[newId] = {
             loyalty: 50, training: 0,
@@ -3912,11 +3984,13 @@ export const useEnhancedMafiaGameState = (
         const hq = newState.headquarters[newState.playerFamily];
         if (hq) {
           const freeId = `${newState.playerFamily}-soldier-free-${Date.now()}`;
+          const freeName = generateSoldierName(collectExistingUnitNames(newState.deployedUnits));
           newState.deployedUnits = [...newState.deployedUnits, {
             id: freeId, type: 'soldier' as const, family: newState.playerFamily,
             q: hq.q, r: hq.r, s: hq.s,
             movesRemaining: 0, maxMoves: 2, level: 1,
             recruited: true,
+            name: freeName,
           }];
           newState.soldierStats[freeId] = {
             loyalty: LOYALTY_RECRUIT_START, training: 0, hits: 0, extortions: 0,
@@ -4194,16 +4268,27 @@ export const useEnhancedMafiaGameState = (
       // Expire reinforcement targets
       newState.reinforceTargets = (newState.reinforceTargets || []).filter(rt => rt.expiresOnTurn > newState.turn);
 
-      // Tick safehouses
+      // Tick safehouses — transfer stockpile to HQ on expiry
       newState.safehouses = (newState.safehouses || [])
         .map(s => ({ ...s, turnsRemaining: s.turnsRemaining - 1 }))
         .filter(s => {
           if (s.turnsRemaining <= 0) {
+            const shTile = newState.hexMap.find(t => t.q === s.q && t.r === s.r && t.s === s.s);
+            const owner = shTile?.controllingFamily;
+            if (owner && owner !== 'neutral') {
+              transferSafehouseUnitsToHq(newState, s, owner);
+            }
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'warning' as const, title: '🏠 Safehouse Expired',
-              message: 'A safehouse has been dismantled.',
+              message: 'A safehouse was dismantled. Remaining stockpile units moved to HQ (overflow lost).',
             }];
             return false;
+          }
+          if (s.turnsRemaining === 1) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'info' as const, title: '🏠 Safehouse Closing Soon',
+              message: 'A safehouse expires next turn — stockpile will transfer to HQ.',
+            }];
           }
           return true;
         });
@@ -4221,187 +4306,9 @@ export const useEnhancedMafiaGameState = (
       newState.season = seasons[Math.floor((newState.turn - 1) / 3) % 4];
       
       computeDistrictBonuses(newState, turnReport);
-      // ============ SUPPLY STOCKPILE TRACKING ============
-      {
-        newState.supplyStockpile = newState.supplyStockpile || [];
-        const allFamiliesForSupply = [newState.playerFamily, ...newState.aiOpponents.map(o => o.family)];
-        allFamiliesForSupply.forEach(fam => {
-          const famConnected = getConnectedTerritory(newState.hexMap, fam);
-          const supplyNodeTypes: SupplyNodeType[] = ['docks', 'union_hall', 'trucking_depot', 'liquor_route', 'food_market'];
-          supplyNodeTypes.forEach(nodeType => {
-            const node = (newState.supplyNodes || []).find(n => n.type === nodeType);
-            if (!node) return;
-            let isConnected = famConnected.has(`${node.q},${node.r},${node.s}`);
-            // Supply Deal: check if any active pact partner has this node connected
-            if (!isConnected) {
-              // Player's pacts: stored on state.supplyDealPacts (player buys from targetFamily)
-              // AI pacts with player as supplier: stored as separate entries where AI is buyer
-              // We use a unified list: supplyDealPacts entries where this fam benefits
-              const famPacts = (newState.supplyDealPacts || []).filter(p => p.active && p.buyerFamily === fam);
-              for (const pact of famPacts) {
-                const partnerConnected = getConnectedTerritory(newState.hexMap, pact.targetFamily);
-                if (partnerConnected.has(`${node.q},${node.r},${node.s}`)) {
-                  isConnected = true;
-                  break;
-                }
-              }
-            }
-            const existing = newState.supplyStockpile.find(e => e.family === fam && e.nodeType === nodeType);
-            if (isConnected) {
-              // Connected — reset stockpile
-              if (existing) existing.turnsSinceDisconnected = 0;
-            } else {
-              // Not connected — increment
-              if (existing) {
-                existing.turnsSinceDisconnected++;
-              } else {
-                newState.supplyStockpile.push({ nodeType, family: fam, turnsSinceDisconnected: 1 });
-              }
-              // Notify player on first disconnect
-              if (fam === newState.playerFamily && existing?.turnsSinceDisconnected === 1) {
-                const cfg = SUPPLY_NODE_CONFIG[nodeType];
-                newState.pendingNotifications.push({
-                  type: 'warning',
-                  title: `⚠️ Supply Route Severed: ${cfg.label}`,
-                  message: `Your route to the ${cfg.label} ${cfg.icon} has been cut! You have ${SUPPLY_STOCKPILE_BUFFER} turns of stockpile before businesses start losing income.`,
-                });
-              }
-            }
-          });
-        });
-      }
 
-      // ============ SAFEHOUSE STOCKPILE ACCUMULATION ============
-      {
-        const hk = (q: number, r: number, s: number) => `${q},${r},${s}`;
-        const dd = [{q:1,r:0,s:-1},{q:-1,r:0,s:1},{q:0,r:1,s:-1},{q:0,r:-1,s:1},{q:1,r:-1,s:0},{q:-1,r:1,s:0}];
-        const allFamiliesForSafehouse = [newState.playerFamily, ...newState.aiOpponents.map(o => o.family)];
-        const supplyRouteHexSets: Record<string, Set<string>> = {};
-        const familyConnectedNodeTypes: Record<string, Set<SupplyNodeType>> = {};
-
-        allFamiliesForSafehouse.forEach(fam => {
-          const famHexSet = new Set(newState.hexMap.filter(t => t.controllingFamily === fam || t.isHeadquarters === fam).map(t => hk(t.q, t.r, t.s)));
-          const hqT = newState.hexMap.find(t => t.isHeadquarters === fam);
-          if (!hqT) { supplyRouteHexSets[fam] = new Set(); familyConnectedNodeTypes[fam] = new Set(); return; }
-          for (const node of (newState.supplyNodes || [])) {
-            const nodeKey = hk(node.q, node.r, node.s);
-            if (famHexSet.has(nodeKey)) continue;
-            const hasNeighbor = dd.some(d => famHexSet.has(hk(node.q+d.q, node.r+d.r, node.s+d.s)));
-            if (hasNeighbor) famHexSet.add(nodeKey);
-          }
-          const vis = new Set<string>();
-          const bQ: Array<{q:number;r:number;s:number}> = [{ q: hqT.q, r: hqT.r, s: hqT.s }];
-          vis.add(hk(hqT.q, hqT.r, hqT.s));
-          while (bQ.length > 0) {
-            const c = bQ.shift()!;
-            for (const d of dd) {
-              const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
-              const nk = hk(nq, nr, ns);
-              if (vis.has(nk) || !famHexSet.has(nk)) continue;
-              vis.add(nk); bQ.push({q:nq, r:nr, s:ns});
-            }
-          }
-          const connectedTypes = new Set<SupplyNodeType>();
-          for (const node of (newState.supplyNodes || [])) {
-            if (vis.has(hk(node.q, node.r, node.s))) connectedTypes.add(node.type);
-          }
-          supplyRouteHexSets[fam] = vis;
-          familyConnectedNodeTypes[fam] = connectedTypes;
-        });
-
-        for (const sh of newState.safehouses) {
-          const shKey = hk(sh.q, sh.r, sh.s);
-          const shTile = newState.hexMap.find(t => t.q === sh.q && t.r === sh.r && t.s === sh.s);
-          if (!shTile) continue;
-          const ownerFamily = shTile.controllingFamily;
-          if (ownerFamily === 'neutral') { sh.connectedSupplyTypes = []; continue; }
-          const routeSet = supplyRouteHexSets[ownerFamily] || new Set();
-          const connTypes = familyConnectedNodeTypes[ownerFamily] || new Set<SupplyNodeType>();
-          const isOnRoute = routeSet.has(shKey);
-          const isAdjToRoute = !isOnRoute && dd.some(d => routeSet.has(hk(sh.q+d.q, sh.r+d.r, sh.s+d.s)));
-          const isAutoConnected = isOnRoute || isAdjToRoute;
-
-          let isManuallyConnectable = false;
-          if (!isAutoConnected && !sh.manualRouteEstablished) {
-            const ownedSet = new Set(newState.hexMap.filter(t => t.controllingFamily === ownerFamily).map(t => hk(t.q, t.r, t.s)));
-            const mVis = new Set<string>();
-            const mQ: Array<{q:number;r:number;s:number}> = [{q: sh.q, r: sh.r, s: sh.s}];
-            mVis.add(shKey);
-            let found = false;
-            while (mQ.length > 0 && !found) {
-              const c = mQ.shift()!;
-              for (const d of dd) {
-                const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
-                const nk = hk(nq, nr, ns);
-                if (mVis.has(nk)) continue;
-                if (routeSet.has(nk)) { found = true; break; }
-                if (ownedSet.has(nk)) { mVis.add(nk); mQ.push({q:nq, r:nr, s:ns}); }
-              }
-            }
-            isManuallyConnectable = found;
-          }
-
-          let isManualConnected = false;
-          if (sh.manualRouteEstablished) {
-            const ownedSet = new Set(newState.hexMap.filter(t => t.controllingFamily === ownerFamily).map(t => hk(t.q, t.r, t.s)));
-            const mVis = new Set<string>();
-            const mQ: Array<{q:number;r:number;s:number}> = [{q: sh.q, r: sh.r, s: sh.s}];
-            mVis.add(shKey);
-            let found = false;
-            const mPar = new Map<string, string>();
-            mPar.set(shKey, '');
-            while (mQ.length > 0 && !found) {
-              const c = mQ.shift()!;
-              for (const d of dd) {
-                const nq = c.q+d.q, nr = c.r+d.r, ns = c.s+d.s;
-                const nk = hk(nq, nr, ns);
-                if (mVis.has(nk)) continue;
-                if (routeSet.has(nk)) {
-                  found = true;
-                  mPar.set(nk, hk(c.q, c.r, c.s));
-                  const subPath: Array<{q:number;r:number;s:number}> = [];
-                  let pk = nk;
-                  while (pk && pk !== '') {
-                    const [pq, pr, ps] = pk.split(',').map(Number);
-                    subPath.unshift({q: pq, r: pr, s: ps});
-                    pk = mPar.get(pk) || '';
-                  }
-                  sh.subRoutePath = subPath;
-                  break;
-                }
-                if (ownedSet.has(nk)) { mVis.add(nk); mPar.set(nk, hk(c.q, c.r, c.s)); mQ.push({q:nq, r:nr, s:ns}); }
-              }
-            }
-            if (found) {
-              isManualConnected = true;
-            } else {
-              sh.manualRouteEstablished = false;
-              sh.subRoutePath = undefined;
-              if (ownerFamily === newState.playerFamily) {
-                newState.pendingNotifications.push({
-                  type: 'warning', title: '🏠 Safehouse Disconnected',
-                  message: `Your safehouse sub-route was severed — territory chain broken. Stockpiling stopped.`,
-                });
-              }
-            }
-          }
-
-          const isConnected = isAutoConnected || isManualConnected;
-          if (isConnected) {
-            sh.connectedSupplyTypes = Array.from(connTypes);
-            const rate = (sh.allocationPercent / SAFEHOUSE_MAX_ALLOCATION) * SAFEHOUSE_STOCKPILE_RATE;
-            for (const nodeType of sh.connectedSupplyTypes) {
-              const current = sh.stockpile[nodeType] || 0;
-              if (current < SAFEHOUSE_MAX_STOCKPILE) {
-                sh.stockpile[nodeType] = Math.min(SAFEHOUSE_MAX_STOCKPILE, current + rate);
-              }
-            }
-          } else {
-            sh.connectedSupplyTypes = [];
-            (sh as any)._manuallyConnectable = isManuallyConnectable;
-          }
-        }
-      }
+      // ============ SUPPLY FLOW (generation, deals, feed, restock) ============
+      processSupplyFlow(newState);
 
       processEconomy(newState, turnReport);
       turnReport.income = newState.finances.totalIncome;
@@ -4489,7 +4396,8 @@ export const useEnhancedMafiaGameState = (
           }
         });
 
-        // 3. Check tension thresholds → trigger wars
+        // 3. Tension warnings (player-involved pairs) then check thresholds → trigger wars
+        checkTensionWarnings(newState);
         allPairs.forEach(key => {
           if ((newState.familyTensions[key] || 0) >= WAR_TENSION_THRESHOLD) {
             const [fA, fB] = key.split('-');
@@ -5872,21 +5780,9 @@ export const useEnhancedMafiaGameState = (
         // ── Supply Line Decay ──
         const deps = SUPPLY_DEPENDENCIES[tile.business.type];
         if (deps && deps.length > 0) {
-          // For store_front / restaurant / store: needs at least ONE of the listed nodes
-          const hasAccess = deps.some(dep => connectedNodeTypes.has(dep));
-          if (!hasAccess) {
-            // Check stockpile buffer
-            const stockEntry = (state.supplyStockpile || []).find(
-              e => e.family === state.playerFamily && deps.includes(e.nodeType)
-            );
-            const turnsSinceDisconnected = stockEntry?.turnsSinceDisconnected ?? 0;
-            if (turnsSinceDisconnected > SUPPLY_STOCKPILE_BUFFER) {
-              // Decay: -10% per turn past buffer, floor at 20%
-              const decayTurns = turnsSinceDisconnected - SUPPLY_STOCKPILE_BUFFER;
-              const decayMultiplier = Math.max(SUPPLY_DECAY_FLOOR, 1 - (SUPPLY_DECAY_RATE * decayTurns));
-              tileIncome = Math.floor(tileIncome * decayMultiplier);
-            }
-          }
+          const hexKey = `${tile.q},${tile.r},${tile.s}`;
+          const decayMultiplier = getBusinessSupplyDecayMultiplier(hexKey, state.businessSupplyStatus);
+          tileIncome = Math.floor(tileIncome * decayMultiplier);
         }
         
        // District control bonus: Manhattan +25% income
@@ -6573,18 +6469,9 @@ export const useEnhancedMafiaGameState = (
           // Apply supply line decay for AI families
           const deps = SUPPLY_DEPENDENCIES[tile.business.type];
           if (deps && deps.length > 0) {
-            const hasAccess = deps.some(dep => aiConnectedNodeTypes.has(dep));
-            if (!hasAccess) {
-              const stockEntry = (state.supplyStockpile || []).find(
-                e => e.family === fam && deps.includes(e.nodeType)
-              );
-              const turnsSinceDisconnected = stockEntry?.turnsSinceDisconnected ?? 0;
-              if (turnsSinceDisconnected > SUPPLY_STOCKPILE_BUFFER) {
-                const decayTurns = turnsSinceDisconnected - SUPPLY_STOCKPILE_BUFFER;
-                const decayMultiplier = Math.max(SUPPLY_DECAY_FLOOR, 1 - (SUPPLY_DECAY_RATE * decayTurns));
-                tileInc = Math.floor(tileInc * decayMultiplier);
-              }
-            }
+            const hexKey = `${tile.q},${tile.r},${tile.s}`;
+            const decayMultiplier = getBusinessSupplyDecayMultiplier(hexKey, state.businessSupplyStatus);
+            tileInc = Math.floor(tileInc * decayMultiplier);
           }
           // War income penalty for AI
           let aiWarPenalty = 0;
@@ -6762,10 +6649,12 @@ export const useEnhancedMafiaGameState = (
             const pickIdx = softmaxPick(deployScores, turnRng, undefined, difficultySoftmaxTemperature(state.difficulty || 'normal'));
             const target = validTargets[pickIdx >= 0 ? pickIdx : 0];
             const newId = `${fam}-soldier-${state.turn}-${Math.floor(turnRng() * 1e9).toString(36)}`;
+            const aiSoldierName = generateSoldierName(collectExistingUnitNames(state.deployedUnits));
             state.deployedUnits.push({
               id: newId, type: 'soldier', family: fam,
               q: target.q, r: target.r, s: target.s,
               movesRemaining: 2, maxMoves: 2, level: 1,
+              name: aiSoldierName,
             });
             state.soldierStats[newId] = {
               loyalty: 40 + Math.floor(turnRng() * 30), training: 0,
@@ -7233,7 +7122,7 @@ export const useEnhancedMafiaGameState = (
                   const shIdx = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
                   if (shIdx !== -1) {
                     const capturedSh = state.safehouses[shIdx];
-                    // Transfer stockpile to captor
+                    seizeSafehouseStockpileToFamily(state, capturedSh, fam);
                     const stockpileDesc = Object.entries(capturedSh.stockpile || {}).filter(([,v]) => (v as number) > 0).map(([k,v]) => `${Math.floor(v as number)} ${k.replace('_',' ')}`).join(', ');
                     state.safehouses.splice(shIdx, 1);
                     if (prevOwner === state.playerFamily) {
@@ -7388,6 +7277,7 @@ export const useEnhancedMafiaGameState = (
                 const shIdx2 = state.safehouses.findIndex(s => s.q === target.q && s.r === target.r && s.s === target.s);
                 if (shIdx2 !== -1 && tile.controllingFamily === fam) {
                     const capturedSh2 = state.safehouses[shIdx2];
+                    seizeSafehouseStockpileToFamily(state, capturedSh2, fam);
                     const stockpileDesc2 = Object.entries(capturedSh2.stockpile || {}).filter(([,v]) => (v as number) > 0).map(([k,v]) => `${Math.floor(v as number)} ${k.replace('_',' ')}`).join(', ');
                     state.safehouses.splice(shIdx2, 1);
                     if (prevOwner === state.playerFamily) {
@@ -9254,29 +9144,56 @@ export const useEnhancedMafiaGameState = (
           newState.safehouses[shIdx].allocationPercent = Math.max(0, Math.min(SAFEHOUSE_MAX_ALLOCATION, action.allocationPercent));
           return newState;
         }
-        case 'release_safehouse_stockpile': {
-          const shIdx = newState.safehouses.findIndex(s => s.q === action.q && s.r === action.r && s.s === action.s);
-          if (shIdx === -1) return newState;
-          const sh = newState.safehouses[shIdx];
-          const supplyType = action.supplyType as SupplyNodeType;
-          const current = sh.stockpile[supplyType] || 0;
-          if (current <= 0) {
-            newState.pendingNotifications.push({ type: 'warning', title: '📦 No Stockpile', message: `No ${supplyType.replace('_', ' ')} reserves to release.` });
-            return newState;
+        case 'halt_business_supply': {
+          const hexKey = action.hexKey as string;
+          const cfg = newState.supplyRoutingConfig || defaultSupplyRoutingConfig();
+          if (!cfg.haltedBusinessHexKeys.includes(hexKey)) {
+            newState.supplyRoutingConfig = {
+              ...cfg,
+              haltedBusinessHexKeys: [...cfg.haltedBusinessHexKeys, hexKey],
+            };
           }
-          // Release 1 unit — sustain businesses for 1 turn
-          sh.stockpile[supplyType] = Math.max(0, current - 1);
-          // Mark the supply type as "sustained" this turn by resetting stockpile disconnect counter
-          const stockEntry = (newState.supplyStockpile || []).find(e => e.family === newState.playerFamily && e.nodeType === supplyType);
-          if (stockEntry && stockEntry.turnsSinceDisconnected > 0) {
-            stockEntry.turnsSinceDisconnected = 0; // Reset — 1 turn of full revenue
+          return newState;
+        }
+        case 'resume_business_supply': {
+          const hexKey = action.hexKey as string;
+          const cfg = newState.supplyRoutingConfig || defaultSupplyRoutingConfig();
+          newState.supplyRoutingConfig = {
+            ...cfg,
+            haltedBusinessHexKeys: cfg.haltedBusinessHexKeys.filter(k => k !== hexKey),
+          };
+          return newState;
+        }
+        case 'set_business_feed_priority': {
+          const nodeType = action.nodeType as SupplyNodeType;
+          const orderedHexKeys = (action.orderedHexKeys || []) as string[];
+          const cfg = newState.supplyRoutingConfig || defaultSupplyRoutingConfig();
+          newState.supplyRoutingConfig = {
+            ...cfg,
+            businessFeedOrder: { ...cfg.businessFeedOrder, [nodeType]: orderedHexKeys },
+          };
+          return newState;
+        }
+        case 'set_hq_supply_priority': {
+          const nodeType = action.nodeType as SupplyNodeType;
+          const enabled = Boolean(action.enabled);
+          const cfg = newState.supplyRoutingConfig || defaultSupplyRoutingConfig();
+          let hqPriorityTypes = [...cfg.hqPriorityTypes];
+          if (enabled && !hqPriorityTypes.includes(nodeType)) {
+            hqPriorityTypes.push(nodeType);
+          } else if (!enabled) {
+            hqPriorityTypes = hqPriorityTypes.filter(t => t !== nodeType);
           }
-          const cfg = SUPPLY_NODE_CONFIG[supplyType];
-          newState.pendingNotifications.push({
-            type: 'success', title: '📦 Stockpile Released',
-            message: `Released 1 unit of ${cfg.label} reserves. Businesses sustained for this turn. ${Math.max(0, current - 1)} remaining.`,
-          });
-          syncLegacyUnits(newState);
+          newState.supplyRoutingConfig = { ...cfg, hqPriorityTypes };
+          return newState;
+        }
+        case 'cancel_supply_deal': {
+          if (!cancelSupplyDeal(newState, action.pactId as string)) {
+            newState.pendingNotifications.push({
+              type: 'warning', title: 'Cannot Cancel Deal',
+              message: 'Deal not found or you are not the supplier.',
+            });
+          }
           return newState;
         }
         case 'plan_hit': {
@@ -9412,11 +9329,13 @@ export const useEnhancedMafiaGameState = (
             const hq = newState.headquarters[newState.playerFamily];
             if (hq) {
               const newId = `${newState.playerFamily}-soldier-merc-${Date.now()}`;
+              const mercName = generateSoldierName(collectExistingUnitNames(newState.deployedUnits));
               newState.deployedUnits = [...newState.deployedUnits, {
                 id: newId, type: 'soldier' as const, family: newState.playerFamily,
                 q: hq.q, r: hq.r, s: hq.s,
                 movesRemaining: 0, maxMoves: 2, level: 1,
                 recruited: false,
+                name: mercName,
               }];
               newState.soldierStats[newId] = {
                 loyalty: LOYALTY_MERC_START, training: 0,
@@ -9459,11 +9378,13 @@ export const useEnhancedMafiaGameState = (
             const hq = newState.headquarters[newState.playerFamily];
             if (hq) {
               const newId = `${newState.playerFamily}-soldier-recruit-${Date.now()}`;
+              const recruitName = generateSoldierName(collectExistingUnitNames(newState.deployedUnits));
               newState.deployedUnits = [...newState.deployedUnits, {
                 id: newId, type: 'soldier' as const, family: newState.playerFamily,
                 q: hq.q, r: hq.r, s: hq.s,
                 movesRemaining: 0, maxMoves: 2, level: 1,
                 recruited: true,
+                name: recruitName,
               }];
               newState.soldierStats[newId] = {
                 loyalty: LOYALTY_RECRUIT_START, training: 0,
@@ -11654,15 +11575,7 @@ export const useEnhancedMafiaGameState = (
         if (enemySafehouseIdx !== -1) {
           const capturedSh = state.safehouses[enemySafehouseIdx];
           const stockpileDesc = Object.entries(capturedSh.stockpile || {}).filter(([,v]) => (v as number) > 0).map(([k,v]) => `${Math.floor(v as number)} ${k.replace('_',' ')}`).join(', ');
-          // Transfer seized stockpile to player's supply buffer (reset disconnect counters)
-          Object.entries(capturedSh.stockpile || {}).forEach(([nodeType, amount]) => {
-            if ((amount as number) > 0) {
-              const stockEntry = (state.supplyStockpile || []).find(e => e.family === state.playerFamily && e.nodeType === nodeType);
-              if (stockEntry && stockEntry.turnsSinceDisconnected > 0) {
-                stockEntry.turnsSinceDisconnected = Math.max(0, stockEntry.turnsSinceDisconnected - Math.floor(amount as number));
-              }
-            }
-          });
+          seizeSafehouseStockpileToFamily(state, capturedSh, state.playerFamily);
           state.safehouses.splice(enemySafehouseIdx, 1);
           state.resources.money += SAFEHOUSE_CAPTURE_BOUNTY;
           // Intel: scout all hexes owned by targetFamily for 1 turn
@@ -12987,6 +12900,13 @@ export const useEnhancedMafiaGameState = (
 
 
 
+  const clearWarDeclaration = useCallback(() => {
+    setGameState(prev => ({
+      ...prev,
+      pendingWarDeclaration: undefined,
+    }));
+  }, []);
+
   const clearNotifications = useCallback(() => {
     setGameState(prev => {
       // Mirror notifications into the persistent alerts log before clearing
@@ -13022,6 +12942,7 @@ export const useEnhancedMafiaGameState = (
 
   // Replace full game state (used by Load Game)
   const loadGameState = useCallback((next: EnhancedMafiaGameState) => {
+    migrateSupplyState(next);
     setGameState(next);
   }, []);
 
@@ -13044,6 +12965,7 @@ export const useEnhancedMafiaGameState = (
     deployUnit,
     isWinner,
     clearNotifications,
+    clearWarDeclaration,
     markAlertsRead,
     fortifyUnit,
     setMoveAction,
