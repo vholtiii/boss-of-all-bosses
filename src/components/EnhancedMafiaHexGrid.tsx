@@ -1472,31 +1472,58 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     const connectedKeys: Set<string> = (window as any).__connectedNodeKeys || new Set();
                     const isConnected = connectedKeys.has(nodeKey);
                     const isPlayerOwned = tile.controllingFamily === playerFamily;
+                    const ringColor = isConnected ? '#10B981' : isPlayerOwned ? '#EF4444' : '#D4AF37';
+                    const badgeCx = x + baseHexRadius * 0.75;
+                    const badgeCy = y - baseHexRadius * 1.05;
+                    const iconCy = y - baseHexRadius * 1.15;
                     return (
                       <g className="pointer-events-none">
+                        {/* Dark backing so the ring reads on any tile */}
                         <polygon
                           points={getHexPoints(x, y, baseHexRadius + 4)}
                           fill="none"
-                          stroke={isConnected ? '#10B981' : isPlayerOwned ? '#EF4444' : '#D4AF37'}
-                          strokeWidth="2.5"
-                          opacity="0.85"
-                          strokeDasharray={isConnected ? 'none' : '4,2'}
+                          stroke="#0b0b12"
+                          strokeWidth={4.5}
+                          strokeLinejoin="round"
+                          opacity={0.9}
                         />
-                        <circle cx={x} cy={y - baseHexRadius * 0.85} r={8} fill="#1a1a2e" stroke="#D4AF37" strokeWidth="1.5" />
-                        <text x={x} y={y - baseHexRadius * 0.85 + 4} textAnchor="middle" fontSize="10" className="select-none">
+                        {/* Continuous colored ring */}
+                        <polygon
+                          points={getHexPoints(x, y, baseHexRadius + 4)}
+                          fill="none"
+                          stroke={ringColor}
+                          strokeWidth={2.5}
+                          strokeLinejoin="round"
+                          opacity={1}
+                        />
+                        {/* Inner glow for disconnected (replaces dashes) */}
+                        {!isConnected && (
+                          <polygon
+                            points={getHexPoints(x, y, baseHexRadius + 2)}
+                            fill="none"
+                            stroke={ringColor}
+                            strokeWidth={1.25}
+                            strokeLinejoin="round"
+                            opacity={0.35}
+                          />
+                        )}
+                        {/* Type-icon badge, lifted clear of the ring */}
+                        <circle cx={x} cy={iconCy} r={9} fill="#0b0b12" opacity={0.9} />
+                        <circle cx={x} cy={iconCy} r={8} fill="#1a1a2e" stroke="#D4AF37" strokeWidth={1.5} />
+                        <text x={x} y={iconCy + 4} textAnchor="middle" fontSize={10} className="select-none">
                           {cfg.icon}
                         </text>
-                        {/* Connection status badge */}
+                        {/* Connection status badge, above-right of the ring */}
                         {isConnected && (
                           <g>
-                            <circle cx={x + baseHexRadius * 0.55} cy={y - baseHexRadius * 0.85} r={6} fill="#10B981" stroke="#ffffff" strokeWidth="1" />
-                            <text x={x + baseHexRadius * 0.55} y={y - baseHexRadius * 0.85 + 3.5} textAnchor="middle" fontSize="7" className="select-none">✓</text>
+                            <circle cx={badgeCx} cy={badgeCy} r={6} fill="#10B981" stroke="#ffffff" strokeWidth={1} />
+                            <text x={badgeCx} y={badgeCy + 3.5} textAnchor="middle" fontSize={7} className="select-none">✓</text>
                           </g>
                         )}
                         {!isConnected && isPlayerOwned && (
                           <g className="animate-pulse">
-                            <circle cx={x + baseHexRadius * 0.55} cy={y - baseHexRadius * 0.85} r={6} fill="#EF4444" stroke="#ffffff" strokeWidth="1" />
-                            <text x={x + baseHexRadius * 0.55} y={y - baseHexRadius * 0.85 + 3.5} textAnchor="middle" fontSize="7" className="select-none">!</text>
+                            <circle cx={badgeCx} cy={badgeCy} r={6} fill="#EF4444" stroke="#ffffff" strokeWidth={1} />
+                            <text x={badgeCx} y={badgeCy + 3.5} textAnchor="middle" fontSize={7} className="select-none">!</text>
                           </g>
                         )}
                       </g>
