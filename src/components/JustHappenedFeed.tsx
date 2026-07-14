@@ -15,7 +15,10 @@ interface Props {
   gameState: any;
   onJumpHex?: (hex: { q: number; r: number; s: number }) => void;
   onJumpUnit?: (unit: { type: 'soldier' | 'capo'; q: number; r: number; s: number }) => void;
+  /** `docked` sits inside the right panel; `floating` keeps the original fixed overlay. */
+  variant?: 'floating' | 'docked';
 }
+
 
 const CAT_ICON: Record<AlertCategory, string> = {
   combat: '⚔️',
@@ -59,6 +62,7 @@ const JustHappenedFeed: React.FC<Props> = ({
   gameState,
   onJumpHex,
   onJumpUnit,
+  variant = 'floating',
 }) => {
   const feedItems = useMemo(
     () => deriveTurnEventsFeed(alerts, currentTurn, 20),
@@ -105,9 +109,15 @@ const JustHappenedFeed: React.FC<Props> = ({
 
   if (totalCount === 0) return null;
 
+  const isDocked = variant === 'docked';
+
   return (
     <div
-      className="pointer-events-none fixed top-[120px] right-4 z-30 w-[320px] max-w-[90vw]"
+      className={cn(
+        isDocked
+          ? 'relative w-full pointer-events-auto'
+          : 'pointer-events-none fixed top-[120px] right-4 z-30 w-[320px] max-w-[90vw]'
+      )}
       role="region"
       aria-label="Recent events"
     >
