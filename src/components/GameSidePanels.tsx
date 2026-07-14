@@ -1428,7 +1428,9 @@ export const RightSidePanel: React.FC<{
   onDeclineIncomingSitdown?: (s: IncomingSitdown) => void;
   onCounterIncomingSitdown?: (s: IncomingSitdown, counterPrice: number) => void;
   onFocusHex?: (q: number, r: number, s: number) => void;
-}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily, onSelectUnit, onOpenOutgoingSitdown, onAcceptIncomingSitdown, onDeclineIncomingSitdown, onCounterIncomingSitdown, onFocusHex }) => {
+  onJumpHex?: (hex: { q: number; r: number; s: number }) => void;
+  onJumpUnit?: (unit: { type: 'soldier' | 'capo'; q: number; r: number; s: number }) => void;
+}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily, onSelectUnit, onOpenOutgoingSitdown, onAcceptIncomingSitdown, onDeclineIncomingSitdown, onCounterIncomingSitdown, onFocusHex, onJumpHex, onJumpUnit }) => {
   const [openSection, setOpenSection] = useState<string>('');
   const { playSound } = useSoundSystem();
   const toggle = (id: string) => {
