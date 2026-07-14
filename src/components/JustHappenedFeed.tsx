@@ -15,7 +15,10 @@ interface Props {
   gameState: any;
   onJumpHex?: (hex: { q: number; r: number; s: number }) => void;
   onJumpUnit?: (unit: { type: 'soldier' | 'capo'; q: number; r: number; s: number }) => void;
+  /** `docked` sits inside the right panel; `floating` keeps the original fixed overlay. */
+  variant?: 'floating' | 'docked';
 }
+
 
 const CAT_ICON: Record<AlertCategory, string> = {
   combat: '⚔️',
