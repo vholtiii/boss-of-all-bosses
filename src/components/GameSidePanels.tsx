@@ -1440,8 +1440,9 @@ export const RightSidePanel: React.FC<{
   };
 
   return (
-    <ScrollArea className="h-full">
-      <div className="p-4 space-y-4">
+    <div className="h-full flex flex-col">
+      <ScrollArea className="flex-1">
+        <div className="p-4 space-y-4">
         {/* ── Threat Board (consolidated alerts) ── */}
         <ThreatBoardPanel gameState={gameState} onSelectUnit={onSelectUnit} />
 
@@ -1673,7 +1674,18 @@ export const RightSidePanel: React.FC<{
           </CollapsibleSection>
         )}
       </div>
-    </ScrollArea>
+      </ScrollArea>
+      <div className="shrink-0 pt-2">
+        <JustHappenedFeed
+          variant="docked"
+          alerts={gameState.alertsLog || []}
+          currentTurn={gameState.turn}
+          gameState={gameState}
+          onJumpHex={onJumpHex}
+          onJumpUnit={onJumpUnit}
+        />
+      </div>
+    </div>
   );
 };
 
