@@ -22,7 +22,6 @@ import EnemyHexActionDialog from '@/components/EnemyHexActionDialog';
 import GameGuide from '@/components/GameGuide';
 import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
 import AlertsLogPanel from '@/components/AlertsLogPanel';
-import JustHappenedFeed from '@/components/JustHappenedFeed';
 import TurnSummaryModal from '@/components/TurnSummaryModal';
 import CommissionVoteModal from '@/components/CommissionVoteModal';
 import WarDeclarationModal from '@/components/WarDeclarationModal';
@@ -1809,18 +1808,6 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           />
         </div>
       </ResponsiveLayout>
-
-      {/* Civ-style "Just Happened" feed — surfaces this turn's events as dismissible cards */}
-      <JustHappenedFeed
-        alerts={gameState.alertsLog || []}
-        currentTurn={gameState.turn}
-        gameState={gameState}
-        onJumpHex={(hex) => {
-          const tile = (gameState.hexMap || []).find((t: any) => t.q === hex.q && t.r === hex.r && t.s === hex.s);
-          if (tile) selectTerritory(tile);
-        }}
-        onJumpUnit={(u) => selectUnit(u.type, { q: u.q, r: u.r, s: u.s })}
-      />
 
 
       {/* Headquarters Info Panel */}
