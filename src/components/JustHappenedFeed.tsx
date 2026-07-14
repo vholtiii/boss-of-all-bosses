@@ -114,7 +114,6 @@ const JustHappenedFeed: React.FC<Props> = ({
   return (
     <div
       className={cn(
-        'role="region" aria-label="Recent events"',
         isDocked
           ? 'relative w-full pointer-events-auto'
           : 'pointer-events-none fixed top-[120px] right-4 z-30 w-[320px] max-w-[90vw]'
