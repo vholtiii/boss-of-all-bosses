@@ -107,9 +107,15 @@ const JustHappenedFeed: React.FC<Props> = ({
   );
   const totalCount = visible.length + postureVisible.length;
 
-  if (totalCount === 0) return null;
-
   const isDocked = variant === 'docked';
+  if (totalCount === 0) {
+    if (!isDocked) return null;
+    return (
+      <div className="w-full text-[10px] text-muted-foreground text-center py-1 border-t border-noir-light/50">
+        📜 Just Happened — no events yet
+      </div>
+    );
+  }
 
   return (
     <div
