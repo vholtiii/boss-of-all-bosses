@@ -487,6 +487,8 @@ export interface TurnReport {
   territoriesLost: string[];
   territoriesGained: string[];
   boldActions?: Array<{ family: string; action: string; respect: number; detail: string }>;
+  /** Per-business hex income collected this turn (drives floating +$ map labels). */
+  hexIncome?: Array<{ hex: string; amount: number }>;
   // ── Structured explanatory sections (why things changed) ──
   incomeBreakdown?: TurnReportIncomeBreakdown;
   heatReasons?: TurnReportReason[];
@@ -3776,6 +3778,7 @@ export const useEnhancedMafiaGameState = (
         territoriesLost: [],
         territoriesGained: [],
         boldActions: [],
+        hexIncome: [],
         heatReasons: [],
         prosecutionReasons: [],
         loyaltyReasons: [],
@@ -5833,6 +5836,12 @@ export const useEnhancedMafiaGameState = (
           illegalIncome += tileIncome;
         }
         income += tileIncome;
+        if (tileIncome > 0 && turnReport?.hexIncome) {
+          turnReport.hexIncome.push({
+            hex: `${tile.q},${tile.r},${tile.s}`,
+            amount: tileIncome,
+          });
+        }
       }
     });
 

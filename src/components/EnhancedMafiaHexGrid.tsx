@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -6,11 +6,18 @@ import { ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
 import SelectedUnitDock from '@/components/SelectedUnitDock';
+import MapEffectsLayer from '@/components/MapEffectsLayer';
+import { useMapEffects } from '@/hooks/useMapEffects';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
 import { ScoutedHex, Safehouse, PlannedHit, SupplyNode, SUPPLY_NODE_CONFIG, SupplyNodeType, FortifiedHex, FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, FLIP_SOLDIER_BASE_COST, FLIP_SOLDIER_COST_ESCALATION, FLIP_SOLDIER_BASE_CHANCE, SUPPLY_DEPENDENCIES, HQ_SUPPLY_CAPACITY, SUPPLY_STOCKPILE_BUFFER } from '@/types/game-mechanics';
 import { computeMapOverlays, computeRouteBreakingHexes, MapOverlays } from '@/lib/map-overlays';
 import { getBusinessSupplyDecayMultiplier } from '@/lib/supply-flow';
 import { FAMILY_COLORS, FAMILY_INK_WASH, TERRAIN_FILLS } from '@/lib/period-theme';
+
+export interface HexGridFxHandle {
+  spawnIncomeFloats: (entries: Array<{ hex: string; amount: number }>) => void;
+  spawnTerritoryFlashes: (changes: Array<{ hex: string; change: 'gained' | 'lost'; to?: string }>) => void;
+}
 
 interface EnhancedMafiaHexGridProps {
   width: number;
@@ -47,12 +54,12 @@ const businessIcons: Record<string, string> = {
   store: '🏪',
 };
 
-const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({ 
+const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridProps>(({ 
   width, height, onBusinessClick, selectedBusiness, playerFamily,
   gameState, onAction, onSelectUnit, onMoveUnit, onSelectHeadquarters,
   onSelectUnitFromHeadquarters, onDeployUnit, planHitMode, planHitStep, planHitPlannerId, onPlanHitSelect, onPlanHitSelectSoldier, onCancelPlanHit,
   bossHighlightHex, highlightedFamily, onClearHighlight
-}) => {
+}, ref) => {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const svgRef = React.useRef<SVGSVGElement | null>(null);
@@ -145,6 +152,20 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
   const bribedOfficials = gameState?.policeHeat?.bribedOfficials || [];
 
   const activeBribes = gameState?.activeBribes || [];
+
+  const { effects, spawnIncomeFloats, spawnTerritoryFlashes } = useMapEffects({
+    hexMap,
+    lastCombatResult: gameState?.lastCombatResult,
+    playerFamily,
+  });
+
+  useImperativeHandle(ref, () => ({
+    spawnIncomeFloats: (entries) => {
+      const hq = hexMap.find(t => t.isHeadquarters === playerFamily);
+      spawnIncomeFloats(entries, hq ? { q: hq.q, r: hq.r, s: hq.s } : null);
+    },
+    spawnTerritoryFlashes,
+  }), [spawnIncomeFloats, spawnTerritoryFlashes, hexMap, playerFamily]);
 
   // Strategic overlays (war fronts, vulnerability, supply support, district ownership…)
   const overlays: MapOverlays | null = useMemo(
@@ -247,6 +268,94 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
     }
     return points.join(' ');
   };
+
+  const selectedUnit = useMemo(
+    () => deployedUnits.find(u => u.id === gameState?.selectedUnitId) || null,
+    [deployedUnits, gameState?.selectedUnitId],
+  );
+
+  /** Flat unit layer positions (non-HQ), keyed by unit id for motion tweening. */
+  const unitRenderList = useMemo(() => {
+    type Entry = {
+      unit: DeployedUnit;
+      x: number;
+      y: number;
+      count: number;
+      family: string;
+      type: 'capo' | 'soldier';
+      badges: Array<'ceremony' | 'rat' | 'confirmedRat' | 'suspicious'>;
+    };
+    const out: Entry[] = [];
+    if (!showSoldiers) return out;
+    const turnPhase = gameState?.turnPhase || 'waiting';
+
+    unitsByHex.forEach((unitsHere, key) => {
+      const [q, r, s] = key.split(',').map(Number);
+      const tile = hexMap.find(t => t.q === q && t.r === r && t.s === s);
+      if (!tile) return;
+      // HQ units use the deployment panel, not the map layer
+      if (tile.isHeadquarters) return;
+      const { x: cx, y: cy } = getHexPosition(q, r);
+
+      const soldiersByFamily = new Map<string, DeployedUnit[]>();
+      const caposByFamily = new Map<string, DeployedUnit[]>();
+      unitsHere.forEach(u => {
+        if (u.type === 'soldier') {
+          if (!soldiersByFamily.has(u.family)) soldiersByFamily.set(u.family, []);
+          soldiersByFamily.get(u.family)!.push(u);
+        } else {
+          if (!caposByFamily.has(u.family)) caposByFamily.set(u.family, []);
+          caposByFamily.get(u.family)!.push(u);
+        }
+      });
+
+      let offsetIdx = 0;
+      caposByFamily.forEach((capos, fam) => {
+        if (fam !== playerFamily && !isRivalUnitVisible(tile, fam)) return;
+        const capo = capos[0];
+        out.push({
+          unit: capo,
+          x: cx - baseHexRadius * 0.3 + offsetIdx * 12,
+          y: cy - baseHexRadius * 0.15,
+          count: 1,
+          family: fam,
+          type: 'capo',
+          badges: [],
+        });
+        offsetIdx++;
+      });
+
+      soldiersByFamily.forEach((soldiers, fam) => {
+        if (fam !== playerFamily && !isRivalUnitVisible(tile, fam)) return;
+        const first = soldiers[0];
+        const badges: Entry['badges'] = [];
+        if (soldiers.some(s => (s as any).pendingPromotion) && fam === playerFamily) badges.push('ceremony');
+        if (fam !== playerFamily && soldiers.some(s =>
+          (gameState?.flippedSoldiers || []).some((f: any) => f.unitId === s.id && f.flippedByFamily === playerFamily)
+        )) badges.push('rat');
+        if (fam === playerFamily) {
+          const confirmed = soldiers.some(s => gameState?.soldierStats?.[s.id]?.confirmedRat);
+          const suspicious = !confirmed && soldiers.some(s => gameState?.soldierStats?.[s.id]?.suspicious);
+          if (confirmed) badges.push('confirmedRat');
+          else if (suspicious) badges.push('suspicious');
+        }
+        out.push({
+          unit: first,
+          x: cx + baseHexRadius * 0.25 + offsetIdx * 12,
+          y: cy + baseHexRadius * 0.35,
+          count: soldiers.length,
+          family: fam,
+          type: 'soldier',
+          badges,
+        });
+        offsetIdx++;
+      });
+    });
+
+    // Silence unused warning for turnPhase (kept for future HQ overlay gates)
+    void turnPhase;
+    return out;
+  }, [showSoldiers, unitsByHex, hexMap, playerFamily, gameState?.flippedSoldiers, gameState?.soldierStats, gameState?.turnPhase]);
 
   // District abbreviations for hex labels
   const districtAbbreviations: Record<string, string> = {
@@ -980,18 +1089,32 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
               const isMoveTarget = gameState?.selectedUnitId && gameState.availableMoveHexes?.some(
                 (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
               );
+              const moveRippleDelay = (isMoveTarget && selectedUnit)
+                ? (hexDistance(selectedUnit, tile) * 40)
+                : 0;
+              const isSelectedUnitHex = !!(selectedUnit
+                && selectedUnit.q === tile.q && selectedUnit.r === tile.r && selectedUnit.s === tile.s);
 
               return (
-                <g key={key}>
+                <g
+                  key={key}
+                  className={cn(
+                    isHovered && 'hex-hovered',
+                    isMoveTarget && 'hex-move-ripple',
+                  )}
+                  style={isMoveTarget ? { animationDelay: `${moveRippleDelay}ms` } as React.CSSProperties : undefined}
+                >
                   {(() => {
                     const isPlayerBuilt = tile.business && !tile.business.isExtorted && isPlayerTerritory;
                     const isConstructionComplete = tile.business && (!tile.business.constructionGoal || (tile.business.constructionProgress ?? 0) >= tile.business.constructionGoal);
                     const showBuiltIndicator = isPlayerBuilt && isConstructionComplete;
-                    const hexStroke = tile.isHeadquarters ? '#D4AF37'
+                    const hexStroke = isHovered ? '#E8D5A3'
+                      : tile.isHeadquarters ? '#D4AF37'
                       : showBuiltIndicator ? '#10B981'
                       : (tile.business?.isLegal && isPlayerTerritory) ? '#3B82F6'
                       : isPlayerTerritory ? '#D4AF3780' : '#333333';
-                    const hexStrokeWidth = tile.isHeadquarters ? 3
+                    const hexStrokeWidth = isHovered ? 2.5
+                      : tile.isHeadquarters ? 3
                       : showBuiltIndicator ? 2.5
                       : (tile.business?.isLegal && isPlayerTerritory) ? 2.5
                       : isPlayerTerritory ? 2 : 1;
@@ -1011,12 +1134,22 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                           stroke={hexStroke}
                           strokeWidth={hexStrokeWidth}
                           strokeDasharray={showBuiltIndicator ? '6 3' : undefined}
-                          opacity={getHexOpacity(tile)}
-                          className="cursor-pointer transition-all duration-150"
+                          opacity={isHovered ? Math.min(1, getHexOpacity(tile) + 0.2) : getHexOpacity(tile)}
+                          className={cn('cursor-pointer hex-interactive', isHovered && 'hex-interactive-hover')}
                           onClick={() => handleHexClick(tile)}
                           onMouseEnter={() => { setHoveredHex(tile); }}
                           onMouseLeave={() => setHoveredHex(null)}
                         />
+                        {isSelectedUnitHex && (
+                          <polygon
+                            points={getHexPoints(x, y, baseHexRadius + 1)}
+                            fill="none"
+                            stroke="#FFD700"
+                            strokeWidth={2}
+                            strokeDasharray="5 4"
+                            className="pointer-events-none marching-ants-ring"
+                          />
+                        )}
                         {isPlayerTerritory && !tile.isHeadquarters && (
                           <polygon
                             points={getHexPoints(x, y, baseHexRadius - 2)}
@@ -1567,177 +1700,7 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                     />
                   )}
 
-                  {/* Render units */}
-                  {showSoldiers && unitsHere.length > 0 && (!tile.isHeadquarters || tile.isHeadquarters === playerFamily || expandedHQKey === key || gameState?.turnPhase === 'move' || gameState?.turnPhase === 'action') && (() => {
-                    const turnPhase = gameState?.turnPhase || 'waiting';
-                    const selectedUnitId = gameState?.selectedUnitId;
-                    // Group by family and type
-                    const soldiersByFamily = new Map<string, DeployedUnit[]>();
-                    const caposByFamily = new Map<string, DeployedUnit[]>();
-                    unitsHere.forEach(u => {
-                      if (u.type === 'soldier') {
-                        if (!soldiersByFamily.has(u.family)) soldiersByFamily.set(u.family, []);
-                        soldiersByFamily.get(u.family)!.push(u);
-                      } else {
-                        if (!caposByFamily.has(u.family)) caposByFamily.set(u.family, []);
-                        caposByFamily.get(u.family)!.push(u);
-                      }
-                    });
-
-                    const elements: React.ReactNode[] = [];
-                    const isAtHQ = !!tile.isHeadquarters;
-                    const isDeployAtHQ = isAtHQ && turnPhase === 'deploy' && tile.isHeadquarters === playerFamily;
-
-                    // Show units at HQ during deploy so players can select them for movement
-                    if (!isAtHQ) {
-                      // Normal compact layout — skip HQ hexes (deployment menu handles those)
-                      let offsetIdx = 0;
-                      const hexRevealed = isHexRevealed(tile);
-
-                      caposByFamily.forEach((capos, fam) => {
-                       // Fog of War: hide rival capos unless visible per intel rules
-                        if (fam !== playerFamily && !isRivalUnitVisible(tile, fam)) return;
-                        const capo = capos[0];
-                        const isSelected = selectedUnitId === capo.id;
-                        const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action');
-                        elements.push(
-                          <CapoIcon
-                            key={`capo-${fam}-${key}`}
-                            x={x - baseHexRadius * 0.3 + offsetIdx * 12}
-                            y={y - baseHexRadius * 0.15}
-                            family={fam as any}
-                            name={capo.name || 'Capo'}
-                            level={capo.level}
-                            isPlayerFamily={fam === playerFamily}
-                            selected={isSelected}
-                            wounded={(capo as any).woundedTurnsRemaining > 0}
-                            onClick={isClickable ? (e) => {
-                              e.stopPropagation();
-                              setPinnedHex(tile);
-                              if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
-                                onSelectUnit('capo', { q: tile.q, r: tile.r, s: tile.s });
-                              }
-                            } : undefined}
-                          />
-                        );
-                        offsetIdx++;
-                      });
-
-                      soldiersByFamily.forEach((soldiers, fam) => {
-                       // Fog of War: hide rival soldiers unless visible per intel rules
-                        if (fam !== playerFamily && !isRivalUnitVisible(tile, fam)) return;
-                        const firstSoldier = soldiers[0];
-                        const isSelected = soldiers.some(s => s.id === selectedUnitId);
-                        const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action' || gameState?.persicoSelectionActive);
-                        const hasMark = fam === playerFamily && soldiers.some(s => gameState?.soldierStats?.[s.id]?.markedForDeath);
-                        const persicoArmed = !!gameState?.persicoSelectionActive && fam === playerFamily;
-                        elements.push(
-                          <SoldierIcon
-                            key={`soldier-${fam}-${key}`}
-                            x={x + baseHexRadius * 0.25 + offsetIdx * 12}
-                            y={y + baseHexRadius * 0.35}
-                            family={fam as any}
-                            count={soldiers.length}
-                            isPlayerFamily={fam === playerFamily}
-                            selected={isSelected || persicoArmed}
-                            markedForDeath={hasMark}
-                            onClick={isClickable ? (e) => {
-                              e.stopPropagation();
-                              setPinnedHex(tile);
-                              if (persicoArmed && onAction) {
-                                // Anoint this soldier as Capo
-                                onAction({ type: 'execute_persico_promotion', unitId: soldiers[0].id });
-                                return;
-                              }
-                              if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
-                                onSelectUnit('soldier', { q: tile.q, r: tile.r, s: tile.s });
-                              }
-                            } : undefined}
-                          />
-                        );
-                        // Show ceremony badge on soldiers with pending promotion
-                        const hasPendingPromotion = soldiers.some(s => (s as any).pendingPromotion);
-                        if (hasPendingPromotion && fam === playerFamily) {
-                          elements.push(
-                            <text
-                              key={`ceremony-${fam}-${key}`}
-                              x={x + baseHexRadius * 0.25 + offsetIdx * 12 - 8}
-                              y={y + baseHexRadius * 0.35 - 10}
-                              fontSize="10"
-                              textAnchor="middle"
-                              className="pointer-events-none"
-                              style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}
-                            >
-                              🎖️
-                            </text>
-                          );
-                        }
-                        // Rat icon on flipped soldiers (only visible for player's flipped assets)
-                        const hasFlippedInGroup = soldiers.some(s => 
-                          (gameState?.flippedSoldiers || []).some((f: any) => f.unitId === s.id && f.flippedByFamily === playerFamily)
-                        );
-                        if (hasFlippedInGroup && fam !== playerFamily) {
-                          elements.push(
-                            <text
-                              key={`rat-${fam}-${key}`}
-                              x={x + baseHexRadius * 0.25 + offsetIdx * 12 + 10}
-                              y={y + baseHexRadius * 0.35 + 12}
-                              fontSize="9"
-                              textAnchor="middle"
-                              className="pointer-events-none"
-                              opacity={0.7}
-                              style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}
-                            >
-                              🐀
-                            </text>
-                          );
-                        }
-                        // Suspicious / Confirmed Rat indicators for player soldiers
-                        if (fam === playerFamily) {
-                          const hasConfirmedRat = soldiers.some(s => {
-                            const stats = gameState?.soldierStats?.[s.id];
-                            return stats?.confirmedRat;
-                          });
-                          const hasSuspicious = !hasConfirmedRat && soldiers.some(s => {
-                            const stats = gameState?.soldierStats?.[s.id];
-                            return stats?.suspicious;
-                          });
-                          if (hasConfirmedRat) {
-                            elements.push(
-                              <text
-                                key={`confirmed-rat-${fam}-${key}`}
-                                x={x + baseHexRadius * 0.25 + offsetIdx * 12 - 10}
-                                y={y + baseHexRadius * 0.35 + 12}
-                                fontSize="9"
-                                textAnchor="middle"
-                                className="pointer-events-none"
-                                style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}
-                              >
-                                🐀
-                              </text>
-                            );
-                          } else if (hasSuspicious) {
-                            elements.push(
-                              <text
-                                key={`suspicious-${fam}-${key}`}
-                                x={x + baseHexRadius * 0.25 + offsetIdx * 12 - 10}
-                                y={y + baseHexRadius * 0.35 + 12}
-                                fontSize="9"
-                                textAnchor="middle"
-                                className="pointer-events-none"
-                                style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}
-                              >
-                                ⚠️
-                              </text>
-                            );
-                          }
-                        }
-                        offsetIdx++;
-                      });
-                    }
-
-                    return elements;
-                  })()}
+                  {/* Units rendered in flat tweened layer below */}
 
                   {/* Territory control dot */}
                   {tile.controllingFamily !== 'neutral' && !tile.isHeadquarters && (
@@ -2333,6 +2296,105 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
                 </foreignObject>
               );
             })()}
+            {/* Flat tweened units layer (keyed by unit.id so moves animate) */}
+            <g className="units-layer">
+              {unitRenderList.map(entry => {
+                const turnPhase = gameState?.turnPhase || 'waiting';
+                const selectedUnitId = gameState?.selectedUnitId;
+                const fam = entry.family;
+                const tile = hexMap.find(t => t.q === entry.unit.q && t.r === entry.unit.r && t.s === entry.unit.s);
+                if (entry.type === 'capo') {
+                  const isSelected = selectedUnitId === entry.unit.id;
+                  const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action');
+                  return (
+                    <motion.g
+                      key={entry.unit.id}
+                      initial={false}
+                      animate={{ x: entry.x, y: [entry.y, entry.y - 2, entry.y] }}
+                      transition={{ duration: 0.3, ease: 'easeInOut' }}
+                    >
+                      <CapoIcon
+                        x={0}
+                        y={0}
+                        family={fam as any}
+                        name={entry.unit.name || 'Capo'}
+                        level={entry.unit.level}
+                        isPlayerFamily={fam === playerFamily}
+                        selected={isSelected}
+                        wounded={(entry.unit as any).woundedTurnsRemaining > 0}
+                        onClick={isClickable ? (e) => {
+                          e.stopPropagation();
+                          if (tile) setPinnedHex(tile);
+                          if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
+                            onSelectUnit('capo', { q: entry.unit.q, r: entry.unit.r, s: entry.unit.s });
+                          }
+                        } : undefined}
+                      />
+                    </motion.g>
+                  );
+                }
+
+                const soldiersOnHex = (unitsByHex.get(`${entry.unit.q},${entry.unit.r},${entry.unit.s}`) || [])
+                  .filter(u => u.family === fam && u.type === 'soldier');
+                const isSelected = soldiersOnHex.some(s => s.id === selectedUnitId);
+                const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action' || gameState?.persicoSelectionActive);
+                const hasMark = fam === playerFamily && soldiersOnHex.some(s => gameState?.soldierStats?.[s.id]?.markedForDeath);
+                const persicoArmed = !!gameState?.persicoSelectionActive && fam === playerFamily;
+                return (
+                  <motion.g
+                    key={entry.unit.id}
+                    initial={false}
+                    animate={{ x: entry.x, y: [entry.y, entry.y - 2, entry.y] }}
+                    transition={{ duration: 0.3, ease: 'easeInOut' }}
+                  >
+                    <SoldierIcon
+                      x={0}
+                      y={0}
+                      family={fam as any}
+                      count={entry.count}
+                      isPlayerFamily={fam === playerFamily}
+                      selected={isSelected || persicoArmed}
+                      markedForDeath={hasMark}
+                      onClick={isClickable ? (e) => {
+                        e.stopPropagation();
+                        if (tile) setPinnedHex(tile);
+                        if (persicoArmed && onAction) {
+                          onAction({ type: 'execute_persico_promotion', unitId: entry.unit.id });
+                          return;
+                        }
+                        if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
+                          onSelectUnit('soldier', { q: entry.unit.q, r: entry.unit.r, s: entry.unit.s });
+                        }
+                      } : undefined}
+                    />
+                    {entry.badges.includes('ceremony') && (
+                      <text x={-8} y={-10} fontSize="10" textAnchor="middle" className="pointer-events-none"
+                        style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}>🎖️</text>
+                    )}
+                    {entry.badges.includes('rat') && (
+                      <text x={10} y={12} fontSize="9" textAnchor="middle" className="pointer-events-none" opacity={0.7}
+                        style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}>🐀</text>
+                    )}
+                    {entry.badges.includes('confirmedRat') && (
+                      <text x={-10} y={12} fontSize="9" textAnchor="middle" className="pointer-events-none"
+                        style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}>🐀</text>
+                    )}
+                    {entry.badges.includes('suspicious') && (
+                      <text x={-10} y={12} fontSize="9" textAnchor="middle" className="pointer-events-none"
+                        style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }}>⚠️</text>
+                    )}
+                  </motion.g>
+                );
+              })}
+            </g>
+
+            <MapEffectsLayer
+              effects={effects}
+              getHexPosition={getHexPosition}
+              getHexPoints={getHexPoints}
+              hexRadius={baseHexRadius}
+            />
+
             <AnimatePresence>
               {combatOverlay && (() => {
                 const { x, y } = getHexPosition(combatOverlay.q, combatOverlay.r);
@@ -3003,6 +3065,8 @@ const EnhancedMafiaHexGrid: React.FC<EnhancedMafiaHexGridProps> = ({
       </div>
     </div>
   );
-};
+});
+
+EnhancedMafiaHexGrid.displayName = 'EnhancedMafiaHexGrid';
 
 export default EnhancedMafiaHexGrid;

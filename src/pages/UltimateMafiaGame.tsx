@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import NegotiationDialog from '@/components/NegotiationDialog';
 import TurnStepRail from '@/components/TurnStepRail';
@@ -11,7 +11,7 @@ import { EnhancedButton } from '@/components/ui/enhanced-button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import ResponsiveLayout, { MobileTabBar, MobileFloatingActionButton } from '@/components/ResponsiveLayout';
-import EnhancedMafiaHexGrid from '@/components/EnhancedMafiaHexGrid';
+import EnhancedMafiaHexGrid, { type HexGridFxHandle } from '@/components/EnhancedMafiaHexGrid';
 import { LeftSidePanel, RightSidePanel } from '@/components/GameSidePanels';
 import { useEnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { getBusinessSupplyDecayMultiplier } from '@/lib/supply-flow';
@@ -24,6 +24,7 @@ import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
 import AlertsLogPanel from '@/components/AlertsLogPanel';
 import JustHappenedFeed from '@/components/JustHappenedFeed';
 import TurnSummaryModal from '@/components/TurnSummaryModal';
+import TurnResolutionOverlay from '@/components/TurnResolutionOverlay';
 import CommissionVoteModal from '@/components/CommissionVoteModal';
 import WarDeclarationModal from '@/components/WarDeclarationModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
@@ -164,10 +165,25 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     return () => document.removeEventListener('click', handleGlobalClick);
   }, [playSound]);
 
-  // Play sounds on combat results
+  const hexFxRef = useRef<HexGridFxHandle | null>(null);
+  const [showTurnResolution, setShowTurnResolution] = useState(false);
+  const [mapShake, setMapShake] = useState(false);
+  const [showVignette, setShowVignette] = useState(false);
+  const lastCombatFxRef = useRef<number | null>(null);
+  const resolvedReportTurnRef = useRef<number | null>(null);
+
+  const triggerCombatFeedback = useCallback(() => {
+    setMapShake(true);
+    setShowVignette(true);
+    const t1 = setTimeout(() => setMapShake(false), 160);
+    const t2 = setTimeout(() => setShowVignette(false), 420);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
+  // Play sounds on combat results + shake/vignette on failures
   useEffect(() => {
     if (gameState.lastCombatResult) {
-      const { success, type } = gameState.lastCombatResult;
+      const { success, type, timestamp } = gameState.lastCombatResult;
       if (type === 'hit') {
         if (success) playSound('hit_kill');
         else playSoundSequence(['hit_fail', 'error']);
@@ -178,13 +194,27 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         if (success) playSound('combat');
         else playSound('error');
       }
+      if (!success && timestamp && lastCombatFxRef.current !== timestamp) {
+        lastCombatFxRef.current = timestamp;
+        triggerCombatFeedback();
+      }
     }
-  }, [gameState.lastCombatResult, playSound, playSoundSequence]);
+  }, [gameState.lastCombatResult, playSound, playSoundSequence, triggerCombatFeedback]);
 
-  // Show turn summary when a new report comes in
+  // Shake on painful notifications (soldier killed / safehouse destroyed)
+  useEffect(() => {
+    const painful = (gameState.pendingNotifications || []).some((n: any) =>
+      /Soldier Killed|Safehouse Destroyed|Capo Wounded/i.test(n?.title || '')
+    );
+    if (painful) triggerCombatFeedback();
+  }, [gameState.pendingNotifications, triggerCombatFeedback]);
+
+  // Start turn-resolution choreography when a new report arrives (modal opens after sequence)
   useEffect(() => {
     if (gameState.turnReport && gameState.turnReport.turn === gameState.turn) {
-      setShowTurnSummary(true);
+      if (resolvedReportTurnRef.current === gameState.turn) return;
+      resolvedReportTurnRef.current = gameState.turn;
+      setShowTurnResolution(true);
     }
   }, [gameState.turnReport, gameState.turn]);
 
@@ -417,7 +447,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       label: 'Map',
       icon: <Target className="h-4 w-4" />,
       content: (
-        <div className="h-full relative">
+        <div className={cn('h-full relative', mapShake && 'map-shake')}>
+          {showVignette && <div className="combat-vignette" />}
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
             <HeatMeter
               heat={(gameState as any).policeHeat?.level ?? 0}
@@ -428,6 +459,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             />
           </div>
           <EnhancedMafiaHexGrid 
+            ref={hexFxRef}
             key="hex-grid-mobile"
             width={12}
             height={12}
@@ -1618,7 +1650,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   };
 
   const mainContent = (
-    <div className="h-full relative" onClick={deselectUnit}>
+    <div className={cn('h-full relative', mapShake && 'map-shake')} onClick={deselectUnit}>
+      {showVignette && <div className="combat-vignette" />}
       {/* Heat meter — pinned top-center of map */}
       <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
         <HeatMeter
@@ -1719,6 +1752,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       )} />
       
           <EnhancedMafiaHexGrid 
+            ref={hexFxRef}
             key="hex-grid-desktop"
             width={12}
             height={12}
@@ -2117,6 +2151,19 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
       <GameGuide
         isOpen={showTutorial}
         onClose={() => setShowTutorial(false)}
+      />
+
+      {/* Turn-end choreography → then newspaper summary */}
+      <TurnResolutionOverlay
+        open={showTurnResolution}
+        report={gameState.turnReport}
+        playSound={playSound}
+        onSpawnIncome={(entries) => hexFxRef.current?.spawnIncomeFloats(entries)}
+        onSpawnTerritory={(changes) => hexFxRef.current?.spawnTerritoryFlashes(changes)}
+        onComplete={() => {
+          setShowTurnResolution(false);
+          setShowTurnSummary(true);
+        }}
       />
 
       {/* Turn Summary Modal */}
