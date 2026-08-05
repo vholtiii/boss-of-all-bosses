@@ -42,6 +42,7 @@ import ThreatBoardPanel from '@/components/ThreatBoardPanel';
 import SitdownsPanel from '@/components/SitdownsPanel';
 import SupplyLedgerPanel from '@/components/SupplyLedgerPanel';
 import RivalComparisonStrip from '@/components/RivalComparisonStrip';
+import JustHappenedFeed from '@/components/JustHappenedFeed';
 import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType, SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, Safehouse, getTensionPairKey, WAR_TENSION_THRESHOLD, FAMILY_POWERS, PendingNegotiation, IncomingSitdown, COMMISSION_VOTE_COST, PROSECUTION_LAWYER_REDUCTION } from '@/types/game-mechanics';
 import { computeCommissionVoteProjection } from '@/lib/action-formulas';
 import { computeLegalBreakdown } from '@/lib/legal-breakdown';
@@ -1427,7 +1428,9 @@ export const RightSidePanel: React.FC<{
   onDeclineIncomingSitdown?: (s: IncomingSitdown) => void;
   onCounterIncomingSitdown?: (s: IncomingSitdown, counterPrice: number) => void;
   onFocusHex?: (q: number, r: number, s: number) => void;
-}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily, onSelectUnit, onOpenOutgoingSitdown, onAcceptIncomingSitdown, onDeclineIncomingSitdown, onCounterIncomingSitdown, onFocusHex }) => {
+  onJumpHex?: (hex: { q: number; r: number; s: number }) => void;
+  onJumpUnit?: (unit: { type: 'soldier' | 'capo'; q: number; r: number; s: number }) => void;
+}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily, onSelectUnit, onOpenOutgoingSitdown, onAcceptIncomingSitdown, onDeclineIncomingSitdown, onCounterIncomingSitdown, onFocusHex, onJumpHex, onJumpUnit }) => {
   const [openSection, setOpenSection] = useState<string>('');
   const { playSound } = useSoundSystem();
   const toggle = (id: string) => {
@@ -1437,8 +1440,9 @@ export const RightSidePanel: React.FC<{
   };
 
   return (
-    <ScrollArea className="h-full">
-      <div className="p-4 space-y-4">
+    <div className="h-full flex flex-col">
+      <ScrollArea className="flex-1">
+        <div className="p-4 space-y-4">
         {/* ── Threat Board (consolidated alerts) ── */}
         <ThreatBoardPanel gameState={gameState} onSelectUnit={onSelectUnit} />
 
@@ -1670,7 +1674,18 @@ export const RightSidePanel: React.FC<{
           </CollapsibleSection>
         )}
       </div>
-    </ScrollArea>
+      </ScrollArea>
+      <div className="shrink-0 pt-2">
+        <JustHappenedFeed
+          variant="docked"
+          alerts={gameState.alertsLog || []}
+          currentTurn={gameState.turn}
+          gameState={gameState}
+          onJumpHex={onJumpHex}
+          onJumpUnit={onJumpUnit}
+        />
+      </div>
+    </div>
   );
 };
 

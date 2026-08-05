@@ -118,7 +118,7 @@ import {
 export { HEAT_GAIN_MULT };
 
 import { generateCapoName, generateSoldierName, collectExistingUnitNames } from '@/lib/capo-names';
-import { pickTensionLine, FAMILY_DISPLAY_NAMES, type FamilyId } from '@/lib/rival-narrative';
+import { pickTensionLine, FAMILY_DISPLAY_NAMES } from '@/lib/rival-narrative';
 import {
   rollFamilyPersonality, rollFamilyStrategy, computeDynamicMood, blendMoodWithPersonality,
   scoreHexForAI, softmaxPick, familySignaturePreference,
