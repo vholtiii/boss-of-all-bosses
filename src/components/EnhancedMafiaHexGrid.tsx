@@ -816,48 +816,32 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           >Cancel</button>
         </div>
       )}
-      {/* Controls */}
-      <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
-        <div className="flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-3 border border-noir-light shadow-lg">
-          <Button variant="outline" size="sm" onClick={() => setZoom(z => Math.min(z + 0.15, 2.5))} className="h-8 w-8 p-0">
-            <ZoomIn className="h-4 w-4" />
+      {/* Map utility strip: compact controls keep the board as the primary surface. */}
+      <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-1.5 max-w-[calc(100%-2rem)]">
+        <div className="flex items-center gap-1 rounded-md border border-noir-light/80 bg-background/90 p-1 shadow-lg backdrop-blur-sm">
+          <Button variant="ghost" size="sm" onClick={() => setZoom(z => Math.min(z + 0.15, 2.5))} className="h-7 w-7 p-0" title="Zoom in" aria-label="Zoom in">
+            <ZoomIn className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setZoom(z => Math.max(z - 0.15, 0.3))} className="h-8 w-8 p-0">
-            <ZoomOut className="h-4 w-4" />
+          <span className="min-w-[38px] text-center text-[10px] font-semibold tabular-nums text-primary">{Math.round(zoom * 100)}%</span>
+          <Button variant="ghost" size="sm" onClick={() => setZoom(z => Math.max(z - 0.15, 0.3))} className="h-7 w-7 p-0" title="Zoom out" aria-label="Zoom out">
+            <ZoomOut className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="h-8 w-8 p-0">
-            <RotateCcw className="h-4 w-4" />
+          <span className="h-4 w-px bg-border" />
+          <Button variant="ghost" size="sm" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="h-7 w-7 p-0" title="Reset map view" aria-label="Reset map view">
+            <RotateCcw className="h-3.5 w-3.5" />
           </Button>
-          <div className="h-6 w-px bg-noir-light mx-1" />
-          <span className="text-sm font-medium text-mafia-gold">{Math.round(zoom * 100)}%</span>
         </div>
-        <Button
-          variant={showSoldiers ? "default" : "outline"}
-          size="sm"
-          onClick={() => setShowSoldiers(s => !s)}
-          className="font-medium"
-        >
-          {showSoldiers ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-          Units
-        </Button>
-        <Button
-          variant={showSupplyLines ? "default" : "outline"}
-          size="sm"
-          onClick={() => setShowSupplyLines(s => !s)}
-          className="font-medium"
-        >
-          {showSupplyLines ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-          Supply Lines
-        </Button>
-        <Button
-          variant={showThreats ? "default" : "outline"}
-          size="sm"
-          onClick={() => setShowThreats(s => !s)}
-          className="font-medium"
-        >
-          {showThreats ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-          Threats
-        </Button>
+        <div className="flex items-center gap-1 rounded-md border border-noir-light/80 bg-background/90 p-1 shadow-lg backdrop-blur-sm">
+          <Button variant={showSoldiers ? "default" : "ghost"} size="sm" onClick={() => setShowSoldiers(s => !s)} className="h-7 gap-1 px-2 text-[10px]" title="Toggle units" aria-pressed={showSoldiers}>
+            {showSoldiers ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />} Units
+          </Button>
+          <Button variant={showSupplyLines ? "default" : "ghost"} size="sm" onClick={() => setShowSupplyLines(s => !s)} className="h-7 gap-1 px-2 text-[10px]" title="Toggle supply lines" aria-pressed={showSupplyLines}>
+            {showSupplyLines ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />} Supply
+          </Button>
+          <Button variant={showThreats ? "default" : "ghost"} size="sm" onClick={() => setShowThreats(s => !s)} className="h-7 gap-1 px-2 text-[10px]" title="Toggle threats" aria-pressed={showThreats}>
+            {showThreats ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />} Threats
+          </Button>
+        </div>
       </div>
 
       {/* Grid */}
@@ -1142,12 +1126,21 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                         />
                         {isSelectedUnitHex && (
                           <polygon
-                            points={getHexPoints(x, y, baseHexRadius + 1)}
-                            fill="none"
-                            stroke="#FFD700"
-                            strokeWidth={2}
-                            strokeDasharray="5 4"
+                            points={getHexPoints(x, y, baseHexRadius + 2)}
+                            fill="hsl(var(--primary) / 0.08)"
+                            stroke="hsl(var(--primary))"
+                            strokeWidth={2.5}
                             className="pointer-events-none marching-ants-ring"
+                          />
+                        )}
+                        {(isDeployTarget || isMoveTarget) && !isSelectedUnitHex && (
+                          <polygon
+                            points={getHexPoints(x, y, baseHexRadius + 2)}
+                            fill="hsl(var(--primary) / 0.07)"
+                            stroke="hsl(var(--primary) / 0.85)"
+                            strokeWidth={1.8}
+                            strokeDasharray="4 3"
+                            className="pointer-events-none"
                           />
                         )}
                         {isPlayerTerritory && !tile.isHeadquarters && (
@@ -1302,8 +1295,8 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                     );
                   })()}
 
-                  {/* District abbreviation label — engraved atlas lettering */}
-                  {!tile.isHeadquarters && !tile.business && (
+                  {/* District shorthand yields to operational markers so the map stays legible. */}
+                  {!tile.isHeadquarters && !tile.business && !tile.supplyNode && unitsHere.length === 0 && !isHexHighlighted(tile) && (
                     <text x={x} y={y + 3} textAnchor="middle" fontSize="7" fill="#E8D5A3" fillOpacity="0.38" fontWeight="600" fontFamily="'Playfair Display', serif" letterSpacing="1" className="pointer-events-none select-none">
                       {districtAbbreviations[tile.district] || ''}
                     </text>
@@ -2966,100 +2959,32 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         playerFamily={playerFamily}
       />
 
-      {/* Map Legend */}
+      {/* Compact map status key */}
       <div className="absolute bottom-3 left-3 z-30">
         <button
+          type="button"
           onClick={() => setShowLegend(prev => !prev)}
-          className="paper-panel rounded px-2 py-1 text-[10px] font-typewriter hover:brightness-105 transition-all"
+          className="flex items-center gap-1.5 rounded-md border border-noir-light/80 bg-background/90 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-primary shadow-lg backdrop-blur-sm hover:bg-accent/30 transition-colors"
+          aria-expanded={showLegend}
         >
-          {showLegend ? '▼ Legend' : '▶ Legend'}
+          <span aria-hidden>{showLegend ? '⌄' : '⌃'}</span> Map key
         </button>
         {showLegend && (
-          <div className="paper-panel mt-1 rounded p-2.5 space-y-1.5 min-w-[160px]">
-            <div className="text-[10px] font-bold text-foreground/80 uppercase tracking-wider mb-1">Hex Outlines</div>
-            {[
-              { color: '#D4AF37', label: 'Headquarters', style: 'solid', width: 3 },
-              { color: '#10B981', label: 'Player-Built', style: 'dashed', width: 2.5 },
-              { color: '#3B82F6', label: 'Legal Business', style: 'solid', width: 2.5 },
-              { color: '#D4AF3780', label: 'Your Territory', style: 'solid', width: 2 },
-              { color: '#F97316', label: 'Contested', style: 'dashed', width: 2.5 },
-              { color: '#976BA5', label: 'Front Boss (Hidden)', style: 'dashed', width: 1.5 },
-              { color: '#D4AF37', label: 'Boosted District', style: 'dashed', width: 1.5 },
-            ].map(item => (
-              <div key={item.label} className="flex items-center gap-2">
-                <svg width="20" height="12" className="flex-shrink-0">
-                  <line x1="0" y1="6" x2="20" y2="6" stroke={item.color} strokeWidth={item.width} strokeDasharray={item.style === 'dashed' ? '4 2' : undefined} />
-                </svg>
-                <span className="text-[10px] text-muted-foreground">{item.label}</span>
-              </div>
-            ))}
-            <div className="border-t border-border pt-1.5 mt-1.5">
-              <div className="text-[10px] font-bold text-foreground/80 uppercase tracking-wider mb-1">Threat Overlays</div>
-              {[
-                { color: '#DC2626', label: 'War front (bordering enemy at war)', style: 'dashed', width: 2 },
-                { color: '#F59E0B', label: 'Vulnerable (erosion risk / pressure)', style: 'dashed', width: 2 },
-                { color: '#E8D5A3', label: 'District border', style: 'solid', width: 2.5 },
-              ].map(item => (
-                <div key={item.label} className="flex items-center gap-2">
-                  <svg width="20" height="12" className="flex-shrink-0">
-                    <line x1="0" y1="6" x2="20" y2="6" stroke={item.color} strokeWidth={item.width} strokeDasharray={item.style === 'dashed' ? '4 2' : undefined} />
-                  </svg>
-                  <span className="text-[10px] text-muted-foreground">{item.label}</span>
-                </div>
-              ))}
-              {[
-                { icon: '⛓️', label: 'Cut off from HQ (no supply route)' },
-                { icon: '📦', label: 'Business missing its supply node' },
-                { icon: '🔗', label: 'Route keystone (loss cuts territory off)' },
-                { icon: '🫠', label: 'Eroding (rival influence building)' },
-              ].map(item => (
-                <div key={item.label} className="flex items-center gap-2">
-                  <span className="text-[10px] w-4 text-center flex-shrink-0">{item.icon}</span>
-                  <span className="text-[10px] text-muted-foreground">{item.label}</span>
-                </div>
-              ))}
+          <div className="mt-1 w-[220px] rounded-md border border-noir-light/80 bg-background/95 p-3 shadow-xl backdrop-blur-sm">
+            <div className="mb-2 flex items-center justify-between border-b border-border/60 pb-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Read the board</span>
+              <span className="text-[9px] text-muted-foreground">priority order</span>
             </div>
-            <div className="border-t border-border pt-1.5 mt-1.5">
-              <div className="text-[10px] font-bold text-foreground/80 uppercase tracking-wider mb-1">Badges</div>
-              {[
-                { icon: '🏛️', label: 'Headquarters' },
-                { icon: '🏗️', label: 'Player-Built (+20% def, Capo to seize)' },
-                { icon: '👔', label: 'Capo Threat (enemy Capo!)' },
-                { icon: '🚧', label: 'Under Construction' },
-                { icon: '👁️', label: 'Scouted Hex' },
-                { icon: '🩸', label: 'Wounded Capo' },
-                { icon: '🎖️', label: 'Promotion Ceremony' },
-                { icon: '🛡️', label: 'Safehouse' },
-                { icon: '⚔️', label: 'Contested (hold 1 turn)' },
-                { icon: '⏳', label: 'Pending Claim (resolves end of next turn)' },
-                { icon: '⚓', label: 'Supply Node: Docks' },
-                { icon: '🔧', label: 'Supply Node: Union Hall' },
-                { icon: '🚛', label: 'Supply Node: Trucking' },
-                { icon: '🍷', label: 'Supply Node: Liquor' },
-                { icon: '🐟', label: 'Supply Node: Food Market' },
-              ].map(item => (
-                <div key={item.label} className="flex items-center gap-2">
-                  <span className="text-[10px] w-4 text-center flex-shrink-0">{item.icon}</span>
-                  <span className="text-[10px] text-muted-foreground">{item.label}</span>
-                </div>
-              ))}
+            <div className="space-y-1.5 text-[10px]">
+              <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm border-2 border-primary bg-primary/10" /><span className="text-foreground">Selected / actionable</span></div>
+              <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm border border-primary/70" /><span className="text-foreground">Your territory</span></div>
+              <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm border border-muted-foreground/50" /><span className="text-foreground">Rival / neutral territory</span></div>
+              <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-emerald-500" /><span className="text-foreground">Connected supply</span></div>
+              <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-destructive" /><span className="text-foreground">Supply interruption</span></div>
+              <div className="flex items-center gap-2"><span className="text-[11px]">⚔️</span><span className="text-foreground">Threat / contested hex</span></div>
+              <div className="flex items-center gap-2"><span className="text-[11px]">👁️</span><span className="text-foreground">Fresh intelligence</span></div>
             </div>
-            <div className="border-t border-border pt-1.5 mt-1.5">
-              <div className="text-[10px] font-bold text-foreground/80 uppercase tracking-wider mb-1">Rival Unit Visibility</div>
-              {[
-                'Scout intel (fresh, per-hex)',
-                'Rat (flipped soldier inside their family)',
-                'Captain bribe — TARGET family only',
-                'Chief bribe — ALL rivals (map-wide)',
-                'Mayor bribe — ALL rivals (map-wide)',
-                'Active alliance or supply deal (that rival)',
-                'Rival on your claimed territory',
-                'Capo vision (within 2 hexes of your capo)',
-                'Rival HQ hex (always public)',
-              ].map(label => (
-                <div key={label} className="text-[10px] text-muted-foreground">• {label}</div>
-              ))}
-            </div>
+            <div className="mt-2 border-t border-border/60 pt-2 text-[9px] text-muted-foreground">Click a hex for territory details. Select a unit to reveal movement and action targets.</div>
           </div>
         )}
       </div>

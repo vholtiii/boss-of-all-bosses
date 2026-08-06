@@ -201,34 +201,45 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 space-y-4">
-        {/* ── Family Header ── */}
-        <div className="text-center pb-3 border-b border-border">
-          <h2 className="text-lg font-bold text-primary font-playfair tracking-wider uppercase">
-            {gameState.playerFamily} Family
-          </h2>
-          <p className="text-xs text-muted-foreground mt-1">Turn {gameState.turn} · {gameState.season}</p>
+      <div className="p-3 space-y-3">
+        {/* ── Management identity ── */}
+        <div className="flex items-end justify-between border-b border-border/70 pb-2">
+          <div>
+            <p className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Command ledger</p>
+            <h2 className="text-lg font-bold text-primary font-playfair tracking-wider uppercase">{gameState.playerFamily} Family</h2>
+          </div>
+          <p className="text-[10px] text-right text-muted-foreground">Turn {gameState.turn}<br /><span className="capitalize">{gameState.season}</span></p>
         </div>
+
+        {/* ── Phase first: what matters now ── */}
+        {actionsLocked && (
+          <div className="rounded-md border border-primary/30 bg-primary/10 px-2.5 py-2">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-primary">{phase === 'deploy' ? 'Deploy step' : 'Tactical step'}</p>
+              <span className="text-[9px] text-muted-foreground">Actions unlock next</span>
+            </div>
+            <p className="mt-1 text-[10px] text-muted-foreground">{phase === 'deploy' ? 'Place units from HQ onto the map.' : 'Move, scout, fortify, escort, or recruit.'}</p>
+          </div>
+        )}
 
         {/* ── Resources Grid ── */}
-        <div className="grid grid-cols-2 gap-2">
-          <ResourceTile icon={<DollarSign className="h-4 w-4" />} label="Money" value={`$${resources.money.toLocaleString()}`} color="text-green-400" />
-          <ResourceTile icon={<Users className="h-4 w-4" />} label="Soldiers" value={String(resources.soldiers)} color="text-destructive" />
-          <ResourceTile icon={<Shield className="h-4 w-4" />} label="Respect" value={`${resources.respect}%`} color="text-blue-400" />
-          <ResourceTile icon={<Crown className="h-4 w-4" />} label="Influence" value={(Math.ceil((resources.influence || 0) * 10) / 10).toFixed(1)} color="text-primary" />
+        <div>
+          <p className="mb-1.5 text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Treasury & command</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            <ResourceTile icon={<DollarSign className="h-4 w-4" />} label="Money" value={`$${resources.money.toLocaleString()}`} color="text-green-400" />
+            <ResourceTile icon={<Users className="h-4 w-4" />} label="Soldiers" value={String(resources.soldiers)} color="text-destructive" />
+            <ResourceTile icon={<Shield className="h-4 w-4" />} label="Respect" value={`${resources.respect}%`} color="text-blue-400" />
+            <ResourceTile icon={<Crown className="h-4 w-4" />} label="Influence" value={(Math.ceil((resources.influence || 0) * 10) / 10).toFixed(1)} color="text-primary" />
+          </div>
         </div>
 
-        {/* ── Status Bars ── */}
-        <div className="space-y-2">
+        {/* ── Pressure snapshot ── */}
+        <div className="space-y-2 rounded-md border border-border/60 bg-card/30 p-2.5">
+          <div className="flex items-center justify-between"><p className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Pressure snapshot</p><span className="text-[9px] text-muted-foreground">0–100</span></div>
           <StatusBar label="Loyalty" value={(() => {
-            const deployedIds = (gameState.deployedUnits || [])
-              .filter((u: any) => u.family === gameState.playerFamily && u.type === 'soldier')
-              .map((u: any) => u.id);
+            const deployedIds = (gameState.deployedUnits || []).filter((u: any) => u.family === gameState.playerFamily && u.type === 'soldier').map((u: any) => u.id);
             if (deployedIds.length === 0) return Math.round(reputation.loyalty);
-            const total = deployedIds.reduce((sum: number, id: string) => {
-              const s = gameState.soldierStats?.[id];
-              return sum + (s ? s.loyalty : 0);
-            }, 0);
+            const total = deployedIds.reduce((sum: number, id: string) => { const s = gameState.soldierStats?.[id]; return sum + (s ? s.loyalty : 0); }, 0);
             return Math.round(total / deployedIds.length);
           })()} max={100} color="bg-primary" />
           <StatusBar label="Police Heat" value={policeHeat.level} max={100} color="bg-destructive" />
@@ -1457,25 +1468,6 @@ export const RightSidePanel: React.FC<{
             onFocusHex={onFocusHex}
           />
         )}
-        {/* ── Territory Control ── */}
-        <div className="pb-3 border-b border-border">
-          <h3 className="text-sm font-bold text-primary font-playfair mb-3 uppercase tracking-wider">Territory Control</h3>
-          <div className="space-y-2">
-            {gameState.familyControl && Object.entries(gameState.familyControl).map(([family, control]) => (
-              <div key={family} className="flex items-center gap-2">
-                <span className={cn(
-                  'text-xs w-16 capitalize font-medium',
-                  family === gameState.playerFamily ? 'text-primary' : 'text-muted-foreground'
-                )}>
-                  {family}
-                </span>
-                <Progress value={control} className="flex-1 h-2" />
-                <span className="text-xs text-muted-foreground w-8 text-right">{control}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* ── Phase Progression ── */}
         <PhaseInfographic
           gamePhase={(gameState as any).gamePhase || 1}
@@ -1486,6 +1478,30 @@ export const RightSidePanel: React.FC<{
           aiOpponents={gameState.aiOpponents}
           playerFamily={gameState.playerFamily}
         />
+
+        {/* ── At-a-glance rival comparison ── */}
+        <RivalComparisonStrip
+          gameState={gameState}
+          highlightedFamily={highlightedFamily}
+          onHighlightFamily={onHighlightFamily}
+        />
+
+        {/* ── Territory Control ── */}
+        <div className="border-b border-border/60 pb-3">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Territory Control</h3>
+            <span className="text-[9px] text-muted-foreground">share of city</span>
+          </div>
+          <div className="space-y-1.5">
+            {gameState.familyControl && Object.entries(gameState.familyControl).map(([family, control]) => (
+              <div key={family} className="flex items-center gap-2">
+                <span className={cn('w-16 truncate text-[10px] capitalize font-medium', family === gameState.playerFamily ? 'text-primary' : 'text-muted-foreground')}>{family}</span>
+                <Progress value={control} className="h-1.5 flex-1" />
+                <span className="w-8 text-right text-[10px] tabular-nums text-muted-foreground">{control}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* ── Events ── */}
         {gameState.events.length > 0 && (
@@ -1518,13 +1534,6 @@ export const RightSidePanel: React.FC<{
             </div>
           </CollapsibleSection>
         )}
-
-        {/* ── At-a-glance rival comparison ── */}
-        <RivalComparisonStrip
-          gameState={gameState}
-          highlightedFamily={highlightedFamily}
-          onHighlightFamily={onHighlightFamily}
-        />
 
         {/* ── Rival Families ── */}
         <CollapsibleSection

@@ -115,38 +115,25 @@ const JustHappenedFeed: React.FC<Props> = ({
     <div
       className={cn(
         isDocked
-          ? 'relative w-full pointer-events-auto'
+          ? 'relative w-full border-t border-primary/20 bg-background/35 pt-2 pointer-events-auto'
           : 'pointer-events-none fixed top-[120px] right-4 z-30 w-[320px] max-w-[90vw]'
       )}
       role="region"
       aria-label="Recent events"
     >
       <div className="pointer-events-auto flex items-center justify-between mb-1.5 px-1">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-mafia-gold/80 font-bold font-playfair">
-          <span>📜</span>
-          <span>Just Happened</span>
+        <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] text-primary/80 font-bold">
+          <span aria-hidden>📜</span>
+          <span>Turn report</span>
           <span className="text-muted-foreground/70">· {totalCount}</span>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setCollapsed((c) => !c)}
-            className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded border border-noir-light bg-background/60"
-          >
+          <button type="button" onClick={() => setCollapsed((c) => !c)} className="rounded border border-border/70 bg-background/50 px-1.5 py-0.5 text-[9px] text-muted-foreground hover:text-foreground">
             {collapsed ? 'Show' : 'Hide'}
           </button>
           {!collapsed && totalCount > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                const ids = new Set(dismissed);
-                visible.forEach((v) => ids.add(v.id));
-                postureVisible.forEach((p) => ids.add(`posture:${p.family}`));
-                setDismissed(ids);
-              }}
-              className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded border border-noir-light bg-background/60"
-            >
-              Clear all
+            <button type="button" onClick={() => { const ids = new Set(dismissed); visible.forEach((v) => ids.add(v.id)); postureVisible.forEach((p) => ids.add(`posture:${p.family}`)); setDismissed(ids); }} className="rounded border border-border/70 bg-background/50 px-1.5 py-0.5 text-[9px] text-muted-foreground hover:text-foreground">
+              Clear
             </button>
           )}
         </div>
@@ -160,7 +147,7 @@ const JustHappenedFeed: React.FC<Props> = ({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 16 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="pointer-events-auto space-y-1.5 max-h-[60vh] overflow-y-auto pr-1"
+            className="pointer-events-auto space-y-1 max-h-[32vh] overflow-y-auto pr-1"
           >
             {/* Posture transition cards first */}
             {postureVisible.slice(0, 3).map((p) => (
