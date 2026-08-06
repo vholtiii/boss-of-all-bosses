@@ -1,27 +1,53 @@
-## Problem
+# Map Readability + Management HUD Polish
 
-The supply-node ring in `EnhancedMafiaHexGrid.tsx` (lines 1469–1504) looks broken/incomplete because:
+## Goal
+Make the map the primary decision surface and make the sidebars feel like a management console: less visual noise, stronger hierarchy, and clearer ownership/status at a glance. Preserve the noir aesthetic, existing mechanics, and interaction rules.
 
-1. The type-icon badge (`<circle cx={x} cy={y - baseHexRadius*0.85} r={8}>`) sits **directly on the top vertex of the ring**, visually cutting the outline at the top.
-2. The connection-status badge (✓ / !) sits on the upper-right edge, cutting that side too.
-3. The `strokeDasharray="4,2"` on unconnected nodes reads as "half-drawn" rather than "pending", reinforcing the "incomplete outline" perception.
-4. The ring is drawn early in the tile group, so later overlays at similar radii (fortify/safehouse markers, family highlight at `+5`) can overpaint segments.
+## User priorities
+- Map readability
+- HUD and sidebars
 
-## Fix (visual only, `src/components/EnhancedMafiaHexGrid.tsx`)
+## Changes
 
-Rework the `tile.supplyNode` block (~1469–1504) so the outline is one continuous stroke and badges float clear of it:
+### 1. Map visual hierarchy
+- Establish a clear visual priority for map states: selected/actionable hexes first, player ownership second, rival ownership third, neutral terrain last.
+- Reduce competing always-visible labels and badges where the same hex already has a unit, business, supply, or tactical marker.
+- Strengthen selected and actionable hex treatment with a consistent outline/fill treatment so the next click is obvious without making the whole board glow.
+- Keep supply-node outlines continuous and move their badges clear of the hex perimeter so connectivity reads cleanly.
+- Add a compact, token-based map status key that explains ownership, units, supply, selected, and threat states without requiring the player to decode symbols.
+- Preserve fog-of-war behavior, click targets, panning, zoom, and all combat/territory logic.
 
-- **Solid, continuous ring** at `baseHexRadius + 4`:
-  - Add a dark backing polygon (same points, `stroke="#0b0b12"`, `strokeWidth="4.5"`, `opacity="0.9"`) so the ring reads on any background.
-  - Draw the colored ring on top: `strokeWidth="2.5"`, `strokeLinejoin="round"`, `opacity="1"`, no dashes.
-  - Colors: connected `#10B981`, player-owned + disconnected `#EF4444`, otherwise `#D4AF37`.
-  - Represent "disconnected" with a subtle inner glow (second polygon at `+2`, `opacity 0.35`) instead of dashes, so the outer perimeter stays whole.
-- **Move badges off the perimeter**:
-  - Type-icon badge: shift from `y - baseHexRadius*0.85` to `y - baseHexRadius*1.15` (fully above the ring) and add a 1px dark halo circle behind it.
-  - Status badge (✓ / !): move to `(x + baseHexRadius*0.75, y - baseHexRadius*1.05)` so it sits above-right of the ring, not on it.
-- **Render order**: emit the supply-node group *after* the fortify/safehouse markers and the family highlight ring (or bump its `z` by placing it just before the boss/family highlight blocks) so nothing overpaints the perimeter. The badges remain the topmost element inside the group.
-- Keep pointer-events off; no logic, tokens, or data changes.
+### 2. Map controls and context
+- Refine the map control cluster into a quieter utility strip with grouped zoom/reset and visibility toggles.
+- Make active visibility toggles visually distinct from inactive ones while keeping controls compact.
+- Improve pinned territory / selected unit context so it reads as one coordinated map inspector instead of multiple floating layers.
+
+### 3. Left management sidebar
+- Reorder the top of the panel around the management loop: family/turn identity, resource snapshot, current phase guidance, then actions.
+- Reduce repeated explanatory copy and move deeper rules into existing tooltips or expandable sections.
+- Give actionable warnings (informants, heat, prosecution, locked phase) a consistent severity treatment and stronger scan order.
+- Keep the existing action previews and phase locks, but make disabled reasons shorter and easier to compare.
+
+### 4. Right intelligence sidebar
+- Make the rival comparison the compact overview, with detailed rival cards remaining expandable below it.
+- Keep Supply Ledger, Businesses, and event history as distinct sections with clearer section headers and less nested visual weight.
+- Preserve family highlighting and supply-node jump behavior.
+- Keep “Just Happened” docked at the bottom, but visually separate it as a short-lived report rail so it does not compete with persistent intelligence.
+
+### 5. Top/bottom HUD cleanup
+- Reduce duplicate status emphasis between the top resource/turn area and sidebars.
+- Keep threats, expiring pacts, deployment ratio, and phase controls visible, but group them by urgency and use fewer simultaneous animated treatments.
+- Retain existing keyboard and click flows, including the Next Step control and Smart End Turn behavior.
+
+## Technical approach
+- Update `EnhancedMafiaHexGrid.tsx` for map layering, marker deconfliction, map controls, and legend presentation.
+- Update `GameSidePanels.tsx` for sidebar hierarchy, compact management summaries, and section styling.
+- Update `JustHappenedFeed.tsx` only if needed for the docked report-rail styling; do not change its data derivation or timing behavior.
+- Add or reuse semantic tokens in `src/index.css`; avoid new hardcoded component colors and preserve family colors from `period-theme.ts`.
+- Use existing Button, Tooltip, Badge, Collapsible, and ScrollArea components for interactive controls.
+- Verify desktop and mobile layouts, map interaction states, and the existing focused jump/highlight flows after implementation.
 
 ## Out of scope
-
-No changes to supply-node data, connectivity math, colors elsewhere, or hex geometry.
+- No balance, AI, combat, economy, or diplomacy changes.
+- No changes to map generation, fog-of-war rules, supply calculations, or action availability.
+- No new backend or persistence work.
