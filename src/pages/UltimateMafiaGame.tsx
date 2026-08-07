@@ -66,6 +66,29 @@ interface GameConfig {
   mapSize?: MapSize;
 }
 
+const SESSION_CONFIG_KEY = 'mafia_game_session_config';
+
+const readSessionConfig = (): GameConfig | null => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SESSION_CONFIG_KEY) || 'null');
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (!['gambino', 'genovese', 'lucchese', 'bonanno', 'colombo'].includes(parsed.family)) return null;
+    if (!['easy', 'normal', 'hard'].includes(parsed.difficulty)) return null;
+    if (!parsed.resources || typeof parsed.resources !== 'object') return null;
+    return parsed as GameConfig;
+  } catch {
+    return null;
+  }
+};
+
+const persistSessionConfig = (config: GameConfig) => {
+  try { localStorage.setItem(SESSION_CONFIG_KEY, JSON.stringify(config)); } catch { /* storage unavailable */ }
+};
+
+const clearSessionConfig = () => {
+  try { localStorage.removeItem(SESSION_CONFIG_KEY); } catch { /* storage unavailable */ }
+};
+
 const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = ({ config, onExitToMenu }) => {
   const {
     gameState,
@@ -346,8 +369,26 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   // notifyTerritoryCaptured and notifyReputationChange already destructured above
 
   // ---- Save/Load: autosave + reliable load ----
-  const { autoSave, emergencySaveAuto } = useGameSaveLoad();
+  const { autoSave, emergencySaveAuto, loadGame } = useGameSaveLoad();
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<number | null>(null);
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
+
+  // Restore the existing autosave once after a remount. This is intentionally
+  // separate from the throttled autosave effect below so a fresh initial state
+  // cannot overwrite the saved session before it has been read.
+  useEffect(() => {
+    let cancelled = false;
+    loadGame('auto', 'local').then(result => {
+      if (cancelled) return;
+      if (result.success && result.gameState && result.gameState.playerFamily === config.family) {
+        loadGameState(result.gameState);
+      }
+      setIsRestoringSession(false);
+    }).catch(() => {
+      if (!cancelled) setIsRestoringSession(false);
+    });
+    return () => { cancelled = true; };
+  }, [config.family, loadGame, loadGameState]);
 
   // ---- Heat history (last 8 turns, excluding current) for HeatMeter sparkline + delta ----
   const [heatHistory, setHeatHistory] = useState<number[]>([]);
@@ -375,12 +416,12 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
 
   // Autosave whenever the turn advances (throttled inside the hook).
   useEffect(() => {
-    if (!gameState || isWinner) return;
+    if (isRestoringSession || !gameState || isWinner) return;
     autoSave(gameState).then(r => {
       if (r.success) setLastAutoSavedAt(Date.now());
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState.turn]);
+  }, [gameState.turn, isRestoringSession]);
 
   // Emergency save on tab close — synchronous LS mirror, picked up next session.
   useEffect(() => {
@@ -2382,7 +2423,12 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
 };
 
 const UltimateMafiaGame: React.FC = () => {
-  const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
+  const [gameConfig, setGameConfig] = useState<GameConfig | null>(() => readSessionConfig());
+
+  const exitToMenu = useCallback(() => {
+    clearSessionConfig();
+    setGameConfig(null);
+  }, []);
 
   // Heartbeat: bump last_seen_at + last_family_played for the signed-in player
   useEffect(() => {
@@ -2407,7 +2453,11 @@ const UltimateMafiaGame: React.FC = () => {
   if (!gameConfig) {
     return (
       <FamilySelectionScreen
-        onSelectFamily={(family, resources, difficulty, seed, mapSize) => setGameConfig({ family, resources, difficulty, seed, mapSize })}
+        onSelectFamily={(family, resources, difficulty, seed, mapSize) => {
+          const nextConfig = { family, resources, difficulty, seed, mapSize };
+          persistSessionConfig(nextConfig);
+          setGameConfig(nextConfig);
+        }}
       />
     );
   }
@@ -2415,10 +2465,10 @@ const UltimateMafiaGame: React.FC = () => {
   return (
     <NotificationProvider>
       <GameErrorBoundary
-        onExitToMenu={() => setGameConfig(null)}
+        onExitToMenu={exitToMenu}
         onRestart={() => setGameConfig({ ...gameConfig })}
       >
-        <GameContent config={gameConfig} onExitToMenu={() => setGameConfig(null)} />
+        <GameContent config={gameConfig} onExitToMenu={exitToMenu} />
       </GameErrorBoundary>
     </NotificationProvider>
   );
