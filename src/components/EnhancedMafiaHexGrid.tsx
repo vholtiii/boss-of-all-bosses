@@ -2472,17 +2472,24 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         );
       })()}
 
-      {/* Hover Info */}
-      <AnimatePresence>
-        {(hoveredHex || pinnedHex) && (() => {
-          const displayHex = pinnedHex || hoveredHex!;
-          return (
-          <motion.div
-            key={`${displayHex.q},${displayHex.r},${displayHex.s}`}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="absolute bottom-4 left-4 bg-noir-dark/90 backdrop-blur-sm border border-noir-light rounded-lg p-4 text-white max-w-xs cursor-pointer hover:border-mafia-gold/60 transition-colors"
+      {/* Bottom-left information stack: unit dossier above territory details */}
+      <div className="pointer-events-none absolute bottom-4 left-4 z-30 flex w-80 max-w-[calc(100%_-_2rem)] flex-col gap-2">
+        <SelectedUnitDock
+          gameState={gameState}
+          playerFamily={playerFamily}
+        />
+
+        {/* Hover Info */}
+        <AnimatePresence>
+          {(hoveredHex || pinnedHex) && (() => {
+            const displayHex = pinnedHex || hoveredHex!;
+            return (
+            <motion.div
+              key={`${displayHex.q},${displayHex.r},${displayHex.s}`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="pointer-events-auto w-full max-w-none cursor-pointer rounded-lg border border-noir-light bg-noir-dark/90 p-4 text-white backdrop-blur-sm transition-colors hover:border-mafia-gold/60"
             onClick={() => { handleHexClick(displayHex); setPinnedHex(null); }}
           >
             {(() => {
@@ -2877,19 +2884,14 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
               })()}
               <p className="text-[10px] text-muted-foreground/60 mt-2 italic">Click for actions</p>
             </div>
-          </motion.div>
-          );
-        })()}
-      </AnimatePresence>
-
-      {/* Selected Unit Dock — surfaces current selection above the hex info card */}
-      <SelectedUnitDock
-        gameState={gameState}
-        playerFamily={playerFamily}
-      />
+            </motion.div>
+            );
+          })()}
+        </AnimatePresence>
+      </div>
 
       {/* Compact map status key */}
-      <div className="absolute bottom-3 left-3 z-30">
+      <div className="absolute left-3 top-3 z-30">
         <button
           type="button"
           onClick={() => setShowLegend(prev => !prev)}

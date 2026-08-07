@@ -57,8 +57,7 @@ const SelectedUnitDock: React.FC<SelectedUnitDockProps> = ({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className="case-file absolute bottom-4 left-4 z-30 rounded-sm px-3 py-2 shadow-lg min-w-[240px] max-w-[320px] font-courier"
-          style={{ marginBottom: 'calc(var(--hex-card-h, 0px))' }}
+          className="case-file relative z-30 w-full min-w-0 max-w-none rounded-sm px-3 py-2 shadow-lg font-courier pointer-events-auto"
         >
           {deployMode ? (
             <div className="flex items-center gap-3">
