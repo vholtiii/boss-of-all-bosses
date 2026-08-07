@@ -2453,7 +2453,11 @@ const UltimateMafiaGame: React.FC = () => {
   if (!gameConfig) {
     return (
       <FamilySelectionScreen
-        onSelectFamily={(family, resources, difficulty, seed, mapSize) => setGameConfig({ family, resources, difficulty, seed, mapSize })}
+        onSelectFamily={(family, resources, difficulty, seed, mapSize) => {
+          const nextConfig = { family, resources, difficulty, seed, mapSize };
+          persistSessionConfig(nextConfig);
+          setGameConfig(nextConfig);
+        }}
       />
     );
   }
@@ -2461,10 +2465,10 @@ const UltimateMafiaGame: React.FC = () => {
   return (
     <NotificationProvider>
       <GameErrorBoundary
-        onExitToMenu={() => setGameConfig(null)}
+        onExitToMenu={exitToMenu}
         onRestart={() => setGameConfig({ ...gameConfig })}
       >
-        <GameContent config={gameConfig} onExitToMenu={() => setGameConfig(null)} />
+        <GameContent config={gameConfig} onExitToMenu={exitToMenu} />
       </GameErrorBoundary>
     </NotificationProvider>
   );
