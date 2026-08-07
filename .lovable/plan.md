@@ -8,18 +8,21 @@ That means **any full page reload sends you straight back to family selection** 
 
 Diagnosis of the reload trigger itself is unconfirmed — no crash report or console error is currently captured. The plan therefore both makes the session survive a reload and adds the instrumentation to identify the trigger if it keeps happening.
 
-## The fix
+## The efficient fix
 
-1. **Persist the session shell.** Save `gameConfig` (family, resources, difficulty, seed, map size) to local storage whenever it changes, and clear it only on an explicit "Exit to menu".
+1. **Persist only the session shell.** Write the small `gameConfig` object once when a family is selected. Do not write on every turn or game-state update.
 
-2. **Resume on load.** On mount, if a stored config exists and an autosave slot is present, skip family selection and drop the player back into the running game with the autosaved state loaded. Show a brief "Resumed your last session" note.
+2. **Restore lazily on mount.** Read that one config value once when the page starts. If present, initialize the game directly; otherwise render family selection as today.
 
-3. **Offer a choice when resume is ambiguous.** If a stored config exists but the autosave is missing or fails validation, show the select screen with a "Continue last game" option instead of silently discarding it.
+3. **Reuse the existing autosave.** Keep game-state persistence inside the current throttled `useGameSaveLoad` flow. Do not add a second autosave loop, polling, timers, or a new save format.
 
-4. **Capture why it reloaded.** Record a lightweight breadcrumb (timestamp, turn, phase) on every autosave and on `beforeunload`, plus surface any stored `lastCrashReport` / `recentBackgroundErrors` entries as a one-line notice on resume. If an actual JS crash is behind this, the next occurrence will name it.
+4. **Clear only on explicit exit.** The existing Exit button and error-boundary "Return to menu" action remove the stored shell config. Normal rerenders and HMR/reloads leave it available for recovery.
+
+5. **Keep diagnostics passive.** Use the already-recorded `lastCrashReport` and `recentBackgroundErrors` only when investigating a real failure; do not add new per-turn breadcrumbs or runtime listeners as part of the fix.
 
 ## Technical notes
 
-- Files touched: `src/pages/UltimateMafiaGame.tsx` (persist/restore shell), `src/lib/gameStorage.ts` (config key + breadcrumb helpers), and the resume entry point in `src/components/FamilySelectionScreen.tsx` for the "Continue last game" button.
-- Reuses the existing `useGameSaveLoad` autosave slot (`auto`) — no new save format, no schema migration.
-- No gameplay, AI, or balance logic changes.
+- Files touched: `src/pages/UltimateMafiaGame.tsx` and, only if needed, the existing save/load integration point.
+- One small local-storage write occurs at game start and one read occurs at app mount; there is no ongoing processing cost.
+- Reuses the existing throttled autosave slot (`auto`) — no new save format, schema migration, polling, or background worker.
+- No gameplay, AI, balance, or map-generation changes.
