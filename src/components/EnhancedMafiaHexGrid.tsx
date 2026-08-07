@@ -506,16 +506,19 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
       }
     }
 
-    // HQ click — during deploy phase, toggle unit picker, show HQ info, AND allow unit selection
+    // HQ click — during deploy phase, toggle unit picker and show HQ info
     if (tile.isHeadquarters && turnPhase === 'deploy' && tile.isHeadquarters === playerFamily) {
       const hqKey = `${tile.q},${tile.r},${tile.s}`;
       setExpandedHQKey(prev => prev === hqKey ? null : hqKey);
       if (onSelectHeadquarters) onSelectHeadquarters(tile.isHeadquarters);
-      // Also try selecting a unit at HQ for movement (don't return early if unit found)
-      const unitsHere = unitsByHex.get(hqKey) || [];
-      const playerUnit = unitsHere.find(u => u.family === playerFamily && u.movesRemaining > 0);
-      if (playerUnit && onSelectUnit) {
-        onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
+      // While deploy mode is active, do NOT auto-select a unit for movement —
+      // that would silently cancel deploy mode and allow moves beyond the deploy ring.
+      if (!gameState?.deployMode) {
+        const unitsHere = unitsByHex.get(hqKey) || [];
+        const playerUnit = unitsHere.find(u => u.family === playerFamily && u.movesRemaining > 0);
+        if (playerUnit && onSelectUnit) {
+          onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
+        }
       }
       return;
     }
@@ -545,8 +548,12 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         onDeployUnit(gameState.deployMode.unitType, { q: tile.q, r: tile.r, s: tile.s }, gameState.deployMode.family);
         return;
       }
-      // Clicked a non-deploy hex — fall through to unit selection below
+      // Clicked outside the deploy ring — cancel deploy mode only.
+      // Never fall through to unit selection/movement on the same click.
+      if (onAction) onAction({ type: 'deselect_unit' });
+      return;
     }
+
 
     // Deploy phase — select units for movement OR place from HQ
     if (turnPhase === 'deploy') {
