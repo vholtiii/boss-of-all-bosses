@@ -90,31 +90,45 @@ const MapEffectsLayer: React.FC<Props> = ({
           }
 
           if (fx.type === 'combat') {
-            const tint = fx.playerLost ? '#EF4444' : '#F8FAFC';
+            const tint = fx.playerLost ? 'hsl(var(--destructive))' : 'hsl(var(--primary))';
             const angles = particleAngles.get(fx.id) || [];
             return (
               <g key={fx.id}>
                 <motion.polygon
                   points={getHexPoints(x, y, hexRadius)}
                   fill={tint}
-                  initial={{ opacity: 0.7 }}
-                  animate={{ opacity: [0.7, 0.2, 0] }}
-                  transition={{ duration: 0.45 }}
+                  initial={{ opacity: 0.75, scale: 0.72 }}
+                  animate={{ opacity: [0.75, 0.28, 0], scale: [0.72, 1.08, 1] }}
+                  transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+                  style={{ transformOrigin: `${x}px ${y}px` }}
+                />
+                <motion.polygon
+                  points={getHexPoints(x, y, hexRadius + 4)}
+                  fill="none"
+                  stroke={tint}
+                  strokeWidth={2.5}
+                  initial={{ opacity: 0, scale: 0.88 }}
+                  animate={{ opacity: [0, 1, 0.45, 0], scale: [0.88, 1.08, 1.24, 1.4] }}
+                  transition={{ duration: 0.9, ease: 'easeOut' }}
+                  style={{ transformOrigin: `${x}px ${y}px` }}
                 />
                 {angles.map((angle, i) => {
-                  const dist = hexRadius * 1.4;
+                  const dist = hexRadius * (i % 2 === 0 ? 1.7 : 1.35);
                   const tx = x + Math.cos(angle) * dist;
                   const ty = y + Math.sin(angle) * dist;
                   return (
-                    <motion.circle
+                    <motion.line
                       key={`${fx.id}-p${i}`}
-                      cx={x}
-                      cy={y}
-                      r={2.2}
-                      fill={fx.playerLost ? '#F87171' : '#FDE68A'}
-                      initial={{ opacity: 1, cx: x, cy: y }}
-                      animate={{ opacity: 0, cx: tx, cy: ty }}
-                      transition={{ duration: 0.55, ease: 'easeOut', delay: i * 0.02 }}
+                      x1={x + Math.cos(angle) * (hexRadius * 0.35)}
+                      y1={y + Math.sin(angle) * (hexRadius * 0.35)}
+                      x2={x + Math.cos(angle) * (hexRadius * 0.35)}
+                      y2={y + Math.sin(angle) * (hexRadius * 0.35)}
+                      stroke={tint}
+                      strokeWidth={i % 2 === 0 ? 2 : 1.25}
+                      strokeLinecap="round"
+                      initial={{ opacity: 0, x2: x, y2: y }}
+                      animate={{ opacity: [0, 1, 0], x2: tx, y2: ty }}
+                      transition={{ duration: 0.6, ease: 'easeOut', delay: i * 0.025 }}
                     />
                   );
                 })}

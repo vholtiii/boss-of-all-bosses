@@ -97,10 +97,14 @@ const HitSpotlight: React.FC<HitSpotlightProps> = ({ result, gameState }) => {
     const [next, ...rest] = queue;
     setQueue(rest);
     setActive(next);
-    const duration = /hq|capo|eliminated|subjugated|assault|assassination/i.test(`${next.title} ${next.details}`) ? 2800 : 1900;
+  }, [active, queue]);
+
+  useEffect(() => {
+    if (!active) return;
+    const duration = /hq|capo|eliminated|subjugated|assault|assassination/i.test(`${active.title} ${active.details}`) ? 2800 : 1900;
     const timer = window.setTimeout(() => setActive(null), duration);
     return () => window.clearTimeout(timer);
-  }, [active, queue]);
+  }, [active]);
 
   const evidence = useMemo(() => active ? buildEvidence(active, gameState) : null, [active, gameState]);
   const skip = () => setActive(null);
