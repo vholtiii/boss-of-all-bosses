@@ -24,6 +24,7 @@ import { HeadquartersInfoPanel } from '@/components/HeadquartersInfoPanel';
 import AlertsLogPanel from '@/components/AlertsLogPanel';
 import TurnSummaryModal from '@/components/TurnSummaryModal';
 import TurnResolutionOverlay from '@/components/TurnResolutionOverlay';
+import HitSpotlight from '@/components/HitSpotlight';
 import CommissionVoteModal from '@/components/CommissionVoteModal';
 import WarDeclarationModal from '@/components/WarDeclarationModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
@@ -179,7 +180,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
-  // Play sounds on combat results + shake/vignette on failures
+  // Play sounds on combat results + a brief impact beat without delaying state resolution
   useEffect(() => {
     if (gameState.lastCombatResult) {
       const { success, type, timestamp } = gameState.lastCombatResult;
@@ -193,7 +194,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         if (success) playSound('combat');
         else playSound('error');
       }
-      if (!success && timestamp && lastCombatFxRef.current !== timestamp) {
+      if (timestamp && lastCombatFxRef.current !== timestamp) {
         lastCombatFxRef.current = timestamp;
         triggerCombatFeedback();
       }
@@ -1843,6 +1844,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         </div>
       </ResponsiveLayout>
 
+      <HitSpotlight result={gameState.lastCombatResult} gameState={gameState} />
 
       {/* Headquarters Info Panel */}
       {selectedHeadquarters && (() => {
