@@ -346,8 +346,26 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   // notifyTerritoryCaptured and notifyReputationChange already destructured above
 
   // ---- Save/Load: autosave + reliable load ----
-  const { autoSave, emergencySaveAuto } = useGameSaveLoad();
+  const { autoSave, emergencySaveAuto, loadGame } = useGameSaveLoad();
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<number | null>(null);
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
+
+  // Restore the existing autosave once after a remount. This is intentionally
+  // separate from the throttled autosave effect below so a fresh initial state
+  // cannot overwrite the saved session before it has been read.
+  useEffect(() => {
+    let cancelled = false;
+    loadGame('auto', 'local').then(result => {
+      if (cancelled) return;
+      if (result.success && result.gameState && result.gameState.playerFamily === config.family) {
+        loadGameState(result.gameState);
+      }
+      setIsRestoringSession(false);
+    }).catch(() => {
+      if (!cancelled) setIsRestoringSession(false);
+    });
+    return () => { cancelled = true; };
+  }, [config.family, loadGame, loadGameState]);
 
   // ---- Heat history (last 8 turns, excluding current) for HeatMeter sparkline + delta ----
   const [heatHistory, setHeatHistory] = useState<number[]>([]);
