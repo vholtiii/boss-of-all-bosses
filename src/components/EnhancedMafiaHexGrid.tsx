@@ -9,6 +9,7 @@ import { businessSprite } from '@/lib/sprites';
 import SelectedUnitDock from '@/components/SelectedUnitDock';
 import TileDevelopmentPanel from '@/components/TileDevelopmentPanel';
 import type { BuildingType, TilePolicy } from '@/types/game-mechanics';
+import { tileEarnPotential, tileHasBuildings } from '@/types/game-mechanics';
 import MapEffectsLayer from '@/components/MapEffectsLayer';
 import { useMapEffects } from '@/hooks/useMapEffects';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
