@@ -5035,11 +5035,8 @@ export const useEnhancedMafiaGameState = (
       const playerHexes = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily);
       const playerControlledHexes = playerHexes.length;
       const activeAlliances = newState.alliances.filter(a => a.active).length;
-      const builtBusinessHexes = playerHexes.filter(t =>
-        tileHasBuildings(t) &&
-        !(false)
-      ).length;
-      const legalBusinessHexes = playerHexes.filter(t => t.anchor && t.anchor.isLegal).length;
+      const builtBusinessHexes = playerHexes.filter(t => tileHasBuildings(t)).length;
+      const legalBusinessHexes = playerHexes.filter(t => !!(t.buildings || {}).store_front).length;
       const activePoliticalBribes = (newState.activeBribes || []).filter(b =>
         b.active && (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'mayor')
       ).length;
@@ -8356,10 +8353,8 @@ export const useEnhancedMafiaGameState = (
       // ── AI RESPECT & INFLUENCE GROWTH (mirrors player real-world drivers) ──
       const aiHexes = state.hexMap.filter(t => t.controllingFamily === fam);
       const aiTerritoryCount = aiHexes.length;
-      const aiBuiltBiz = aiHexes.filter(t => tileHasBuildings(t) &&
-        !(false)
-      ).length;
-      const aiLegalBiz = aiHexes.filter(t => t.anchor && t.anchor.isLegal).length;
+      const aiBuiltBiz = aiHexes.filter(t => tileHasBuildings(t)).length;
+      const aiLegalBiz = aiHexes.filter(t => !!(t.buildings || {}).store_front).length;
       const aiAlliancesInvolving = (state.alliances || []).filter(a => a.active && a.alliedFamily === fam).length;
       const aiDistricts60 = new Set(
         (state.activeDistrictBonuses || []).filter(b => b.family === fam).map(b => b.district)
