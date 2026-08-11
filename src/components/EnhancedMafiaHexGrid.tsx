@@ -7,6 +7,8 @@ import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
 import { businessSprite } from '@/lib/sprites';
 import SelectedUnitDock from '@/components/SelectedUnitDock';
+import TileDevelopmentPanel from '@/components/TileDevelopmentPanel';
+import type { BuildingType, TilePolicy } from '@/types/game-mechanics';
 import MapEffectsLayer from '@/components/MapEffectsLayer';
 import { useMapEffects } from '@/hooks/useMapEffects';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
@@ -42,6 +44,8 @@ interface EnhancedMafiaHexGridProps {
   bossHighlightHex?: { q: number; r: number; s: number } | null;
   highlightedFamily?: string | null;
   onClearHighlight?: () => void;
+  onStartBuild?: (q: number, r: number, s: number, type: BuildingType) => void;
+  onSetTilePolicy?: (q: number, r: number, s: number, policy: TilePolicy) => void;
 }
 
 const familyColors: Record<string, string> = FAMILY_COLORS;
@@ -59,7 +63,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   width, height, onBusinessClick, selectedBusiness, playerFamily,
   gameState, onAction, onSelectUnit, onMoveUnit, onSelectHeadquarters,
   onSelectUnitFromHeadquarters, onDeployUnit, planHitMode, planHitStep, planHitPlannerId, onPlanHitSelect, onPlanHitSelectSoldier, onCancelPlanHit,
-  bossHighlightHex, highlightedFamily, onClearHighlight
+  bossHighlightHex, highlightedFamily, onClearHighlight, onStartBuild, onSetTilePolicy
 }, ref) => {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -2531,6 +2535,20 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           gameState={gameState}
           playerFamily={playerFamily}
         />
+
+        {/* Block development — owned hexes only */}
+        <AnimatePresence>
+          {pinnedHex && pinnedHex.controllingFamily === playerFamily && (
+            <TileDevelopmentPanel
+              key={`dev-${pinnedHex.q},${pinnedHex.r},${pinnedHex.s}`}
+              tile={(gameState?.hexMap || []).find((t: HexTile) => t.q === pinnedHex.q && t.r === pinnedHex.r && t.s === pinnedHex.s) || pinnedHex}
+              gameState={gameState}
+              playerFamily={playerFamily}
+              onStartBuild={onStartBuild}
+              onSetTilePolicy={onSetTilePolicy}
+            />
+          )}
+        </AnimatePresence>
 
         {/* Hover Info */}
         <AnimatePresence>

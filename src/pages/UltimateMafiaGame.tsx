@@ -526,6 +526,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onSelectHeadquarters={handleHeadquartersClick}
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
+            onStartBuild={startBuild}
+            onSetTilePolicy={setTilePolicy}
             planHitMode={planHitMode}
             planHitStep={planHitStep}
             planHitPlannerId={planHitPlannerId}
@@ -1844,6 +1846,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onSelectHeadquarters={handleHeadquartersClick}
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
+            onStartBuild={startBuild}
+            onSetTilePolicy={setTilePolicy}
             planHitMode={planHitMode}
             planHitStep={planHitStep}
             planHitPlannerId={planHitPlannerId}
