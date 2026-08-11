@@ -138,7 +138,14 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Barlow', 'Source Sans Pro', sans-serif;
   }
+
+  h1, h2, h3 {
+    font-family: 'Cinzel', 'Playfair Display', serif;
+    letter-spacing: 0.03em;
+  }
+
 
   /* Prevent browser zoom issues */
   html {
