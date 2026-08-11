@@ -34,10 +34,10 @@ const TurnActionMeter: React.FC<TurnActionMeterProps> = ({
   return (
     <div className="flex items-center gap-2">
       <div
-        className="flex items-center gap-2 bg-background/80 rounded-lg border border-noir-light px-2.5 py-1"
+        className="panel-noir flex items-center gap-2 rounded-lg px-2.5 py-1"
         title="Actions left this turn. Moves inside your own connected territory are free; moving beyond it costs 1 action."
       >
-        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Actions</span>
+        <span className="label-caps text-[10px] text-muted-foreground">Actions</span>
         <div className="flex items-center gap-1" role="img" aria-label={`${actionsRemaining} of ${total} actions remaining`}>
           {Array.from({ length: total }).map((_, i) => (
             <span
