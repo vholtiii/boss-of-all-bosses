@@ -2962,7 +2962,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
       </div>
 
       {/* Compact map status key */}
-      <div className="absolute left-3 top-3 z-30">
+      <div className="absolute left-4 top-[3.5rem] z-30">
         <button
           type="button"
           onClick={() => setShowLegend(prev => !prev)}
