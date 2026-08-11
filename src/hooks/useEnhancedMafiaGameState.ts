@@ -12989,6 +12989,91 @@ export const useEnhancedMafiaGameState = (
     }));
   }, []);
 
+  // ============ TILE DEVELOPMENT ACTIONS ============
+  /** Queue a build/upgrade order on an owned block. Costs 1 action + cash. */
+  const startBuild = useCallback((q: number, r: number, s: number, type: BuildingType) => {
+    setGameState(prev => {
+      const state: EnhancedMafiaGameState = JSON.parse(JSON.stringify(prev));
+      const tile = state.hexMap.find(t => t.q === q && t.r === r && t.s === s);
+      const notify = (title: string, message: string, type2: 'warning' | 'success' = 'warning') => {
+        state.pendingNotifications = [...(state.pendingNotifications || []), { type: type2, title, message }];
+      };
+      if (!tile || tile.controllingFamily !== state.playerFamily) {
+        notify('🚫 Not Your Block', 'You can only build on blocks you control.');
+        return state;
+      }
+      if (tile.build) {
+        notify('🏗️ Already Building', 'Crews are already working this block.');
+        return state;
+      }
+      if (state.actionsRemaining <= 0) {
+        notify('⏳ No Actions Left', 'Building costs 1 action.');
+        return state;
+      }
+      const currentTier = (tile.buildings || {})[type];
+      const nextTier = ((currentTier || 0) + 1) as BuildingTier;
+      if (nextTier > MAX_BUILDING_TIER) {
+        notify('🏆 Fully Upgraded', `${BUILDING_DEFS[type].label} is already at the top tier here.`);
+        return state;
+      }
+      const def = BUILDING_DEFS[type].tiers[nextTier];
+      if (state.resources.money < def.cost) {
+        notify('💵 Short On Cash', `${def.name} costs $${def.cost.toLocaleString()}.`);
+        return state;
+      }
+      state.resources.money -= def.cost;
+      state.actionsRemaining = Math.max(0, state.actionsRemaining - 1);
+      tile.build = { type, tier: nextTier, monthsRemaining: def.months };
+      notify('🏗️ Ground Broken', `${def.name} — ready in ${def.months} month${def.months > 1 ? 's' : ''}.`, 'success');
+      return state;
+    });
+  }, []);
+
+  /** Set the standing order on an owned block. Free. */
+  const setTilePolicy = useCallback((q: number, r: number, s: number, policy: TilePolicy) => {
+    setGameState(prev => {
+      const state: EnhancedMafiaGameState = JSON.parse(JSON.stringify(prev));
+      const tile = state.hexMap.find(t => t.q === q && t.r === r && t.s === s);
+      if (!tile || tile.controllingFamily !== state.playerFamily) return prev;
+      tile.policy = policy;
+      return state;
+    });
+  }, []);
+
+  /** Buy a global district upgrade. Requires district dominance + cash. */
+  const buyDistrictUpgrade = useCallback((id: DistrictUpgradeId) => {
+    setGameState(prev => {
+      const state: EnhancedMafiaGameState = JSON.parse(JSON.stringify(prev));
+      const notify = (title: string, message: string, type2: 'warning' | 'success' = 'warning') => {
+        state.pendingNotifications = [...(state.pendingNotifications || []), { type: type2, title, message }];
+      };
+      const def = DISTRICT_UPGRADES[id];
+      state.districtUpgrades = state.districtUpgrades || [];
+      if (state.districtUpgrades.includes(id)) return prev;
+      // Best single-district control ratio
+      let best = 0;
+      const districts = new Set(state.hexMap.map(t => t.district));
+      districts.forEach(d => {
+        const all = state.hexMap.filter(t => t.district === d);
+        if (!all.length) return;
+        const mine = all.filter(t => t.controllingFamily === state.playerFamily).length;
+        best = Math.max(best, mine / all.length);
+      });
+      if (best < def.requiredControl) {
+        notify('🏙️ Not Enough Pull', `${def.label} needs ${Math.round(def.requiredControl * 100)}% control of a single district. Your best is ${Math.round(best * 100)}%.`);
+        return state;
+      }
+      if (state.resources.money < def.cost) {
+        notify('💵 Short On Cash', `${def.label} costs $${def.cost.toLocaleString()}.`);
+        return state;
+      }
+      state.resources.money -= def.cost;
+      state.districtUpgrades = [...state.districtUpgrades, id];
+      notify('🤝 Deal Made', `${def.label} — ${def.blurb}`, 'success');
+      return state;
+    });
+  }, []);
+
   // ============ WINNER CHECK ============
   const isWinner = gameState.victoryType !== null;
 
@@ -13023,6 +13108,9 @@ export const useEnhancedMafiaGameState = (
     setMoveAction,
     startEscort,
     resolveEnemyHexAction,
+    startBuild,
+    setTilePolicy,
+    buyDistrictUpgrade,
     loadGameState,
   };
 };
