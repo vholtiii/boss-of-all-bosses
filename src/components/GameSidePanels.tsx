@@ -1267,7 +1267,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               gamePhase={(gameState as any).gamePhase || 1}
               activeBribes={gameState.activeBribes || []}
               actionsRemaining={gameState.actionsRemaining}
-              phaseIsAction={phase === 'action'}
+              phaseIsAction={phase !== 'waiting'}
               onHire={(targetUnitId, targetFamily) => onAction({ type: 'hire_hitman', targetUnitId, targetFamily })}
             />
           )}
