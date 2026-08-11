@@ -15,7 +15,7 @@
  *   - changed value semantics (enum rename, units changed, etc.)
  */
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 type Migration = (state: any) => any;
 
@@ -27,6 +27,18 @@ export const migrations: Record<number, Migration> = {
     ...s,
     arrestedSoldiers: (s.arrestedSoldiers || []).filter((a: any) => !!a.family),
     arrestedCapos: (s.arrestedCapos || []).filter((a: any) => !!a.family),
+  }),
+  // v3: tile development layer — buildings/policy/recruitProgress on every hex,
+  // plus the global districtUpgrades list.
+  3: (s) => ({
+    ...s,
+    districtUpgrades: s.districtUpgrades || [],
+    hexMap: (s.hexMap || []).map((t: any) => ({
+      ...t,
+      buildings: t.buildings || {},
+      policy: t.policy || 'earn',
+      recruitProgress: t.recruitProgress || 0,
+    })),
   }),
 };
 
