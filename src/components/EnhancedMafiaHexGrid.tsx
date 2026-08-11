@@ -599,7 +599,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         
         // Soldiers can only extort on their own hex; Capos can extort adjacent hexes
         const unitOnTargetHex = selectedUnit.q === tile.q && selectedUnit.r === tile.r && selectedUnit.s === tile.s;
-        const hasCompletedBusiness = !!tile.anchor && !(tile.anchor.constructionProgress !== undefined && tile.anchor.constructionProgress < (tile.anchor.constructionGoal || 3));
+        const hasCompletedBusiness = !!tile.anchor;
         
         const isEnemyHQ = !!tile.isHeadquarters && tile.isHeadquarters !== playerFamily;
         
@@ -1059,7 +1059,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                 >
                   {(() => {
                     const isPlayerBuilt = tile.anchor && !tile.anchor.isExtorted && isPlayerTerritory;
-                    const isConstructionComplete = tile.anchor && (!tile.anchor.constructionGoal || (tile.anchor.constructionProgress ?? 0) >= tile.anchor.constructionGoal);
+                    const isConstructionComplete = !!tile.anchor;
                     const showBuiltIndicator = isPlayerBuilt && isConstructionComplete;
                     const hexStroke = isHovered ? '#E8D5A3'
                       : tile.isHeadquarters ? '#D4AF37'
@@ -1250,7 +1250,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
 
                   {/* Business/HQ sprite */}
                   {(() => {
-                    const underConstruction = !!tile.anchor?.constructionGoal && (tile.anchor!.constructionProgress ?? 0) < tile.anchor!.constructionGoal!;
+                    const underConstruction = false;
                     if (tile.isHeadquarters) {
                       return (
                         <text x={x} y={y + 5} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">🏛️</text>
@@ -1281,7 +1281,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                   })()}
 
                   {/* Construction progress label */}
-                  {tile.anchor && tile.anchor.constructionGoal && (tile.anchor.constructionProgress ?? 0) < tile.anchor.constructionGoal && !tile.isHeadquarters && (() => {
+                  {tile.anchor && false && !tile.isHeadquarters && (() => {
                     const hexKey = `${tile.q},${tile.r},${tile.s}`;
                     const hexUnits = unitsByHex.get(hexKey) || [];
                     const hasCapoOnHex = hexUnits.some(u => u.family === playerFamily && u.type === 'capo');
@@ -1307,7 +1307,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                   )}
 
                   {/* Always-visible income label (hide during construction) */}
-                  {tile.anchor && !tile.isHeadquarters && !(tile.anchor.constructionGoal && (tile.anchor.constructionProgress ?? 0) < tile.anchor.constructionGoal) && (
+                  {tile.anchor && !tile.isHeadquarters && !(false) && (
                     <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#10B981" fontWeight="700" className="pointer-events-none select-none">
                       ${tile.anchor.tribute >= 1000 ? `${(tile.anchor.tribute / 1000).toFixed(1)}k` : tile.anchor.tribute}
                     </text>
@@ -2593,7 +2593,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
               <p><span className="text-muted-foreground">Owner:</span> {(displayHex.controllingFamily || 'neutral').toUpperCase()}</p>
               <p><span className="text-muted-foreground">Terrain:</span> {displayHex.terrain}</p>
               {displayHex.anchor && (() => {
-                const isUnderConstruction = displayHex.anchor.constructionGoal && (displayHex.anchor.constructionProgress ?? 0) < displayHex.anchor.constructionGoal;
+                const isUnderConstruction = false;
                 const hexKey = `${displayHex.q},${displayHex.r},${displayHex.s}`;
                 const hexUnits = unitsByHex.get(hexKey) || [];
                 const hasCapoH = hexUnits.some(u => u.family === playerFamily && u.type === 'capo');
@@ -2621,7 +2621,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
               })()}
               {/* Income contribution sub-card (player-owned hex with business) */}
               {displayHex.anchor && displayHex.controllingFamily === playerFamily && (() => {
-                const isUnderConstruction = displayHex.anchor.constructionGoal && (displayHex.anchor.constructionProgress ?? 0) < displayHex.anchor.constructionGoal;
+                const isUnderConstruction = false;
                 if (isUnderConstruction) return null;
 
                 const baseIncome = displayHex.anchor.tribute || 0;

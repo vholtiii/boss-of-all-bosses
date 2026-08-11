@@ -2571,7 +2571,7 @@ export const useEnhancedMafiaGameState = (
             workingTile = { ...workingTile, pendingClaim: undefined };
           }
           if (workingTile.controllingFamily === 'neutral' && !workingTile.isHeadquarters && unit.type === 'capo' && !isWoundedCapo) {
-            const hasCompletedBusiness = workingTile.anchor && !(workingTile.anchor.constructionProgress !== undefined && workingTile.anchor.constructionProgress < (workingTile.anchor.constructionGoal || 3));
+            const hasCompletedBusiness = !!workingTile.anchor;
             if (hasCompletedBusiness) {
               // Capo auto-extorts any completed business on arrival (legal pays less)
               const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
@@ -3192,7 +3192,7 @@ export const useEnhancedMafiaGameState = (
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
           if (unitType === 'capo' && tile.controllingFamily === 'neutral' && !tile.isHeadquarters && !isWoundedCapo) {
-            const hasCompletedBusiness = tile.anchor && !(tile.anchor.constructionProgress !== undefined && tile.anchor.constructionProgress < (tile.anchor.constructionGoal || 3));
+            const hasCompletedBusiness = !!tile.anchor;
             if (hasCompletedBusiness) {
               const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
               const basePayout = tile.anchor.isLegal ? 1500 : 3000;
@@ -4539,7 +4539,7 @@ export const useEnhancedMafiaGameState = (
       {
         const builtBizCount = newState.hexMap.filter(t => 
           t.controllingFamily === newState.playerFamily && t.anchor && !t.anchor.isExtorted &&
-          !(t.anchor.constructionProgress !== undefined && t.anchor.constructionProgress < (t.anchor.constructionGoal || 3))
+          !(false)
         ).length;
         const bonusTiers = Math.floor(builtBizCount / BUILT_BUSINESS_RESPECT_THRESHOLD);
         if (bonusTiers > 0) {
@@ -5034,7 +5034,7 @@ export const useEnhancedMafiaGameState = (
       const activeAlliances = newState.alliances.filter(a => a.active).length;
       const builtBusinessHexes = playerHexes.filter(t =>
         t.anchor && !t.anchor.isExtorted &&
-        !(t.anchor.constructionProgress !== undefined && t.anchor.constructionProgress < (t.anchor.constructionGoal || 3))
+        !(false)
       ).length;
       const legalBusinessHexes = playerHexes.filter(t => t.anchor && t.anchor.isLegal).length;
       const activePoliticalBribes = (newState.activeBribes || []).filter(b =>
@@ -5615,7 +5615,7 @@ export const useEnhancedMafiaGameState = (
     // Tick construction timers on ALL hexes (player-owned)
     const LEGAL_BIZ_DEFS = BUILDABLE_BUSINESS_DEFS;
     (state.hexMap || []).forEach(tile => {
-      if (tile.controllingFamily === state.playerFamily && tile.anchor && tile.anchor.constructionGoal && (tile.anchor.constructionProgress ?? 0) < tile.anchor.constructionGoal) {
+      if (tile.controllingFamily === state.playerFamily && tile.anchor && false) {
         // Check unit presence on this hex
         const hasCapo = units.some(u => 
           u.family === state.playerFamily && u.type === 'capo' &&
@@ -5690,7 +5690,7 @@ export const useEnhancedMafiaGameState = (
     (state.hexMap || []).forEach(tile => {
       if (tile.controllingFamily === state.playerFamily && tile.anchor) {
         // Skip businesses still under construction
-        if (tile.anchor.constructionProgress !== undefined && tile.anchor.constructionProgress < (tile.anchor.constructionGoal || 3)) {
+        if (false) {
           return;
         }
         const hasCapo = units.some(u => 
@@ -7364,7 +7364,7 @@ export const useEnhancedMafiaGameState = (
         if (!tile) continue;
         
         if (tile.controllingFamily === 'neutral' && tile.anchor && 
-            (tile.anchor.constructionProgress === undefined || tile.anchor.constructionProgress >= (tile.anchor.constructionGoal || 3))) {
+            true) {
           // Extort neutral business: claim territory + collect payout
           tile.controllingFamily = fam;
           const basePayout = tile.anchor.isLegal ? 1500 : 3000;
@@ -7415,7 +7415,7 @@ export const useEnhancedMafiaGameState = (
             // Territory freeze: skip ceasefire families
             const isCeasefireTarget = (state.ceasefires || []).some(c => c.active && (c.family === t.controllingFamily || (t.controllingFamily === state.playerFamily && c.family === fam)));
             return dist === 1 && t.controllingFamily !== fam && t.controllingFamily !== 'neutral' && !isCeasefireTarget &&
-                   t.anchor && (t.anchor.constructionProgress === undefined || t.anchor.constructionProgress >= (t.anchor.constructionGoal || 3));
+                   t.anchor && true;
           });
           
           for (const enemyTile of adjacentEnemyBiz) {
@@ -8401,7 +8401,7 @@ export const useEnhancedMafiaGameState = (
       const aiHexes = state.hexMap.filter(t => t.controllingFamily === fam);
       const aiTerritoryCount = aiHexes.length;
       const aiBuiltBiz = aiHexes.filter(t => t.anchor && !t.anchor.isExtorted &&
-        !(t.anchor.constructionProgress !== undefined && t.anchor.constructionProgress < (t.anchor.constructionGoal || 3))
+        !(false)
       ).length;
       const aiLegalBiz = aiHexes.filter(t => t.anchor && t.anchor.isLegal).length;
       const aiAlliancesInvolving = (state.alliances || []).filter(a => a.active && a.alliedFamily === fam).length;
