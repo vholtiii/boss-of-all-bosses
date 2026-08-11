@@ -1068,45 +1068,59 @@ const generateHexMap = (radius: number, seed?: number): HexTile[] => {
       const district = getDistrict(q, r);
       const terrain = terrainTypes[Math.floor(rng() * terrainTypes.length)];
       
-      const districtConfig: Record<string, { density: number; incomeMult: number; weights: number[] }> = {
-        'Manhattan':      { density: 0.35, incomeMult: 1.8, weights: [5, 40, 15, 40] },
-        'Little Italy':   { density: 0.25, incomeMult: 1.0, weights: [5, 30, 10, 55] },
-        'Brooklyn':       { density: 0.20, incomeMult: 0.9, weights: [20, 25, 30, 25] },
-        'Bronx':          { density: 0.15, incomeMult: 0.7, weights: [35, 15, 35, 15] },
-        'Queens':         { density: 0.15, incomeMult: 0.8, weights: [10, 25, 15, 50] },
-        'Staten Island':  { density: 0.10, incomeMult: 0.75, weights: [5, 10, 20, 65] },
-      };
-      const cfg = districtConfig[district] || { density: 0.20, incomeMult: 1.0, weights: [25, 25, 25, 25] };
-      const hasBusiness = rng() < cfg.density;
-      
-      const tile: HexTile = { q, r, s, district, terrain, controllingFamily: 'neutral' };
-
-      if (hasBusiness) {
-        const typeRoll = rng() * 100;
-        const cumWeights = cfg.weights.reduce((acc: number[], w, i) => {
-          acc.push((acc[i - 1] || 0) + w);
-          return acc;
-        }, []);
-        const typeIdx = cumWeights.findIndex(cw => typeRoll < cw);
-        const bConfig = DOC_BUSINESS_TYPES[typeIdx >= 0 ? typeIdx : 0];
-        
-        const incomeVariation = Math.floor(rng() * 2000);
-        const baseIncome = Math.round((bConfig.baseIncome + incomeVariation) * cfg.incomeMult);
-        tile.anchor = {
-          type: bConfig.type,
-          income: baseIncome,
-          isLegal: bConfig.type === 'store_front',
-          heatLevel: bConfig.baseHeat,
-          launderingCapacity: bConfig.launderingCapacity,
-        };
-      }
-
-      tiles.push(tile);
+      // The map starts bare. Earners come from what you build, plus the handful
+      // of pre-placed anchor rackets seeded in placeAnchorRackets() below.
+      tiles.push({ q, r, s, district, terrain, controllingFamily: 'neutral', buildings: {}, policy: 'earn', recruitProgress: 0 });
     }
   }
 
   return tiles;
 };
+
+/**
+ * Seed the map with a handful of lucrative, pre-built rackets at strategic spots:
+ * spaced apart, away from every HQ, and biased toward each archetype's districts.
+ */
+const placeAnchorRackets = (
+  tiles: HexTile[],
+  hqPositions: Array<{ q: number; r: number; s: number }>,
+  mapSize: string,
+  seed: number,
+) => {
+  const rng = mulberry32(seed + 31337);
+  const target = ANCHOR_COUNT_BY_MAP_SIZE[mapSize] ?? 10;
+  const placed: HexTile[] = [];
+  const usedNames = new Set<string>();
+
+  const eligible = (t: HexTile) =>
+    !t.isHeadquarters && !t.supplyNode && !t.anchor &&
+    !hqPositions.some(hq => hexDistance(hq, t) <= ANCHOR_HQ_EXCLUSION) &&
+    !placed.some(p => hexDistance(p, t) < ANCHOR_MIN_SPACING);
+
+  for (let i = 0; i < target; i++) {
+    const arch = ANCHOR_ARCHETYPES[i % ANCHOR_ARCHETYPES.length];
+    let pool = tiles.filter(t => eligible(t) && arch.districts.includes(t.district as any));
+    if (!pool.length) pool = tiles.filter(eligible);
+    if (!pool.length) break;
+    const tile = pool[Math.floor(rng() * pool.length)];
+    const names = arch.names.filter(n => !usedNames.has(n));
+    const name = (names.length ? names : arch.names)[Math.floor(rng() * Math.max(1, names.length))] || arch.names[0];
+    usedNames.add(name);
+    const tribute = Math.round((arch.tribute * (0.85 + rng() * 0.3)) / 50) * 50;
+    tile.anchor = {
+      type: arch.type,
+      name,
+      tribute,
+      heatLevel: arch.heatLevel,
+      buyoutCost: anchorBuyoutCost(tribute),
+      isLegal: arch.type === 'store_front',
+      launderingCapacity: arch.launderingCapacity,
+      isExtorted: false,
+    };
+    placed.push(tile);
+  }
+};
+
 
 const HQ_POSITIONS_BY_SIZE: Record<string, Record<string, {q:number;r:number;s:number;district:HexTile['district']}>> = {
   small: {
