@@ -1,0 +1,172 @@
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
+import {
+  BUILDING_DEFS,
+  BUILDING_TYPES,
+  MAX_BUILDING_TIER,
+  TILE_POLICIES,
+  DEFAULT_TILE_POLICY,
+  RECRUIT_PROGRESS_GOAL,
+  garrisonShare,
+  tileBuildingTotals,
+  type BuildingType,
+  type BuildingTier,
+  type TilePolicy,
+} from '@/types/game-mechanics';
+import type { HexTile } from '@/hooks/useEnhancedMafiaGameState';
+
+interface TileDevelopmentPanelProps {
+  tile: HexTile;
+  gameState: any;
+  playerFamily: string;
+  onStartBuild?: (q: number, r: number, s: number, type: BuildingType) => void;
+  onSetTilePolicy?: (q: number, r: number, s: number, policy: TilePolicy) => void;
+}
+
+const POLICY_ORDER: TilePolicy[] = ['earn', 'muscle', 'lay_low', 'fortify'];
+
+const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
+  tile, gameState, playerFamily, onStartBuild, onSetTilePolicy,
+}) => {
+  const [tab, setTab] = useState<'orders' | 'build'>('orders');
+  if (!tile || tile.controllingFamily !== playerFamily) return null;
+
+  const money = gameState?.resources?.money ?? 0;
+  const actions = gameState?.actionsRemaining ?? 0;
+  const policy = (tile.policy || DEFAULT_TILE_POLICY) as TilePolicy;
+  const totals = tileBuildingTotals(tile.buildings);
+
+  const unitsHere = (gameState?.deployedUnits || []).filter(
+    (u: any) => u.family === playerFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s
+  );
+  const capoHere = unitsHere.some((u: any) => u.type === 'capo' || u.type === 'boss');
+  const soldiers = unitsHere.filter((u: any) => u.type === 'soldier').length;
+  const share = garrisonShare(capoHere, soldiers);
+  const policyDef = TILE_POLICIES[policy];
+  const monthly = Math.floor(totals.income * share * policyDef.incomeMult);
+  const progressPct = Math.min(100, Math.round(((tile.recruitProgress || 0) / RECRUIT_PROGRESS_GOAL) * 100));
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 12 }}
+      className="panel-noir pointer-events-auto w-full rounded-lg border border-noir-light bg-noir-dark/92 p-3 text-white backdrop-blur-sm"
+    >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="label-caps text-xs text-mafia-gold">The Block · {tile.district}</h3>
+        <span className="text-[10px] text-muted-foreground">
+          {monthly > 0 ? `$${monthly.toLocaleString()}/mo` : 'no earners'}
+        </span>
+      </div>
+
+      <div className="mb-2 grid grid-cols-2 gap-1 text-[10px]">
+        <button
+          type="button"
+          onClick={() => setTab('orders')}
+          className={cn('rounded px-2 py-1 label-caps border', tab === 'orders'
+            ? 'border-mafia-gold/60 bg-mafia-gold/15 text-mafia-gold'
+            : 'border-noir-light text-muted-foreground hover:text-white')}
+        >
+          Standing Order
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('build')}
+          className={cn('rounded px-2 py-1 label-caps border', tab === 'build'
+            ? 'border-mafia-gold/60 bg-mafia-gold/15 text-mafia-gold'
+            : 'border-noir-light text-muted-foreground hover:text-white')}
+        >
+          Build
+        </button>
+      </div>
+
+      {tab === 'orders' && (
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-2 gap-1">
+            {POLICY_ORDER.map(id => {
+              const def = TILE_POLICIES[id];
+              const active = policy === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  title={def.blurb}
+                  onClick={() => onSetTilePolicy?.(tile.q, tile.r, tile.s, id)}
+                  className={cn('rounded border px-2 py-1.5 text-left text-[11px] transition-colors',
+                    active
+                      ? 'border-mafia-gold/70 bg-mafia-gold/10 text-mafia-gold'
+                      : 'border-noir-light text-muted-foreground hover:border-mafia-gold/40 hover:text-white')}
+                >
+                  {def.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[10px] leading-snug text-muted-foreground">{policyDef.blurb}</p>
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+            <span>Garrison share</span>
+            <span className="text-white">{Math.round(share * 100)}%</span>
+          </div>
+          {totals.infra > 0 && (
+            <div>
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>Crew coming up</span>
+                <span className="text-white">{progressPct}%</span>
+              </div>
+              <div className="mt-0.5 h-1 w-full overflow-hidden rounded bg-noir-light">
+                <div className="h-full bg-mafia-gold/70" style={{ width: `${progressPct}%` }} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'build' && (
+        <div className="space-y-1.5">
+          {tile.build && (
+            <div className="rounded border border-amber-500/40 bg-amber-900/25 px-2 py-1.5 text-[10px] text-amber-200">
+              🏗️ {BUILDING_DEFS[tile.build.type].tiers[tile.build.tier].name} — {tile.build.monthsRemaining} month
+              {tile.build.monthsRemaining !== 1 ? 's' : ''} out
+            </div>
+          )}
+          {BUILDING_TYPES.map(type => {
+            const cur = (tile.buildings || {})[type] as BuildingTier | undefined;
+            const next = ((cur || 0) + 1) as BuildingTier;
+            const maxed = next > MAX_BUILDING_TIER;
+            const def = maxed ? BUILDING_DEFS[type].tiers[MAX_BUILDING_TIER] : BUILDING_DEFS[type].tiers[next];
+            const blocked = maxed || !!tile.build || money < def.cost || actions <= 0;
+            return (
+              <button
+                key={type}
+                type="button"
+                disabled={blocked}
+                onClick={() => onStartBuild?.(tile.q, tile.r, tile.s, type)}
+                className={cn('flex w-full items-center justify-between gap-2 rounded border px-2 py-1.5 text-left text-[11px] transition-colors',
+                  blocked
+                    ? 'cursor-not-allowed border-noir-light/60 text-muted-foreground/60'
+                    : 'border-noir-light text-white hover:border-mafia-gold/60 hover:bg-mafia-gold/10')}
+              >
+                <span className="min-w-0 truncate">
+                  {BUILDING_DEFS[type].label}
+                  <span className="ml-1 text-[9px] text-muted-foreground">
+                    {cur ? `T${cur}` : '—'}{!maxed ? ` → T${next}` : ' max'}
+                  </span>
+                </span>
+                {!maxed && (
+                  <span className="shrink-0 text-[10px] text-mafia-gold">
+                    ${def.cost.toLocaleString()} · {def.months}mo
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          <p className="text-[9px] text-muted-foreground">Breaking ground costs 1 action.</p>
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+export default TileDevelopmentPanel;
