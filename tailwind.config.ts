@@ -15,6 +15,9 @@ export default {
     extend: {
       fontFamily: {
         'playfair': ['Playfair Display', 'serif'],
+        'cinzel': ['Cinzel', 'Playfair Display', 'serif'],
+        'barlow': ['Barlow', 'Source Sans Pro', 'sans-serif'],
+        'condensed': ['Barlow Condensed', 'Barlow', 'sans-serif'],
         'source': ['Source Sans Pro', 'sans-serif'],
         'headline': ['Playfair Display', 'serif'],
         'typewriter': ['Special Elite', 'Courier Prime', 'monospace'],
