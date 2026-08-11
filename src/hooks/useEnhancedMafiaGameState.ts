@@ -5804,11 +5804,10 @@ export const useEnhancedMafiaGameState = (
 
       const policyDef = TILE_POLICIES[(tile.policy || DEFAULT_TILE_POLICY) as TilePolicy];
       const capoHere = units.some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
-      const bossHere = units.some(u => u.family === state.playerFamily && u.type === 'boss' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
       const soldierCount = units.filter(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
 
       // 2) income from built tiers, garrison-shared and policy-adjusted
-      let earned = Math.floor(totals.income * garrisonShare(capoHere || bossHere, soldierCount) * policyDef.incomeMult);
+      let earned = Math.floor(totals.income * garrisonShare(capoHere, soldierCount) * policyDef.incomeMult);
       if (hasSupplyRoutes) earned = Math.floor(earned * 1.1);
       buildingIncome += earned;
       buildingHeat += totals.heat * policyDef.heatMult;
