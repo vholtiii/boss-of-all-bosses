@@ -570,6 +570,8 @@ export interface EnhancedMafiaGameState {
   victoryType: VictoryType;
   familyBonuses: FamilyBonuses;
   lastTurnIncome: number;
+  /** Global district upgrades the player has purchased. */
+  districtUpgrades: DistrictUpgradeId[];
   pendingNotifications: Array<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; message?: string }>;
   alertsLog: AlertEntry[];
   alertsLastSeenTurn?: number;
@@ -1347,6 +1349,7 @@ export const createInitialGameState = (
     aiVictor: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
+    districtUpgrades: [],
     pendingNotifications: [],
     alertsLog: [],
     alertsLastSeenTurn: 0,
