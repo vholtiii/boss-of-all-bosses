@@ -1223,7 +1223,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
 
         {/* ── CORRUPTION (4-tier bribe system) — tactical step ── */}
         {(() => {
-          const corruptionLocked = phase !== 'move';
+          const corruptionLocked = phase === 'waiting';
           return (
             <CollapsibleSection
               title="Corruption"
