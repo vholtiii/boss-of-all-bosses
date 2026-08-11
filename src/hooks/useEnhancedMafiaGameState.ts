@@ -5693,18 +5693,18 @@ export const useEnhancedMafiaGameState = (
           u.q === tile.q && u.r === tile.r && u.s === tile.s
         );
         
-        let tileIncome = 0;
+        // ── Garrison share: who is standing on the block decides what it earns ──
+        const soldiersHere = units.filter(u =>
+          u.family === state.playerFamily && u.type === 'soldier' &&
+          u.q === tile.q && u.r === tile.r && u.s === tile.s
+        ).length;
         const isPlayerBuilt = !tile.business.isExtorted && tile.controllingFamily === state.playerFamily;
-        if (isPlayerBuilt) {
-          // Player-built businesses earn 100% regardless of unit presence
-          tileIncome = tile.business.income;
-        } else if (hasCapo) {
-          tileIncome = tile.business.income; // 100%
-        } else if (hasSoldier) {
-          tileIncome = Math.floor(tile.business.income * 0.3); // 30%
-        } else {
-          tileIncome = Math.floor(tile.business.income * 0.1); // 10% passive
-        }
+        const share = isPlayerBuilt ? 1 : garrisonShare(hasCapo, soldiersHere);
+        let tileIncome = Math.floor(tile.business.income * share);
+
+        // ── Tile policy (Earn / Muscle Up / Lay Low / Fortify Up) ──
+        const tilePolicyDef = TILE_POLICIES[(tile.policy || DEFAULT_TILE_POLICY) as TilePolicy];
+        tileIncome = Math.floor(tileIncome * tilePolicyDef.incomeMult);
 
         // Apply family bonuses
         if (bonuses.businessIncome > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.businessIncome / 100));
