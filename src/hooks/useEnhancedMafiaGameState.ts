@@ -4541,8 +4541,7 @@ export const useEnhancedMafiaGameState = (
       // --- Built business empire bonuses: +1 respect & +1 loyalty per 3 built businesses ---
       {
         const builtBizCount = newState.hexMap.filter(t => 
-          t.controllingFamily === newState.playerFamily && tileHasBuildings(t) &&
-          !(false)
+          t.controllingFamily === newState.playerFamily && tileHasBuildings(t)
         ).length;
         const bonusTiers = Math.floor(builtBizCount / BUILT_BUSINESS_RESPECT_THRESHOLD);
         if (bonusTiers > 0) {

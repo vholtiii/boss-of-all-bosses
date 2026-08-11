@@ -1288,7 +1288,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                   )}
 
                   {/* Always-visible income label (hide during construction) */}
-                  {tile.anchor && !tile.isHeadquarters && !(false) && (
+                  {tile.anchor && !tile.isHeadquarters && (
                     <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#10B981" fontWeight="700" className="pointer-events-none select-none">
                       ${tile.anchor.tribute >= 1000 ? `${(tile.anchor.tribute / 1000).toFixed(1)}k` : tile.anchor.tribute}
                     </text>
