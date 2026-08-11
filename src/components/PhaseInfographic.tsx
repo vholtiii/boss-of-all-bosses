@@ -36,7 +36,7 @@ const PhaseInfographic: React.FC<PhaseInfographicProps> = ({
 }) => {
   const playerHexes = hexMap?.filter((h: any) => h.controllingFamily === playerFamily).length || 0;
   const capoCount = (units || []).filter((u: any) => u.family === playerFamily && u.type === 'capo').length;
-  const businessCount = hexMap?.filter((h: any) => h.controllingFamily === playerFamily && h.business && !h.business.isExtorted).length || 0;
+  const businessCount = hexMap?.filter((h: any) => h.controllingFamily === playerFamily && h.anchor && !h.anchor.isExtorted).length || 0;
   const respect = resources?.respect || 0;
 
   const districtAgg = React.useMemo(() => {

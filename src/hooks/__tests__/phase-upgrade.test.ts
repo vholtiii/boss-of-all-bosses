@@ -165,7 +165,7 @@ describe('preview/execution parity', () => {
     // Enemy hex (50% base) so the bonus isn't swallowed by the 99% cap
     const state = extortState();
     state.hexMap[0].controllingFamily = 'genovese';
-    (state.hexMap[0] as any).business = { type: 'gambling', income: 2500, isLegal: false };
+    (state.hexMap[0] as any).anchor = { type: 'gambling', income: 2500, isLegal: false };
     const without = computeExtortCore(state, { targetQ: 1, targetR: 0, targetS: -1 });
     const withBonus = computeExtortCore({
       ...state,

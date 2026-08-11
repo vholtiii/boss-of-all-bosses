@@ -40,7 +40,7 @@ describe("Influence — real-world drivers wiring", () => {
   });
 
   it("construction completion grants a one-off influence spike (legal +3, illegal +2)", () => {
-    expect(src).toMatch(/influenceSpike\s*=\s*tile\.business\.isLegal\s*\?\s*3\s*:\s*2/);
+    expect(src).toMatch(/influenceSpike\s*=\s*tile\.anchor\.isLegal\s*\?\s*3\s*:\s*2/);
   });
 
   it("AI uses the same weighted formula (0.4 built / 0.25 legal / 0.7 alliance / 0.4 districts)", () => {

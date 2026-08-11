@@ -226,7 +226,7 @@ export const previewSabotage = (
   args: { targetQ: number; targetR: number; targetS: number }
 ): ActionPreview => {
   const tile = (state.hexMap || []).find((t: any) => t.q === args.targetQ && t.r === args.targetR && t.s === args.targetS);
-  if (!tile || !tile.business || tile.controllingFamily === state.playerFamily || tile.isHeadquarters) {
+  if (!tile || !tile.anchor || tile.controllingFamily === state.playerFamily || tile.isHeadquarters) {
     return blocked('Sabotage Business', 'No rival business here');
   }
   if ((state.resources?.money || 0) < SABOTAGE_COST) {
@@ -246,7 +246,7 @@ export const previewSabotage = (
     modifiers: isFrontRisk ? [{ label: 'Possible Genovese front (30% foil risk)', delta: -30 }] : [],
     costs: [{ label: 'Money', value: `−${money(SABOTAGE_COST)}`, tone: 'bad' }],
     onSuccess: [
-      { label: 'Rival business', value: `${tile.business.type} (${money(tile.business.income)}/turn) destroyed permanently`, tone: 'good' },
+      { label: 'Rival business', value: `${tile.anchor.type} (${money(tile.anchor.tribute)}/turn) destroyed permanently`, tone: 'good' },
       { label: 'Heat', value: `+${scaledHeat}`, tone: 'bad' },
       { label: `Relationship (${tile.controllingFamily})`, value: `−${SABOTAGE_RELATIONSHIP_PENALTY}`, tone: 'bad' },
     ],

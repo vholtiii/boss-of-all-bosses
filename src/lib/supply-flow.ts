@@ -203,15 +203,15 @@ interface SupplyBusiness {
 function getSupplyBusinesses(state: SupplyFlowGameState, family: string): SupplyBusiness[] {
   const out: SupplyBusiness[] = [];
   for (const tile of state.hexMap) {
-    if (tile.controllingFamily !== family || !tile.business) continue;
-    if (tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal) continue;
-    const deps = SUPPLY_DEPENDENCIES[tile.business.type];
+    if (tile.controllingFamily !== family || !tile.anchor) continue;
+    if (tile.anchor.constructionGoal && (tile.anchor.constructionProgress ?? 0) < tile.anchor.constructionGoal) continue;
+    const deps = SUPPLY_DEPENDENCIES[tile.anchor.type];
     if (!deps?.length) continue;
     out.push({
       q: tile.q, r: tile.r, s: tile.s,
       hexKey: supplyHexKey(tile.q, tile.r, tile.s),
-      businessType: tile.business.type,
-      income: tile.business.income,
+      businessType: tile.anchor.type,
+      income: tile.anchor.tribute,
       district: tile.district,
       deps,
     });

@@ -26,10 +26,10 @@ const placeSoldierOnExtortedHex = (
 ) => {
   const isExtorted = opts.isExtorted ?? true;
   const sameFamily = opts.sameFamily ?? true;
-  const tile = s.hexMap.find((t) => t.business && !t.isHeadquarters)!;
+  const tile = s.hexMap.find((t) => t.anchor && !t.isHeadquarters)!;
   expect(tile).toBeDefined();
   tile.controllingFamily = sameFamily ? s.playerFamily : ("genovese" as any);
-  tile.business!.isExtorted = isExtorted;
+  tile.anchor!.isExtorted = isExtorted;
   const soldier = findPlayerSoldier(s);
   soldier.q = tile.q;
   soldier.r = tile.r;
@@ -194,9 +194,9 @@ describe("Passive racketeering — extorted hex occupancy", () => {
         extortedHexTurns: 0,
       } as any;
     }
-    const tile = s.hexMap.find((t) => t.business && !t.isHeadquarters)!;
+    const tile = s.hexMap.find((t) => t.anchor && !t.isHeadquarters)!;
     tile.controllingFamily = aiFamily as any;
-    tile.business!.isExtorted = true;
+    tile.anchor!.isExtorted = true;
     aiSoldier!.q = tile.q;
     aiSoldier!.r = tile.r;
     aiSoldier!.s = tile.s;

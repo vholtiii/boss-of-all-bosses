@@ -371,7 +371,7 @@ const SitdownsPanel: React.FC<SitdownsPanelProps> = ({
                 const enemyOnHex = tile
                   ? gameState.deployedUnits.filter((u: any) => u.family === p.targetFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s).length
                   : 0;
-                const hexIncome = tile?.business?.income || 0;
+                const hexIncome = tile?.anchor?.tribute || 0;
                 const fam = p.targetFamily.charAt(0).toUpperCase() + p.targetFamily.slice(1);
                 // Best-case odds across territory deal types
                 const sample: NegotiationType = 'bribe_territory';
