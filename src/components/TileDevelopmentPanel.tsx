@@ -13,6 +13,7 @@ import {
   type BuildingType,
   type BuildingTier,
   type TilePolicy,
+  anchorBuyoutCost,
 } from '@/types/game-mechanics';
 import type { HexTile } from '@/hooks/useEnhancedMafiaGameState';
 
@@ -22,12 +23,13 @@ interface TileDevelopmentPanelProps {
   playerFamily: string;
   onStartBuild?: (q: number, r: number, s: number, type: BuildingType) => void;
   onSetTilePolicy?: (q: number, r: number, s: number, policy: TilePolicy) => void;
+  onBuyOutAnchor?: (q: number, r: number, s: number) => void;
 }
 
 const POLICY_ORDER: TilePolicy[] = ['earn', 'muscle', 'lay_low', 'fortify'];
 
 const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
-  tile, gameState, playerFamily, onStartBuild, onSetTilePolicy,
+  tile, gameState, playerFamily, onStartBuild, onSetTilePolicy, onBuyOutAnchor,
 }) => {
   const [tab, setTab] = useState<'orders' | 'build'>('orders');
   if (!tile || tile.controllingFamily !== playerFamily) return null;
@@ -44,7 +46,10 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
   const soldiers = unitsHere.filter((u: any) => u.type === 'soldier').length;
   const share = garrisonShare(capoHere, soldiers);
   const policyDef = TILE_POLICIES[policy];
-  const monthly = Math.floor(totals.income * share * policyDef.incomeMult);
+  const anchor = tile.anchor;
+  const anchorTribute = anchor?.isExtorted ? anchor.tribute : 0;
+  const monthly = Math.floor((totals.income + anchorTribute) * share * policyDef.incomeMult);
+  const buyoutCost = anchor ? (anchor.buyoutCost ?? anchorBuyoutCost(anchor.tribute)) : 0;
   const progressPct = Math.min(100, Math.round(((tile.recruitProgress || 0) / RECRUIT_PROGRESS_GOAL) * 100));
 
   return (
@@ -125,6 +130,33 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
 
       {tab === 'build' && (
         <div className="space-y-1.5">
+          {anchor && (
+            <div className="rounded border border-mafia-gold/40 bg-mafia-gold/10 px-2 py-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate text-[11px] text-mafia-gold">🍸 {anchor.name}</span>
+                <span className="shrink-0 text-[10px] text-muted-foreground">
+                  ${anchor.tribute.toLocaleString()}/mo tribute
+                </span>
+              </div>
+              {anchor.isExtorted ? (
+                <button
+                  type="button"
+                  disabled={money < buyoutCost || actions <= 0}
+                  onClick={() => onBuyOutAnchor?.(tile.q, tile.r, tile.s)}
+                  className={cn('mt-1.5 w-full rounded border px-2 py-1 text-[10px] label-caps transition-colors',
+                    money < buyoutCost || actions <= 0
+                      ? 'cursor-not-allowed border-noir-light/60 text-muted-foreground/60'
+                      : 'border-mafia-gold/60 text-mafia-gold hover:bg-mafia-gold/15')}
+                >
+                  Buy it out · ${buyoutCost.toLocaleString()}
+                </button>
+              ) : (
+                <p className="mt-1 text-[9px] text-muted-foreground">
+                  Set up the racket here first, then you can buy it outright.
+                </p>
+              )}
+            </div>
+          )}
           {tile.build && (
             <div className="rounded border border-amber-500/40 bg-amber-900/25 px-2 py-1.5 text-[10px] text-amber-200">
               🏗️ {BUILDING_DEFS[tile.build.type].tiers[tile.build.tier].name} — {tile.build.monthsRemaining} month

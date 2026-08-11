@@ -116,6 +116,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     startEscort,
     resolveEnemyHexAction,
     startBuild,
+    buyOutAnchor,
     setTilePolicy,
     buyDistrictUpgrade,
     loadGameState,
@@ -530,6 +531,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
             onStartBuild={startBuild}
+            onBuyOutAnchor={buyOutAnchor}
             onSetTilePolicy={setTilePolicy}
             planHitMode={planHitMode}
             planHitStep={planHitStep}
@@ -1681,7 +1683,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     const playerHexes = gameState.hexMap?.filter((h: any) => h.controllingFamily === config.family).length || 0;
     const playerRespect = gameState.resources?.respect ?? 0;
     const playerCapos = gameState.units?.[config.family]?.capos?.length ?? 0;
-    const playerBuilt = gameState.hexMap?.filter((h: any) => h.controllingFamily === config.family && h.business && !h.business.isExtorted).length ?? 0;
+    const playerBuilt = gameState.hexMap?.filter((h: any) => h.controllingFamily === config.family && h.anchor && !h.anchor.isExtorted).length ?? 0;
     const playerIncome = gameState.lastTurnIncome ?? 0;
     const districtCounts: Record<string, { fam: number; total: number }> = {};
     (gameState.hexMap || []).forEach((h: any) => {
@@ -1851,6 +1853,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
             onStartBuild={startBuild}
+            onBuyOutAnchor={buyOutAnchor}
             onSetTilePolicy={setTilePolicy}
             planHitMode={planHitMode}
             planHitStep={planHitStep}
@@ -1926,12 +1929,12 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         });
 
         const hexBusinesses = (gameState.hexMap || [])
-          .filter((tile: any) => tile.controllingFamily === hqFamily && tile.business)
+          .filter((tile: any) => tile.controllingFamily === hqFamily && tile.anchor)
           .map((tile: any) => {
-            const baseIncome = tile.business.income || 0;
-            const underConstruction = tile.business.constructionProgress !== undefined &&
-              tile.business.constructionProgress < (tile.business.constructionGoal || 3);
-            const bizType = tile.business.type || tile.business.businessType || 'Business';
+            const baseIncome = tile.anchor.tribute || 0;
+            const underConstruction = tile.anchor.constructionProgress !== undefined &&
+              tile.anchor.constructionProgress < (tile.anchor.constructionGoal || 3);
+            const bizType = tile.anchor.type || tile.anchor.businessType || 'Business';
             const deps = SUPPLY_DEPENDENCIES[bizType];
             const supplyDependency = deps && deps.length > 0 ? deps.join(',') : undefined;
             const supplyConnected = supplyDependency ? deps!.some(d => connectedNodeTypes.has(d)) : undefined;
@@ -1943,14 +1946,14 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 businessType: bizType,
                 income: underConstruction ? 0 : baseIncome,
                 baseIncome,
-                isLegal: tile.business.isLegal !== false,
-                isExtorted: tile.business.isExtorted === true,
+                isLegal: tile.anchor.isLegal !== false,
+                isExtorted: tile.anchor.isExtorted === true,
                 underConstruction,
                 collectionRate: underConstruction ? 0 : 100,
                 collectionReason: underConstruction ? 'Under construction' : '',
                 supplyConnected,
                 supplyDependency,
-                launderingCapacity: tile.business.launderingCapacity,
+                launderingCapacity: tile.anchor.launderingCapacity,
               };
             }
 
@@ -1965,7 +1968,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
 
             let collectionRate = 10;
             let collectionReason = 'No unit';
-            const isPlayerBuilt = !tile.business.isExtorted;
+            const isPlayerBuilt = !tile.anchor.isExtorted;
             let tileIncome = Math.floor(baseIncome * 0.1);
             
             if (isPlayerBuilt) {
@@ -2009,15 +2012,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               businessType: bizType,
               income: tileIncome,
               baseIncome,
-              isLegal: tile.business.isLegal !== false,
-              isExtorted: tile.business.isExtorted === true,
+              isLegal: tile.anchor.isLegal !== false,
+              isExtorted: tile.anchor.isExtorted === true,
               isPlayerBuilt,
               underConstruction,
               collectionRate,
               collectionReason,
               supplyConnected,
               supplyDependency,
-              launderingCapacity: tile.business.launderingCapacity,
+              launderingCapacity: tile.anchor.launderingCapacity,
             };
           });
         const territoryCount = (gameState.hexMap || []).filter((tile: any) => tile.controllingFamily === hqFamily).length;
@@ -2130,7 +2133,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
               playerReputation={gameState.reputation.respect}
               playerMoney={gameState.resources.money}
               enemyStrength={enemyUnitsOnHex.length}
-              hexIncome={tile.business?.income || 0}
+              hexIncome={tile.anchor?.tribute || 0}
               treacheryTurnsRemaining={(gameState as any).treacheryDebuff?.turnsRemaining || 0}
               lockedDealType={(negotiationState as any).lockedDealType}
               proposedAmount={(negotiationState as any).proposedAmount}
@@ -2404,9 +2407,9 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
             district: tile.district || 'Unknown',
             controllingFamily: tile.controllingFamily || 'neutral',
             defendersCount: defenders.length,
-            hasBusiness: !!tile.business,
-            businessType: tile.business?.type,
-            isLegal: tile.business?.isLegal,
+            hasBusiness: !!tile.anchor,
+            businessType: tile.anchor?.type,
+            isLegal: tile.anchor?.isLegal,
             isScouted,
             planMatchesHere,
             planRelocatedHere,

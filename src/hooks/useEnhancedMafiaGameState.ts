@@ -25,6 +25,9 @@ import {
   BUILDING_DEFS, BUILDING_TYPES, MAX_BUILDING_TIER, TILE_POLICIES, DEFAULT_TILE_POLICY,
   RECRUIT_PROGRESS_GOAL, RECRUIT_PROGRESS_PER_INFRA, DISTRICT_UPGRADES,
   TURF_TAX_PER_HEX, EMPTY_BLOCK_OVERHEAD, garrisonShare, tileBuildingTotals,
+  AnchorRacket, ANCHOR_ARCHETYPES, ANCHOR_COUNT_BY_MAP_SIZE, ANCHOR_MIN_SPACING, ANCHOR_HQ_EXCLUSION,
+  ANCHOR_EXTORT_RESPECT, ANCHOR_BUYOUT_INFLUENCE, anchorBuyoutCost, tileHasBuildings, tileEarnPotential,
+
   FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, MAX_FORTIFICATIONS, FortifiedHex, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
   SAFEHOUSE_COST, SAFEHOUSE_DEFENSE_BONUS, SAFEHOUSE_CAPTURE_BOUNTY, SAFEHOUSE_CAPTURE_INTEL_DURATION, SAFEHOUSE_TERRITORY_THRESHOLD, MAX_SAFEHOUSES,
   PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_FAIL_REPUTATION, PLAN_HIT_FAIL_LOYALTY,
@@ -168,11 +171,10 @@ const syncRespect = (state: any, value: number) => {
 
 // ============ BUILT BUSINESS SEIZURE HELPER ============
 const applyBuiltBusinessSeizure = (state: any, tile: any, seizingFamily: string, losingFamily: string) => {
-  if (!tile.business || tile.business.isExtorted) return; // Only applies to player-built businesses
-  
-  // Mark business with seizure penalty
-  tile.business.seizurePenaltyTurns = BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION;
-  tile.business.wasPlayerBuilt = true;
+  if (!tileHasBuildings(tile)) return; // Only applies to developed blocks
+
+  // Mark the block with a seizure penalty
+  tile.seizurePenaltyTurns = BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION;
   
   // Auto-ceasefire between the two families
   const existingCeasefire = (state.ceasefires || []).some(
@@ -285,8 +287,8 @@ export const tickPassiveRacketeering = (state: EnhancedMafiaGameState): number =
     const eligible = !!(
       tile &&
       tile.controllingFamily === unit.family &&
-      tile.business &&
-      tile.business.isExtorted === true
+      tile.anchor &&
+      tile.anchor.isExtorted === true
     );
     if (!eligible) {
       if ((stats.extortedHexTurns || 0) > 0) stats.extortedHexTurns = 0;
@@ -309,7 +311,7 @@ export const tickPassiveRacketeering = (state: EnhancedMafiaGameState): number =
 // ============ IMMUTABLE STATE CLONE HELPER ============
 const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGameState => ({
   ...state,
-  hexMap: state.hexMap.map(t => ({ ...t, business: t.business ? { ...t.business } : undefined })),
+  hexMap: state.hexMap.map(t => ({ ...t, business: t.anchor ? { ...t.anchor } : undefined })),
   deployedUnits: (state.deployedUnits || []).map(u => ({ ...u, escortingSoldierIds: u.escortingSoldierIds ? [...u.escortingSoldierIds] : undefined })),
   pendingNotifications: [...(state.pendingNotifications || [])],
   alertsLog: [...(state.alertsLog || [])],
@@ -434,19 +436,11 @@ export interface HexTile {
   district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
   terrain: 'urban' | 'industrial' | 'residential' | 'docks' | 'commercial';
   controllingFamily: 'neutral' | 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
-  business?: {
-    type: string;
-    income: number;
-    isLegal: boolean;
-    heatLevel: number;
-    launderingCapacity?: number;
-    turnsUntilComplete?: number;
-    constructionProgress?: number;
-    constructionGoal?: number;
-    isExtorted?: boolean;
-    seizurePenaltyTurns?: number;  // turns remaining at 50% income after rival seizes a player-built business
-    wasPlayerBuilt?: boolean;       // tracks that this was originally a player-built business (cleared when penalty expires)
-  };
+  /** Pre-placed lucrative racket. Extort it for tribute, buy it out to develop it. */
+  anchor?: AnchorRacket;
+  /** Turns remaining at 50% earnings after a rival seized this developed block. */
+  seizurePenaltyTurns?: number;
+
   isHeadquarters?: string;
   supplyNode?: SupplyNodeType;
   // Phase 3 influence system
@@ -960,7 +954,7 @@ const applyPendingClaim = (
   tile.pendingClaim = { family, sinceTurn: state.turn };
   // A3: heat applies on claim initiation. Player only.
   if (isPlayer) {
-    const heatGain = tile.business ? CLAIM_HEAT_BUSINESS : CLAIM_HEAT_PLAIN;
+    const heatGain = tile.anchor ? CLAIM_HEAT_BUSINESS : CLAIM_HEAT_PLAIN;
     applyPlayerHeat(state, heatGain);
   }
   return true;
@@ -1073,45 +1067,59 @@ const generateHexMap = (radius: number, seed?: number): HexTile[] => {
       const district = getDistrict(q, r);
       const terrain = terrainTypes[Math.floor(rng() * terrainTypes.length)];
       
-      const districtConfig: Record<string, { density: number; incomeMult: number; weights: number[] }> = {
-        'Manhattan':      { density: 0.35, incomeMult: 1.8, weights: [5, 40, 15, 40] },
-        'Little Italy':   { density: 0.25, incomeMult: 1.0, weights: [5, 30, 10, 55] },
-        'Brooklyn':       { density: 0.20, incomeMult: 0.9, weights: [20, 25, 30, 25] },
-        'Bronx':          { density: 0.15, incomeMult: 0.7, weights: [35, 15, 35, 15] },
-        'Queens':         { density: 0.15, incomeMult: 0.8, weights: [10, 25, 15, 50] },
-        'Staten Island':  { density: 0.10, incomeMult: 0.75, weights: [5, 10, 20, 65] },
-      };
-      const cfg = districtConfig[district] || { density: 0.20, incomeMult: 1.0, weights: [25, 25, 25, 25] };
-      const hasBusiness = rng() < cfg.density;
-      
-      const tile: HexTile = { q, r, s, district, terrain, controllingFamily: 'neutral' };
-
-      if (hasBusiness) {
-        const typeRoll = rng() * 100;
-        const cumWeights = cfg.weights.reduce((acc: number[], w, i) => {
-          acc.push((acc[i - 1] || 0) + w);
-          return acc;
-        }, []);
-        const typeIdx = cumWeights.findIndex(cw => typeRoll < cw);
-        const bConfig = DOC_BUSINESS_TYPES[typeIdx >= 0 ? typeIdx : 0];
-        
-        const incomeVariation = Math.floor(rng() * 2000);
-        const baseIncome = Math.round((bConfig.baseIncome + incomeVariation) * cfg.incomeMult);
-        tile.business = {
-          type: bConfig.type,
-          income: baseIncome,
-          isLegal: bConfig.type === 'store_front',
-          heatLevel: bConfig.baseHeat,
-          launderingCapacity: bConfig.launderingCapacity,
-        };
-      }
-
-      tiles.push(tile);
+      // The map starts bare. Earners come from what you build, plus the handful
+      // of pre-placed anchor rackets seeded in placeAnchorRackets() below.
+      tiles.push({ q, r, s, district, terrain, controllingFamily: 'neutral', buildings: {}, policy: 'earn', recruitProgress: 0 });
     }
   }
 
   return tiles;
 };
+
+/**
+ * Seed the map with a handful of lucrative, pre-built rackets at strategic spots:
+ * spaced apart, away from every HQ, and biased toward each archetype's districts.
+ */
+const placeAnchorRackets = (
+  tiles: HexTile[],
+  hqPositions: Array<{ q: number; r: number; s: number }>,
+  mapSize: string,
+  seed: number,
+) => {
+  const rng = mulberry32(seed + 31337);
+  const target = ANCHOR_COUNT_BY_MAP_SIZE[mapSize] ?? 10;
+  const placed: HexTile[] = [];
+  const usedNames = new Set<string>();
+
+  const eligible = (t: HexTile) =>
+    !t.isHeadquarters && !t.supplyNode && !t.anchor &&
+    !hqPositions.some(hq => hexDistance(hq, t) <= ANCHOR_HQ_EXCLUSION) &&
+    !placed.some(p => hexDistance(p, t) < ANCHOR_MIN_SPACING);
+
+  for (let i = 0; i < target; i++) {
+    const arch = ANCHOR_ARCHETYPES[i % ANCHOR_ARCHETYPES.length];
+    let pool = tiles.filter(t => eligible(t) && arch.districts.includes(t.district as any));
+    if (!pool.length) pool = tiles.filter(eligible);
+    if (!pool.length) break;
+    const tile = pool[Math.floor(rng() * pool.length)];
+    const names = arch.names.filter(n => !usedNames.has(n));
+    const name = (names.length ? names : arch.names)[Math.floor(rng() * Math.max(1, names.length))] || arch.names[0];
+    usedNames.add(name);
+    const tribute = Math.round((arch.tribute * (0.85 + rng() * 0.3)) / 50) * 50;
+    tile.anchor = {
+      type: arch.type,
+      name,
+      tribute,
+      heatLevel: arch.heatLevel,
+      buyoutCost: anchorBuyoutCost(tribute),
+      isLegal: arch.type === 'store_front',
+      launderingCapacity: arch.launderingCapacity,
+      isExtorted: false,
+    };
+    placed.push(tile);
+  }
+};
+
 
 const HQ_POSITIONS_BY_SIZE: Record<string, Record<string, {q:number;r:number;s:number;district:HexTile['district']}>> = {
   small: {
@@ -1193,7 +1201,7 @@ export const createInitialGameState = (
     if (hqTile) {
       hqTile.isHeadquarters = fam;
       hqTile.controllingFamily = fam;
-      hqTile.business = undefined;
+      hqTile.anchor = undefined;
     }
     const neighbors = getHexNeighbors(hq.q, hq.r, hq.s);
     neighbors.forEach(n => {
@@ -1201,7 +1209,11 @@ export const createInitialGameState = (
       if (tile && tile.controllingFamily === 'neutral') {
         tile.controllingFamily = fam;
       }
-    });
+  });
+
+  // Seed the strategic anchor rackets once HQs and supply nodes are locked in.
+  placeAnchorRackets(hexMap, hqPositions, mapSize, mapSeed);
+
   });
 
   const deployedUnits: DeployedUnit[] = [];
@@ -1477,17 +1489,17 @@ function buildLegacyTerritories(hexMap: HexTile[]): EnhancedMafiaGameState['terr
     const owner = Object.entries(dominantFamily).sort((a,b) => b[1] - a[1])[0]?.[0] || 'neutral';
 
     const businesses = tilesInDistrict
-      .filter(t => t.business)
+      .filter(t => t.anchor)
       .map((t, i) => ({
         q: t.q, r: t.r, s: t.s,
         businessId: `${district.toLowerCase().replace(' ', '_')}_biz_${i}`,
-        businessType: t.business!.type,
-        isLegal: t.business!.isLegal,
-        income: t.business!.income,
+        businessType: t.anchor!.type,
+        isLegal: t.anchor!.isLegal,
+        income: t.anchor!.tribute,
         district,
         family: t.controllingFamily,
         isExtorted: false,
-        heatLevel: t.business!.heatLevel,
+        heatLevel: t.anchor!.heatLevel,
       }));
 
     return { district, family: owner as any, businesses };
@@ -1691,7 +1703,7 @@ export const useEnhancedMafiaGameState = (
     const respect = isPlayer ? state.reputation.respect : (state.aiOpponents.find(o => o.family === family)?.resources.respect || 0);
     const capoCount = state.deployedUnits.filter(u => u.family === family && u.type === 'capo').length;
     // Count only legally constructed (non-extorted) businesses for both player and AI
-    const builtBusinessCount = state.hexMap.filter(t => t.controllingFamily === family && t.business && !t.business.isExtorted).length;
+    const builtBusinessCount = state.hexMap.filter(t => t.controllingFamily === family && tileHasBuildings(t)).length;
     const income = isPlayer
       ? state.lastTurnIncome
       : (state.aiOpponents.find(o => o.family === family)?.resources.lastTurnIncome || 0);
@@ -1744,7 +1756,7 @@ export const useEnhancedMafiaGameState = (
     const hexCount = state.hexMap.filter(t => t.controllingFamily === family).length;
     const respect = isPlayer ? state.reputation.respect : (state.aiOpponents.find(o => o.family === family)?.resources.respect || 0);
     const capoCount = state.deployedUnits.filter(u => u.family === family && u.type === 'capo').length;
-    const builtBusinessCount = state.hexMap.filter(t => t.controllingFamily === family && t.business && !t.business.isExtorted).length;
+    const builtBusinessCount = state.hexMap.filter(t => t.controllingFamily === family && tileHasBuildings(t)).length;
     const income = isPlayer ? state.lastTurnIncome : (state.aiOpponents.find(o => o.family === family)?.resources.lastTurnIncome || 0);
     const DISTRICT_CTRL = 0.6;
     const districtCounts: Record<string, { fam: number; total: number }> = {};
@@ -2194,8 +2206,8 @@ export const useEnhancedMafiaGameState = (
               freshUntilTurn: newState.turn + 1,
               enemySoldierCount: enemyUnitsOnHex.length,
               enemyFamily: tile.controllingFamily,
-              businessType: tile.business?.type,
-              businessIncome: tile.business?.income,
+              businessType: tile.anchor?.type,
+              businessIncome: tile.anchor?.tribute,
               isFortified: hexIsFortified || undefined,
               hasSafehouse: hexHasSafehouse || undefined,
             });
@@ -2562,25 +2574,25 @@ export const useEnhancedMafiaGameState = (
             workingTile = { ...workingTile, pendingClaim: undefined };
           }
           if (workingTile.controllingFamily === 'neutral' && !workingTile.isHeadquarters && unit.type === 'capo' && !isWoundedCapo) {
-            const hasCompletedBusiness = workingTile.business && !(workingTile.business.constructionProgress !== undefined && workingTile.business.constructionProgress < (workingTile.business.constructionGoal || 3));
+            const hasCompletedBusiness = !!workingTile.anchor;
             if (hasCompletedBusiness) {
               // Capo auto-extorts any completed business on arrival (legal pays less)
               const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
-              const basePayout = workingTile.business.isLegal ? 1500 : 3000;
+              const basePayout = workingTile.anchor.isLegal ? 1500 : 3000;
               bonusMoney = Math.floor(basePayout * respectPayoutMult);
-              bonusRespect = workingTile.business.isLegal ? 3 : 5;
+              bonusRespect = workingTile.anchor.isLegal ? 3 : 5;
               autoExtortNotification = {
                 type: 'success' as const,
                 title: '💰 Capo Auto-Extortion!',
-                message: `${unit.name || 'Your Capo'} set up a protection racket on the ${workingTile.business.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
+                message: `${unit.name || 'Your Capo'} set up a protection racket on the ${workingTile.anchor.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
               };
               // Auto-extort still finalizes ownership immediately (untouched per plan).
-              return { ...workingTile, controllingFamily: prev.playerFamily, business: workingTile.business ? { ...workingTile.business, isExtorted: true } : undefined };
+              return { ...workingTile, controllingFamily: prev.playerFamily, business: workingTile.anchor ? { ...workingTile.anchor, isExtorted: true } : undefined };
             } else {
               // A1: Capo auto-claim now produces a PENDING claim, not finalized.
               // A3: heat applies on initiation.
               if (!workingTile.pendingClaim || workingTile.pendingClaim.family === prev.playerFamily) {
-                pendingClaimHeatGain = workingTile.business ? 6 : 3;
+                pendingClaimHeatGain = workingTile.anchor ? 6 : 3;
                 autoExtortNotification = {
                   type: 'info' as const,
                   title: '⏳ Territory Contested',
@@ -2898,8 +2910,8 @@ export const useEnhancedMafiaGameState = (
       freshUntilTurn: prev.turn + 1, // live data on scout turn, stale after
       enemySoldierCount: enemyUnitsOnHex.length,
       enemyFamily: tile.controllingFamily,
-      businessType: tile.business?.type,
-      businessIncome: tile.business?.income,
+      businessType: tile.anchor?.type,
+      businessIncome: tile.anchor?.tribute,
       isFortified: hexIsFortified || undefined,
       hasSafehouse: hexHasSafehouse || undefined,
     };
@@ -2911,8 +2923,8 @@ export const useEnhancedMafiaGameState = (
     const notifications = [...prev.pendingNotifications, {
       type: 'info' as const, title: '👁️ Hex Scouted',
       message: tile.controllingFamily === 'neutral'
-        ? `Neutral territory${tile.business ? `: ${tile.business.type} generating $${tile.business.income}/turn` : ': no businesses'}.`
-        : `${tile.controllingFamily.toUpperCase()} territory: ${enemyUnitsOnHex.length} units${tile.business ? `, ${tile.business.type} ($${tile.business.income}/turn)` : ''}${hexIsFortified ? ' ⚠️ FORTIFIED' : ''}${hexHasSafehouse ? ' 🏠 Enemy Safehouse detected!' : ''}.`,
+        ? `Neutral territory${tile.anchor ? `: ${tile.anchor.type} generating $${tile.anchor.tribute}/turn` : ': no businesses'}.`
+        : `${tile.controllingFamily.toUpperCase()} territory: ${enemyUnitsOnHex.length} units${tile.anchor ? `, ${tile.anchor.type} ($${tile.anchor.tribute}/turn)` : ''}${hexIsFortified ? ' ⚠️ FORTIFIED' : ''}${hexHasSafehouse ? ' 🏠 Enemy Safehouse detected!' : ''}.`,
     }];
 
     // Detection chance on enemy-controlled hexes (no heat, but AI gets reinforcement flag)
@@ -3183,23 +3195,23 @@ export const useEnhancedMafiaGameState = (
       const newHexMap = prev.hexMap.map(tile => {
         if (tile.q === targetLocation.q && tile.r === targetLocation.r && tile.s === targetLocation.s) {
           if (unitType === 'capo' && tile.controllingFamily === 'neutral' && !tile.isHeadquarters && !isWoundedCapo) {
-            const hasCompletedBusiness = tile.business && !(tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3));
+            const hasCompletedBusiness = !!tile.anchor;
             if (hasCompletedBusiness) {
               const respectPayoutMult = 0.5 + (prev.reputation.respect / 100);
-              const basePayout = tile.business.isLegal ? 1500 : 3000;
+              const basePayout = tile.anchor.isLegal ? 1500 : 3000;
               bonusMoney = Math.floor(basePayout * respectPayoutMult);
-              bonusRespect = tile.business.isLegal ? 3 : 5;
+              bonusRespect = tile.anchor.isLegal ? 3 : 5;
               autoExtortNotification = {
                 type: 'success' as const,
                 title: '💰 Capo Auto-Extortion!',
-                message: `${deployedUnit?.name || 'Your Capo'} set up a protection racket on the ${tile.business.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
+                message: `${deployedUnit?.name || 'Your Capo'} set up a protection racket on the ${tile.anchor.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
               };
               // Auto-extort still finalizes ownership immediately (untouched per plan).
-              return { ...tile, controllingFamily: family as any, business: tile.business ? { ...tile.business, isExtorted: true } : undefined };
+              return { ...tile, controllingFamily: family as any, business: tile.anchor ? { ...tile.anchor, isExtorted: true } : undefined };
             } else {
               // A1: pending claim, not finalized
               if (!tile.pendingClaim || tile.pendingClaim.family === family) {
-                pendingClaimHeatGain = tile.business ? 6 : 3;
+                pendingClaimHeatGain = tile.anchor ? 6 : 3;
                 autoExtortNotification = {
                   type: 'info' as const,
                   title: '⏳ Territory Contested',
@@ -4104,7 +4116,7 @@ export const useEnhancedMafiaGameState = (
 
         // 2. High-income hex bonus (+3)
         const hex = newState.hexMap.find(t => t.q === u.q && t.r === u.r && t.s === u.s);
-        if (hex?.business && hex.business.income >= LOYALTY_INCOME_HEX_THRESHOLD) {
+        if (hex?.anchor && hex.anchor.tribute >= LOYALTY_INCOME_HEX_THRESHOLD) {
           loyaltyDelta += LOYALTY_INCOME_HEX_BONUS;
         }
 
@@ -4272,7 +4284,7 @@ export const useEnhancedMafiaGameState = (
         // Boss Assassination check — no soldiers, in debt, no recovery path
         const remainingPlayerSoldiers = newState.deployedUnits.filter(u => u.family === newState.playerFamily && u.type === 'soldier');
         const totalIncome = newState.hexMap.reduce((sum, t) => {
-          if (t.controllingFamily === newState.playerFamily && t.business) return sum + (t.business.income || 0);
+          if (t.controllingFamily === newState.playerFamily && t.anchor) return sum + (t.anchor.tribute || 0);
           return sum;
         }, 0);
         const totalCosts = remainingPlayerSoldiers.length * 600 + newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily && !t.isHeadquarters && newState.deployedUnits.filter(u => u.q === t.q && u.r === t.r && u.s === t.s).length === 0).length * 150;
@@ -4515,11 +4527,11 @@ export const useEnhancedMafiaGameState = (
       // Suppressed during Lay Low, scaled by HEAT_GAIN_MULT × policeHeatMult via applyPlayerHeat (parity with AI).
       if (!isLayingLow(newState)) {
         const illegalBizzes = newState.hexMap.filter(t => 
-          t.controllingFamily === newState.playerFamily && t.business && !t.business.isLegal
+          t.controllingFamily === newState.playerFamily && t.anchor && !t.anchor.isLegal
         );
         let heatFromBiz = 0;
         illegalBizzes.forEach(t => {
-          const isPlayerBuilt = !t.business!.isExtorted;
+          const isPlayerBuilt = !t.anchor!.isExtorted;
           heatFromBiz += isPlayerBuilt ? 0.5 : 1; // built = half heat contribution
         });
         const passiveHeat = Math.floor(heatFromBiz / 3);
@@ -4529,8 +4541,7 @@ export const useEnhancedMafiaGameState = (
       // --- Built business empire bonuses: +1 respect & +1 loyalty per 3 built businesses ---
       {
         const builtBizCount = newState.hexMap.filter(t => 
-          t.controllingFamily === newState.playerFamily && t.business && !t.business.isExtorted &&
-          !(t.business.constructionProgress !== undefined && t.business.constructionProgress < (t.business.constructionGoal || 3))
+          t.controllingFamily === newState.playerFamily && tileHasBuildings(t)
         ).length;
         const bonusTiers = Math.floor(builtBizCount / BUILT_BUSINESS_RESPECT_THRESHOLD);
         if (bonusTiers > 0) {
@@ -4746,12 +4757,12 @@ export const useEnhancedMafiaGameState = (
         if (heat >= 90) {
           // Shut down a random illegal business
           const illegalBizHexes = newState.hexMap.filter(t =>
-            t.controllingFamily === newState.playerFamily && t.business && !t.business.isLegal
+            t.controllingFamily === newState.playerFamily && t.anchor && !t.anchor.isLegal
           );
           if (illegalBizHexes.length > 0) {
             const target = illegalBizHexes[Math.floor(Math.random() * illegalBizHexes.length)];
-            const bizType = target.business!.type;
-            target.business = undefined;
+            const bizType = target.anchor!.type;
+            target.anchor = undefined;
             turnReport.events.push(`🏚️ Federal raid! Your ${bizType} was shut down permanently!`);
             newState.pendingNotifications.push({
               type: 'error' as const, title: '🏚️ Business Shut Down!',
@@ -4908,8 +4919,8 @@ export const useEnhancedMafiaGameState = (
               newState.resources.money -= frozen;
               // Shut down illegal businesses
               newState.hexMap.forEach(t => {
-                if (t.controllingFamily === newState.playerFamily && t.business && !t.business.isLegal) {
-                  t.business = undefined;
+                if (t.controllingFamily === newState.playerFamily && t.anchor && !t.anchor.isLegal) {
+                  t.anchor = undefined;
                 }
               });
               turnReport.events.push(`🏛️ FEDERAL INDICTMENT! Paid $${FEDERAL_INDICTMENT_DEFENSE_COST.toLocaleString()} defense. All illegal businesses shut down. $${frozen.toLocaleString()} frozen.`);
@@ -5023,11 +5034,8 @@ export const useEnhancedMafiaGameState = (
       const playerHexes = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily);
       const playerControlledHexes = playerHexes.length;
       const activeAlliances = newState.alliances.filter(a => a.active).length;
-      const builtBusinessHexes = playerHexes.filter(t =>
-        t.business && !t.business.isExtorted &&
-        !(t.business.constructionProgress !== undefined && t.business.constructionProgress < (t.business.constructionGoal || 3))
-      ).length;
-      const legalBusinessHexes = playerHexes.filter(t => t.business && t.business.isLegal).length;
+      const builtBusinessHexes = playerHexes.filter(t => tileHasBuildings(t)).length;
+      const legalBusinessHexes = playerHexes.filter(t => !!(t.buildings || {}).store_front).length;
       const activePoliticalBribes = (newState.activeBribes || []).filter(b =>
         b.active && (b.tier === 'police_captain' || b.tier === 'police_chief' || b.tier === 'mayor')
       ).length;
@@ -5050,7 +5058,7 @@ export const useEnhancedMafiaGameState = (
       newState.reputation.streetInfluence = Math.round(newState.resources.influence);
       
       // --- Per-turn Respect growth (harder; bold moves bypass via direct awards) ---
-      const hexesWithBusinesses = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily && t.business).length;
+      const hexesWithBusinesses = newState.hexMap.filter(t => t.controllingFamily === newState.playerFamily && t.anchor).length;
       // Income gain: cap 2, divisor 10000 (was cap 3, divisor 7000)
       const incomeRespectGain = Math.min(2, newState.finances.totalIncome / 10000);
       // Business gain: hexes/10 (was /7)
@@ -5603,53 +5611,6 @@ export const useEnhancedMafiaGameState = (
     const units = state.deployedUnits || [];
     const bonuses = state.familyBonuses;
 
-    // Tick construction timers on ALL hexes (player-owned)
-    const LEGAL_BIZ_DEFS = BUILDABLE_BUSINESS_DEFS;
-    (state.hexMap || []).forEach(tile => {
-      if (tile.controllingFamily === state.playerFamily && tile.business && tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal) {
-        // Check unit presence on this hex
-        const hasCapo = units.some(u => 
-          u.family === state.playerFamily && u.type === 'capo' &&
-          u.q === tile.q && u.r === tile.r && u.s === tile.s
-        );
-        const hasSoldier = units.some(u => 
-          u.family === state.playerFamily && u.type === 'soldier' &&
-          u.q === tile.q && u.r === tile.r && u.s === tile.s
-        );
-
-        let progressIncrement = 0;
-        if (hasCapo) {
-          progressIncrement = 1.5; // 50% faster
-        } else if (hasSoldier) {
-          progressIncrement = 0.75; // 25% slower
-        }
-        // If no unit → paused (0 progress)
-
-        if (progressIncrement > 0) {
-          tile.business.constructionProgress = (tile.business.constructionProgress ?? 0) + progressIncrement;
-        }
-
-        if ((tile.business.constructionProgress ?? 0) >= tile.business.constructionGoal) {
-          const def = LEGAL_BIZ_DEFS[tile.business.type];
-          if (def) {
-            tile.business.income = def.income;
-            tile.business.launderingCapacity = def.launderingCapacity;
-          }
-          tile.business.constructionGoal = undefined;
-          tile.business.constructionProgress = undefined;
-          tile.business.turnsUntilComplete = undefined;
-          // One-off influence spike for completing a build (legal +3, illegal +2)
-          const influenceSpike = tile.business.isLegal ? 3 : 2;
-          state.resources.influence = Math.min(100, (state.resources.influence || 0) + influenceSpike);
-          state.reputation.streetInfluence = Math.round(state.resources.influence);
-          state.pendingNotifications = [...(state.pendingNotifications || []), {
-            type: 'success' as const, title: '🏢 Business Complete!',
-            message: `Your ${tile.business.type} is now operational and generating $${tile.business.income.toLocaleString()}/turn. +${influenceSpike} Influence — your new ${tile.business.isLegal ? 'legitimate front' : 'operation'} cements your standing in ${tile.district}.`,
-          }];
-        }
-      }
-    });
-    
     // Compute supply line connectivity (BFS from HQ)
     const connectedHexes = getConnectedTerritory(state.hexMap, state.playerFamily);
     const connectedNodeTypes = new Set<SupplyNodeType>();
@@ -5679,11 +5640,7 @@ export const useEnhancedMafiaGameState = (
     let illegalIncome = 0;
     
     (state.hexMap || []).forEach(tile => {
-      if (tile.controllingFamily === state.playerFamily && tile.business) {
-        // Skip businesses still under construction
-        if (tile.business.constructionProgress !== undefined && tile.business.constructionProgress < (tile.business.constructionGoal || 3)) {
-          return;
-        }
+      if (tile.controllingFamily === state.playerFamily && tile.anchor?.isExtorted) {
         const hasCapo = units.some(u => 
           u.family === state.playerFamily && u.type === 'capo' &&
           u.q === tile.q && u.r === tile.r && u.s === tile.s
@@ -5698,9 +5655,9 @@ export const useEnhancedMafiaGameState = (
           u.family === state.playerFamily && u.type === 'soldier' &&
           u.q === tile.q && u.r === tile.r && u.s === tile.s
         ).length;
-        const isPlayerBuilt = !tile.business.isExtorted && tile.controllingFamily === state.playerFamily;
-        const share = isPlayerBuilt ? 1 : garrisonShare(hasCapo, soldiersHere);
-        let tileIncome = Math.floor(tile.business.income * share);
+        // Anchors only pay while someone is standing on them — tribute needs a collector.
+        const share = garrisonShare(hasCapo, soldiersHere);
+        let tileIncome = Math.floor(tile.anchor.tribute * share);
 
         // ── Tile policy (Earn / Muscle Up / Lay Low / Fortify Up) ──
         const tilePolicyDef = TILE_POLICIES[(tile.policy || DEFAULT_TILE_POLICY) as TilePolicy];
@@ -5712,7 +5669,7 @@ export const useEnhancedMafiaGameState = (
         if (bonuses.income > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.income / 100));
 
         // ── Supply Line Decay ──
-        const deps = SUPPLY_DEPENDENCIES[tile.business.type];
+        const deps = SUPPLY_DEPENDENCIES[tile.anchor.type];
         if (deps && deps.length > 0) {
           const hexKey = `${tile.q},${tile.r},${tile.s}`;
           const decayMultiplier = getBusinessSupplyDecayMultiplier(hexKey, state.businessSupplyStatus);
@@ -5730,8 +5687,8 @@ export const useEnhancedMafiaGameState = (
         }
         // Front Boss heat zeroing: skip heat for businesses on front boss hexes
         const isOnFrontBossHex = (state.frontBossHexes || []).some(h => h.q === tile.q && h.r === tile.r && h.s === tile.s && h.ownerFamily === state.playerFamily);
-        if (isOnFrontBossHex && tile.business) {
-          tile.business.heatLevel = 0;
+        if (isOnFrontBossHex && tile.anchor) {
+          tile.anchor.heatLevel = 0;
         }
         // War income penalty: -20% on hexes adjacent to warring enemy territory (capped at -30%)
         let warPenalty = 0;
@@ -5751,7 +5708,7 @@ export const useEnhancedMafiaGameState = (
           tileIncome = Math.floor(tileIncome * (1 - warPenalty));
         }
         
-        if (tile.business.isLegal) {
+        if (tile.anchor.isLegal) {
           legalIncome += tileIncome;
         } else {
           illegalIncome += tileIncome;
@@ -5866,8 +5823,8 @@ export const useEnhancedMafiaGameState = (
     let shareProfitsIncome = 0;
     (state.shareProfitsPacts || []).filter(p => p.active).forEach(pact => {
       const pactTile = state.hexMap.find(t => t.q === pact.hexQ && t.r === pact.hexR && t.s === pact.hexS);
-      if (pactTile?.business) {
-        const pactIncome = Math.floor(pactTile.business.income * pact.incomeShare);
+      if (pactTile?.anchor) {
+        const pactIncome = Math.floor(pactTile.anchor.tribute * pact.incomeShare);
         shareProfitsIncome += pactIncome;
       }
     });
@@ -5899,7 +5856,7 @@ export const useEnhancedMafiaGameState = (
     // Community upkeep — $150/turn for each empty claimed hex (neighborhood expenses)
     const communityHexCount = (state.hexMap || []).filter(tile => {
       if (tile.controllingFamily !== state.playerFamily) return false;
-      if (tile.isHeadquarters || tile.business) return false;
+      if (tile.isHeadquarters || tile.anchor) return false;
       if (tile.buildings && Object.keys(tile.buildings).length > 0) return false;
       const garrisoned = state.deployedUnits.some(u =>
         u.family === state.playerFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s
@@ -6497,19 +6454,28 @@ export const useEnhancedMafiaGameState = (
         }
       });
       state.hexMap.forEach(tile => {
-        if (tile.controllingFamily === fam && tile.business) {
+        if (tile.controllingFamily !== fam) return;
+        // Advance AI build orders — rivals develop their blocks on the same clock.
+        if (tile.build) {
+          tile.build = { ...tile.build, monthsRemaining: tile.build.monthsRemaining - 1 };
+          if (tile.build.monthsRemaining <= 0) {
+            tile.buildings = { ...(tile.buildings || {}), [tile.build.type]: tile.build.tier };
+            tile.build = undefined;
+          }
+        }
+        const aiTileEarn = tileEarnPotential(tile);
+        if (aiTileEarn > 0) {
           let tileInc = 0;
           const hasCapo = state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
-          const hasSoldier = state.deployedUnits.some(u => u.family === fam && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
-          if (hasCapo) tileInc = tile.business.income;
-          else if (hasSoldier) tileInc = Math.floor(tile.business.income * 0.3);
-          else tileInc = Math.floor(tile.business.income * 0.1);
+          const soldiersHere = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
+          const hasSoldier = soldiersHere > 0;
+          tileInc = Math.floor(aiTileEarn * garrisonShare(hasCapo, soldiersHere));
           // Seized player-built business runs at 50% during penalty period
-          if (tile.business.seizurePenaltyTurns && tile.business.seizurePenaltyTurns > 0) {
+          if (tile.seizurePenaltyTurns && tile.seizurePenaltyTurns > 0) {
             tileInc = Math.floor(tileInc * BUILT_BIZ_SEIZURE_INCOME_PENALTY);
           }
           // Apply supply line decay for AI families
-          const deps = SUPPLY_DEPENDENCIES[tile.business.type];
+          const deps = tile.anchor ? SUPPLY_DEPENDENCIES[tile.anchor.type] : undefined;
           if (deps && deps.length > 0) {
             const hexKey = `${tile.q},${tile.r},${tile.s}`;
             const decayMultiplier = getBusinessSupplyDecayMultiplier(hexKey, state.businessSupplyStatus);
@@ -6533,7 +6499,7 @@ export const useEnhancedMafiaGameState = (
             tileInc = Math.floor(tileInc * (1 - aiWarPenalty));
           }
           aiIncome += tileInc;
-          if (SUPPLY_DEPENDENCIES[tile.business.type]?.length) {
+          if (deps?.length) {
             aiSupplyDependentIncome += tileInc;
           }
         }
@@ -6559,7 +6525,7 @@ export const useEnhancedMafiaGameState = (
       // ===== AI ECONOMY PARITY: soldier maintenance + community upkeep (mirrors player lines 5236–5244) =====
       const aiDeployedSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier').length;
       const aiSoldierMaintenance = aiDeployedSoldiers * SOLDIER_MAINTENANCE;
-      const aiCommunityHexCount = state.hexMap.filter(t => t.controllingFamily === fam && !t.business && !t.isHeadquarters).length;
+      const aiCommunityHexCount = state.hexMap.filter(t => t.controllingFamily === fam && tileEarnPotential(t) === 0 && !t.isHeadquarters).length;
       const aiCommunityUpkeep = aiCommunityHexCount * 150;
       const aiTotalExpenses = aiSoldierMaintenance + aiCommunityUpkeep;
       const aiNetIncome = aiIncome - aiTotalExpenses;
@@ -6673,10 +6639,10 @@ export const useEnhancedMafiaGameState = (
               }, 0);
               const friendliesHere = state.deployedUnits.filter(u => u.family === fam && u.q === n.q && u.r === n.r && u.s === n.s).length;
               const ownedByUs = tile?.controllingFamily === fam;
-              const onOwnSupplyRoute = ownedByUs && !!tile?.business;
+              const onOwnSupplyRoute = ownedByUs && !!tile?.anchor;
               const adjacentToEnemyBiz = getHexNeighbors(n.q, n.r, n.s).some(adj => {
                 const at = state.hexMap.find(t => t.q === adj.q && t.r === adj.r && t.s === adj.s);
-                return !!(at && at.business && at.controllingFamily !== fam && at.controllingFamily !== 'neutral');
+                return !!(at && at.anchor && at.controllingFamily !== fam && at.controllingFamily !== 'neutral');
               });
               return scoreDeployNeighbor({
                 distanceToOwnHQ: hexDistance(n, hq),
@@ -6975,7 +6941,7 @@ export const useEnhancedMafiaGameState = (
             );
             const isVulnerable = willPileOn && !!tile?.controllingFamily && vulnerableFamilies.has(tile.controllingFamily);
             return scoreHexForAI({
-              hexIncome: tile?.business?.income || 0,
+              hexIncome: tile?.anchor?.tribute || 0,
               defenderCount,
               isInFocusDistrict: !!(tile?.district && focusSet.has(tile.district)),
               distanceToOwnHQ: hexDistance(n, hq),
@@ -7016,7 +6982,7 @@ export const useEnhancedMafiaGameState = (
           clearRivalIntrusion(state, target.q, target.r, target.s, fam);
 
           const targetTile = state.hexMap.find(t => t.q === target.q && t.r === target.r && t.s === target.s);
-          const isCommunityHex = targetTile && targetTile.controllingFamily === state.playerFamily && !targetTile.business && !targetTile.isHeadquarters;
+          const isCommunityHex = targetTile && targetTile.controllingFamily === state.playerFamily && !targetTile.anchor && !targetTile.isHeadquarters;
           const moveCost = isCommunityHex ? 2 : 1;
           unit.movesRemaining = Math.max(0, unit.movesRemaining - moveCost);
           movesLeft = Math.max(0, movesLeft - moveCost);
@@ -7074,7 +7040,7 @@ export const useEnhancedMafiaGameState = (
                 // Safehouse defense bonus: defenders on safehouse hex are harder to kill
               const isTargetSafehouse = state.safehouses.some(s => s.q === target.q && s.r === target.r && s.s === target.s);
                 // Built business defense bonus: player-built businesses on this hex grant defenders +20% protection
-                const isDefenderBuiltBiz = tile.controllingFamily === state.playerFamily && tile.business && !tile.business.isExtorted;
+                const isDefenderBuiltBiz = tile.controllingFamily === state.playerFamily && tileHasBuildings(tile);
                 const builtBizDefBonus = isDefenderBuiltBiz ? (BUILT_BUSINESS_DEFENSE_BONUS / 100) : 0;
                 // District control bonus: Queens +5% hit success for AI attacker
                 const aiQueensHitBonus = hasFamilyDistrictBonus(state, fam, 'hit_bonus') ? 0.05 : 0;
@@ -7137,7 +7103,7 @@ export const useEnhancedMafiaGameState = (
               if (remainingEnemies.length === 0) {
                   const prevOwner = tile.controllingFamily;
                   // Built business seizure: requires a Capo to take over
-                  const isPlayerBuiltBiz = prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted;
+                  const isPlayerBuiltBiz = prevOwner === state.playerFamily && tileHasBuildings(tile);
                   const hasCapoOnHex = state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === target.q && u.r === target.r && u.s === target.s);
                   if (isPlayerBuiltBiz && !hasCapoOnHex) {
                     // Regular soldiers can't seize player-built businesses
@@ -7251,7 +7217,7 @@ export const useEnhancedMafiaGameState = (
                   const aiCaptureScouted = aiHasScoutIntel(state, fam, target.q, target.r, target.s);
                   // Territory freeze: skip claiming ceasefire family hexes
                   const prevOwnerCeasefire = (state.ceasefires || []).some(c => c.active && (c.family === prevOwner || (prevOwner === state.playerFamily && c.family === fam)));
-                  const isPushOutEligible = !tile.business; // empty rival hex → Push Out path (low heat, no civilians)
+                  const isPushOutEligible = !tile.anchor; // empty rival hex → Push Out path (low heat, no civilians)
                   if (prevOwnerCeasefire) {
                     // Can't claim — ceasefire territory freeze
                   } else if (isPushOutEligible && aiActionsRemaining > 0) {
@@ -7286,7 +7252,7 @@ export const useEnhancedMafiaGameState = (
                     break;
                   } else if (aiActionsRemaining > 0) {
                     // Built business protection: requires a Capo to seize
-                    const isPlayerBuiltBiz2 = prevOwner === state.playerFamily && tile.business && !tile.business.isExtorted;
+                    const isPlayerBuiltBiz2 = prevOwner === state.playerFamily && tileHasBuildings(tile);
                     if (isPlayerBuiltBiz2 && unit.type !== 'capo') {
                       state.pendingNotifications.push({
                         type: 'info' as const,
@@ -7354,11 +7320,11 @@ export const useEnhancedMafiaGameState = (
         const tile = state.hexMap.find(t => t.q === unit.q && t.r === unit.r && t.s === unit.s);
         if (!tile) continue;
         
-        if (tile.controllingFamily === 'neutral' && tile.business && 
-            (tile.business.constructionProgress === undefined || tile.business.constructionProgress >= (tile.business.constructionGoal || 3))) {
+        if (tile.controllingFamily === 'neutral' && tile.anchor && 
+            true) {
           // Extort neutral business: claim territory + collect payout
           tile.controllingFamily = fam;
-          const basePayout = tile.business.isLegal ? 1500 : 3000;
+          const basePayout = tile.anchor.isLegal ? 1500 : 3000;
           const respectMult = 0.5 + (opponent.resources.influence || 50) / 100;
           const payout = Math.round(basePayout * respectMult);
           opponent.resources.money += payout;
@@ -7381,7 +7347,7 @@ export const useEnhancedMafiaGameState = (
         const tile = state.hexMap.find(t => t.q === unit.q && t.r === unit.r && t.s === unit.s);
         if (!tile) continue;
         
-        if (tile.controllingFamily === 'neutral' && !tile.business && !tile.isHeadquarters) {
+        if (tile.controllingFamily === 'neutral' && !tile.anchor && !tile.isHeadquarters) {
           // A1: AI claim is now PENDING — finalizes after 1 turn of presence.
           if (applyPendingClaim(state, tile, fam, false)) {
             checkEncroachment(state, tile.q, tile.r, tile.s, fam);
@@ -7406,7 +7372,7 @@ export const useEnhancedMafiaGameState = (
             // Territory freeze: skip ceasefire families
             const isCeasefireTarget = (state.ceasefires || []).some(c => c.active && (c.family === t.controllingFamily || (t.controllingFamily === state.playerFamily && c.family === fam)));
             return dist === 1 && t.controllingFamily !== fam && t.controllingFamily !== 'neutral' && !isCeasefireTarget &&
-                   t.business && (t.business.constructionProgress === undefined || t.business.constructionProgress >= (t.business.constructionGoal || 3));
+                   t.anchor && true;
           });
           
           for (const enemyTile of adjacentEnemyBiz) {
@@ -7418,7 +7384,7 @@ export const useEnhancedMafiaGameState = (
             if (turnRng() < successChance) {
               // Hole #6: AI extortion → tension
               addPairTension(state, fam, enemyTile.controllingFamily as string, TENSION_EXTORT_RIVAL);
-              const basePayout = enemyTile.business!.isLegal ? 1500 : 3000;
+              const basePayout = enemyTile.anchor!.isLegal ? 1500 : 3000;
               const payout = Math.round(basePayout * 0.7); // Enemy extortion pays less
               opponent.resources.money += payout;
               // ===== AI HEAT PARITY: rival extortion success (mirrors player +12) =====
@@ -7444,13 +7410,13 @@ export const useEnhancedMafiaGameState = (
       if (caposAtHQ.length > 0) {
         const capo = caposAtHQ[0];
         const candidates = state.hexMap.filter(t =>
-          t.controllingFamily === fam && t.business && !t.isHeadquarters &&
+          t.controllingFamily === fam && t.anchor && !t.isHeadquarters &&
           !state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
         );
         if (candidates.length > 0) {
           const otherCapos = state.deployedUnits.filter(u => u.family === fam && u.type === 'capo' && u.id !== capo.id);
           const scored = candidates.map(t => {
-            const income = t.business?.income || 0;
+            const income = t.anchor?.tribute || 0;
             const neighbors = getHexNeighbors(t.q, t.r, t.s);
             const isBorder = neighbors.some(n => {
               const nt = state.hexMap.find(tt => tt.q === n.q && tt.r === n.r && tt.s === n.s);
@@ -7665,7 +7631,7 @@ export const useEnhancedMafiaGameState = (
             const fortifiedPenalty = (state.fortifiedHexes || []).some(
               f => f.q === t.q && f.r === t.r && f.s === t.s && f.family === state.playerFamily
             ) ? 40 : 0;
-            const income = t.business?.income || 0;
+            const income = t.anchor?.tribute || 0;
             const score = income + garrisonBonus - fortifiedPenalty;
             if (score > bestScore) { bestScore = score; bestTile = t; }
           }
@@ -7680,7 +7646,7 @@ export const useEnhancedMafiaGameState = (
           const playerUnitsOnHex = state.deployedUnits.filter(
             u => u.family === state.playerFamily && u.q === bestTile.q && u.r === bestTile.r && u.s === bestTile.s
           ).length;
-          const hexIncome = bestTile.business?.income || 0;
+          const hexIncome = bestTile.anchor?.tribute || 0;
           const baseCost = deal === 'bribe_territory' ? 8000 : 3000;
           const proposedAmount = deal === 'bribe_territory'
             ? baseCost + playerUnitsOnHex * 2000 + hexIncome
@@ -8190,7 +8156,7 @@ export const useEnhancedMafiaGameState = (
       const aiBuildRunway = opponent.resources.money / upkeepForRunway;
       const aiBuildBudget = 12000; // store-tier cost
       const aiHasBuildableHex = state.hexMap.some(t =>
-        t.controllingFamily === fam && !t.business && !t.isHeadquarters &&
+        t.controllingFamily === fam && !t.build && !t.isHeadquarters &&
         state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
       );
       const aiBuildChance = aiBuildPosture ? 0.55 : (policy.economyFocusMul >= 1.1 ? 0.30 : 0.10);
@@ -8206,31 +8172,26 @@ export const useEnhancedMafiaGameState = (
           turnRng() < aiBuildChance
         ) {
           const buildCandidates = state.hexMap.filter(t =>
-            t.controllingFamily === fam && !t.business && !t.isHeadquarters &&
+            t.controllingFamily === fam && !t.build && !t.isHeadquarters &&
             state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
           );
           // Prefer interior hexes (away from contested borders) for build safety
           buildCandidates.sort((a, b) => hexDistance(a, hq) - hexDistance(b, hq));
           const buildTile = buildCandidates[0];
-          // Pick business type by money: construction $35k > restaurant $20k > store $12k
-          let bType: 'store' | 'restaurant' | 'construction' = 'store';
-          let bCost = 12000; let bIncome = 1800;
-          if (opponent.resources.money >= 35000 && aiBuildRunway >= 8) {
-            bType = 'construction'; bCost = 35000; bIncome = 5000;
-          } else if (opponent.resources.money >= 20000 && aiBuildRunway >= 6) {
-            bType = 'restaurant'; bCost = 20000; bIncome = 3000;
+          // Pick a building track by cash on hand; AI builds tier by tier like the player.
+          const aiTrack: BuildingType = opponent.resources.money >= 35000 && aiBuildRunway >= 8
+            ? 'gambling_den'
+            : opponent.resources.money >= 20000 && aiBuildRunway >= 6
+              ? 'loan_sharking'
+              : 'store_front';
+          const aiTier = (((buildTile.buildings || {})[aiTrack] || 0) + 1) as BuildingTier;
+          const aiDef = aiTier <= MAX_BUILDING_TIER ? BUILDING_DEFS[aiTrack].tiers[aiTier] : null;
+          if (aiDef && opponent.resources.money >= aiDef.cost) {
+            opponent.resources.money -= aiDef.cost;
+            aiActionsRemaining--;
+            buildTile.build = { type: aiTrack, tier: aiTier, monthsRemaining: aiDef.months };
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'build_business', detail: `Broke ground on ${aiDef.name} in ${buildTile.district || 'territory'} for $${aiDef.cost.toLocaleString()}` });
           }
-          opponent.resources.money -= bCost;
-          aiActionsRemaining--;
-          buildTile.business = {
-            type: bType,
-            income: bIncome,
-            isLegal: false,
-            isExtorted: false, // built business — counts toward influence formula like player-built
-            heatLevel: 0,
-            launderingCapacity: Math.floor(bIncome * 0.7),
-          };
-          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'build_business', detail: `Built a ${bType} in ${buildTile.district || 'territory'} for $${bCost.toLocaleString()}` });
         }
       }
 
@@ -8273,7 +8234,7 @@ export const useEnhancedMafiaGameState = (
             const score = scoreHitmanTarget({
               exposure,
               level: c.level || 1,
-              hexIncome: ch?.business?.income || 0,
+              hexIncome: ch?.anchor?.tribute || 0,
               inContestedDistrict,
               jitter: turnRng() * 2 - 1,
             });
@@ -8335,10 +8296,10 @@ export const useEnhancedMafiaGameState = (
             }
           } else if (fam === 'genovese' && turnRng() < 0.25) {
             // Hide highest-value hex
-            const ownHexes = state.hexMap.filter(t => t.controllingFamily === fam && t.business && !t.isHeadquarters);
+            const ownHexes = state.hexMap.filter(t => t.controllingFamily === fam && t.anchor && !t.isHeadquarters);
             const notHidden = ownHexes.filter(t => !(state.frontBossHexes || []).some(h => h.q === t.q && h.r === t.r && h.s === t.s));
             if (notHidden.length > 0) {
-              const best = notHidden.sort((a, b) => (b.business?.income || 0) - (a.business?.income || 0))[0];
+              const best = notHidden.sort((a, b) => (b.anchor?.tribute || 0) - (a.anchor?.tribute || 0))[0];
               state.frontBossHexes = [...(state.frontBossHexes || []), { q: best.q, r: best.r, s: best.s, turnsRemaining: 3, ownerFamily: fam }];
               aiTacticalRemaining -= aiPower.cost;
               state.familyPowerCooldowns[fam] = aiPower.cooldownTurns;
@@ -8391,10 +8352,8 @@ export const useEnhancedMafiaGameState = (
       // ── AI RESPECT & INFLUENCE GROWTH (mirrors player real-world drivers) ──
       const aiHexes = state.hexMap.filter(t => t.controllingFamily === fam);
       const aiTerritoryCount = aiHexes.length;
-      const aiBuiltBiz = aiHexes.filter(t => t.business && !t.business.isExtorted &&
-        !(t.business.constructionProgress !== undefined && t.business.constructionProgress < (t.business.constructionGoal || 3))
-      ).length;
-      const aiLegalBiz = aiHexes.filter(t => t.business && t.business.isLegal).length;
+      const aiBuiltBiz = aiHexes.filter(t => tileHasBuildings(t)).length;
+      const aiLegalBiz = aiHexes.filter(t => !!(t.buildings || {}).store_front).length;
       const aiAlliancesInvolving = (state.alliances || []).filter(a => a.active && a.alliedFamily === fam).length;
       const aiDistricts60 = new Set(
         (state.activeDistrictBonuses || []).filter(b => b.family === fam).map(b => b.district)
@@ -8684,11 +8643,11 @@ export const useEnhancedMafiaGameState = (
         // 1. Passive heat from illegal businesses (mirrors player line ~4189)
         if (!isAILayingLow(opponent, state.turn)) {
           const aiIllegalBizzes = state.hexMap.filter(t =>
-            t.controllingFamily === fam && t.business && !t.business.isLegal
+            t.controllingFamily === fam && t.anchor && !t.anchor.isLegal
           );
           let aiHeatFromBiz = 0;
           aiIllegalBizzes.forEach(t => {
-            const isBuilt = !t.business!.isExtorted;
+            const isBuilt = !t.anchor!.isExtorted;
             aiHeatFromBiz += isBuilt ? 0.5 : 1; // built biz = half heat
           });
           // Ceil (not floor) so 1-2 illegal biz still generates 1 heat/turn.
@@ -9724,7 +9683,7 @@ export const useEnhancedMafiaGameState = (
             }
             if (tier === 'mayor' && action.targetFamily) {
               const rivalHex = newState.hexMap.find(t => 
-                t.controllingFamily === action.targetFamily && t.business && !t.isHeadquarters
+                t.controllingFamily === action.targetFamily && t.anchor && !t.isHeadquarters
               );
               if (rivalHex) {
                 rivalHex.controllingFamily = 'neutral';
@@ -10150,7 +10109,7 @@ export const useEnhancedMafiaGameState = (
           }
           // Check that at least one valid hex exists (with Capo for legal)
           const validHexes = newState.hexMap.filter((t: HexTile) => 
-            t.controllingFamily === newState.playerFamily && !t.business && !t.isHeadquarters
+            t.controllingFamily === newState.playerFamily && !t.anchor && !t.isHeadquarters
           );
           const hexesWithCapo = validHexes.filter((t: HexTile) => 
             newState.deployedUnits.some((u: DeployedUnit) => u.type === 'capo' && u.family === newState.playerFamily && u.q === t.q && u.r === t.r && u.s === t.s)
@@ -10182,7 +10141,7 @@ export const useEnhancedMafiaGameState = (
             }];
             return newState;
           }
-          if (targetTile.business || targetTile.isHeadquarters) {
+          if (targetTile.anchor || targetTile.isHeadquarters) {
             newState.pendingNotifications = [...newState.pendingNotifications, {
               type: 'warning' as const, title: '🚫 Hex Occupied',
               message: 'This territory already has a business or headquarters.',
@@ -10208,20 +10167,25 @@ export const useEnhancedMafiaGameState = (
             }
             newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
           }
-          newState.resources.money -= pending.cost;
-          targetTile.business = {
-            type: pending.businessType,
-            income: 0,
-            isLegal: pending.isLegal,
-            heatLevel: 0,
-            launderingCapacity: 0,
-            constructionProgress: 0,
-            constructionGoal: BUILD_CONSTRUCTION_GOAL,
-          };
+          const legacyTrack: BuildingType = (BUILDING_TYPES as string[]).includes(pending.businessType)
+            ? (pending.businessType as BuildingType)
+            : 'store_front';
+          const legacyTier = (((targetTile.buildings || {})[legacyTrack] || 0) + 1) as BuildingTier;
+          if (legacyTier > MAX_BUILDING_TIER) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '🏆 Fully Upgraded',
+              message: 'That operation is already at the top tier on this block.',
+            }];
+            newState.pendingBusinessBuild = null;
+            return newState;
+          }
+          const legacyDef = BUILDING_DEFS[legacyTrack].tiers[legacyTier];
+          newState.resources.money -= legacyDef.cost;
+          targetTile.build = { type: legacyTrack, tier: legacyTier, monthsRemaining: legacyDef.months };
           newState.pendingBusinessBuild = null;
           newState.pendingNotifications = [...newState.pendingNotifications, {
             type: 'success' as const, title: '🚧 Construction Started',
-            message: `Building ${pending.businessType} for $${pending.cost.toLocaleString()}. Keep a Capo on hex for faster construction! (1 action used)`,
+            message: `Crews broke ground on ${pending.businessType.replace('_', ' ')}. (1 action used)`,
           }];
           return newState;
         }
@@ -10733,10 +10697,10 @@ export const useEnhancedMafiaGameState = (
         case 'launder_money': {
           // Laundering: convert dirty money to clean via legal hex businesses
           const legalHexBusinesses = Object.values(newState.hexMap).filter(
-            (t: any) => t.controllingFamily === newState.playerFamily && t.business?.isLegal
+            (t: any) => t.controllingFamily === newState.playerFamily && t.anchor?.isLegal
           );
           const totalLaunderingCapacity = legalHexBusinesses.reduce(
-            (sum: number, t: any) => sum + Math.floor((t.business?.income || 0) * 0.5), 0
+            (sum: number, t: any) => sum + Math.floor((t.anchor?.tribute || 0) * 0.5), 0
           );
           const amountToLaunder = Math.min(newState.finances.dirtyMoney, totalLaunderingCapacity);
           if (amountToLaunder > 0) {
@@ -10887,7 +10851,7 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Units Present', message: 'Withdraw all units before abandoning this territory.' });
             return newState;
           }
-          if (hex.business) {
+          if (hex.anchor) {
             newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Business Present', message: 'You cannot abandon a hex with a business. Shut it down first.' });
             return newState;
           }
@@ -11022,11 +10986,11 @@ export const useEnhancedMafiaGameState = (
             if (choiceId === 'risk') {
               // Shut down a random player business
               const playerBusinessHexes = newState.hexMap.filter(
-                t => t.controllingFamily === newState.playerFamily && t.business
+                t => t.controllingFamily === newState.playerFamily && t.anchor
               );
               if (playerBusinessHexes.length > 0) {
                 const victim = playerBusinessHexes[Math.floor(Math.random() * playerBusinessHexes.length)];
-                const lostBiz = victim.business!.type;
+                const lostBiz = victim.anchor!.type;
                 newState.hexMap = newState.hexMap.map(t =>
                   t.q === victim.q && t.r === victim.r && t.s === victim.s
                     ? { ...t, business: undefined }
@@ -11051,7 +11015,7 @@ export const useEnhancedMafiaGameState = (
   const processSabotageHex = (state: EnhancedMafiaGameState, action: any): EnhancedMafiaGameState => {
     const { targetQ, targetR, targetS } = action;
     const tile = state.hexMap.find(t => t.q === targetQ && t.r === targetR && t.s === targetS);
-    if (!tile || !tile.business || tile.controllingFamily === state.playerFamily || tile.isHeadquarters) return state;
+    if (!tile || !tile.anchor || tile.controllingFamily === state.playerFamily || tile.isHeadquarters) return state;
 
     // Require sabotage funds
     if (state.resources.money < SABOTAGE_COST) {
@@ -11092,10 +11056,10 @@ export const useEnhancedMafiaGameState = (
       return state;
     }
 
-    const destroyedType = tile.business.type;
-    const destroyedIncome = tile.business.income;
+    const destroyedType = tile.anchor.type;
+    const destroyedIncome = tile.anchor.tribute;
     const sabotagedFamily = tile.controllingFamily;
-    tile.business = undefined;
+    tile.anchor = undefined;
 
     // Track for "Send a Message" bold-move detection
     state._sabotagedThisTurn = [...(state._sabotagedThisTurn || []), {
@@ -11200,7 +11164,7 @@ export const useEnhancedMafiaGameState = (
       sStats.turnsIdle = 0;
     }
 
-    const heatGain = tile.business ? 6 : 3;
+    const heatGain = tile.anchor ? 6 : 3;
     state.pendingNotifications = [...state.pendingNotifications, {
       type: 'info' as const, title: '⏳ Territory Contested',
       message: `${tile.district || 'Territory'} is now contested by your family. Hold a unit on or adjacent for 1 turn to finalize the claim. Heat +${heatGain}.${toughnessMsg}`,
@@ -11339,8 +11303,8 @@ export const useEnhancedMafiaGameState = (
         freshUntilTurn: state.turn + 1,
         enemySoldierCount: flippedHexEnemies,
         enemyFamily: targetFamily,
-        businessType: flippedTile?.business?.type,
-        businessIncome: flippedTile?.business?.income,
+        businessType: flippedTile?.anchor?.type,
+        businessIncome: flippedTile?.anchor?.tribute,
         isFortified: (state.fortifiedHexes || []).some(f => f.q === target.q && f.r === target.r && f.s === target.s && f.family === targetFamily) || undefined,
         hasSafehouse: (state.safehouses || []).some(s => s.q === target.q && s.r === target.r && s.s === target.s) || undefined,
       });
@@ -11639,8 +11603,8 @@ export const useEnhancedMafiaGameState = (
               freshUntilTurn: state.turn + 1,
               enemySoldierCount: state.deployedUnits.filter(u => u.family === targetFamily && u.q === h.q && u.r === h.r && u.s === h.s).length,
               enemyFamily: targetFamily,
-              businessType: h.business?.type,
-              businessIncome: h.business?.income,
+              businessType: h.anchor?.type,
+              businessIncome: h.anchor?.tribute,
               isFortified: (state.fortifiedHexes || []).some(f => f.q === h.q && f.r === h.r && f.s === h.s && f.family === targetFamily) || undefined,
               hasSafehouse: (state.safehouses || []).some(s => s.q === h.q && s.r === h.r && s.s === h.s) || undefined,
             }));
@@ -11945,7 +11909,7 @@ export const useEnhancedMafiaGameState = (
       }];
       return state;
     }
-    if (tile.business) {
+    if (tile.anchor) {
       state.pendingNotifications = [...state.pendingNotifications, {
         type: 'warning' as const, title: '⚠️ Has a Business',
         message: 'Use Hit or Sabotage on hexes with a business.',
@@ -12205,9 +12169,9 @@ export const useEnhancedMafiaGameState = (
       if (Math.random() < chance) {
         if (isNeutral) {
           tile.controllingFamily = state.playerFamily;
-          if (tile.business) tile.business.isExtorted = true;
+          if (tile.anchor) tile.anchor.isExtorted = true;
         }
-        const baseMoneyGain = isEnemy ? (tile.business?.income || 2000) : 3000;
+        const baseMoneyGain = isEnemy ? (tile.anchor?.tribute || 2000) : 3000;
         const respectPayoutMultiplier = 0.5 + (state.reputation.respect / 100);
         const moneyGain = Math.floor(baseMoneyGain * respectPayoutMultiplier);
         const respectGain = isEnemy ? 3 : 5;
@@ -12335,7 +12299,7 @@ export const useEnhancedMafiaGameState = (
 
     // Fair baseline — what the deal "should" cost
     const defaultCost = config.baseCost + (negotiationType === 'bribe_territory' && tile
-      ? (state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS).length * 2000 + (tile.business?.income || 0))
+      ? (state.deployedUnits.filter(u => u.family === enemyFamily && u.q === targetQ && u.r === targetR && u.s === targetS).length * 2000 + (tile.anchor?.tribute || 0))
       : 0);
 
     // What the player actually offered. Precedence:
@@ -12645,7 +12609,7 @@ export const useEnhancedMafiaGameState = (
       // Built businesses within range (owned by family)
       const hasBuiltBiz = state.hexMap.some(t =>
         t.controllingFamily === family &&
-        t.business && !t.business.isExtorted &&
+        tileHasBuildings(t) &&
         hexDistance(t, hex) <= EROSION_PROTECTION_RANGE
       );
       if (hasBuiltBiz) return true;
@@ -12679,7 +12643,7 @@ export const useEnhancedMafiaGameState = (
       // Built business adjacent
       const hasBuiltBiz = state.hexMap.some(t =>
         t.controllingFamily === family &&
-        t.business && !t.business.isExtorted &&
+        tileHasBuildings(t) &&
         neighbors.some(n => n.q === t.q && n.r === t.r && n.s === t.s)
       );
       if (hasBuiltBiz) return true;
@@ -12802,11 +12766,10 @@ export const useEnhancedMafiaGameState = (
   const processPacts = (state: EnhancedMafiaGameState) => {
     // Tick down seizure penalties on businesses
     state.hexMap.forEach(tile => {
-      if (tile.business && tile.business.seizurePenaltyTurns && tile.business.seizurePenaltyTurns > 0) {
-        tile.business.seizurePenaltyTurns -= 1;
-        if (tile.business.seizurePenaltyTurns <= 0) {
-          tile.business.seizurePenaltyTurns = undefined;
-          tile.business.wasPlayerBuilt = undefined;
+      if (tile.seizurePenaltyTurns && tile.seizurePenaltyTurns > 0) {
+        tile.seizurePenaltyTurns -= 1;
+        if (tile.seizurePenaltyTurns <= 0) {
+          tile.seizurePenaltyTurns = undefined;
           state.pendingNotifications = [...state.pendingNotifications, {
             type: 'info', title: '💼 Business Stabilized',
             message: `${tile.controllingFamily.charAt(0).toUpperCase() + tile.controllingFamily.slice(1)}'s seized business in ${tile.district} now runs at full revenue.`,
@@ -13028,7 +12991,50 @@ export const useEnhancedMafiaGameState = (
     });
   }, []);
 
+  /**
+   * Buy an anchor racket out from under its old owners: pay the lump sum and it
+   * becomes a Tier 1 building on that block, upgradeable like anything you built.
+   */
+  const buyOutAnchor = useCallback((q: number, r: number, s: number) => {
+    setGameState(prev => {
+      const state: EnhancedMafiaGameState = JSON.parse(JSON.stringify(prev));
+      const tile = state.hexMap.find(t => t.q === q && t.r === r && t.s === s);
+      const notify = (title: string, message: string, type2: 'warning' | 'success' = 'warning') => {
+        state.pendingNotifications = [...(state.pendingNotifications || []), { type: type2, title, message }];
+      };
+      if (!tile || tile.controllingFamily !== state.playerFamily || !tile.anchor) {
+        notify('🚫 Nothing To Buy', 'You can only buy out a racket on a block you hold.');
+        return state;
+      }
+      if (!tile.anchor.isExtorted) {
+        notify('🤝 Set Up The Racket First', 'Shake the place down before you talk about owning it.');
+        return state;
+      }
+      const cost = tile.anchor.buyoutCost ?? anchorBuyoutCost(tile.anchor.tribute);
+      if (state.resources.money < cost) {
+        notify('💵 Short On Cash', `Buying out ${tile.anchor.name} costs $${cost.toLocaleString()}.`);
+        return state;
+      }
+      if (state.actionsRemaining <= 0) {
+        notify('⏳ No Actions Left', 'A buy-out costs 1 action.');
+        return state;
+      }
+      const track = tile.anchor.type;
+      const existing = (tile.buildings || {})[track] || 0;
+      state.resources.money -= cost;
+      state.actionsRemaining = Math.max(0, state.actionsRemaining - 1);
+      tile.buildings = { ...(tile.buildings || {}), [track]: Math.max(1, existing) as BuildingTier };
+      const name = tile.anchor.name;
+      tile.anchor = undefined;
+      state.resources.influence = Math.min(100, (state.resources.influence || 0) + ANCHOR_BUYOUT_INFLUENCE);
+      state.reputation.streetInfluence = Math.round(state.resources.influence);
+      notify('📜 On The Books', `${name} is yours outright — now a tier 1 ${BUILDING_DEFS[track].label} you can upgrade. +${ANCHOR_BUYOUT_INFLUENCE} influence.`, 'success');
+      return state;
+    });
+  }, []);
+
   /** Set the standing order on an owned block. Free. */
+
   const setTilePolicy = useCallback((q: number, r: number, s: number, policy: TilePolicy) => {
     setGameState(prev => {
       const state: EnhancedMafiaGameState = JSON.parse(JSON.stringify(prev));
@@ -13108,6 +13114,8 @@ export const useEnhancedMafiaGameState = (
     startEscort,
     resolveEnemyHexAction,
     startBuild,
+    buyOutAnchor,
+
     setTilePolicy,
     buyDistrictUpgrade,
     loadGameState,

@@ -31,7 +31,9 @@ export interface SupplyFlowGameState {
     controllingFamily: string;
     isHeadquarters?: string;
     supplyNode?: SupplyNodeType;
-    business?: { type: string; income: number; constructionGoal?: number; constructionProgress?: number };
+    anchor?: { type: string; tribute: number; isExtorted?: boolean };
+    buildings?: Record<string, number | undefined>;
+
   }>;
   supplyNodes?: Array<{ type: SupplyNodeType; q: number; r: number; s: number }>;
   aiOpponents: Array<{ family: string }>;
@@ -203,19 +205,24 @@ interface SupplyBusiness {
 function getSupplyBusinesses(state: SupplyFlowGameState, family: string): SupplyBusiness[] {
   const out: SupplyBusiness[] = [];
   for (const tile of state.hexMap) {
-    if (tile.controllingFamily !== family || !tile.business) continue;
-    if (tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal) continue;
-    const deps = SUPPLY_DEPENDENCIES[tile.business.type];
-    if (!deps?.length) continue;
+    if (tile.controllingFamily !== family) continue;
+    const types: string[] = [];
+    let income = 0;
+    if (tile.anchor?.isExtorted) { types.push(tile.anchor.type); income += tile.anchor.tribute || 0; }
+    Object.keys(tile.buildings || {}).forEach(t => { if ((tile.buildings as any)[t]) types.push(t); });
+    if (!types.length) continue;
+    const deps = Array.from(new Set(types.flatMap(t => SUPPLY_DEPENDENCIES[t] || []))) as SupplyNodeType[];
+    if (!deps.length) continue;
     out.push({
       q: tile.q, r: tile.r, s: tile.s,
       hexKey: supplyHexKey(tile.q, tile.r, tile.s),
-      businessType: tile.business.type,
-      income: tile.business.income,
+      businessType: types[0],
+      income,
       district: tile.district,
       deps,
     });
   }
+
   return out;
 }
 

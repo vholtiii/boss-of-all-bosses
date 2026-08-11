@@ -187,7 +187,7 @@ export const computeHitCore = (
     chance -= SAFEHOUSE_DEFENSE_BONUS / 100;
     modifiers.push({ label: 'Defender safehouse', delta: -SAFEHOUSE_DEFENSE_BONUS });
   }
-  const isDefenderBuiltBiz = tile.business && !tile.business.isExtorted && tile.controllingFamily !== state.playerFamily;
+  const isDefenderBuiltBiz = tile.anchor && !tile.anchor.isExtorted && tile.controllingFamily !== state.playerFamily;
   if (isDefenderBuiltBiz) {
     chance -= BUILT_BUSINESS_DEFENSE_BONUS / 100;
     modifiers.push({ label: 'Built business defense', delta: -BUILT_BUSINESS_DEFENSE_BONUS });
@@ -315,7 +315,7 @@ export const computePushOutCore = (
   if (tile.controllingFamily === state.playerFamily || tile.controllingFamily === 'neutral') {
     return { ...empty, blockedReason: 'Push Out only works on rival territory' };
   }
-  if (tile.business) return { ...empty, blockedReason: 'Use Hit or Sabotage on business hexes' };
+  if (tile.anchor) return { ...empty, blockedReason: 'Use Hit or Sabotage on business hexes' };
   const targetFamily = tile.controllingFamily as string;
   if ((state.ceasefires || []).some((c: any) => c.active && c.family === targetFamily)) {
     return { ...empty, targetFamily, blockedReason: `Ceasefire active with ${targetFamily}` };
@@ -479,7 +479,7 @@ export const computeExtortCore = (
   }
   chance = Math.min(0.99, chance);
 
-  const baseMoneyGain = isEnemy ? (tile.business?.income || 2000) : 3000;
+  const baseMoneyGain = isEnemy ? (tile.anchor?.tribute || 2000) : 3000;
   const respectPayoutMultiplier = 0.5 + ((state.reputation?.respect || 0) / 100);
   const expectedMoney = Math.floor(baseMoneyGain * respectPayoutMultiplier);
   const respectGain = isEnemy ? 3 : 5;
@@ -819,7 +819,7 @@ export const computeClaimCore = (
     return { ...empty, blockedReason: `Contested by ${tile.pendingClaim.family}` };
   }
 
-  const rawHeat = tile.business ? CLAIM_HEAT_BUSINESS : CLAIM_HEAT_PLAIN;
+  const rawHeat = tile.anchor ? CLAIM_HEAT_BUSINESS : CLAIM_HEAT_PLAIN;
   const familyHexCount = (state.hexMap || []).filter((t: any) => t.controllingFamily === state.playerFamily).length;
   const rewards = familyHexCount <= 10
     ? { respect: 1, influence: 1 }

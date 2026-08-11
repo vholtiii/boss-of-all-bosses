@@ -15,7 +15,7 @@
  *   - changed value semantics (enum rename, units changed, etc.)
  */
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 type Migration = (state: any) => any;
 
@@ -40,7 +40,45 @@ export const migrations: Record<number, Migration> = {
       recruitProgress: t.recruitProgress || 0,
     })),
   }),
+  // v4: the old per-hex `business` record is gone. Player/AI-built businesses
+  // become tier 1 buildings on their block; extorted ones become anchor rackets.
+  4: (s) => ({
+    ...s,
+    hexMap: (s.hexMap || []).map((t: any) => {
+      const biz = t.business;
+      const { business, ...rest } = t;
+      if (!biz) return { ...rest, buildings: t.buildings || {} };
+      const trackMap: Record<string, string> = {
+        store: 'store_front', store_front: 'store_front', restaurant: 'store_front',
+        construction: 'store_front', brothel: 'brothel', prostitution: 'brothel',
+        gambling: 'gambling_den', gambling_den: 'gambling_den', casino: 'gambling_den',
+        loan_sharking: 'loan_sharking',
+      };
+      const track = trackMap[biz.type] || 'store_front';
+      if (biz.isExtorted) {
+        const tribute = biz.income || 1800;
+        return {
+          ...rest,
+          buildings: t.buildings || {},
+          anchor: {
+            type: track,
+            name: String(track).replace('_', ' '),
+            tribute,
+            heatLevel: biz.heatLevel || 2,
+            buyoutCost: Math.round((tribute * 6) / 500) * 500,
+            isLegal: !!biz.isLegal,
+            launderingCapacity: biz.launderingCapacity || 0,
+            isExtorted: true,
+          },
+        };
+      }
+      return { ...rest, buildings: { ...(t.buildings || {}), [track]: 1 } };
+    }),
+  }),
 };
+
+
+
 
 export interface MigrationResult {
   state: any;

@@ -165,7 +165,7 @@ describe('preview/execution parity', () => {
     // Enemy hex (50% base) so the bonus isn't swallowed by the 99% cap
     const state = extortState();
     state.hexMap[0].controllingFamily = 'genovese';
-    (state.hexMap[0] as any).business = { type: 'gambling', income: 2500, isLegal: false };
+    (state.hexMap[0] as any).anchor = { type: 'gambling', income: 2500, isLegal: false };
     const without = computeExtortCore(state, { targetQ: 1, targetR: 0, targetS: -1 });
     const withBonus = computeExtortCore({
       ...state,
@@ -245,7 +245,7 @@ describe('map overlays', () => {
       // Enemy at war borders the chain tip
       { q: 3, r: 0, s: -3, controllingFamily: 'genovese', district: 'Manhattan' },
       // Business hex needing supply (no supply nodes anywhere → disconnected)
-      { q: 1, r: -1, s: 0, controllingFamily: 'gambino', district: 'Manhattan', business: { type: depBizType, income: 3000, isLegal: true } },
+      { q: 1, r: -1, s: 0, controllingFamily: 'gambino', district: 'Manhattan', buildings: { [depBizType]: 1 } },
       // Neutral expansion candidate adjacent to player
       { q: 0, r: 1, s: -1, controllingFamily: 'neutral', district: 'Manhattan' },
     ],

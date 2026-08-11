@@ -96,7 +96,7 @@ export const isHexProtected = (state: any, hex: { q: number; r: number; s: numbe
   if (units.some(u => u.family === family && hexDistancePure(u, hex) <= EROSION_PROTECTION_RANGE)) return true;
   const hexMap: any[] = state.hexMap || [];
   if (hexMap.some(t =>
-    t.controllingFamily === family && t.business && !t.business.isExtorted &&
+    t.controllingFamily === family && !!t.buildings && Object.keys(t.buildings).length > 0 &&
     hexDistancePure(t, hex) <= EROSION_PROTECTION_RANGE)) return true;
   if (hexMap.some(t =>
     t.controllingFamily === family && t.supplyNode &&
@@ -192,9 +192,13 @@ export const computeMapOverlays = (state: any): MapOverlays => {
   });
   const disconnectedBusinesses = new Map<string, string[]>();
   playerHexes.forEach(t => {
-    if (!t.business) return;
-    const deps = SUPPLY_DEPENDENCIES[t.business.type];
-    if (!deps || deps.length === 0) return;
+    const earnerTypes: string[] = [
+      ...(t.anchor?.isExtorted ? [t.anchor.type] : []),
+      ...Object.keys(t.buildings || {}).filter(k => (t.buildings as any)[k]),
+    ];
+    if (!earnerTypes.length) return;
+    const deps = Array.from(new Set(earnerTypes.flatMap(bt => SUPPLY_DEPENDENCIES[bt] || [])));
+    if (!deps.length) return;
     const hasAccess = deps.some(dep => connectedNodeTypes.has(dep));
     if (!hasAccess) disconnectedBusinesses.set(hexKey(t.q, t.r, t.s), [...deps]);
   });
@@ -239,8 +243,8 @@ export const computeMapOverlays = (state: any): MapOverlays => {
     const reasons: string[] = [];
     if (adjacentToPlayer >= 2) reasons.push(`${adjacentToPlayer} friendly neighbors`);
     if (t.supplyNode) { score += 4; reasons.push(`${t.supplyNode} supply node`); }
-    if (t.business) {
-      const inc = t.business.income || 0;
+    if (t.anchor) {
+      const inc = t.anchor.tribute || 0;
       score += Math.min(4, inc / 1500);
       reasons.push(`$${inc.toLocaleString()}/turn business`);
     }

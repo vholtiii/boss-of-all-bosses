@@ -606,7 +606,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 .filter(({ hex }: any) => {
                   if (hex.controllingFamily !== gameState.playerFamily) return false;
                   if (hex.isHeadquarters) return false;
-                  if (hex.business) return false;
+                  if (hex.anchor) return false;
                   const hasUnits = (gameState.deployedUnits || []).some((u: any) => u.q === hex.q && u.r === hex.r && u.s === hex.s && u.family === gameState.playerFamily);
                   return !hasUnits;
                 });
@@ -680,7 +680,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               👔 Legal businesses require a Capo on the hex · 1 action token
               {(() => {
                 const validHexes = (gameState.hexMap || []).filter((t: any) => 
-                  t.controllingFamily === gameState.playerFamily && !t.business && !t.isHeadquarters
+                  t.controllingFamily === gameState.playerFamily && !t.anchor && !t.isHeadquarters
                 );
                 const hexesWithCapo = validHexes.filter((t: any) =>
                   (gameState.deployedUnits || []).some((u: any) => u.type === 'capo' && u.family === gameState.playerFamily && u.q === t.q && u.r === t.r && u.s === t.s)
@@ -1384,15 +1384,15 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                     {gameState.selectedTerritory.family === 'neutral' ? 'Nobody' : gameState.selectedTerritory.family}
                   </span>
                 </div>
-                {gameState.selectedTerritory.business && (
+                {gameState.selectedTerritory.anchor && (
                   <>
                     <div className="flex justify-between">
                       <span>Business</span>
-                      <span className="capitalize text-foreground">{gameState.selectedTerritory.business.type}</span>
+                      <span className="capitalize text-foreground">{gameState.selectedTerritory.anchor.type}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Income</span>
-                      <span className="text-green-400">${gameState.selectedTerritory.business.income}/turn</span>
+                      <span className="text-green-400">${gameState.selectedTerritory.anchor.tribute}/turn</span>
                     </div>
                   </>
                 )}

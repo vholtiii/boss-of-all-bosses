@@ -1269,3 +1269,112 @@ export function tileBuildingTotals(buildings?: Partial<Record<BuildingType, Buil
   });
   return { income, heat, infra, cover };
 }
+
+// ============================================================
+// ANCHOR RACKETS — the handful of pre-built, lucrative earners
+// placed at strategic spots on an otherwise bare map. You extort
+// them for monthly tribute, then buy them out to develop them.
+// ============================================================
+
+export type AnchorDistrict = 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
+
+export interface AnchorRacket {
+  /** Which building track this anchor converts into on buy-out. */
+  type: BuildingType;
+  /** Display name, e.g. "The Fulton Fish Market". */
+  name: string;
+  /** Monthly tribute paid to whoever holds and garrisons the block. */
+  tribute: number;
+  /** Heat generated per month while extorted. */
+  heatLevel: number;
+  /** Lump cost to take the business over and convert it to a Tier 1 building. */
+  buyoutCost: number;
+  isLegal: boolean;
+  launderingCapacity: number;
+  /** True once someone has set up the racket. */
+  isExtorted?: boolean;
+  extortedBy?: string;
+  seizurePenaltyTurns?: number;
+  wasPlayerBuilt?: boolean;
+}
+
+export interface AnchorArchetype {
+  type: BuildingType;
+  /** Names are drawn from this pool, without repeats on a map. */
+  names: string[];
+  tribute: number;
+  heatLevel: number;
+  launderingCapacity: number;
+  /** Districts this racket prefers, most-likely first. */
+  districts: AnchorDistrict[];
+  blurb: string;
+}
+
+export const ANCHOR_ARCHETYPES: AnchorArchetype[] = [
+  {
+    type: 'gambling_den',
+    names: ['The Bowery Card Room', 'The Vesuvio Club', 'The Copper Rail Casino', 'The Nightingale Room'],
+    tribute: 2600, heatLevel: 5, launderingCapacity: 30,
+    districts: ['Manhattan', 'Little Italy', 'Brooklyn'],
+    blurb: 'A running game with real money on the table every night.',
+  },
+  {
+    type: 'loan_sharking',
+    names: ['Delancey Finance', 'The Garment Row Desk', 'Anselmi & Sons Loans', 'The Kingsbridge Vig'],
+    tribute: 2300, heatLevel: 3, launderingCapacity: 20,
+    districts: ['Manhattan', 'Brooklyn', 'Bronx'],
+    blurb: 'Half the block already owes them. You just collect the collector.',
+  },
+  {
+    type: 'brothel',
+    names: ['The Mulberry Parlor', 'The Grand Concourse House', 'The Rosewood Rooms', 'The Astoria Parlor'],
+    tribute: 2100, heatLevel: 6, launderingCapacity: 10,
+    districts: ['Little Italy', 'Bronx', 'Queens'],
+    blurb: 'Loud money, loud trouble. The vice squad knows the address.',
+  },
+  {
+    type: 'store_front',
+    names: ['The Fulton Fish Market', 'Red Hook Import Co.', 'The Arthur Avenue Market', 'Richmond Freight & Storage'],
+    tribute: 1800, heatLevel: 1, launderingCapacity: 50,
+    districts: ['Brooklyn', 'Queens', 'Staten Island'],
+    blurb: 'Clean paper, steady cut, and a truck bay nobody looks in.',
+  },
+];
+
+/** How many anchors get placed, by map size. */
+export const ANCHOR_COUNT_BY_MAP_SIZE: Record<string, number> = {
+  small: 8,
+  medium: 10,
+  large: 12,
+};
+
+/** Buy-out price = tribute x this multiplier. */
+export const ANCHOR_BUYOUT_MULTIPLIER = 6;
+
+/** Minimum hex distance between two anchors. */
+export const ANCHOR_MIN_SPACING = 3;
+
+/** No anchor may spawn within this many hexes of any family HQ. */
+export const ANCHOR_HQ_EXCLUSION = 3;
+
+/** Respect awarded for setting up a racket on an anchor. */
+export const ANCHOR_EXTORT_RESPECT = 4;
+
+/** Influence awarded for buying an anchor out and putting it on the books. */
+export const ANCHOR_BUYOUT_INFLUENCE = 3;
+
+export function anchorBuyoutCost(tribute: number): number {
+  return Math.round((tribute * ANCHOR_BUYOUT_MULTIPLIER) / 500) * 500;
+}
+
+/** Does this block have anything built on it? */
+export function tileHasBuildings(tile: { buildings?: Partial<Record<BuildingType, BuildingTier>> } | undefined | null): boolean {
+  return !!tile?.buildings && Object.keys(tile.buildings).length > 0;
+}
+
+/** Everything a block earns before garrison/policy: buildings + anchor tribute. */
+export function tileEarnPotential(tile: any): number {
+  const built = tileBuildingTotals(tile?.buildings).income;
+  const trib = tile?.anchor?.isExtorted ? (tile.anchor.tribute || 0) : 0;
+  return built + trib;
+}
