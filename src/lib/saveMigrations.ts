@@ -15,7 +15,7 @@
  *   - changed value semantics (enum rename, units changed, etc.)
  */
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 type Migration = (state: any) => any;
 
