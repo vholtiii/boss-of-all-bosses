@@ -205,19 +205,24 @@ interface SupplyBusiness {
 function getSupplyBusinesses(state: SupplyFlowGameState, family: string): SupplyBusiness[] {
   const out: SupplyBusiness[] = [];
   for (const tile of state.hexMap) {
-    if (tile.controllingFamily !== family || !tile.anchor) continue;
-    if (tile.anchor.constructionGoal && (tile.anchor.constructionProgress ?? 0) < tile.anchor.constructionGoal) continue;
-    const deps = SUPPLY_DEPENDENCIES[tile.anchor.type];
-    if (!deps?.length) continue;
+    if (tile.controllingFamily !== family) continue;
+    const types: string[] = [];
+    let income = 0;
+    if (tile.anchor?.isExtorted) { types.push(tile.anchor.type); income += tile.anchor.tribute || 0; }
+    Object.keys(tile.buildings || {}).forEach(t => { if ((tile.buildings as any)[t]) types.push(t); });
+    if (!types.length) continue;
+    const deps = Array.from(new Set(types.flatMap(t => SUPPLY_DEPENDENCIES[t] || []))) as SupplyNodeType[];
+    if (!deps.length) continue;
     out.push({
       q: tile.q, r: tile.r, s: tile.s,
       hexKey: supplyHexKey(tile.q, tile.r, tile.s),
-      businessType: tile.anchor.type,
-      income: tile.anchor.tribute,
+      businessType: types[0],
+      income,
       district: tile.district,
       deps,
     });
   }
+
   return out;
 }
 
