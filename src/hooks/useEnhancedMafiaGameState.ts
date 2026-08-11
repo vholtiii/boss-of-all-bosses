@@ -5766,6 +5766,103 @@ export const useEnhancedMafiaGameState = (
       }
     });
 
+    // ══════════════════════════════════════════════════════════
+    // TILE DEVELOPMENT — build orders, building income, crew growth
+    // ══════════════════════════════════════════════════════════
+    const upgrades = state.districtUpgrades || [];
+    const hasSupplyRoutes = upgrades.includes('supply_routes');
+    const hasLocalMuscle = upgrades.includes('local_muscle');
+    const hasGoodwill = upgrades.includes('community_goodwill');
+    const hasPolitics = upgrades.includes('political_connections');
+
+    let buildingIncome = 0;
+    let buildingHeat = 0;
+    let recruitsSpawned = 0;
+
+    (state.hexMap || []).forEach(tile => {
+      if (tile.controllingFamily !== state.playerFamily) return;
+
+      // 1) advance any build order
+      if (tile.build) {
+        tile.build = { ...tile.build, monthsRemaining: tile.build.monthsRemaining - 1 };
+        if (tile.build.monthsRemaining <= 0) {
+          const { type, tier } = tile.build;
+          tile.buildings = { ...(tile.buildings || {}), [type]: tier };
+          tile.build = undefined;
+          const def = BUILDING_DEFS[type].tiers[tier];
+          state.pendingNotifications = [...(state.pendingNotifications || []), {
+            type: 'success' as const,
+            title: `🏗️ ${def.name} Opened`,
+            message: `${BUILDING_DEFS[type].label} tier ${tier} is running in ${tile.district}. +$${def.income.toLocaleString()}/month before garrison share.`,
+          }];
+          if (turnReport) turnReport.events.push(`🏗️ ${def.name} opened in ${tile.district}`);
+        }
+      }
+
+      const totals = tileBuildingTotals(tile.buildings);
+      if (totals.income === 0 && totals.infra === 0) return;
+
+      const policyDef = TILE_POLICIES[(tile.policy || DEFAULT_TILE_POLICY) as TilePolicy];
+      const capoHere = units.some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+      const bossHere = units.some(u => u.family === state.playerFamily && u.type === 'boss' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+      const soldierCount = units.filter(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
+
+      // 2) income from built tiers, garrison-shared and policy-adjusted
+      let earned = Math.floor(totals.income * garrisonShare(capoHere || bossHere, soldierCount) * policyDef.incomeMult);
+      if (hasSupplyRoutes) earned = Math.floor(earned * 1.1);
+      buildingIncome += earned;
+      buildingHeat += totals.heat * policyDef.heatMult;
+
+      // 3) crew growth
+      let growth = totals.infra * RECRUIT_PROGRESS_PER_INFRA * policyDef.growthMult;
+      if (hasLocalMuscle) growth *= 1.25;
+      const progress = (tile.recruitProgress || 0) + growth;
+      if (progress >= RECRUIT_PROGRESS_GOAL) {
+        tile.recruitProgress = progress - RECRUIT_PROGRESS_GOAL;
+        recruitsSpawned += 1;
+      } else {
+        tile.recruitProgress = progress;
+      }
+    });
+
+    if (buildingIncome > 0) {
+      income += buildingIncome;
+      illegalIncome += buildingIncome;
+      if (turnReport?.hexIncome) {
+        // building income is already attributed per tile in the loop above
+      }
+    }
+    if (buildingHeat > 0) applyPlayerHeat(state, Math.round(buildingHeat));
+    if (hasGoodwill && state.policeHeat) {
+      state.policeHeat.level = Math.max(0, (state.policeHeat.level || 0) - 2);
+    }
+    if (hasPolitics) {
+      state.resources.influence = Math.min(100, (state.resources.influence || 0) + 2);
+    }
+    if (recruitsSpawned > 0) {
+      state.resources.soldiers += recruitsSpawned;
+      state.pendingNotifications = [...(state.pendingNotifications || []), {
+        type: 'success' as const,
+        title: `👥 ${recruitsSpawned} New ${recruitsSpawned === 1 ? 'Recruit' : 'Recruits'}`,
+        message: `Your blocks turned out ${recruitsSpawned} fresh ${recruitsSpawned === 1 ? 'soldier' : 'soldiers'} this month. Deploy them from the HQ.`,
+      }];
+      if (turnReport) turnReport.events.push(`👥 ${recruitsSpawned} soldier(s) came up through the neighborhood`);
+    }
+
+    // Turf tax — every block you hold inside a district you dominate pays tribute
+    const dominatedDistricts = new Set(
+      (state.activeDistrictBonuses || []).filter(b => b.family === state.playerFamily).map(b => b.district)
+    );
+    let turfTaxIncome = 0;
+    if (dominatedDistricts.size > 0) {
+      const taxedHexes = (state.hexMap || []).filter(t => t.controllingFamily === state.playerFamily && dominatedDistricts.has(t.district)).length;
+      turfTaxIncome = taxedHexes * TURF_TAX_PER_HEX;
+      income += turfTaxIncome;
+      legalIncome += turfTaxIncome;
+    }
+    (state as any)._turfTaxIncome = turfTaxIncome;
+    (state as any)._buildingIncome = buildingIncome;
+
     // Share Profits pact income — earn 30% of target hex's income
     let shareProfitsIncome = 0;
     (state.shareProfitsPacts || []).filter(p => p.active).forEach(pact => {
@@ -5801,10 +5898,16 @@ export const useEnhancedMafiaGameState = (
     const soldierMaintenance = playerSoldiers.length * SOLDIER_MAINTENANCE;
 
     // Community upkeep — $150/turn for each empty claimed hex (neighborhood expenses)
-    const communityHexCount = (state.hexMap || []).filter(tile =>
-      tile.controllingFamily === state.playerFamily && !tile.business && !tile.isHeadquarters
-    ).length;
-    const communityUpkeep = communityHexCount * 150;
+    const communityHexCount = (state.hexMap || []).filter(tile => {
+      if (tile.controllingFamily !== state.playerFamily) return false;
+      if (tile.isHeadquarters || tile.business) return false;
+      if (tile.buildings && Object.keys(tile.buildings).length > 0) return false;
+      const garrisoned = state.deployedUnits.some(u =>
+        u.family === state.playerFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s
+      );
+      return !garrisoned;
+    }).length;
+    const communityUpkeep = communityHexCount * EMPTY_BLOCK_OVERHEAD;
 
     // Store gross income before penalties
     let grossIncome = income;
