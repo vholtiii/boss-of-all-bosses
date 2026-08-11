@@ -1700,7 +1700,7 @@ export const useEnhancedMafiaGameState = (
     const respect = isPlayer ? state.reputation.respect : (state.aiOpponents.find(o => o.family === family)?.resources.respect || 0);
     const capoCount = state.deployedUnits.filter(u => u.family === family && u.type === 'capo').length;
     // Count only legally constructed (non-extorted) businesses for both player and AI
-    const builtBusinessCount = state.hexMap.filter(t => t.controllingFamily === family && t.anchor && !t.anchor.isExtorted).length;
+    const builtBusinessCount = state.hexMap.filter(t => t.controllingFamily === family && tileHasBuildings(t)).length;
     const income = isPlayer
       ? state.lastTurnIncome
       : (state.aiOpponents.find(o => o.family === family)?.resources.lastTurnIncome || 0);
@@ -1753,7 +1753,7 @@ export const useEnhancedMafiaGameState = (
     const hexCount = state.hexMap.filter(t => t.controllingFamily === family).length;
     const respect = isPlayer ? state.reputation.respect : (state.aiOpponents.find(o => o.family === family)?.resources.respect || 0);
     const capoCount = state.deployedUnits.filter(u => u.family === family && u.type === 'capo').length;
-    const builtBusinessCount = state.hexMap.filter(t => t.controllingFamily === family && t.anchor && !t.anchor.isExtorted).length;
+    const builtBusinessCount = state.hexMap.filter(t => t.controllingFamily === family && tileHasBuildings(t)).length;
     const income = isPlayer ? state.lastTurnIncome : (state.aiOpponents.find(o => o.family === family)?.resources.lastTurnIncome || 0);
     const DISTRICT_CTRL = 0.6;
     const districtCounts: Record<string, { fam: number; total: number }> = {};
@@ -4538,7 +4538,7 @@ export const useEnhancedMafiaGameState = (
       // --- Built business empire bonuses: +1 respect & +1 loyalty per 3 built businesses ---
       {
         const builtBizCount = newState.hexMap.filter(t => 
-          t.controllingFamily === newState.playerFamily && t.anchor && !t.anchor.isExtorted &&
+          t.controllingFamily === newState.playerFamily && tileHasBuildings(t) &&
           !(false)
         ).length;
         const bonusTiers = Math.floor(builtBizCount / BUILT_BUSINESS_RESPECT_THRESHOLD);
@@ -5033,7 +5033,7 @@ export const useEnhancedMafiaGameState = (
       const playerControlledHexes = playerHexes.length;
       const activeAlliances = newState.alliances.filter(a => a.active).length;
       const builtBusinessHexes = playerHexes.filter(t =>
-        t.anchor && !t.anchor.isExtorted &&
+        tileHasBuildings(t) &&
         !(false)
       ).length;
       const legalBusinessHexes = playerHexes.filter(t => t.anchor && t.anchor.isLegal).length;
@@ -7032,7 +7032,7 @@ export const useEnhancedMafiaGameState = (
                 // Safehouse defense bonus: defenders on safehouse hex are harder to kill
               const isTargetSafehouse = state.safehouses.some(s => s.q === target.q && s.r === target.r && s.s === target.s);
                 // Built business defense bonus: player-built businesses on this hex grant defenders +20% protection
-                const isDefenderBuiltBiz = tile.controllingFamily === state.playerFamily && tile.anchor && !tile.anchor.isExtorted;
+                const isDefenderBuiltBiz = tile.controllingFamily === state.playerFamily && tileHasBuildings(tile);
                 const builtBizDefBonus = isDefenderBuiltBiz ? (BUILT_BUSINESS_DEFENSE_BONUS / 100) : 0;
                 // District control bonus: Queens +5% hit success for AI attacker
                 const aiQueensHitBonus = hasFamilyDistrictBonus(state, fam, 'hit_bonus') ? 0.05 : 0;
@@ -7095,7 +7095,7 @@ export const useEnhancedMafiaGameState = (
               if (remainingEnemies.length === 0) {
                   const prevOwner = tile.controllingFamily;
                   // Built business seizure: requires a Capo to take over
-                  const isPlayerBuiltBiz = prevOwner === state.playerFamily && tile.anchor && !tile.anchor.isExtorted;
+                  const isPlayerBuiltBiz = prevOwner === state.playerFamily && tileHasBuildings(tile);
                   const hasCapoOnHex = state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === target.q && u.r === target.r && u.s === target.s);
                   if (isPlayerBuiltBiz && !hasCapoOnHex) {
                     // Regular soldiers can't seize player-built businesses
@@ -7244,7 +7244,7 @@ export const useEnhancedMafiaGameState = (
                     break;
                   } else if (aiActionsRemaining > 0) {
                     // Built business protection: requires a Capo to seize
-                    const isPlayerBuiltBiz2 = prevOwner === state.playerFamily && tile.anchor && !tile.anchor.isExtorted;
+                    const isPlayerBuiltBiz2 = prevOwner === state.playerFamily && tileHasBuildings(tile);
                     if (isPlayerBuiltBiz2 && unit.type !== 'capo') {
                       state.pendingNotifications.push({
                         type: 'info' as const,
@@ -8344,7 +8344,7 @@ export const useEnhancedMafiaGameState = (
       // ── AI RESPECT & INFLUENCE GROWTH (mirrors player real-world drivers) ──
       const aiHexes = state.hexMap.filter(t => t.controllingFamily === fam);
       const aiTerritoryCount = aiHexes.length;
-      const aiBuiltBiz = aiHexes.filter(t => t.anchor && !t.anchor.isExtorted &&
+      const aiBuiltBiz = aiHexes.filter(t => tileHasBuildings(t) &&
         !(false)
       ).length;
       const aiLegalBiz = aiHexes.filter(t => t.anchor && t.anchor.isLegal).length;
@@ -12603,7 +12603,7 @@ export const useEnhancedMafiaGameState = (
       // Built businesses within range (owned by family)
       const hasBuiltBiz = state.hexMap.some(t =>
         t.controllingFamily === family &&
-        t.anchor && !t.anchor.isExtorted &&
+        tileHasBuildings(t) &&
         hexDistance(t, hex) <= EROSION_PROTECTION_RANGE
       );
       if (hasBuiltBiz) return true;
@@ -12637,7 +12637,7 @@ export const useEnhancedMafiaGameState = (
       // Built business adjacent
       const hasBuiltBiz = state.hexMap.some(t =>
         t.controllingFamily === family &&
-        t.anchor && !t.anchor.isExtorted &&
+        tileHasBuildings(t) &&
         neighbors.some(n => n.q === t.q && n.r === t.r && n.s === t.s)
       );
       if (hasBuiltBiz) return true;
