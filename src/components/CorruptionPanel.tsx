@@ -108,7 +108,7 @@ const CorruptionPanel: React.FC<CorruptionPanelProps> = ({
               {actionsRemaining === 1 ? '' : 's'}
             </span>
           ) : (
-            <span className="text-muted-foreground">Available in Tactical step</span>
+            <span className="text-muted-foreground">No actions left</span>
           )}
         </div>
         <Badge variant="outline" className="text-[10px]">
@@ -266,7 +266,7 @@ const CorruptionPanel: React.FC<CorruptionPanelProps> = ({
                     disabled={!canAfford || noBudget}
                     title={
                       !phaseIsTactical
-                        ? 'Available in Tactical step'
+                        ? 'No actions left'
                         : actionsRemaining <= 0
                           ? 'No tactical actions left'
                           : !canAfford

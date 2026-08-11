@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import NegotiationDialog from '@/components/NegotiationDialog';
-import TurnStepRail from '@/components/TurnStepRail';
+import TurnActionMeter from '@/components/TurnActionMeter';
 import SmartEndTurnButton from '@/components/SmartEndTurnButton';
 import type { PendingItem } from '@/lib/pending-actions';
 import ResourceStrip from '@/components/ResourceStrip';
@@ -1101,9 +1101,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             </Popover>
           );
 
-          const powerCd = gameState.turnPhase === 'move'
-            ? (((gameState as any).familyPowerCooldowns || {})[gameState.playerFamily] || 0)
-            : 0;
+          const powerCd = ((gameState as any).familyPowerCooldowns || {})[gameState.playerFamily] || 0;
 
           const hasFrontBoss = (gameState as any).frontBossHexes?.length > 0
             && (gameState as any).frontBossHexes.some((h: any) => h.ownerFamily === gameState.playerFamily);
@@ -1200,12 +1198,12 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
 
       {/* Right side - Actions */}
       <div className="flex items-center space-x-2">
-        <TurnStepRail
-          phase={gameState.turnPhase}
+        <TurnActionMeter
+          actionsRemaining={gameState.actionsRemaining}
+          maxActions={gameState.maxActions}
           jailed={gameState.legalStatus.jailTime > 0}
           jailTime={gameState.legalStatus.jailTime}
-          onAdvance={() => advancePhase()}
-          onSkipToAction={() => skipToActionPhase()}
+          resolving={gameState.turnPhase === 'waiting'}
           onEndTurn={() => { playSound('notification'); endTurn(); }}
         />
 
@@ -1308,11 +1306,20 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         
         {/* Selection pill removed — SelectedUnitDock on the map is now the source of truth. */}
 
-        {/* Tactical action toolbar — only during tactical (move) phase */}
-        {gameState.turnPhase === 'move' && (
+        {/* Action toolbar — available all turn from the single action pool */}
+        {gameState.turnPhase !== 'waiting' && (
             <div className="flex flex-col gap-1">
             <div className="flex items-center gap-1 bg-background/80 rounded-lg px-2 py-1 border border-noir-light">
-              <span className="text-[10px] text-muted-foreground mr-1">📋 {gameState.tacticalActionsRemaining}/{gameState.maxTacticalActions}</span>
+              <span className="text-[10px] text-muted-foreground mr-1" title="Shared action pool for this turn">⚡ {gameState.actionsRemaining}/{gameState.maxActions}</span>
+              <Button
+                size="sm"
+                variant={(gameState.selectedMoveAction || 'move') === 'move' ? 'default' : 'outline'}
+                className="text-xs h-7 px-2"
+                title="Move & act: free movement inside your connected territory, 1 action to push beyond it."
+                onClick={() => setMoveAction('move')}
+              >
+                🚶 Move
+              </Button>
               {([
                 { action: 'scout' as const, label: '👁️ Scout', tip: 'Select a soldier or capo, click an enemy hex to scout. Soldiers: 1 hex, Capos: 2 hexes.' },
                 { action: 'fortify' as const, label: `🛡️ Fortify (${(gameState.fortifiedHexes || []).filter((f: any) => f.family === gameState.playerFamily).length}/${4})`, tip: 'Click a unit to fortify its hex (+25% defense for all units there). Max 4.' },
@@ -1326,12 +1333,12 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                 return true;
               }).map(({ action, label, tip }) => {
 
-                const noTactical = gameState.tacticalActionsRemaining <= 0;
+                const noTactical = gameState.actionsRemaining <= 0;
                 const selectedUnit = gameState.selectedUnitId ? (gameState.deployedUnits || []).find((u: any) => u.id === gameState.selectedUnitId) : null;
                 const isSoldier = selectedUnit?.type === 'soldier';
                 const isCapo = selectedUnit?.type === 'capo';
 
-                const reason = noTactical ? 'No tactical actions left' : '';
+                const reason = noTactical ? 'No actions left this turn' : '';
                 const isDisabled = noTactical;
 
                 return (
@@ -1361,7 +1368,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               )}
               {/* Sweep + Family Dinner one-click buttons */}
               {(() => {
-                const noTactical = gameState.tacticalActionsRemaining <= 0;
+                const noTactical = gameState.actionsRemaining <= 0;
                 const lastDinner = ((gameState as any).lastFamilyDinnerTurn || {})[gameState.playerFamily] || 0;
                 const dinnerCdLeft = lastDinner > 0 ? Math.max(0, 5 - (gameState.turn - lastDinner)) : 0;
                 const csActive = ((gameState as any).counterSurveillance || []).some((c: any) => c.family === gameState.playerFamily);
@@ -1375,7 +1382,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                     <Button
                       size="sm" variant="outline" className="text-xs h-7 px-2 ml-1"
                       disabled={noTactical || gameState.resources.money < 800 || csActive}
-                      title={csActive ? 'Counter-surveillance already active' : `Sweep your operation for bugs. $800 / 1 tactical. ${totalSuspected > 0 ? `(${wiretapsOnMe} rival + ${fedBugsOnMe} Fed${fedDiscovered > 0 ? ` — ${fedDiscovered} known` : ''} suspected). Fed wires hurt the prosecution case more the longer they've run.` : '(none detected)'}`}
+                      title={csActive ? 'Counter-surveillance already active' : `Sweep your operation for bugs. $800 / 1 action. ${totalSuspected > 0 ? `(${wiretapsOnMe} rival + ${fedBugsOnMe} Fed${fedDiscovered > 0 ? ` — ${fedDiscovered} known` : ''} suspected). Fed wires hurt the prosecution case more the longer they've run.` : '(none detected)'}`}
                       onClick={() => handleAction({ type: 'sweep_for_bugs' })}
                     >
                       🧹 Sweep{csActive ? ' (active)' : totalSuspected > 0 ? ` ⚠️ ${totalSuspected}${fedBugsOnMe > 0 ? `🎧` : ''}` : ''}
@@ -1383,7 +1390,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
                     <Button
                       size="sm" variant="outline" className="text-xs h-7 px-2"
                       disabled={noTactical || gameState.resources.money < 1000 || dinnerCdLeft > 0}
-                      title={dinnerCdLeft > 0 ? `Next dinner in ${dinnerCdLeft} turn(s)` : 'Sunday dinner at HQ. $1,000 / 1 tactical. +6 loyalty to crew within 2 of HQ, +1 respect, +1 heat.'}
+                      title={dinnerCdLeft > 0 ? `Next dinner in ${dinnerCdLeft} turn(s)` : 'Sunday dinner at HQ. $1,000 / 1 action. +6 loyalty to crew within 2 of HQ, +1 respect, +1 heat.'}
                       onClick={() => handleAction({ type: 'family_dinner' })}
                     >
                       🍝 Dinner{dinnerCdLeft > 0 ? ` (${dinnerCdLeft}t)` : ''}
@@ -1653,12 +1660,14 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const gp = (gameState as any).gamePhase || 1;
   const gpConfig = PHASE_CONFIGS[gp - 1];
   const phaseConfig: Record<string, { label: string; hint: string; color: string }> = {
-    deploy: { label: '📦 DEPLOY STEP', hint: 'Deploy units from HQ & move them across the map', color: 'bg-blue-600/80' },
-    move: { label: '📋 TACTICAL STEP', hint: `Scout, Fortify, Escort, Safehouse, Send Word (${gameState.tacticalActionsRemaining}/${gameState.maxTacticalActions} left) — no movement`, color: 'bg-amber-600/80' },
-    action: { label: '⚔️ ACTION STEP', hint: `Hit, Extort, Claim, Negotiate (${gameState.actionsRemaining}/${gameState.maxActions} left)`, color: 'bg-red-600/80' },
-    waiting: { label: '⏳ END TURN', hint: 'Press End Turn to advance', color: 'bg-muted' },
+    action: {
+      label: '⚔️ YOUR TURN',
+      hint: `Deploy, move, scout or strike — any order (${gameState.actionsRemaining}/${gameState.maxActions} actions left)`,
+      color: gameState.actionsRemaining > 0 ? 'bg-red-600/80' : 'bg-amber-600/80',
+    },
+    waiting: { label: '⏳ RIVALS MOVING', hint: 'The other families are making their moves', color: 'bg-muted' },
   };
-  const currentPhaseConfig = phaseConfig[gameState.turnPhase] || phaseConfig.waiting;
+  const currentPhaseConfig = gameState.turnPhase === 'waiting' ? phaseConfig.waiting : phaseConfig.action;
 
   const phaseProgressRows = useMemo(() => {
     if (gp >= 4) return null;

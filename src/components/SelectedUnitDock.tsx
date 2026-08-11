@@ -90,11 +90,9 @@ const SelectedUnitDock: React.FC<SelectedUnitDockProps> = ({
             const isCapo = unit.type === 'capo';
             const stats = !isCapo ? gameState?.soldierStats?.[unit.id] : null;
             const wounded = isCapo && (unit.woundedTurnsRemaining ?? 0) > 0;
-            const phaseHint = gameState?.turnPhase === 'action'
-              ? 'Click a highlighted hex to act'
-              : gameState?.turnPhase === 'move'
-                ? `${unit.movesRemaining ?? 0} moves left`
-                : 'Tactical phase';
+            const phaseHint = gameState?.turnPhase === 'waiting'
+              ? 'Rivals moving…'
+              : `${unit.movesRemaining ?? 0} moves left · click a highlighted hex`;
 
             return (
               <div className="flex items-start gap-3">

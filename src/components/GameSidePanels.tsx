@@ -175,7 +175,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
   onSelectUnit,
 }) => {
   const phase = turnPhase || gameState.turnPhase || 'action';
-  const actionsLocked = phase === 'deploy' || phase === 'move';
+  const actionsLocked = phase === 'waiting';
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(['actions']));
   const { resources, reputation, policeHeat, legalStatus } = gameState;
 
@@ -191,7 +191,8 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
   const totalDiscountPct = Math.round(totalSoldierDiscount * 100);
   const playerTerritoryCount = gameState.hexMap?.filter((t: any) => t.controllingFamily === gameState.playerFamily).length || 0;
   const canRecruit = playerTerritoryCount >= RECRUIT_TERRITORY_REQUIREMENT;
-  const isTacticalPhase = phase === 'move';
+  // Single open turn — every ability draws from one shared action pool.
+  const isTacticalPhase = phase !== 'waiting';
 
   const toggle = (id: string) => setOpenSections(prev => {
     const next = new Set(prev);
@@ -215,10 +216,10 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         {actionsLocked && (
           <div className="rounded-md border border-primary/30 bg-primary/10 px-2.5 py-2">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-primary">{phase === 'deploy' ? 'Deploy step' : 'Tactical step'}</p>
-              <span className="text-[9px] text-muted-foreground">Actions unlock next</span>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Rivals moving</p>
+              <span className="text-[9px] text-muted-foreground">Your turn resumes shortly</span>
             </div>
-            <p className="mt-1 text-[10px] text-muted-foreground">{phase === 'deploy' ? 'Place units from HQ onto the map.' : 'Move, scout, fortify, escort, or recruit.'}</p>
+            <p className="mt-1 text-[10px] text-muted-foreground">Rival families are making their moves.</p>
           </div>
         )}
 
@@ -297,15 +298,10 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
         {actionsLocked && (
           <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-center">
             <p className="text-xs font-semibold text-primary uppercase tracking-wide">
-              {phase === 'deploy' ? '📦 Deploy Step' : '📋 Tactical Step'}
+              ⏳ Rivals Moving
             </p>
             <p className="text-[10px] text-muted-foreground mt-1">
-              {phase === 'deploy'
-                ? 'Place your units from HQ onto the map.'
-                : 'Move, fortify, scout, escort, or recruit units.'}
-            </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              Complete this phase to unlock actions.
+              Rival families are making their moves.
             </p>
           </div>
         )}
@@ -325,12 +321,12 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
             usedForever ? 'Already used this game' :
             colomboCapoCount >= MAX_CAPOS_LOCAL ? `Capo cap reached (${MAX_CAPOS_LOCAL})` :
             colomboSoldierCount === 0 ? 'No soldiers available to anoint' :
-            !isTacticalPhase ? 'Available in Tactical phase' :
-            gameState.tacticalActionsRemaining < power.cost ? `Need ${power.cost} tactical action` : ''
+            !isTacticalPhase ? 'Rivals are moving' :
+            gameState.actionsRemaining < power.cost ? `Need ${power.cost} action` : ''
           ) : '';
           const canUse = isColombo
-            ? (!usedForever && colomboSoldierCount > 0 && colomboCapoCount < MAX_CAPOS_LOCAL && gameState.tacticalActionsRemaining >= power.cost && isTacticalPhase)
-            : (!usedForever && cd <= 0 && gameState.tacticalActionsRemaining >= power.cost && isTacticalPhase);
+            ? (!usedForever && colomboSoldierCount > 0 && colomboCapoCount < MAX_CAPOS_LOCAL && gameState.actionsRemaining >= power.cost && isTacticalPhase)
+            : (!usedForever && cd <= 0 && gameState.actionsRemaining >= power.cost && isTacticalPhase);
           const familyColorMap: Record<string, string> = {
             gambino: 'border-families-gambino',
             genovese: 'border-families-genovese',
@@ -422,7 +418,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 </Button>
               )}
               {!isTacticalPhase && (
-                <p className="text-[9px] text-muted-foreground text-center">Available during Tactical phase</p>
+                <p className="text-[9px] text-muted-foreground text-center">Rivals are moving — wait for your turn</p>
               )}
             </div>
           );
@@ -535,7 +531,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                         </Badge>
                       )}
                     </span>
-                    <span className="text-[10px] text-muted-foreground italic">Action Phase</span>
+                    
                   </button>
 
                   <AnimatePresence>
@@ -590,7 +586,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                           )}
                           {!canEliminate && flaggedCount > 0 && (
                             <p className="text-[9px] text-destructive/70 text-center">
-                              {actionsLocked ? 'Available during Action phase' : 'No actions remaining'}
+                              {actionsLocked ? 'Wait for your turn' : 'No actions remaining'}
                             </p>
                           )}
                         </div>
@@ -785,12 +781,12 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                   ? '🔒 Unlocks Phase 2'
                   : gameState.turn < (gameState.planHitCooldownUntil || 0)
                   ? `⏳ Cooldown: ${(gameState.planHitCooldownUntil || 0) - gameState.turn} turn(s)`
-                  : `🎯 Mark target — execute next Action step · +${PLAN_HIT_BONUS}% · ${PLAN_HIT_DURATION}t`
+                  : `🎯 Mark target — execute next turn · +${PLAN_HIT_BONUS}% · ${PLAN_HIT_DURATION}t`
               }
               disabled={
                 (gameState as any).gamePhase < 2 ||
                 gameState.turn < (gameState.planHitCooldownUntil || 0) ||
-                gameState.tacticalActionsRemaining <= 0 || 
+                gameState.actionsRemaining <= 0 || 
                 !(gameState.scoutedHexes || []).some((s: any) => {
                   const tile = (gameState.hexMap || []).find((t: any) => t.q === s.q && t.r === s.r && t.s === s.s);
                   return tile && tile.controllingFamily !== gameState.playerFamily && tile.controllingFamily !== 'neutral';
@@ -801,7 +797,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                   ? '🔒 Unlocks in Phase 2: Establishing Territory'
                   : gameState.turn < (gameState.planHitCooldownUntil || 0)
                   ? `Cooldown: ${(gameState.planHitCooldownUntil || 0) - gameState.turn} turn(s) remaining`
-                  : gameState.tacticalActionsRemaining <= 0 ? 'No tactical actions' : 'Scout an enemy hex first'
+                  : gameState.actionsRemaining <= 0 ? 'No actions left' : 'Scout an enemy hex first'
               }
               phaseLocked={!isTacticalPhase}
               variant="destructive"
@@ -815,7 +811,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               const targetOnOriginalHex = target && target.q === gameState.plannedHit.q && target.r === gameState.plannedHit.r && target.s === gameState.plannedHit.s;
               const targetExists = !!target;
               const targetRelocated = targetExists && !targetOnOriginalHex;
-              const isActionPhase = phase === 'action';
+              const isActionPhase = phase !== 'waiting';
               const isTacticalStep = phase === 'move';
               return (
                 <div className={cn(
@@ -1243,8 +1239,8 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
                 reputation={gameState.reputation.reputation}
                 heat={gameState.policeHeat.level}
                 gamePhase={(gameState as any).gamePhase || 1}
-                actionsRemaining={gameState.tacticalActionsRemaining}
-                phaseIsTactical={phase === 'move'}
+                actionsRemaining={gameState.actionsRemaining}
+                phaseIsTactical={phase !== 'waiting'}
                 onBribe={(tier, targetFamily) => onAction({ type: 'bribe_corruption', tier, targetFamily })}
               />
             </CollapsibleSection>
@@ -1260,7 +1256,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
           phaseLocked={actionsLocked}
         >
           {actionsLocked ? (
-            <p className="text-xs text-muted-foreground italic flex items-center gap-1">🔒 Unlock in Action step</p>
+            <p className="text-xs text-muted-foreground italic flex items-center gap-1">⏳ Rivals are moving</p>
           ) : (
             <HitmanPanel
               hitmanContracts={gameState.hitmanContracts || []}
@@ -1814,7 +1810,7 @@ const CollapsibleSection: React.FC<{
     >
       {icon}
       <span className="flex-1">{title}</span>
-      {phaseLocked && <span className="text-[9px] text-muted-foreground font-normal italic">({title.includes('Recruit') || title.includes('Tactical') || title.includes('Corruption') ? 'Tactical Step' : 'Action Step'})</span>}
+      {phaseLocked && <span className="text-[9px] text-muted-foreground font-normal italic">(rivals moving)</span>}
       {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
     </button>
     <AnimatePresence>

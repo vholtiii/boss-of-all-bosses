@@ -177,7 +177,7 @@ const HitmanPanel: React.FC<HitmanPanelProps> = ({
             onClick={() => setSelecting(true)}
           >
             <Crosshair className="h-3 w-3 mr-1" />
-            {hitmanContracts.length >= MAX_HITMEN ? 'Max Contracts' : noActions ? (phaseIsAction ? 'No actions left' : 'Action step only') : money < HITMAN_CONTRACT_COST ? 'Not Enough Money' : 'Select Target'}
+            {hitmanContracts.length >= MAX_HITMEN ? 'Max Contracts' : noActions ? (phaseIsAction ? 'No actions left' : 'No actions left') : money < HITMAN_CONTRACT_COST ? 'Not Enough Money' : 'Select Target'}
           </Button>
         ) : (
           <div className="space-y-2">

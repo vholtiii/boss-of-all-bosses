@@ -575,11 +575,13 @@ export interface EnhancedMafiaGameState {
   lastFamilyDinnerTurn?: Record<string, number>;
 
   
-  // Action & tactical budgets
+  // Unified action budget (single pool for tactical + action abilities)
   actionsRemaining: number;
   maxActions: number;
-  tacticalActionsRemaining: number;
-  maxTacticalActions: number;
+  /** @deprecated legacy mirror of actionsRemaining — kept for save compatibility */
+  tacticalActionsRemaining?: number;
+  /** @deprecated legacy mirror of maxActions — kept for save compatibility */
+  maxTacticalActions?: number;
   
   // Enhanced systems
   economy: EconomySystem;
@@ -902,6 +904,13 @@ const checkEncroachment = (state: EnhancedMafiaGameState, q: number, r: number, 
     }
   });
 };
+
+// ============ SINGLE-TURN ACTION MODEL ============
+// Tactical abilities that consume from the single per-turn action pool.
+const TACTICAL_MOVE_ACTIONS = new Set([
+  'scout', 'wiretap', 'safehouse', 'fortify', 'escort', 'send_word', 'family_power',
+]);
+const isTacticalMoveAction = (a?: string) => TACTICAL_MOVE_ACTIONS.has(a || 'move');
 
 // ============ A1/A3/A4 + B3: PENDING CLAIM HELPERS ============
 // Capo movement constants live in @/types/game-mechanics (single source of truth).
@@ -1258,7 +1267,7 @@ export const createInitialGameState = (
     },
 
     hexMap, deployedUnits,
-    turnPhase: 'deploy' as TurnPhase, movementPhase: true,
+    turnPhase: 'action' as TurnPhase, movementPhase: true,
     selectedUnitId: null, availableMoveHexes: [],
     deployMode: null, availableDeployHexes: [],
     headquarters: Object.fromEntries(allFamilies.map(f => [f, HQ_POSITIONS[f]])),
@@ -1340,8 +1349,8 @@ export const createInitialGameState = (
     lastFamilyDinnerTurn: {},
     actionsRemaining: BASE_ACTIONS_PER_TURN,
     maxActions: BASE_ACTIONS_PER_TURN,
-    tacticalActionsRemaining: TACTICAL_ACTIONS_PER_TURN,
-    maxTacticalActions: TACTICAL_ACTIONS_PER_TURN,
+    tacticalActionsRemaining: BASE_ACTIONS_PER_TURN,
+    maxTacticalActions: BASE_ACTIONS_PER_TURN,
 
     
     economy: {
@@ -1856,156 +1865,31 @@ export const useEnhancedMafiaGameState = (
     });
   };
 
-  // ============ PHASE-BASED TURN SYSTEM ============
+  // ============ SINGLE-TURN SYSTEM ============
+  // The turn is one open step: every ability draws from one action pool.
+  // These callbacks are retained as no-op/compat shims for older call sites.
   const advancePhase = useCallback(() => {
-    setGameState(prev => {
-      try {
-        const phaseOrder: TurnPhase[] = ['deploy', 'move', 'action'];
-        const currentIdx = phaseOrder.indexOf(prev.turnPhase);
-        const nextPhase = currentIdx < phaseOrder.length - 1 ? phaseOrder[currentIdx + 1] : 'waiting' as TurnPhase;
-
-        // Calculate action budget when entering action phase
-        let actionsRemaining = prev.actionsRemaining;
-        let maxActions = prev.maxActions;
-        if (nextPhase === 'action') {
-          const hasBonus = prev.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD &&
-                           prev.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
-          const manhattanAP = (prev.activeDistrictBonuses || []).some((b: any) => b.family === prev.playerFamily && b.bonusType === 'extra_ap') ? 1 : 0;
-          maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0) + manhattanAP;
-          actionsRemaining = maxActions;
-        }
-
-        // Reset movesRemaining for all player units when entering tactical phase
-        let deployedUnits = prev.deployedUnits;
-        if (nextPhase === 'move') {
-          deployedUnits = prev.deployedUnits.map(u => {
-            if (u.family !== prev.playerFamily) return u;
-            // Mattresses: units are locked — 0 moves
-            if ((prev.mattressesState || {}).active) return { ...u, movesRemaining: 0 };
-            const baseMoves = u.type === 'capo' ? CAPO_MOVES_PER_TURN : 2;
-            return { ...u, movesRemaining: baseMoves };
-          });
-        }
-
-        return {
-          ...prev,
-          turnPhase: nextPhase,
-          movementPhase: nextPhase === 'move' || nextPhase === 'deploy',
-          selectedUnitId: null,
-          availableMoveHexes: [],
-          deployMode: null,
-          availableDeployHexes: [],
-          selectedMoveAction: 'move' as MoveAction,
-          actionsRemaining,
-          maxActions,
-          deployedUnits,
-          // Reset tactical budget when entering move (tactical) phase
-          tacticalActionsRemaining: nextPhase === 'move' ? TACTICAL_ACTIONS_PER_TURN : prev.tacticalActionsRemaining,
-        };
-      } catch (err) {
-        console.error('[advancePhase] crashed — keeping previous state', err);
-        return {
-          ...prev,
-          pendingNotifications: [
-            ...(prev.pendingNotifications || []),
-            { type: 'error' as const, title: '⚠️ Phase skipped', message: 'Something went wrong advancing the phase. Try again.' },
-          ],
-        };
-      }
-    });
-  }, []);
-
-  // Legacy compat — map to advancePhase
-  const startMovementPhase = useCallback(() => {
     setGameState(prev => ({
       ...prev,
-      turnPhase: 'move' as TurnPhase,
-      movementPhase: true, selectedUnitId: null, availableMoveHexes: [],
-      deployMode: null, availableDeployHexes: [],
+      selectedUnitId: null,
+      availableMoveHexes: [],
+      deployMode: null,
+      availableDeployHexes: [],
+      selectedMoveAction: 'move' as MoveAction,
     }));
   }, []);
 
-  const endMovementPhase = useCallback(() => {
-    setGameState(prev => ({
-      ...prev,
-      turnPhase: 'action' as TurnPhase,
-      movementPhase: false, selectedUnitId: null, availableMoveHexes: [],
-      deployMode: null, availableDeployHexes: [],
-    }));
-  }, []);
-
-  const skipToActionPhase = useCallback(() => {
-    setGameState(prev => {
-      if (prev.turnPhase === 'action' || prev.turnPhase === 'waiting') return prev;
-      const hasBonus = prev.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD && 
-                       prev.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
-      const manhattanAP = (prev.activeDistrictBonuses || []).some((b: any) => b.family === prev.playerFamily && b.bonusType === 'extra_ap') ? 1 : 0;
-      const maxActs = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0) + manhattanAP;
-      return {
-        ...prev,
-        turnPhase: 'action' as TurnPhase,
-        movementPhase: false,
-        selectedUnitId: null,
-        availableMoveHexes: [],
-        deployMode: null,
-        availableDeployHexes: [],
-        selectedMoveAction: 'move' as MoveAction,
-        actionsRemaining: maxActs,
-        maxActions: maxActs,
-        tacticalActionsRemaining: 0,
-      };
-    });
-  }, []);
+  const startMovementPhase = useCallback(() => { advancePhase(); }, [advancePhase]);
+  const endMovementPhase = useCallback(() => { advancePhase(); }, [advancePhase]);
+  const skipToActionPhase = useCallback(() => { advancePhase(); }, [advancePhase]);
 
   // ============ SELECT UNIT FOR MOVEMENT ============
   const selectUnit = useCallback((unitType: 'soldier' | 'capo', location: { q: number; r: number; s: number }) => {
     setGameState(prev => {
-      if (prev.turnPhase !== 'move' && prev.turnPhase !== 'deploy' && prev.turnPhase !== 'action') return prev;
-      
-      // Action phase: select unit and compute valid action target hexes
-      if (prev.turnPhase === 'action') {
-        const unit = prev.deployedUnits.find(u => 
-          u.family === prev.playerFamily && u.type === unitType &&
-          u.q === location.q && u.r === location.r && u.s === location.s
-        );
-        if (!unit || (unit as any).pendingPromotion) return prev;
-        
-        // If clicking the already-selected unit, deselect
-        if (prev.selectedUnitId === unit.id) {
-          return { ...prev, selectedUnitId: null, availableMoveHexes: [] };
-        }
-        
-        // Compute valid action target hexes (adjacent hexes where actions can be performed)
-        const neighbors = getHexNeighbors(unit.q, unit.r, unit.s);
-        // Also include the unit's own hex (for safehouse on owned territory)
-        const candidateHexes = [...neighbors, { q: unit.q, r: unit.r, s: unit.s }];
-        
-        const actionTargets = candidateHexes.filter(h => {
-          const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
-          if (!tile || tile.isHeadquarters) return false;
-          
-          const isEnemy = tile.controllingFamily !== 'neutral' && tile.controllingFamily !== prev.playerFamily;
-          const isNeutral = tile.controllingFamily === 'neutral';
-          const isOwned = tile.controllingFamily === prev.playerFamily;
-          
-          if (unitType === 'soldier') {
-            // Soldiers can hit/sabotage enemy, extort neutral/enemy with business, claim neutral
-            if (isEnemy) return true;
-            if (isNeutral) return true;
-          }
-          if (unitType === 'capo') {
-            // Capos can negotiate on enemy hexes, safehouse on owned
-            if (isEnemy) return true;
-            if (isOwned && h.q === unit.q && h.r === unit.r && h.s === unit.s) return true;
-          }
-          return false;
-        });
-        
-        return { ...prev, selectedUnitId: unit.id, availableMoveHexes: actionTargets, deployMode: null, availableDeployHexes: [] };
-      }
+      if (prev.turnPhase === 'waiting') return prev;
 
       const moveAction = prev.selectedMoveAction || 'move';
-      const bypassMovesCheck = prev.turnPhase === 'move' && (moveAction === 'escort' || moveAction === 'fortify');
+      const bypassMovesCheck = true; // selection is always allowed — costs are validated on commit
       const unit = prev.deployedUnits.find(u => 
         u.family === prev.playerFamily && u.type === unitType &&
         u.q === location.q && u.r === location.r && u.s === location.s &&
@@ -2013,11 +1897,15 @@ export const useEnhancedMafiaGameState = (
       );
       if (!unit || (unit as any).pendingPromotion) return prev;
 
+      // Clicking the already-selected unit in plain move mode deselects it
+      if (moveAction === 'move' && prev.selectedUnitId === unit.id) {
+        return { ...prev, selectedUnitId: null, availableMoveHexes: [] };
+      }
 
-      // Tactical phase: only tactical actions (scout, fortify, safehouse, escort) — no regular movement
-      if (prev.turnPhase === 'move') {
+      // Tactical abilities — each costs from the single action pool
+      if (isTacticalMoveAction(moveAction)) {
         if (moveAction === 'scout' && (unitType === 'soldier' || unitType === 'capo')) {
-          if (prev.tacticalActionsRemaining <= 0) return prev;
+          if (prev.actionsRemaining <= 0) return prev;
           const scoutRange = unitType === 'capo' ? 2 : 1;
           const neighbors = scoutRange === 1 ? getHexNeighbors(unit.q, unit.r, unit.s) : getHexesInRange(unit.q, unit.r, unit.s, scoutRange);
           const scoutableHexes = neighbors.filter(h => {
@@ -2029,7 +1917,7 @@ export const useEnhancedMafiaGameState = (
         }
 
         if (moveAction === 'wiretap' && (unitType === 'soldier' || unitType === 'capo')) {
-          if (prev.tacticalActionsRemaining <= 0) return prev;
+          if (prev.actionsRemaining <= 0) return prev;
           const targets = getHexesInRange(unit.q, unit.r, unit.s, WIRETAP_PLANT_RANGE).filter(h => {
             const tile = prev.hexMap.find(t => t.q === h.q && t.r === h.r && t.s === h.s);
             if (!tile) return false;
@@ -2043,14 +1931,14 @@ export const useEnhancedMafiaGameState = (
 
 
         if (moveAction === 'safehouse' && unitType === 'capo') {
-          if (prev.tacticalActionsRemaining <= 0) return prev;
+          if (prev.actionsRemaining <= 0) return prev;
           // One-click safehouse: apply immediately on capo select
           const result = processSafehouse({ ...prev, selectedUnitId: unit.id }, unit);
-          return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
+          return { ...result, actionsRemaining: prev.actionsRemaining - 1 };
         }
 
         if (moveAction === 'fortify') {
-          if (prev.tacticalActionsRemaining <= 0) return prev;
+          if (prev.actionsRemaining <= 0) return prev;
           if (isHexFortified(prev.fortifiedHexes || [], unit.q, unit.r, unit.s, prev.playerFamily)) return prev;
           const playerFortCount = (prev.fortifiedHexes || []).filter(f => f.family === prev.playerFamily).length;
           if (playerFortCount >= MAX_FORTIFICATIONS) {
@@ -2060,7 +1948,7 @@ export const useEnhancedMafiaGameState = (
             ...prev,
             fortifiedHexes: [...(prev.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: prev.playerFamily, fortifiedOnTurn: prev.turn }],
             selectedUnitId: null, availableMoveHexes: [],
-            tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
+            actionsRemaining: prev.actionsRemaining - 1,
             pendingNotifications: [...prev.pendingNotifications, {
               type: 'info' as const, title: '🛡️ Hex Fortified',
               message: `Defenses built at this position (+${FORTIFY_DEFENSE_BONUS}% defense for all units here).`,
@@ -2069,7 +1957,7 @@ export const useEnhancedMafiaGameState = (
         }
 
         if (moveAction === 'escort') {
-          if (prev.tacticalActionsRemaining <= 0) return prev;
+          if (prev.actionsRemaining <= 0) return prev;
 
           // If a soldier is already selected and user clicks a capo, trigger the escort directly
           if (prev.selectedUnitId && unitType === 'capo') {
@@ -2085,7 +1973,7 @@ export const useEnhancedMafiaGameState = (
               return {
                 ...prev, deployedUnits: newUnits,
                 selectedUnitId: null, availableMoveHexes: [],
-                tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
+                actionsRemaining: prev.actionsRemaining - 1,
                 pendingNotifications: [...prev.pendingNotifications, {
                   type: 'info' as const, title: '🚗 Escort Summoned',
                   message: `${unit.name || 'The Capo'} sent word — a soldier's been called to the meeting point.`,
@@ -2108,7 +1996,7 @@ export const useEnhancedMafiaGameState = (
 
         if (moveAction === 'send_word') {
           if ((prev as any).gamePhase < 2) return prev;
-          if (prev.tacticalActionsRemaining <= 0) return prev;
+          if (prev.actionsRemaining <= 0) return prev;
           if (unitType !== 'capo') return prev;
           if ((unit as any).woundedTurnsRemaining > 0) return prev;
           if (isLayingLow(prev)) return prev;
@@ -2200,10 +2088,9 @@ export const useEnhancedMafiaGameState = (
   // ============ MOVE UNIT (with zone-of-control + escort) ============
   const moveUnit = useCallback((targetLocation: { q: number; r: number; s: number }) => {
     setGameState(prev => {
-      if (prev.turnPhase !== 'move' && prev.turnPhase !== 'deploy') return prev;
+      if (prev.turnPhase === 'waiting') return prev;
       // In tactical phase, only allow tactical actions — not regular movement
       const moveActionCheck = prev.selectedMoveAction || 'move';
-      if (prev.turnPhase === 'move' && moveActionCheck === 'move') return prev;
       if (!prev.selectedUnitId) return prev;
       const unitIdx = prev.deployedUnits.findIndex(u => u.id === prev.selectedUnitId);
       if (unitIdx === -1) return prev;
@@ -2211,15 +2098,15 @@ export const useEnhancedMafiaGameState = (
       const moveAction = prev.selectedMoveAction || 'move';
 
       // Handle scout action (tactical phase only)
-      if (prev.turnPhase === 'move' && moveAction === 'scout' && (unit.type === 'soldier' || unit.type === 'capo')) {
+      if (moveAction === 'scout' && (unit.type === 'soldier' || unit.type === 'capo')) {
         if ((prev.gamePhase || 1) < 2) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🔒 Phase Locked', message: 'Scouting unlocks in Phase 2: Establishing Territory.' }] };
-        if (prev.tacticalActionsRemaining <= 0) return prev;
+        if (prev.actionsRemaining <= 0) return prev;
         const result = processScout(prev, unit, targetLocation);
-        return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
+        return { ...result, actionsRemaining: prev.actionsRemaining - 1 };
       }
 
       // Handle wiretap action (tactical phase only) — click target hex after selecting friendly soldier/capo.
-      if (prev.turnPhase === 'move' && moveAction === 'wiretap' && (unit.type === 'soldier' || unit.type === 'capo')) {
+      if (moveAction === 'wiretap' && (unit.type === 'soldier' || unit.type === 'capo')) {
         if ((prev.gamePhase || 1) < WIRETAP_MIN_PHASE) {
           return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🔒 Phase Locked', message: `Wiretaps unlock in Phase ${WIRETAP_MIN_PHASE}.` }] };
         }
@@ -2227,7 +2114,7 @@ export const useEnhancedMafiaGameState = (
         // Mutate via dispatching synthetically here:
         const result = (() => {
           const newState = cloneStateForMutation(prev);
-          if (newState.tacticalActionsRemaining < WIRETAP_TACTICAL_COST) return newState;
+          if (newState.actionsRemaining < WIRETAP_TACTICAL_COST) return newState;
           if (newState.resources.money < WIRETAP_COST) {
             newState.pendingNotifications.push({ type: 'warning' as const, title: '💸 Insufficient Funds', message: `Wiretap costs $${WIRETAP_COST.toLocaleString()}.` });
             return newState;
@@ -2242,7 +2129,7 @@ export const useEnhancedMafiaGameState = (
           if (myWiretaps.some(w => w.q === tile.q && w.r === tile.r && w.s === tile.s)) return newState;
           if (hexDistance(unit, tile) > WIRETAP_PLANT_RANGE) return newState;
           newState.resources.money -= WIRETAP_COST;
-          newState.tacticalActionsRemaining -= WIRETAP_TACTICAL_COST;
+          newState.actionsRemaining -= WIRETAP_TACTICAL_COST;
           newState.wiretaps = [...(newState.wiretaps || []), {
             id: `wt_${newState.turn}_${Math.random().toString(36).slice(2, 8)}`,
             plantedBy: newState.playerFamily,
@@ -2263,10 +2150,10 @@ export const useEnhancedMafiaGameState = (
         return result;
       }
 
-      if (prev.turnPhase === 'move' && moveAction === 'family_power') {
+      if (moveAction === 'family_power') {
         const power = FAMILY_POWERS[prev.playerFamily];
         if (!power || !power.requiresHexTarget) return prev;
-        if (prev.tacticalActionsRemaining < power.cost) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '⚡ Not Enough Tactical Actions', message: `${power.name} costs ${power.cost} tactical action(s).` }] };
+        if (prev.actionsRemaining < power.cost) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '⚡ Not Enough Actions', message: `${power.name} costs ${power.cost} action(s).` }] };
         const cd = (prev.familyPowerCooldowns || {})[prev.playerFamily] || 0;
         if (cd > 0) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '⏳ Power on Cooldown', message: `${power.name} available in ${cd} turn(s).` }] };
         
@@ -2299,7 +2186,7 @@ export const useEnhancedMafiaGameState = (
             scoutedCount++;
           });
           newState.scoutedHexes = newScoutedHexes;
-          newState.tacticalActionsRemaining -= power.cost;
+          newState.actionsRemaining -= power.cost;
           newState.familyPowerCooldowns[newState.playerFamily] = power.cooldownTurns;
           newState.pendingNotifications.push({
             type: 'success', title: '🕵️ Dellacroce Network Activated',
@@ -2322,7 +2209,7 @@ export const useEnhancedMafiaGameState = (
             return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '⚠️ Already Hidden', message: 'This hex is already under Front Boss protection.' }] };
           }
           newState.frontBossHexes = [...(newState.frontBossHexes || []), { q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, turnsRemaining: 3, ownerFamily: newState.playerFamily }];
-          newState.tacticalActionsRemaining -= power.cost;
+          newState.actionsRemaining -= power.cost;
           newState.familyPowerCooldowns[newState.playerFamily] = power.cooldownTurns;
           newState.pendingNotifications.push({
             type: 'success', title: '🎭 Front Boss Activated',
@@ -2336,7 +2223,7 @@ export const useEnhancedMafiaGameState = (
         
         return prev;
       }
-      if (prev.turnPhase === 'move' && moveAction === 'safehouse' && unit.type === 'capo') {
+      if (moveAction === 'safehouse' && unit.type === 'capo') {
         if ((prev.gamePhase || 1) < 2) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🔒 Phase Locked', message: 'Safehouses unlock in Phase 2: Establishing Territory.' }] };
         if ((unit.woundedTurnsRemaining || 0) > 0) {
           return { ...prev, pendingNotifications: [...prev.pendingNotifications, {
@@ -2344,14 +2231,14 @@ export const useEnhancedMafiaGameState = (
             message: `${unit.name || 'Your Capo'} is wounded and cannot establish a safehouse for ${unit.woundedTurnsRemaining} more turn(s).`,
           }]};
         }
-        if (prev.tacticalActionsRemaining <= 0) return prev;
+        if (prev.actionsRemaining <= 0) return prev;
         const result = processSafehouse(prev, unit);
-        return { ...result, tacticalActionsRemaining: prev.tacticalActionsRemaining - 1 };
+        return { ...result, actionsRemaining: prev.actionsRemaining - 1 };
       }
 
       // Handle escort "call" action (tactical phase only) — teleport soldier to capo's hex
-      if (prev.turnPhase === 'move' && moveAction === 'escort' && unit.type === 'soldier') {
-        if (prev.tacticalActionsRemaining <= 0) return prev;
+      if (moveAction === 'escort' && unit.type === 'soldier') {
+        if (prev.actionsRemaining <= 0) return prev;
         // Find capo at target hex
         const capo = prev.deployedUnits.find(u => 
           u.type === 'capo' && u.family === prev.playerFamily &&
@@ -2433,7 +2320,7 @@ export const useEnhancedMafiaGameState = (
             soldierStats: newSoldierStats,
             copFlippedSoldiers: newCopFlipped,
             selectedUnitId: null, availableMoveHexes: [],
-            tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
+            actionsRemaining: prev.actionsRemaining - 1,
             reputation: { ...prev.reputation, fear: newFear },
             policeHeat: { ...prev.policeHeat, level: newHeat },
             resources: { ...prev.resources, respect: newRespect },
@@ -2450,7 +2337,7 @@ export const useEnhancedMafiaGameState = (
         return {
           ...prev, deployedUnits: newUnitsEscort,
           selectedUnitId: null, availableMoveHexes: [],
-          tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
+          actionsRemaining: prev.actionsRemaining - 1,
           pendingNotifications: [...prev.pendingNotifications, {
             type: 'info' as const, title: '🚗 Escort Summoned',
             message: `${capo.name || 'The Capo'} sent word — a soldier's been called to the meeting point.`,
@@ -2459,9 +2346,9 @@ export const useEnhancedMafiaGameState = (
       }
 
       // Handle "Send Word" action (tactical phase only) — capo requests negotiation on enemy hex
-      if (prev.turnPhase === 'move' && moveAction === 'send_word' && unit.type === 'capo') {
+      if (moveAction === 'send_word' && unit.type === 'capo') {
         if ((prev as any).gamePhase < 2) return prev;
-        if (prev.tacticalActionsRemaining <= 0) return prev;
+        if (prev.actionsRemaining <= 0) return prev;
         const targetTile = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
         if (!targetTile || targetTile.controllingFamily === prev.playerFamily || targetTile.controllingFamily === 'neutral' || targetTile.isHeadquarters) return prev;
         // Check for duplicate pending on same hex
@@ -2490,7 +2377,7 @@ export const useEnhancedMafiaGameState = (
           ...prev,
           pendingNegotiations: [...(prev.pendingNegotiations || []), newPending],
           selectedUnitId: null, availableMoveHexes: [],
-          tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
+          actionsRemaining: prev.actionsRemaining - 1,
           pendingNotifications: [...prev.pendingNotifications, {
             type: 'info' as const, title: '📩 Word Sent',
             message: `${unit.name || 'Your Capo'} has sent word to ${targetTile.controllingFamily} territory. Negotiation available next turn.`,
@@ -2502,11 +2389,12 @@ export const useEnhancedMafiaGameState = (
         return prev;
       }
 
-      // Free movement check: both origin and target in connected territory = 0 cost
+      // Free movement: origin AND target inside your connected territory = 0 move points, 0 actions.
+      // Any other movement costs 1 action from the single per-turn pool.
       const hexKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
       let moveCost = 1;
       let isFreeMove = false;
-      if (unit.type === 'soldier') {
+      {
         const connectedSet = getConnectedTerritory(prev.hexMap, prev.playerFamily);
         const originKey = hexKey(unit.q, unit.r, unit.s);
         const targetKey = hexKey(targetLocation.q, targetLocation.r, targetLocation.s);
@@ -2516,7 +2404,23 @@ export const useEnhancedMafiaGameState = (
         }
       }
 
+      const actionCost = isFreeMove ? 0 : 1;
+      if (actionCost > 0 && prev.actionsRemaining < actionCost) {
+        return {
+          ...prev,
+          pendingNotifications: [...prev.pendingNotifications, {
+            type: 'warning' as const, title: '⛔ No Actions Left',
+            message: 'Moving outside your connected territory costs 1 action. Moves inside your own territory are free.',
+          }],
+        };
+      }
+
       if (unit.movesRemaining < moveCost) return prev;
+
+      // Spend the action for movement outside connected territory (all returns below spread `prev`)
+      if (actionCost > 0) {
+        prev = { ...prev, actionsRemaining: prev.actionsRemaining - actionCost };
+      }
 
       const newUnits = [...prev.deployedUnits];
       let remainingMoves = unit.movesRemaining - moveCost;
@@ -2766,9 +2670,9 @@ export const useEnhancedMafiaGameState = (
   // ============ FORTIFY HEX ============
   const fortifyUnit = useCallback(() => {
     setGameState(prev => {
-      if (prev.turnPhase !== 'move') return prev;
+      if (prev.turnPhase === 'waiting') return prev;
       if ((prev.gamePhase || 1) < 2) return { ...prev, pendingNotifications: [...prev.pendingNotifications, { type: 'warning' as const, title: '🔒 Phase Locked', message: 'Fortification unlocks in Phase 2: Establishing Territory.' }] };
-      if (prev.tacticalActionsRemaining <= 0) return prev;
+      if (prev.actionsRemaining <= 0) return prev;
       if (!prev.selectedUnitId) return prev;
       const unit = prev.deployedUnits.find(u => u.id === prev.selectedUnitId);
       if (!unit) return prev;
@@ -2783,7 +2687,7 @@ export const useEnhancedMafiaGameState = (
         ...prev,
         fortifiedHexes: [...(prev.fortifiedHexes || []), { q: unit.q, r: unit.r, s: unit.s, family: prev.playerFamily, fortifiedOnTurn: prev.turn }],
         selectedUnitId: null, availableMoveHexes: [],
-        tacticalActionsRemaining: prev.tacticalActionsRemaining - 1,
+        actionsRemaining: prev.actionsRemaining - 1,
         pendingNotifications: [...prev.pendingNotifications, {
           type: 'info' as const, title: '🛡️ Hex Fortified',
           message: `Defenses built at this position (+${FORTIFY_DEFENSE_BONUS}% defense for all units here).`,
@@ -2873,7 +2777,7 @@ export const useEnhancedMafiaGameState = (
           };
           newState.pendingNotifications = [...(newState.pendingNotifications || []), {
             type: 'warning' as const, title: '⚠️ No Active Plan',
-            message: 'Plan Hit is a two-step move. Mark a target during the Tactical step, then execute next turn.',
+            message: 'Plan Hit is a two-step move. Mark a target one turn, then execute it the next.',
           }];
           syncLegacyUnits(newState);
           return newState;
@@ -3085,7 +2989,7 @@ export const useEnhancedMafiaGameState = (
   // ============ START ESCORT (legacy — now handled via tactical phase call) ============
   const startEscort = useCallback((capoId: string, soldierIds: string[]) => {
     setGameState(prev => {
-      if (prev.turnPhase !== 'move') return prev;
+      if (prev.turnPhase === 'waiting') return prev;
       const capoIdx = prev.deployedUnits.findIndex(u => u.id === capoId && u.type === 'capo' && u.family === prev.playerFamily);
       if (capoIdx === -1) return prev;
       const capo = prev.deployedUnits[capoIdx];
@@ -3125,7 +3029,7 @@ export const useEnhancedMafiaGameState = (
 
   const selectUnitFromHeadquarters = useCallback((unitType: 'soldier' | 'capo', family: string) => {
     setGameState(prev => {
-      if (prev.turnPhase !== 'deploy') return prev; // Only during deploy phase
+      if (prev.turnPhase === 'waiting') return prev; // Only during deploy phase
       if (family !== prev.playerFamily) return prev;
       const hq = prev.headquarters[family];
       if (!hq) return prev;
@@ -3805,7 +3709,7 @@ export const useEnhancedMafiaGameState = (
       }
 
       // Reset to deploy phase for next turn
-      newState.turnPhase = 'deploy';
+      newState.turnPhase = 'action';
       newState.movementPhase = true;
       newState.selectedUnitId = null;
       newState.availableMoveHexes = [];
@@ -3966,14 +3870,15 @@ export const useEnhancedMafiaGameState = (
       newState.aiBounties = newState.aiBounties.filter(b => newState.turn < b.expiresOnTurn);
       newState.selectedMoveAction = 'move' as MoveAction;
       
-      // Reset action & tactical budgets for new turn
+      // Reset the single action pool for the new turn
       const hasBonus = newState.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD && 
                        newState.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
       const manhattanAP = hasPlayerDistrictBonus(newState, 'extra_ap') ? 1 : 0;
       newState.maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0) + manhattanAP;
       newState.actionsRemaining = newState.maxActions;
-      newState.tacticalActionsRemaining = TACTICAL_ACTIONS_PER_TURN;
-      newState.maxTacticalActions = TACTICAL_ACTIONS_PER_TURN;
+      // Legacy mirrors (save compatibility)
+      newState.tacticalActionsRemaining = newState.actionsRemaining;
+      newState.maxTacticalActions = newState.maxActions;
 
       // ============ SECONDARY: BRONX FREE RECRUIT (every 3 turns) ============
       // Double-check actual current Bronx ownership to prevent stale-bonus spawns.
@@ -9222,17 +9127,17 @@ export const useEnhancedMafiaGameState = (
             return newState;
           }
           // Tactical phase action — costs 1 tactical action
-          if (newState.turnPhase !== 'move') {
+          if (newState.turnPhase === 'waiting') {
             newState.pendingNotifications = [...newState.pendingNotifications, {
-              type: 'warning' as const, title: '⚠️ Wrong Phase',
-              message: 'Plan Hit is only available during the Tactical phase.',
+              type: 'warning' as const, title: '⚠️ Turn Resolving',
+              message: "Plan Hit isn't available while the turn is resolving.",
             }];
             return newState;
           }
-          if (newState.tacticalActionsRemaining <= 0) {
+          if (newState.actionsRemaining <= 0) {
             newState.pendingNotifications = [...newState.pendingNotifications, {
-              type: 'warning' as const, title: '⚠️ No Tactical Actions',
-              message: 'You have no tactical actions remaining.',
+              type: 'warning' as const, title: '⚠️ No Actions Left',
+              message: 'You have no actions remaining this turn.',
             }];
             return newState;
           }
@@ -9293,7 +9198,7 @@ export const useEnhancedMafiaGameState = (
             plannedOnTurn: newState.turn,
             expiresOnTurn: newState.turn + PLAN_HIT_DURATION,
           };
-          newState.tacticalActionsRemaining -= 1;
+          newState.actionsRemaining -= 1;
           newState.selectedUnitId = null;
           newState.availableMoveHexes = [];
           const targetName = targetUnit.name || targetUnit.id.split('-').slice(-2).join(' ');
@@ -9314,10 +9219,10 @@ export const useEnhancedMafiaGameState = (
             }];
             return newState;
           }
-          if (newState.turnPhase !== 'move') {
+          if (newState.turnPhase === 'waiting') {
             newState.pendingNotifications = [...newState.pendingNotifications, {
-              type: 'warning' as const, title: '⚠️ Wrong Phase',
-              message: 'Plan Hit can only be cancelled during the Tactical step.',
+              type: 'warning' as const, title: '⚠️ Turn Resolving',
+              message: "Plan Hit can't be cancelled while the turn is resolving.",
             }];
             return newState;
           }
@@ -9326,7 +9231,7 @@ export const useEnhancedMafiaGameState = (
           newState.plannedHit = null;
           newState.pendingNotifications = [...newState.pendingNotifications, {
             type: 'info' as const, title: '🚫 Plan Hit Cancelled',
-            message: `${cancelTargetName} is no longer marked. Tactical action is not refunded.`,
+            message: `${cancelTargetName} is no longer marked. The action spent marking it is not refunded.`,
           }];
           return newState;
         }
@@ -9436,8 +9341,8 @@ export const useEnhancedMafiaGameState = (
             return newState;
           }
           // Check tactical actions
-          if (newState.tacticalActionsRemaining < power.cost) {
-            newState.pendingNotifications.push({ type: 'warning', title: '⚡ Not Enough Actions', message: `${power.name} costs ${power.cost} tactical action(s).` });
+          if (newState.actionsRemaining < power.cost) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚡ Not Enough Actions', message: `${power.name} costs ${power.cost} action(s).` });
             return newState;
           }
           
@@ -9485,7 +9390,7 @@ export const useEnhancedMafiaGameState = (
             });
             newState.resources.money += tributeExtracted;
             newState.luccheseBoostedDistrict = { district: bestDistrict[0], turnsRemaining: 3, family: newState.playerFamily };
-            newState.tacticalActionsRemaining -= power.cost;
+            newState.actionsRemaining -= power.cost;
             newState.familyPowerCooldowns[newState.playerFamily] = power.cooldownTurns;
             newState.pendingNotifications.push({
               type: 'success', title: '💰 Garment District Shakedown!',
@@ -9522,7 +9427,7 @@ export const useEnhancedMafiaGameState = (
               ...(newState.bonannoPurgeImmunity || []),
               ...survivors.map(id => ({ unitId: id, turnsRemaining: 2 })),
             ];
-            newState.tacticalActionsRemaining -= power.cost;
+            newState.actionsRemaining -= power.cost;
             newState.familyPowerCooldowns[newState.playerFamily] = power.cooldownTurns;
             newState.pendingNotifications.push({
               type: 'success', title: '🔪 Donnie Brasco Purge!',
@@ -9577,8 +9482,8 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications.push({ type: 'warning', title: '👑 Capo Cap Reached', message: `You already have ${MAX_CAPOS} capos — cannot promote.` });
             return newState;
           }
-          if (newState.tacticalActionsRemaining < (power?.cost || 1)) {
-            newState.pendingNotifications.push({ type: 'warning', title: '⚡ Not Enough Actions', message: 'Persico Succession costs 1 tactical action.' });
+          if (newState.actionsRemaining < (power?.cost || 1)) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚡ Not Enough Actions', message: 'Persico Succession costs 1 action.' });
             return newState;
           }
           // Promote in place: convert soldier → capo
@@ -9602,7 +9507,7 @@ export const useEnhancedMafiaGameState = (
           syncLegacyUnits(newState);
           newState.familyPowerUsedForever = { ...(newState.familyPowerUsedForever || {}), colombo: true };
           newState.persicoSelectionActive = false;
-          newState.tacticalActionsRemaining = Math.max(0, newState.tacticalActionsRemaining - (power?.cost || 1));
+          newState.actionsRemaining = Math.max(0, newState.actionsRemaining - (power?.cost || 1));
           newState.pendingNotifications.push({
             type: 'success', title: '👑 Persico Succession!',
             message: `${capoName} has been instantly anointed as a Capo. The family endures.`,
@@ -9661,8 +9566,8 @@ export const useEnhancedMafiaGameState = (
         case 'bribe_corruption': {
           const tier = action.tier as BribeTier;
           // Tactical-step budget guard (Corruption is a tactical-step spend)
-          if (newState.tacticalActionsRemaining <= 0) {
-            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ No Tactical Actions', message: 'You have used all your tactical actions this turn.' });
+          if (newState.actionsRemaining <= 0) {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ No Actions Left', message: 'You have used all your actions this turn.' });
             return newState;
           }
           // Phase gate: Patrol Officer requires Phase 2, Captain+ requires Phase 3
@@ -9684,7 +9589,7 @@ export const useEnhancedMafiaGameState = (
           const successChance = computeBribeCore(newState, tier).chance;
           
           newState.resources.money -= config.cost;
-          newState.tacticalActionsRemaining = Math.max(0, newState.tacticalActionsRemaining - 1);
+          newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
           
           if (Math.random() * 100 < successChance) {
             const contract: BribeContract = {
@@ -9804,8 +9709,8 @@ export const useEnhancedMafiaGameState = (
             newState.pendingNotifications.push({ type: 'warning', title: '🎧 Wiretap Locked', message: `Available from Phase ${WIRETAP_MIN_PHASE}.` });
             return newState;
           }
-          if (newState.turnPhase !== 'move') return newState;
-          if (newState.tacticalActionsRemaining < WIRETAP_TACTICAL_COST) return newState;
+          if (newState.turnPhase === 'waiting') return newState;
+          if (newState.actionsRemaining < WIRETAP_TACTICAL_COST) return newState;
           if (newState.resources.money < WIRETAP_COST) {
             newState.pendingNotifications.push({ type: 'warning', title: '💸 Insufficient Funds', message: `Wiretap costs $${WIRETAP_COST.toLocaleString()}.` });
             return newState;
@@ -9835,7 +9740,7 @@ export const useEnhancedMafiaGameState = (
             return newState;
           }
           newState.resources.money -= WIRETAP_COST;
-          newState.tacticalActionsRemaining -= WIRETAP_TACTICAL_COST;
+          newState.actionsRemaining -= WIRETAP_TACTICAL_COST;
           newState.wiretaps = [...(newState.wiretaps || []), {
             id: `wt_${newState.turn}_${Math.random().toString(36).slice(2, 8)}`,
             plantedBy: newState.playerFamily,
@@ -9855,14 +9760,14 @@ export const useEnhancedMafiaGameState = (
         }
         case 'sweep_for_bugs': {
           // Tactical: sweep all wiretaps targeting any of your hexes. $800 / 1 tactical.
-          if (newState.turnPhase !== 'move') return newState;
-          if (newState.tacticalActionsRemaining < SWEEP_TACTICAL_COST) return newState;
+          if (newState.turnPhase === 'waiting') return newState;
+          if (newState.actionsRemaining < SWEEP_TACTICAL_COST) return newState;
           if (newState.resources.money < SWEEP_COST) {
             newState.pendingNotifications.push({ type: 'warning', title: '💸 Insufficient Funds', message: `Sweep costs $${SWEEP_COST.toLocaleString()}.` });
             return newState;
           }
           newState.resources.money -= SWEEP_COST;
-          newState.tacticalActionsRemaining -= SWEEP_TACTICAL_COST;
+          newState.actionsRemaining -= SWEEP_TACTICAL_COST;
           const onMyHexes = (newState.wiretaps || []).filter(w => w.targetFamily === newState.playerFamily);
           let found = 0;
           let fedFound = 0;
@@ -9917,8 +9822,8 @@ export const useEnhancedMafiaGameState = (
         }
         case 'family_dinner': {
           // Tactical: +loyalty to soldiers/capos within range of HQ. $1000 / 1 tactical, 5-turn cooldown.
-          if (newState.turnPhase !== 'move') return newState;
-          if (newState.tacticalActionsRemaining < FAMILY_DINNER_TACTICAL_COST) return newState;
+          if (newState.turnPhase === 'waiting') return newState;
+          if (newState.actionsRemaining < FAMILY_DINNER_TACTICAL_COST) return newState;
           const last = (newState.lastFamilyDinnerTurn || {})[newState.playerFamily] || 0;
           if (last > 0 && (newState.turn - last) < FAMILY_DINNER_COOLDOWN) {
             const left = FAMILY_DINNER_COOLDOWN - (newState.turn - last);
@@ -9940,7 +9845,7 @@ export const useEnhancedMafiaGameState = (
             return newState;
           }
           newState.resources.money -= FAMILY_DINNER_COST;
-          newState.tacticalActionsRemaining -= FAMILY_DINNER_TACTICAL_COST;
+          newState.actionsRemaining -= FAMILY_DINNER_TACTICAL_COST;
           newState.lastFamilyDinnerTurn = { ...(newState.lastFamilyDinnerTurn || {}), [newState.playerFamily]: newState.turn };
           for (const u of nearby) {
             const s = newState.soldierStats[u.id];
@@ -10444,8 +10349,8 @@ export const useEnhancedMafiaGameState = (
           // Boss action — does NOT consume action budget
           const hq = newState.headquarters[newState.playerFamily];
           if (!hq) return newState;
-          if (newState.turnPhase !== 'action') {
-            newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'Sitdown can only be called during the Action phase.' });
+          if (newState.turnPhase === 'waiting') {
+            newState.pendingNotifications.push({ type: 'error', title: 'Turn Resolving', message: 'Sitdown cannot be called while the turn is resolving.' });
             return newState;
           }
           if (newState.sitdownCooldownUntil > newState.turn) {
@@ -10499,8 +10404,8 @@ export const useEnhancedMafiaGameState = (
             return newState;
           }
           // Boss action — costs $10K + 1 action point
-          if (newState.turnPhase !== 'action') {
-            newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'Declare War is only available during the Action phase.' });
+          if (newState.turnPhase === 'waiting') {
+            newState.pendingNotifications.push({ type: 'error', title: 'Turn Resolving', message: 'Declare War is not available while the turn is resolving.' });
             return newState;
           }
           if (newState.resources.money < DECLARE_WAR_COST) {
@@ -10540,8 +10445,8 @@ export const useEnhancedMafiaGameState = (
           return newState;
         }
         case 'lay_low': {
-          if (newState.turnPhase !== 'action') {
-            newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'Lay Low is only available during the Action phase.' });
+          if (newState.turnPhase === 'waiting') {
+            newState.pendingNotifications.push({ type: 'error', title: 'Turn Resolving', message: 'Lay Low is not available while the turn is resolving.' });
             return newState;
           }
           if (isLayingLow(newState)) {
@@ -10571,8 +10476,8 @@ export const useEnhancedMafiaGameState = (
             return newState;
           }
           // Boss action — $5K + 1 action, 3-turn defensive stance
-          if (newState.turnPhase !== 'action') {
-            newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'Go to the Mattresses is only available during the Action phase.' });
+          if (newState.turnPhase === 'waiting') {
+            newState.pendingNotifications.push({ type: 'error', title: 'Turn Resolving', message: 'Go to the Mattresses is not available while the turn is resolving.' });
             return newState;
           }
           if (newState.resources.money < MATTRESSES_COST) {
@@ -10621,8 +10526,8 @@ export const useEnhancedMafiaGameState = (
             return newState;
           }
           // Boss action — $5K + 1 action, 2-turn offensive boost
-          if (newState.turnPhase !== 'action') {
-            newState.pendingNotifications.push({ type: 'error', title: 'Wrong Phase', message: 'War Summit is only available during the Action phase.' });
+          if (newState.turnPhase === 'waiting') {
+            newState.pendingNotifications.push({ type: 'error', title: 'Turn Resolving', message: 'War Summit is not available while the turn is resolving.' });
             return newState;
           }
           if (newState.resources.money < WAR_SUMMIT_COST) {
@@ -10798,8 +10703,8 @@ export const useEnhancedMafiaGameState = (
 
         case 'eliminate_soldier': {
           // Purge Ranks: eliminate a suspicious or confirmed rat soldier
-          if (newState.turnPhase !== 'action') {
-            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Wrong Phase', message: 'Purge Ranks is only available during the Action phase.' });
+          if (newState.turnPhase === 'waiting') {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Turn Resolving', message: 'Purge Ranks is not available while the turn is resolving.' });
             return newState;
           }
           if (newState.actionsRemaining <= 0) {
@@ -10839,8 +10744,8 @@ export const useEnhancedMafiaGameState = (
 
         case 'abandon_territory': {
           // Abandon an empty hex to escape maintenance cost death spiral
-          if (newState.turnPhase !== 'action') {
-            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Wrong Phase', message: 'Abandon Territory is only available during the Action phase.' });
+          if (newState.turnPhase === 'waiting') {
+            newState.pendingNotifications.push({ type: 'warning', title: '⚠️ Turn Resolving', message: 'Abandon Territory is not available while the turn is resolving.' });
             return newState;
           }
           const abandonLimit = 2;

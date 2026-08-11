@@ -477,20 +477,13 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
       return; // Consume all clicks during placement mode
     }
 
-    // During move phase, try selecting units on HQ hex before opening the panel
-    if (tile.isHeadquarters && turnPhase === 'move') {
-      const key = `${tile.q},${tile.r},${tile.s}`;
-      setExpandedHQKey(key); // Ensure units are visible
-      const unitsHere = unitsByHex.get(key) || [];
-      const playerUnit = unitsHere.find(u => u.family === playerFamily && u.movesRemaining > 0);
-      if (playerUnit && onSelectUnit) {
-        onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
-        return;
-      }
-    }
+    // Single open turn: tactical abilities take over clicks, otherwise move + act freely
+    const moveActionMode = gameState?.selectedMoveAction || 'move';
+    const isTacticalMode = moveActionMode !== 'move';
+    const isOpenTurn = turnPhase !== 'waiting';
 
-    // HQ click — during deploy phase, toggle unit picker and show HQ info
-    if (tile.isHeadquarters && turnPhase === 'deploy' && tile.isHeadquarters === playerFamily) {
+    // HQ click — toggle unit picker and show HQ info (own HQ)
+    if (tile.isHeadquarters && tile.isHeadquarters === playerFamily) {
       const hqKey = `${tile.q},${tile.r},${tile.s}`;
       setExpandedHQKey(prev => prev === hqKey ? null : hqKey);
       if (onSelectHeadquarters) onSelectHeadquarters(tile.isHeadquarters);
@@ -498,7 +491,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
       // that would silently cancel deploy mode and allow moves beyond the deploy ring.
       if (!gameState?.deployMode) {
         const unitsHere = unitsByHex.get(hqKey) || [];
-        const playerUnit = unitsHere.find(u => u.family === playerFamily && u.movesRemaining > 0);
+        const playerUnit = unitsHere.find(u => u.family === playerFamily && (isTacticalMode || u.movesRemaining > 0));
         if (playerUnit && onSelectUnit) {
           onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
         }
@@ -506,24 +499,17 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
       return;
     }
 
-    // HQ click — toggle unit icons and open headquarters panel
-    // Block rival HQ clicks during deploy phase to prevent deploying from enemy HQs
+    // Rival HQ — blocked while placing units, otherwise open the info panel
     if (tile.isHeadquarters) {
-      if (turnPhase === 'deploy' && tile.isHeadquarters !== playerFamily) {
-        return; // Don't open rival HQ panel during deploy phase
-      }
+      if (gameState?.deployMode) return;
       const hqKey = `${tile.q},${tile.r},${tile.s}`;
-      if (expandedHQKey === hqKey) {
-        setExpandedHQKey(null);
-      } else {
-        setExpandedHQKey(hqKey);
-      }
+      setExpandedHQKey(expandedHQKey === hqKey ? null : hqKey);
       if (onSelectHeadquarters) onSelectHeadquarters(tile.isHeadquarters);
       return;
     }
 
-    // Deploy mode — place unit (deploy phase)
-    if (turnPhase === 'deploy' && gameState?.deployMode) {
+    // Deploy mode — place unit from HQ (free, ring-limited)
+    if (gameState?.deployMode) {
       const isValid = gameState.availableDeployHexes?.some(
         (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
       );
@@ -532,66 +518,36 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         return;
       }
       // Clicked outside the deploy ring — cancel deploy mode only.
-      // Never fall through to unit selection/movement on the same click.
       if (onAction) onAction({ type: 'deselect_unit' });
       return;
     }
 
-
-    // Deploy phase — select units for movement OR place from HQ
-    if (turnPhase === 'deploy') {
-      // If we have a selected unit, try to move it
+    // Tactical ability armed (scout, wiretap, fortify, escort, send word, family power)
+    if (isOpenTurn && isTacticalMode) {
       if (gameState?.selectedUnitId) {
-        const isValidMove = gameState.availableMoveHexes?.some(
+        const isValidTacticalTarget = gameState.availableMoveHexes?.some(
           (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
         );
-        if (isValidMove && onMoveUnit) {
+        if (isValidTacticalTarget && onMoveUnit) {
           onMoveUnit({ q: tile.q, r: tile.r, s: tile.s });
           return;
         }
       }
-
-      // Try to select a player unit on this hex for movement
       const key = `${tile.q},${tile.r},${tile.s}`;
       const unitsHere = unitsByHex.get(key) || [];
-      const playerUnit = unitsHere.find(u => u.family === playerFamily && u.movesRemaining > 0);
+      const playerUnit = unitsHere.find(u => u.family === playerFamily);
       if (playerUnit && onSelectUnit) {
         onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
         return;
       }
     }
 
-    // Move (tactical) phase — select units for tactical actions
-    if (turnPhase === 'move') {
-      // If we have a selected unit, try to move it
-      if (gameState?.selectedUnitId) {
-        const isValidMove = gameState.availableMoveHexes?.some(
-          (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
-        );
-        if (isValidMove && onMoveUnit) {
-          onMoveUnit({ q: tile.q, r: tile.r, s: tile.s });
-          return;
-        }
-      }
-
-      // Try to select a player unit on this hex
-      const key = `${tile.q},${tile.r},${tile.s}`;
-      const unitsHere = unitsByHex.get(key) || [];
-      const currentMoveAction = gameState?.selectedMoveAction || 'move';
-      const bypassMoves = currentMoveAction === 'escort' || currentMoveAction === 'fortify';
-      const playerUnit = unitsHere.find(u => u.family === playerFamily && (bypassMoves || u.movesRemaining > 0));
-      if (playerUnit && onSelectUnit) {
-        onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
-        return;
-      }
-    }
-
-    // Action phase — unit-first selection flow
-    if (turnPhase === 'action') {
+    // Open turn — move and act in any order with the selected unit
+    if (isOpenTurn && !isTacticalMode) {
       const key = `${tile.q},${tile.r},${tile.s}`;
       const unitsHere = unitsByHex.get(key) || [];
       const playerUnitsHere = unitsHere.filter(u => u.family === playerFamily);
-      
+
       // If no unit selected yet, try to select a player unit on this hex
       if (!gameState?.selectedUnitId) {
         if (playerUnitsHere.length > 0 && onSelectUnit) {
@@ -606,11 +562,23 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         setActionMenu(null);
         return;
       }
-      
-      // A unit is selected — check if this hex is a valid action target (highlighted)
-      const isValidTarget = gameState.availableMoveHexes?.some(
+
+      const selectedUnitNow = (gameState.deployedUnits || []).find((u: DeployedUnit) => u.id === gameState.selectedUnitId);
+      const clickedOwnHex = !!selectedUnitNow && selectedUnitNow.q === tile.q && selectedUnitNow.r === tile.r && selectedUnitNow.s === tile.s;
+      const isHighlighted = gameState.availableMoveHexes?.some(
         (h: any) => h.q === tile.q && h.r === tile.r && h.s === tile.s
       );
+
+      // Highlighted hex (and not the unit's own hex) → move there
+      if (isHighlighted && !clickedOwnHex && onMoveUnit) {
+        onMoveUnit({ q: tile.q, r: tile.r, s: tile.s });
+        return;
+      }
+
+      // Otherwise fall through to the context action menu below
+      const isValidTarget = clickedOwnHex || !!isHighlighted || (!!selectedUnitNow &&
+        hexDistance(selectedUnitNow, tile) <= (selectedUnitNow.type === 'capo' ? 2 : 1));
+
       
       if (isValidTarget) {
         // Show context-sensitive action menu for the selected unit on this target
@@ -638,7 +606,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           (isSoldier && unitOnTargetHex) || 
           (isCapo && (unitOnTargetHex || true))
         ) && (isNeutral || isEnemy) && !tile.isHeadquarters && !enemyExtortLocked;
-        const canClaim = !phase3Locked && isNeutral && isSoldier && !tile.business && !tile.isHeadquarters;
+        const canClaim = !phase3Locked && isNeutral && isSoldier && unitOnTargetHex && !tile.business && !tile.isHeadquarters;
         const isCapoWounded = isCapo && (selectedUnit as any).woundedTurnsRemaining > 0;
         // Negotiate: only available during action phase when a pending negotiation is ready on this hex
         const readyPending = (gameState?.pendingNegotiations || []).find((p: any) => p.ready && p.targetQ === tile.q && p.targetR === tile.r && p.targetS === tile.s);
@@ -680,6 +648,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           if (phase3Locked) reasons.claim = '🔒 Phase 3 — shifts through influence';
           else if (tile.business) reasons.claim = 'Has business (extort instead)';
           else if (!isSoldier) reasons.claim = 'Need a soldier';
+          else if (!unitOnTargetHex) reasons.claim = 'Move the soldier onto the hex first';
         }
         if (!canSabotage && isEnemy) {
           if (!tile.business) reasons.sabotage = 'No business to sabotage';
@@ -689,7 +658,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         if (!canNegotiate && isEnemy && !tile.isHeadquarters) {
           const hasPending = (gameState?.pendingNegotiations || []).some((p: any) => p.targetQ === tile.q && p.targetR === tile.r && p.targetS === tile.s && !p.ready);
           if (hasPending) reasons.negotiate = 'Word sent — available next turn';
-          else reasons.negotiate = 'Send Word first (tactical step)';
+          else reasons.negotiate = 'Send Word with a capo first';
         }
         if (!canSafehouse && isOwned && isCapoWounded) {
           reasons.safehouse = 'Capo is wounded';
@@ -1313,7 +1282,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                   })()}
 
                   {/* Prompt to click HQ during deploy phase */}
-                  {tile.isHeadquarters === playerFamily && gameState?.turnPhase === 'deploy' && expandedHQKey !== key && (
+                  {tile.isHeadquarters === playerFamily && gameState?.turnPhase !== 'waiting' && expandedHQKey !== key && (
                     <motion.text
                       x={x} y={y + baseHexRadius + 14}
                       textAnchor="middle" fontSize="7" fill="#D4AF37" fontWeight="bold"
@@ -2288,7 +2257,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                 const tile = hexMap.find(t => t.q === entry.unit.q && t.r === entry.unit.r && t.s === entry.unit.s);
                 if (entry.type === 'capo') {
                   const isSelected = selectedUnitId === entry.unit.id;
-                  const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action');
+                  const isClickable = fam === playerFamily && turnPhase !== 'waiting';
                   return (
                     <motion.g
                       key={entry.unit.id}
@@ -2308,7 +2277,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                         onClick={isClickable ? (e) => {
                           e.stopPropagation();
                           if (tile) setPinnedHex(tile);
-                          if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
+                          if (turnPhase !== 'waiting' && onSelectUnit) {
                             onSelectUnit('capo', { q: entry.unit.q, r: entry.unit.r, s: entry.unit.s });
                           }
                         } : undefined}
@@ -2320,7 +2289,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                 const soldiersOnHex = (unitsByHex.get(`${entry.unit.q},${entry.unit.r},${entry.unit.s}`) || [])
                   .filter(u => u.family === fam && u.type === 'soldier');
                 const isSelected = soldiersOnHex.some(s => s.id === selectedUnitId);
-                const isClickable = fam === playerFamily && (turnPhase === 'move' || turnPhase === 'deploy' || turnPhase === 'action' || gameState?.persicoSelectionActive);
+                const isClickable = fam === playerFamily && (turnPhase !== 'waiting' || gameState?.persicoSelectionActive);
                 const hasMark = fam === playerFamily && soldiersOnHex.some(s => gameState?.soldierStats?.[s.id]?.markedForDeath);
                 const persicoArmed = !!gameState?.persicoSelectionActive && fam === playerFamily;
                 return (
@@ -2345,7 +2314,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                           onAction({ type: 'execute_persico_promotion', unitId: entry.unit.id });
                           return;
                         }
-                        if ((turnPhase === 'deploy' || turnPhase === 'move' || turnPhase === 'action') && onSelectUnit) {
+                        if (turnPhase !== 'waiting' && onSelectUnit) {
                           onSelectUnit('soldier', { q: entry.unit.q, r: entry.unit.r, s: entry.unit.s });
                         }
                       } : undefined}
@@ -2405,7 +2374,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         </svg>
       </div>
 
-      {gameState?.turnPhase === 'deploy' && expandedHQKey && (() => {
+      {gameState?.turnPhase !== 'waiting' && expandedHQKey && (() => {
         const expandedTile = hexMap.find(tile => `${tile.q},${tile.r},${tile.s}` === expandedHQKey);
         if (!expandedTile || expandedTile.isHeadquarters !== playerFamily) return null;
 

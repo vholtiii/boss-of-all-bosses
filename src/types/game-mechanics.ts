@@ -702,10 +702,12 @@ export const PLAN_HIT_LOOT = 5000;            // +$5,000 loot bonus on successfu
 export const PLAN_HIT_CAPO_INFLUENCE = 15;    // +15 influence when plan hit kills a capo
 
 // ============ ACTION BUDGET ============
-export const BASE_ACTIONS_PER_TURN = 2;
+// Single pool per turn — every tactical/action ability draws from it.
+export const BASE_ACTIONS_PER_TURN = 3;
 export const BONUS_ACTION_RESPECT_THRESHOLD = 50;
 export const BONUS_ACTION_INFLUENCE_THRESHOLD = 50;
-export const TACTICAL_ACTIONS_PER_TURN = 3;
+/** @deprecated tactical actions now share the single action pool */
+export const TACTICAL_ACTIONS_PER_TURN = BASE_ACTIONS_PER_TURN;
 
 // ============ BLIND HIT SYSTEM ============
 export interface HiddenUnit {
