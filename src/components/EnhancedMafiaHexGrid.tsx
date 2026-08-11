@@ -824,6 +824,11 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         >
           {/* 1920s city-block terrain patterns (sepia palette, drawn once, tiled per hex) */}
           <defs>
+            <radialGradient id="tile-shade" cx="42%" cy="34%" r="72%">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.10" />
+              <stop offset="55%" stopColor="#000000" stopOpacity="0.05" />
+              <stop offset="100%" stopColor="#000000" stopOpacity="0.42" />
+            </radialGradient>
             {/* Urban: dense rooftops with tar seams */}
             <pattern id="terrain-urban" width="14" height="14" patternUnits="userSpaceOnUse">
               <rect width="14" height="14" fill={TERRAIN_FILLS.urban} />
@@ -1068,6 +1073,13 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                         <polygon
                           points={getHexPoints(x, y, baseHexRadius)}
                           fill={`url(#terrain-${tile.terrain || 'urban'})`}
+                          stroke="none"
+                          className="pointer-events-none"
+                        />
+                        {/* Painterly shade — lamplight from upper-left, deep block shadow at the rim */}
+                        <polygon
+                          points={getHexPoints(x, y, baseHexRadius)}
+                          fill="url(#tile-shade)"
                           stroke="none"
                           className="pointer-events-none"
                         />
