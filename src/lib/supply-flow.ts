@@ -31,7 +31,9 @@ export interface SupplyFlowGameState {
     controllingFamily: string;
     isHeadquarters?: string;
     supplyNode?: SupplyNodeType;
-    business?: { type: string; income: number; constructionGoal?: number; constructionProgress?: number };
+    anchor?: { type: string; tribute: number; isExtorted?: boolean };
+    buildings?: Record<string, number | undefined>;
+
   }>;
   supplyNodes?: Array<{ type: SupplyNodeType; q: number; r: number; s: number }>;
   aiOpponents: Array<{ family: string }>;
