@@ -1699,6 +1699,49 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
               );
             })}
 
+            {/* ═══ TERRITORY BORDERS — thick brass-edged outlines on owner boundaries ═══ */}
+            {(() => {
+              const centerKey = (px: number, py: number) => `${Math.round(px)}|${Math.round(py)}`;
+              const ownerAt = new Map<string, string | null>();
+              hexMap.forEach(t => {
+                const { x, y } = getHexPosition(t.q, t.r);
+                ownerAt.set(centerKey(x, y), t.controllingFamily || null);
+              });
+              const segs: { d: string; color: string; key: string }[] = [];
+              hexMap.forEach(t => {
+                const owner = t.controllingFamily;
+                if (!owner) return;
+                const { x, y } = getHexPosition(t.q, t.r);
+                const R = baseHexRadius;
+                for (let i = 0; i < 6; i++) {
+                  const a1 = (Math.PI / 3) * i;
+                  const a2 = (Math.PI / 3) * (i + 1);
+                  const x1 = x + R * Math.cos(a1), y1 = y + R * Math.sin(a1);
+                  const x2 = x + R * Math.cos(a2), y2 = y + R * Math.sin(a2);
+                  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+                  const nx = x + (mx - x) * 2, ny = y + (my - y) * 2;
+                  const neighborOwner = ownerAt.get(centerKey(nx, ny));
+                  if (neighborOwner === owner) continue;
+                  segs.push({
+                    d: `M ${x1} ${y1} L ${x2} ${y2}`,
+                    color: familyColors[owner] || '#D4AF37',
+                    key: `${t.q},${t.r},${t.s}-${i}`,
+                  });
+                }
+              });
+              return (
+                <g className="pointer-events-none">
+                  {segs.map(s => (
+                    <path key={`tb-shadow-${s.key}`} d={s.d} stroke="#0a0a0a" strokeWidth="4.5" strokeOpacity="0.55" strokeLinecap="round" fill="none" />
+                  ))}
+                  {segs.map(s => (
+                    <path key={`tb-${s.key}`} d={s.d} stroke={s.color} strokeWidth="2.6" strokeOpacity="0.95" strokeLinecap="round" fill="none" />
+                  ))}
+                </g>
+              );
+            })()}
+
+
             {/* ═══ STRATEGIC OVERLAYS (war fronts, vulnerability, supply support) ═══ */}
             {showThreats && overlays && (
               <g className="pointer-events-none">
