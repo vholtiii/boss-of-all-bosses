@@ -12997,7 +12997,50 @@ export const useEnhancedMafiaGameState = (
     });
   }, []);
 
+  /**
+   * Buy an anchor racket out from under its old owners: pay the lump sum and it
+   * becomes a Tier 1 building on that block, upgradeable like anything you built.
+   */
+  const buyOutAnchor = useCallback((q: number, r: number, s: number) => {
+    setGameState(prev => {
+      const state: EnhancedMafiaGameState = JSON.parse(JSON.stringify(prev));
+      const tile = state.hexMap.find(t => t.q === q && t.r === r && t.s === s);
+      const notify = (title: string, message: string, type2: 'warning' | 'success' = 'warning') => {
+        state.pendingNotifications = [...(state.pendingNotifications || []), { type: type2, title, message }];
+      };
+      if (!tile || tile.controllingFamily !== state.playerFamily || !tile.anchor) {
+        notify('🚫 Nothing To Buy', 'You can only buy out a racket on a block you hold.');
+        return state;
+      }
+      if (!tile.anchor.isExtorted) {
+        notify('🤝 Set Up The Racket First', 'Shake the place down before you talk about owning it.');
+        return state;
+      }
+      const cost = tile.anchor.buyoutCost ?? anchorBuyoutCost(tile.anchor.tribute);
+      if (state.resources.money < cost) {
+        notify('💵 Short On Cash', `Buying out ${tile.anchor.name} costs $${cost.toLocaleString()}.`);
+        return state;
+      }
+      if (state.actionsRemaining <= 0) {
+        notify('⏳ No Actions Left', 'A buy-out costs 1 action.');
+        return state;
+      }
+      const track = tile.anchor.type;
+      const existing = (tile.buildings || {})[track] || 0;
+      state.resources.money -= cost;
+      state.actionsRemaining = Math.max(0, state.actionsRemaining - 1);
+      tile.buildings = { ...(tile.buildings || {}), [track]: Math.max(1, existing) as BuildingTier };
+      const name = tile.anchor.name;
+      tile.anchor = undefined;
+      state.resources.influence = Math.min(100, (state.resources.influence || 0) + ANCHOR_BUYOUT_INFLUENCE);
+      state.reputation.streetInfluence = Math.round(state.resources.influence);
+      notify('📜 On The Books', `${name} is yours outright — now a tier 1 ${BUILDING_DEFS[track].label} you can upgrade. +${ANCHOR_BUYOUT_INFLUENCE} influence.`, 'success');
+      return state;
+    });
+  }, []);
+
   /** Set the standing order on an owned block. Free. */
+
   const setTilePolicy = useCallback((q: number, r: number, s: number, policy: TilePolicy) => {
     setGameState(prev => {
       const state: EnhancedMafiaGameState = JSON.parse(JSON.stringify(prev));
