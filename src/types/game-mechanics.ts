@@ -1116,3 +1116,156 @@ export const DISTRICT_BONUSES: Record<string, DistrictBonusDef> = {
   'Queens':        { bonusType: 'extortion', description: '+15% extortion success', secondaryBonusType: 'hit_bonus', secondaryDescription: '+5% hit success on all attacks', identity: 'Racketeering, extortion, and influence growth' },
   'Staten Island': { bonusType: 'respect', description: '+3 respect/turn', secondaryBonusType: 'influence_gain', secondaryDescription: '+1 influence/turn', identity: 'Respect and political influence' },
 };
+
+// ============================================================
+// TILE DEVELOPMENT — building tiers, policies, crew growth,
+// district upgrades, and the garrison-share income model.
+// ============================================================
+
+export type BuildingType = 'store_front' | 'brothel' | 'gambling_den' | 'loan_sharking';
+export type BuildingTier = 1 | 2 | 3;
+
+export interface BuildingTierDef {
+  name: string;
+  cost: number;
+  months: number;   // build time
+  income: number;   // gross monthly income at this tier
+  heat: number;     // heat generated per month
+  infra: number;    // feeds crew growth
+  cover: number;    // defensive contribution
+}
+
+export interface BuildingDef {
+  type: BuildingType;
+  label: string;
+  blurb: string;
+  tiers: Record<BuildingTier, BuildingTierDef>;
+}
+
+export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
+  store_front: {
+    type: 'store_front',
+    label: 'Store Front',
+    blurb: 'Quiet money. Low heat, steady earn, good cover for the block.',
+    tiers: {
+      1: { name: 'Corner Store',   cost: 3000,  months: 1, income: 700,  heat: 1, infra: 1, cover: 1 },
+      2: { name: 'Grocery Chain',  cost: 7500,  months: 2, income: 1500, heat: 2, infra: 2, cover: 2 },
+      3: { name: 'Import Company', cost: 16000, months: 3, income: 3000, heat: 3, infra: 3, cover: 4 },
+    },
+  },
+  brothel: {
+    type: 'brothel',
+    label: 'Brothel',
+    blurb: 'Fast cash and loose lips. Earns well, draws the vice squad.',
+    tiers: {
+      1: { name: 'Rooming House', cost: 4000,  months: 1, income: 1100, heat: 3, infra: 1, cover: 0 },
+      2: { name: 'Parlor House',  cost: 9000,  months: 2, income: 2300, heat: 5, infra: 2, cover: 1 },
+      3: { name: 'Club Row',      cost: 18000, months: 3, income: 4400, heat: 8, infra: 3, cover: 2 },
+    },
+  },
+  gambling_den: {
+    type: 'gambling_den',
+    label: 'Gambling Den',
+    blurb: 'The house always wins. Highest earn, highest exposure.',
+    tiers: {
+      1: { name: 'Back Room',   cost: 4500,  months: 1, income: 1300, heat: 4, infra: 1, cover: 0 },
+      2: { name: 'Card Parlor', cost: 10500, months: 2, income: 2700, heat: 6, infra: 2, cover: 1 },
+      3: { name: 'Casino Hall', cost: 21000, months: 3, income: 5200, heat: 9, infra: 3, cover: 2 },
+    },
+  },
+  loan_sharking: {
+    type: 'loan_sharking',
+    label: 'Loan Office',
+    blurb: 'Vig on every dollar. Builds crew faster than it builds cash.',
+    tiers: {
+      1: { name: 'Shylock Desk',  cost: 3500,  months: 1, income: 900,  heat: 2, infra: 2, cover: 1 },
+      2: { name: 'Finance Front', cost: 8000,  months: 2, income: 1900, heat: 4, infra: 3, cover: 2 },
+      3: { name: 'Bank Interest', cost: 17000, months: 3, income: 3600, heat: 6, infra: 5, cover: 3 },
+    },
+  },
+};
+
+export const BUILDING_TYPES = Object.keys(BUILDING_DEFS) as BuildingType[];
+export const MAX_BUILDING_TIER: BuildingTier = 3;
+
+export type TilePolicy = 'earn' | 'muscle' | 'lay_low' | 'fortify';
+
+export interface TilePolicyDef {
+  id: TilePolicy;
+  label: string;
+  blurb: string;
+  incomeMult: number;
+  growthMult: number;
+  heatMult: number;
+  defenseBonus: number;
+}
+
+export const TILE_POLICIES: Record<TilePolicy, TilePolicyDef> = {
+  earn:    { id: 'earn',    label: 'Earn',       blurb: 'Squeeze the block for cash. Full income, normal heat.',            incomeMult: 1.0,  growthMult: 0.6, heatMult: 1.0,  defenseBonus: 0 },
+  muscle:  { id: 'muscle',  label: 'Muscle Up',  blurb: 'Put the money into bodies. Half income, crew grows fast.',         incomeMult: 0.5,  growthMult: 1.8, heatMult: 1.1,  defenseBonus: 0 },
+  lay_low: { id: 'lay_low', label: 'Lay Low',    blurb: 'Keep it quiet. Reduced income, heat cut hard.',                    incomeMult: 0.65, growthMult: 0.4, heatMult: 0.35, defenseBonus: 0 },
+  fortify: { id: 'fortify', label: 'Fortify Up', blurb: 'Dig in. Income suffers, the block gets much harder to take.',      incomeMult: 0.7,  growthMult: 0.5, heatMult: 0.8,  defenseBonus: 25 },
+};
+
+export const DEFAULT_TILE_POLICY: TilePolicy = 'earn';
+
+/** Recruit progress needed on a single tile to spawn a free soldier. */
+export const RECRUIT_PROGRESS_GOAL = 100;
+/** Progress per infra point per month, before policy multiplier. */
+export const RECRUIT_PROGRESS_PER_INFRA = 7;
+
+// --- Garrison share (spec income model) ---
+export const GARRISON_SHARE = {
+  capoOrBoss: 1.0,
+  twoSoldiers: 0.6,
+  oneSoldier: 0.35,
+  unguarded: 0.12,
+} as const;
+
+/** Monthly tax collected per controlled hex in a district you dominate. */
+export const TURF_TAX_PER_HEX = 120;
+/** Monthly overhead paid for each owned block with no garrison and no earner. */
+export const EMPTY_BLOCK_OVERHEAD = 180;
+
+export function garrisonShare(capoOrBoss: boolean, soldiers: number): number {
+  if (capoOrBoss) return GARRISON_SHARE.capoOrBoss;
+  if (soldiers >= 2) return GARRISON_SHARE.twoSoldiers;
+  if (soldiers === 1) return GARRISON_SHARE.oneSoldier;
+  return GARRISON_SHARE.unguarded;
+}
+
+// --- District upgrades (global purchases) ---
+export type DistrictUpgradeId = 'supply_routes' | 'local_muscle' | 'community_goodwill' | 'political_connections';
+
+export interface DistrictUpgradeDef {
+  id: DistrictUpgradeId;
+  label: string;
+  blurb: string;
+  cost: number;
+  /** Required best single-district control ratio (0..1). */
+  requiredControl: number;
+}
+
+export const DISTRICT_UPGRADES: Record<DistrictUpgradeId, DistrictUpgradeDef> = {
+  supply_routes:         { id: 'supply_routes',         label: 'Supply Routes',         blurb: '+10% income from every block you hold.',        cost: 25000, requiredControl: 0.4 },
+  local_muscle:          { id: 'local_muscle',          label: 'Local Muscle',          blurb: '+25% crew growth on every block.',              cost: 30000, requiredControl: 0.5 },
+  community_goodwill:    { id: 'community_goodwill',    label: 'Community Goodwill',    blurb: '-2 heat every month.',                          cost: 22000, requiredControl: 0.5 },
+  political_connections: { id: 'political_connections', label: 'Political Connections', blurb: '+2 influence every month.',                     cost: 35000, requiredControl: 0.6 },
+};
+
+export const DISTRICT_UPGRADE_IDS = Object.keys(DISTRICT_UPGRADES) as DistrictUpgradeId[];
+
+/** Aggregate the built tiers on a tile into income / heat / infra / cover. */
+export function tileBuildingTotals(buildings?: Partial<Record<BuildingType, BuildingTier>>) {
+  let income = 0, heat = 0, infra = 0, cover = 0;
+  if (!buildings) return { income, heat, infra, cover };
+  (Object.keys(buildings) as BuildingType[]).forEach(type => {
+    const tier = buildings[type];
+    const def = BUILDING_DEFS[type];
+    if (!tier || !def) return;
+    const t = def.tiers[tier as BuildingTier];
+    if (!t) return;
+    income += t.income; heat += t.heat; infra += t.infra; cover += t.cover;
+  });
+  return { income, heat, infra, cover };
+}
