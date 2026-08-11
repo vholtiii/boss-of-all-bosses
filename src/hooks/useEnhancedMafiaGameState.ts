@@ -8148,7 +8148,7 @@ export const useEnhancedMafiaGameState = (
       const aiBuildRunway = opponent.resources.money / upkeepForRunway;
       const aiBuildBudget = 12000; // store-tier cost
       const aiHasBuildableHex = state.hexMap.some(t =>
-        t.controllingFamily === fam && !t.anchor && !t.isHeadquarters &&
+        t.controllingFamily === fam && !t.build && !t.isHeadquarters &&
         state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
       );
       const aiBuildChance = aiBuildPosture ? 0.55 : (policy.economyFocusMul >= 1.1 ? 0.30 : 0.10);
@@ -8164,30 +8164,26 @@ export const useEnhancedMafiaGameState = (
           turnRng() < aiBuildChance
         ) {
           const buildCandidates = state.hexMap.filter(t =>
-            t.controllingFamily === fam && !t.anchor && !t.isHeadquarters &&
+            t.controllingFamily === fam && !t.build && !t.isHeadquarters &&
             state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
           );
           // Prefer interior hexes (away from contested borders) for build safety
           buildCandidates.sort((a, b) => hexDistance(a, hq) - hexDistance(b, hq));
           const buildTile = buildCandidates[0];
-          // Pick business type by money: construction $35k > restaurant $20k > store $12k
-          let bType: 'store' | 'restaurant' | 'construction' = 'store';
-          let bCost = 12000; let bIncome = 1800;
-          if (opponent.resources.money >= 35000 && aiBuildRunway >= 8) {
-            bType = 'construction'; bCost = 35000; bIncome = 5000;
-          } else if (opponent.resources.money >= 20000 && aiBuildRunway >= 6) {
-            bType = 'restaurant'; bCost = 20000; bIncome = 3000;
-          }
+          // Pick a building track by cash on hand; AI builds tier by tier like the player.
+          const aiTrack: BuildingType = opponent.resources.money >= 35000 && aiBuildRunway >= 8
+            ? 'gambling_den'
+            : opponent.resources.money >= 20000 && aiBuildRunway >= 6
+              ? 'loan_sharking'
+              : 'store_front';
+          const aiTier = (((buildTile.buildings || {})[aiTrack] || 0) + 1) as BuildingTier;
+          const aiDef = aiTier <= MAX_BUILDING_TIER ? BUILDING_DEFS[aiTrack].tiers[aiTier] : null;
+          const bType = aiTrack;
+          const bCost = aiDef?.cost ?? 0;
+          if (!aiDef || opponent.resources.money < bCost) break aiBuildBlock;
           opponent.resources.money -= bCost;
           aiActionsRemaining--;
-          buildTile.anchor = {
-            type: bType,
-            income: bIncome,
-            isLegal: false,
-            isExtorted: false, // built business — counts toward influence formula like player-built
-            heatLevel: 0,
-            launderingCapacity: Math.floor(bIncome * 0.7),
-          };
+          buildTile.build = { type: aiTrack, tier: aiTier, monthsRemaining: aiDef.months };
           if (turnReport) turnReport.aiActions.push({ family: fam, action: 'build_business', detail: `Built a ${bType} in ${buildTile.district || 'territory'} for $${bCost.toLocaleString()}` });
         }
       }
@@ -10166,20 +10162,25 @@ export const useEnhancedMafiaGameState = (
             }
             newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
           }
-          newState.resources.money -= pending.cost;
-          targetTile.anchor = {
-            type: pending.businessType,
-            income: 0,
-            isLegal: pending.isLegal,
-            heatLevel: 0,
-            launderingCapacity: 0,
-            constructionProgress: 0,
-            constructionGoal: BUILD_CONSTRUCTION_GOAL,
-          };
+          const legacyTrack: BuildingType = (BUILDING_TYPES as string[]).includes(pending.businessType)
+            ? (pending.businessType as BuildingType)
+            : 'store_front';
+          const legacyTier = (((targetTile.buildings || {})[legacyTrack] || 0) + 1) as BuildingTier;
+          if (legacyTier > MAX_BUILDING_TIER) {
+            newState.pendingNotifications = [...newState.pendingNotifications, {
+              type: 'warning' as const, title: '🏆 Fully Upgraded',
+              message: 'That operation is already at the top tier on this block.',
+            }];
+            newState.pendingBusinessBuild = null;
+            return newState;
+          }
+          const legacyDef = BUILDING_DEFS[legacyTrack].tiers[legacyTier];
+          newState.resources.money -= legacyDef.cost;
+          targetTile.build = { type: legacyTrack, tier: legacyTier, monthsRemaining: legacyDef.months };
           newState.pendingBusinessBuild = null;
           newState.pendingNotifications = [...newState.pendingNotifications, {
             type: 'success' as const, title: '🚧 Construction Started',
-            message: `Building ${pending.businessType} for $${pending.cost.toLocaleString()}. Keep a Capo on hex for faster construction! (1 action used)`,
+            message: `Crews broke ground on ${pending.businessType.replace('_', ' ')}. (1 action used)`,
           }];
           return newState;
         }
