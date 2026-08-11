@@ -1209,7 +1209,11 @@ export const createInitialGameState = (
       if (tile && tile.controllingFamily === 'neutral') {
         tile.controllingFamily = fam;
       }
-    });
+  });
+
+  // Seed the strategic anchor rackets once HQs and supply nodes are locked in.
+  placeAnchorRackets(hexMap, hqPositions, mapSize, mapSeed);
+
   });
 
   const deployedUnits: DeployedUnit[] = [];
