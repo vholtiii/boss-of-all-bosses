@@ -1161,8 +1161,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                         )}
                         {/* Capo threat indicator — enemy Capo on a player-built business hex */}
                         {(() => {
-                          const isPlayerBuiltBiz = isPlayerTerritory && tile.anchor && !tile.anchor.isExtorted && 
-                            (!tile.anchor.constructionGoal || (tile.anchor.constructionProgress ?? 0) >= tile.anchor.constructionGoal);
+                          const isPlayerBuiltBiz = isPlayerTerritory && !!tile.anchor && !tile.anchor.isExtorted;
                           const enemyCapoOnHex = isPlayerBuiltBiz && deployedUnits.some(u => 
                             u.family !== playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s
                           );
@@ -1277,25 +1276,6 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                           style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.65))' }}
                         />
                       </g>
-                    );
-                  })()}
-
-                  {/* Construction progress label */}
-                  {tile.anchor && false && !tile.isHeadquarters && (() => {
-                    const hexKey = `${tile.q},${tile.r},${tile.s}`;
-                    const hexUnits = unitsByHex.get(hexKey) || [];
-                    const hasCapoOnHex = hexUnits.some(u => u.family === playerFamily && u.type === 'capo');
-                    const hasSoldierOnHex = hexUnits.some(u => u.family === playerFamily && u.type === 'soldier');
-                    const remaining = tile.anchor!.constructionGoal! - (tile.anchor!.constructionProgress ?? 0);
-                    let rate = 0;
-                    let icon = '⏸️';
-                    if (hasCapoOnHex) { rate = 1.5; icon = '⚡'; }
-                    else if (hasSoldierOnHex) { rate = 0.75; icon = '🐢'; }
-                    const estTurns = rate > 0 ? Math.ceil(remaining / rate) : null;
-                    return (
-                      <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#F59E0B" fontWeight="700" className="pointer-events-none select-none">
-                        {icon} {estTurns !== null ? `${estTurns}t` : 'PAUSED'}
-                      </text>
                     );
                   })()}
 
@@ -2593,37 +2573,16 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
               <p><span className="text-muted-foreground">Owner:</span> {(displayHex.controllingFamily || 'neutral').toUpperCase()}</p>
               <p><span className="text-muted-foreground">Terrain:</span> {displayHex.terrain}</p>
               {displayHex.anchor && (() => {
-                const isUnderConstruction = false;
-                const hexKey = `${displayHex.q},${displayHex.r},${displayHex.s}`;
-                const hexUnits = unitsByHex.get(hexKey) || [];
-                const hasCapoH = hexUnits.some(u => u.family === playerFamily && u.type === 'capo');
-                const hasSoldierH = hexUnits.some(u => u.family === playerFamily && u.type === 'soldier');
                 return (
                   <>
                     <p><span className="text-muted-foreground">Business:</span> {displayHex.anchor.type.replace('_', ' ').toUpperCase()}</p>
                     <p><span className="text-muted-foreground">Type:</span> {displayHex.anchor.isLegal ? 'Legal' : 'Illegal'}</p>
-                    {isUnderConstruction ? (
-                      <div className="mt-1 p-1.5 rounded bg-yellow-900/40 border border-yellow-500/30">
-                        <p className="text-yellow-300 font-bold text-xs">🚧 UNDER CONSTRUCTION</p>
-                        <p><span className="text-muted-foreground">Progress:</span> {(displayHex.anchor.constructionProgress ?? 0).toFixed(1)} / {displayHex.anchor.constructionGoal!.toFixed(1)}</p>
-                        <p><span className="text-muted-foreground">Speed:</span> {hasCapoH ? '⚡ Capo: 50% faster' : hasSoldierH ? '🐢 Soldier: 25% slower' : '⏸️ Paused — no unit'}</p>
-                        {(hasCapoH || hasSoldierH) && (() => {
-                          const rate = hasCapoH ? 1.5 : 0.75;
-                          const rem = displayHex.anchor.constructionGoal! - (displayHex.anchor.constructionProgress ?? 0);
-                          return <p><span className="text-muted-foreground">Est. turns:</span> {Math.ceil(rem / rate)}</p>;
-                        })()}
-                      </div>
-                    ) : (
-                      <p><span className="text-muted-foreground">Income:</span> ${displayHex.anchor.tribute.toLocaleString()}/turn</p>
-                    )}
+                    <p><span className="text-muted-foreground">Income:</span> ${displayHex.anchor.tribute.toLocaleString()}/turn</p>
                   </>
                 );
               })()}
               {/* Income contribution sub-card (player-owned hex with business) */}
               {displayHex.anchor && displayHex.controllingFamily === playerFamily && (() => {
-                const isUnderConstruction = false;
-                if (isUnderConstruction) return null;
-
                 const baseIncome = displayHex.anchor.tribute || 0;
                 const bizType = displayHex.anchor.type || (displayHex.anchor as any).businessType || '';
                 const deps = SUPPLY_DEPENDENCIES[bizType];
