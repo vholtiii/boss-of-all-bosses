@@ -8178,13 +8178,12 @@ export const useEnhancedMafiaGameState = (
               : 'store_front';
           const aiTier = (((buildTile.buildings || {})[aiTrack] || 0) + 1) as BuildingTier;
           const aiDef = aiTier <= MAX_BUILDING_TIER ? BUILDING_DEFS[aiTrack].tiers[aiTier] : null;
-          const bType = aiTrack;
-          const bCost = aiDef?.cost ?? 0;
-          if (!aiDef || opponent.resources.money < bCost) break aiBuildBlock;
-          opponent.resources.money -= bCost;
-          aiActionsRemaining--;
-          buildTile.build = { type: aiTrack, tier: aiTier, monthsRemaining: aiDef.months };
-          if (turnReport) turnReport.aiActions.push({ family: fam, action: 'build_business', detail: `Built a ${bType} in ${buildTile.district || 'territory'} for $${bCost.toLocaleString()}` });
+          if (aiDef && opponent.resources.money >= aiDef.cost) {
+            opponent.resources.money -= aiDef.cost;
+            aiActionsRemaining--;
+            buildTile.build = { type: aiTrack, tier: aiTier, monthsRemaining: aiDef.months };
+            if (turnReport) turnReport.aiActions.push({ family: fam, action: 'build_business', detail: `Broke ground on ${aiDef.name} in ${buildTile.district || 'territory'} for $${aiDef.cost.toLocaleString()}` });
+          }
         }
       }
 
