@@ -812,7 +812,7 @@ export const LeftSidePanel: React.FC<{ gameState: EnhancedMafiaGameState; onActi
               const targetExists = !!target;
               const targetRelocated = targetExists && !targetOnOriginalHex;
               const isActionPhase = phase !== 'waiting';
-              const isTacticalStep = phase === 'move';
+              const isTacticalStep = phase !== 'waiting';
               return (
                 <div className={cn(
                   "rounded-md border px-3 py-1.5 text-xs font-medium flex flex-col gap-0.5",
