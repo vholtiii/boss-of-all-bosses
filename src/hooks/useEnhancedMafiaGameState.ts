@@ -5641,7 +5641,7 @@ export const useEnhancedMafiaGameState = (
     let illegalIncome = 0;
     
     (state.hexMap || []).forEach(tile => {
-      if (tile.controllingFamily === state.playerFamily && tile.anchor) {
+      if (tile.controllingFamily === state.playerFamily && tile.anchor?.isExtorted) {
         const hasCapo = units.some(u => 
           u.family === state.playerFamily && u.type === 'capo' &&
           u.q === tile.q && u.r === tile.r && u.s === tile.s
@@ -5656,8 +5656,8 @@ export const useEnhancedMafiaGameState = (
           u.family === state.playerFamily && u.type === 'soldier' &&
           u.q === tile.q && u.r === tile.r && u.s === tile.s
         ).length;
-        const isPlayerBuilt = !tile.anchor.isExtorted && tile.controllingFamily === state.playerFamily;
-        const share = isPlayerBuilt ? 1 : garrisonShare(hasCapo, soldiersHere);
+        // Anchors only pay while someone is standing on them — tribute needs a collector.
+        const share = garrisonShare(hasCapo, soldiersHere);
         let tileIncome = Math.floor(tile.anchor.tribute * share);
 
         // ── Tile policy (Earn / Muscle Up / Lay Low / Fortify Up) ──
