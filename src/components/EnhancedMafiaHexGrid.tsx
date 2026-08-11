@@ -1231,10 +1231,38 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                     </text>
                   )}
 
-                  {/* Business/HQ icon */}
-                  <text x={x} y={y + (tile.business && !tile.isHeadquarters ? 1 : 5)} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">
-                    {tile.isHeadquarters ? '🏛️' : tile.business ? (tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal ? '🚧' : (businessIcons[tile.business.type] || '🏢')) : ''}
-                  </text>
+                  {/* Business/HQ sprite */}
+                  {(() => {
+                    const underConstruction = !!tile.business?.constructionGoal && (tile.business!.constructionProgress ?? 0) < tile.business!.constructionGoal!;
+                    if (tile.isHeadquarters) {
+                      return (
+                        <text x={x} y={y + 5} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">🏛️</text>
+                      );
+                    }
+                    if (!tile.business) return null;
+                    if (underConstruction) {
+                      return (
+                        <text x={x} y={y + 1} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">🚧</text>
+                      );
+                    }
+                    const sprite = businessSprite(tile.business.type);
+                    if (!sprite) return null;
+                    return (
+                      <g className="pointer-events-none select-none">
+                        <ellipse cx={x} cy={y + 12} rx="15" ry="4.5" fill="#000000" opacity="0.4" />
+                        <image
+                          href={sprite}
+                          x={x - 22}
+                          y={y - 22}
+                          width={44}
+                          height={38}
+                          preserveAspectRatio="xMidYMax meet"
+                          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.65))' }}
+                        />
+                      </g>
+                    );
+                  })()}
+
                   {/* Construction progress label */}
                   {tile.business && tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal && !tile.isHeadquarters && (() => {
                     const hexKey = `${tile.q},${tile.r},${tile.s}`;
