@@ -115,6 +115,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     setMoveAction,
     startEscort,
     resolveEnemyHexAction,
+    startBuild,
+    setTilePolicy,
+    buyDistrictUpgrade,
     loadGameState,
   } = useEnhancedMafiaGameState(config.family, config.resources, config.difficulty, config.seed, config.mapSize);
 
