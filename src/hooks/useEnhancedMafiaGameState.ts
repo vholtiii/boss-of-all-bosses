@@ -5612,53 +5612,6 @@ export const useEnhancedMafiaGameState = (
     const units = state.deployedUnits || [];
     const bonuses = state.familyBonuses;
 
-    // Tick construction timers on ALL hexes (player-owned)
-    const LEGAL_BIZ_DEFS = BUILDABLE_BUSINESS_DEFS;
-    (state.hexMap || []).forEach(tile => {
-      if (tile.controllingFamily === state.playerFamily && tile.anchor && false) {
-        // Check unit presence on this hex
-        const hasCapo = units.some(u => 
-          u.family === state.playerFamily && u.type === 'capo' &&
-          u.q === tile.q && u.r === tile.r && u.s === tile.s
-        );
-        const hasSoldier = units.some(u => 
-          u.family === state.playerFamily && u.type === 'soldier' &&
-          u.q === tile.q && u.r === tile.r && u.s === tile.s
-        );
-
-        let progressIncrement = 0;
-        if (hasCapo) {
-          progressIncrement = 1.5; // 50% faster
-        } else if (hasSoldier) {
-          progressIncrement = 0.75; // 25% slower
-        }
-        // If no unit → paused (0 progress)
-
-        if (progressIncrement > 0) {
-          tile.anchor.constructionProgress = (tile.anchor.constructionProgress ?? 0) + progressIncrement;
-        }
-
-        if ((tile.anchor.constructionProgress ?? 0) >= tile.anchor.constructionGoal) {
-          const def = LEGAL_BIZ_DEFS[tile.anchor.type];
-          if (def) {
-            tile.anchor.tribute = def.income;
-            tile.anchor.launderingCapacity = def.launderingCapacity;
-          }
-          tile.anchor.constructionGoal = undefined;
-          tile.anchor.constructionProgress = undefined;
-          tile.anchor.turnsUntilComplete = undefined;
-          // One-off influence spike for completing a build (legal +3, illegal +2)
-          const influenceSpike = tile.anchor.isLegal ? 3 : 2;
-          state.resources.influence = Math.min(100, (state.resources.influence || 0) + influenceSpike);
-          state.reputation.streetInfluence = Math.round(state.resources.influence);
-          state.pendingNotifications = [...(state.pendingNotifications || []), {
-            type: 'success' as const, title: '🏢 Business Complete!',
-            message: `Your ${tile.anchor.type} is now operational and generating $${tile.anchor.tribute.toLocaleString()}/turn. +${influenceSpike} Influence — your new ${tile.anchor.isLegal ? 'legitimate front' : 'operation'} cements your standing in ${tile.district}.`,
-          }];
-        }
-      }
-    });
-    
     // Compute supply line connectivity (BFS from HQ)
     const connectedHexes = getConnectedTerritory(state.hexMap, state.playerFamily);
     const connectedNodeTypes = new Set<SupplyNodeType>();
@@ -5689,10 +5642,6 @@ export const useEnhancedMafiaGameState = (
     
     (state.hexMap || []).forEach(tile => {
       if (tile.controllingFamily === state.playerFamily && tile.anchor) {
-        // Skip businesses still under construction
-        if (false) {
-          return;
-        }
         const hasCapo = units.some(u => 
           u.family === state.playerFamily && u.type === 'capo' &&
           u.q === tile.q && u.r === tile.r && u.s === tile.s
