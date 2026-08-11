@@ -557,7 +557,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} onHighlightFamily={setHighlightedFamily} highlightedFamily={highlightedFamily} onSelectUnit={selectUnit} onOpenOutgoingSitdown={handleOpenOutgoingSitdown} onAcceptIncomingSitdown={handleAcceptIncomingSitdown} onDeclineIncomingSitdown={handleDeclineIncomingSitdown} onCounterIncomingSitdown={handleCounterIncomingSitdown} onJumpHex={(hex) => {
         const tile = (gameState.hexMap || []).find((t: any) => t.q === hex.q && t.r === hex.r && t.s === hex.s);
         if (tile) selectTerritory(tile);
-      }} onJumpUnit={(u) => selectUnit(u.type, { q: u.q, r: u.r, s: u.s })} />
+      }} onJumpUnit={(u) => selectUnit(u.type, { q: u.q, r: u.r, s: u.s })} onBuyDistrictUpgrade={buyDistrictUpgrade} />
     },
   ];
 
@@ -858,6 +858,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         if (tile) selectTerritory(tile);
       }}
       onJumpUnit={(u) => selectUnit(u.type, { q: u.q, r: u.r, s: u.s })}
+      onBuyDistrictUpgrade={buyDistrictUpgrade}
     />
   );
 

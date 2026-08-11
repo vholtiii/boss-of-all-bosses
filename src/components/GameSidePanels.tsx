@@ -43,7 +43,7 @@ import SitdownsPanel from '@/components/SitdownsPanel';
 import SupplyLedgerPanel from '@/components/SupplyLedgerPanel';
 import RivalComparisonStrip from '@/components/RivalComparisonStrip';
 import JustHappenedFeed from '@/components/JustHappenedFeed';
-import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType, SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, Safehouse, getTensionPairKey, WAR_TENSION_THRESHOLD, FAMILY_POWERS, PendingNegotiation, IncomingSitdown, COMMISSION_VOTE_COST, PROSECUTION_LAWYER_REDUCTION } from '@/types/game-mechanics';
+import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType, SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, Safehouse, getTensionPairKey, WAR_TENSION_THRESHOLD, FAMILY_POWERS, PendingNegotiation, IncomingSitdown, COMMISSION_VOTE_COST, PROSECUTION_LAWYER_REDUCTION, DISTRICT_UPGRADES, DISTRICT_UPGRADE_IDS, type DistrictUpgradeId } from '@/types/game-mechanics';
 import { computeCommissionVoteProjection } from '@/lib/action-formulas';
 import { computeLegalBreakdown } from '@/lib/legal-breakdown';
 import { previewRecruitMercenary, previewRecruitLocal, previewBuildBusiness, type ActionPreview } from '@/lib/action-previews';
