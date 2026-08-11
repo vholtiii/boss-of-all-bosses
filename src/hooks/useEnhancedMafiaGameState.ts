@@ -13120,6 +13120,8 @@ export const useEnhancedMafiaGameState = (
     startEscort,
     resolveEnemyHexAction,
     startBuild,
+    buyOutAnchor,
+
     setTilePolicy,
     buyDistrictUpgrade,
     loadGameState,
