@@ -75,6 +75,9 @@ export const migrations: Record<number, Migration> = {
       return { ...rest, buildings: { ...(t.buildings || {}), [track]: 1 } };
     }),
   }),
+};
+
+
 
 
 export interface MigrationResult {
