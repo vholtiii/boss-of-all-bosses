@@ -116,6 +116,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     startEscort,
     resolveEnemyHexAction,
     startBuild,
+    buyOutAnchor,
     setTilePolicy,
     buyDistrictUpgrade,
     loadGameState,
@@ -530,6 +531,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
             onStartBuild={startBuild}
+            onBuyOutAnchor={buyOutAnchor}
             onSetTilePolicy={setTilePolicy}
             planHitMode={planHitMode}
             planHitStep={planHitStep}
@@ -1851,6 +1853,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
             onStartBuild={startBuild}
+            onBuyOutAnchor={buyOutAnchor}
             onSetTilePolicy={setTilePolicy}
             planHitMode={planHitMode}
             planHitStep={planHitStep}

@@ -45,6 +45,7 @@ interface EnhancedMafiaHexGridProps {
   highlightedFamily?: string | null;
   onClearHighlight?: () => void;
   onStartBuild?: (q: number, r: number, s: number, type: BuildingType) => void;
+  onBuyOutAnchor?: (q: number, r: number, s: number) => void;
   onSetTilePolicy?: (q: number, r: number, s: number, policy: TilePolicy) => void;
 }
 
@@ -63,7 +64,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   width, height, onBusinessClick, selectedBusiness, playerFamily,
   gameState, onAction, onSelectUnit, onMoveUnit, onSelectHeadquarters,
   onSelectUnitFromHeadquarters, onDeployUnit, planHitMode, planHitStep, planHitPlannerId, onPlanHitSelect, onPlanHitSelectSoldier, onCancelPlanHit,
-  bossHighlightHex, highlightedFamily, onClearHighlight, onStartBuild, onSetTilePolicy
+  bossHighlightHex, highlightedFamily, onClearHighlight, onStartBuild, onBuyOutAnchor, onSetTilePolicy
 }, ref) => {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -2525,6 +2526,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
               gameState={gameState}
               playerFamily={playerFamily}
               onStartBuild={onStartBuild}
+              onBuyOutAnchor={onBuyOutAnchor}
               onSetTilePolicy={onSetTilePolicy}
             />
           )}
