@@ -795,7 +795,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                 )}
 
                 {/* Boss negotiate buttons */}
-                {turnPhase === 'action' && enemyFamilies.length > 0 && (
+                {turnPhase !== 'waiting' && enemyFamilies.length > 0 && (
                   <div className="space-y-1">
                     <p className="text-[10px] text-muted-foreground">Negotiate ceasefire or alliance:</p>
                     <div className="flex flex-wrap gap-1">
@@ -817,8 +817,8 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                     )}
                   </div>
                 )}
-                {turnPhase !== 'action' && (
-                  <p className="text-[10px] text-muted-foreground italic">Available during Action step</p>
+                {turnPhase === 'waiting' && (
+                  <p className="text-[10px] text-muted-foreground italic">Available on your turn</p>
                 )}
               </div>
             )}
@@ -828,7 +828,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
               (() => {
                 const onCooldown = sitdownCooldownUntil > currentTurn;
                 const cooldownLeft = sitdownCooldownUntil - currentTurn;
-                const isActionPhase = turnPhase === 'action';
+                const isActionPhase = turnPhase !== 'waiting';
                 const awayUnits = (deployedUnits || []).filter((u: any) =>
                   u.family === family &&
                   !(u.q === headquarters.q && u.r === headquarters.r && u.s === headquarters.s)
@@ -860,7 +860,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                        <p className="text-[10px] text-muted-foreground italic text-center">🔒 Unlocks in Phase 2</p>
                     )}
                     {!sitdownPhaseLocked && !isActionPhase && !sitdownOpen && (
-                       <p className="text-[10px] text-muted-foreground italic text-center">Available during Action step</p>
+                       <p className="text-[10px] text-muted-foreground italic text-center">Available on your turn</p>
                     )}
 
                     <AnimatePresence>
@@ -971,7 +971,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
             {/* Declare War — Boss Action (Phase 3+) */}
             {isPlayerFamily && onDeclareWar && (
               (() => {
-                const isActionPhase = turnPhase === 'action';
+                const isActionPhase = turnPhase !== 'waiting';
                 const playerWars = activeWars.filter(w => w.family1 === playerFamily || w.family2 === playerFamily).length;
                 const atMaxWars = playerWars >= WAR_MAX_SIMULTANEOUS;
                 const noActions = actionsRemaining <= 0;
@@ -992,7 +992,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                     >
                       ⚔️ Declare War (${ DECLARE_WAR_COST.toLocaleString()})
                     </Button>
-                    {!isActionPhase && <p className="text-[10px] text-muted-foreground italic text-center">Available during Action step</p>}
+                    {!isActionPhase && <p className="text-[10px] text-muted-foreground italic text-center">Available on your turn</p>}
                     {atMaxWars && isActionPhase && <p className="text-[10px] text-muted-foreground italic text-center">Max {WAR_MAX_SIMULTANEOUS} simultaneous wars</p>}
                     
                     <AnimatePresence>
@@ -1032,7 +1032,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
             {/* Go to the Mattresses — Boss Action */}
             {isPlayerFamily && onGoToMattresses && (
               (() => {
-                const isActionPhase = turnPhase === 'action';
+                const isActionPhase = turnPhase !== 'waiting';
                 const isActive = mattressesState?.active;
                 const onCooldown = mattressesCooldownUntil > currentTurn;
                 const cooldownLeft = mattressesCooldownUntil - currentTurn;
@@ -1064,7 +1064,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
             {/* War Summit — Boss Action */}
             {isPlayerFamily && onWarSummit && (
               (() => {
-                const isActionPhase = turnPhase === 'action';
+                const isActionPhase = turnPhase !== 'waiting';
                 const isActive = warSummitState?.active;
                 const onCooldown = warSummitCooldownUntil > currentTurn;
                 const cooldownLeft = warSummitCooldownUntil - currentTurn;
@@ -1096,7 +1096,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
             {/* Lay Low — Boss Action (free, punishing) */}
             {isPlayerFamily && onLayLow && (
               (() => {
-                const isActionPhase = turnPhase === 'action';
+                const isActionPhase = turnPhase !== 'waiting';
                 const isActive = layLowActiveUntil >= currentTurn;
                 const turnsLeft = isActive ? (layLowActiveUntil - currentTurn + 1) : 0;
                 const onCooldown = !isActive && layLowCooldownUntil > currentTurn;
@@ -1134,7 +1134,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                 return stats && (stats.suspicious || stats.confirmedRat);
               });
 
-              const isActionPhase = turnPhase === 'action';
+              const isActionPhase = turnPhase !== 'waiting';
               const noActions = actionsRemaining <= 0;
 
               return (
@@ -1200,7 +1200,7 @@ export const HeadquartersInfoPanel: React.FC<HeadquartersInfoPanelProps> = ({
                         </div>
                       </ScrollArea>
                       {!isActionPhase && (
-                        <p className="text-[9px] text-muted-foreground italic text-center">Available during Action step</p>
+                        <p className="text-[9px] text-muted-foreground italic text-center">Available on your turn</p>
                       )}
                       {isActionPhase && noActions && (
                         <p className="text-[9px] text-muted-foreground italic text-center">No actions remaining</p>

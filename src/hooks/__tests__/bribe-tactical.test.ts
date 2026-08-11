@@ -1,35 +1,34 @@
 /**
  * Regression coverage for the Corruption move to the Tactical step.
- *  1. Player: bribe_corruption requires tacticalActionsRemaining > 0.
+ *  1. Player: bribe_corruption requires actionsRemaining > 0.
  *  2. AI: warm-tier heat triggers an aiSpendOnHeatReduction within a few turns.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useEnhancedMafiaGameState } from "@/hooks/useEnhancedMafiaGameState";
 
-describe("bribe_corruption — tactical-step contract", () => {
-  it("rejects with a warning notification when tacticalActionsRemaining is 0", () => {
+describe("bribe_corruption — action-budget contract", () => {
+  it("rejects with a warning notification when actionsRemaining is 0", () => {
     const { result } = renderHook(() =>
       useEnhancedMafiaGameState("gambino", undefined, "normal", 1234, "small")
     );
 
-    act(() => result.current.advancePhase()); // deploy → tactical
     act(() => {
-      // Drain tactical budget and unlock phase gate.
-      (result.current.gameState as any).tacticalActionsRemaining = 0;
+      // Drain the action budget and unlock the phase gate.
+      (result.current.gameState as any).actionsRemaining = 0;
       (result.current.gameState as any).gamePhase = 2;
     });
 
     const moneyBefore = result.current.gameState.resources.money;
     const bribesBefore = (result.current.gameState.activeBribes || []).length;
-    expect(result.current.gameState.tacticalActionsRemaining).toBe(0);
+    expect(result.current.gameState.actionsRemaining).toBe(0);
 
     act(() => {
       result.current.performAction({ type: "bribe_corruption", tier: "patrol_officer" });
     });
 
     const notes = result.current.gameState.pendingNotifications || [];
-    const blocked = notes.find((n: any) => /Tactical Action/i.test(n.title || ""));
+    const blocked = notes.find((n: any) => /Action/i.test(n.title || ""));
     expect(blocked).toBeTruthy();
     expect(result.current.gameState.resources.money).toBe(moneyBefore);
     expect((result.current.gameState.activeBribes || []).length).toBe(bribesBefore);

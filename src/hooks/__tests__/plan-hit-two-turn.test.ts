@@ -53,10 +53,10 @@ describe("plan_hit — two-turn contract", () => {
         ...(s.scoutedHexes || []),
         { q: enemyTile.q, r: enemyTile.r, s: enemyTile.s, turnScouted: s.turn },
       ];
-      s.tacticalActionsRemaining = 3;
+      s.actionsRemaining = 3;
     });
 
-    const tacticalBefore = result.current.gameState.tacticalActionsRemaining;
+    const tacticalBefore = result.current.gameState.actionsRemaining;
     const actionsBefore = result.current.gameState.actionsRemaining;
 
     act(() => {
@@ -70,7 +70,7 @@ describe("plan_hit — two-turn contract", () => {
     const after: any = result.current.gameState;
     expect(after.plannedHit).toBeTruthy();
     expect(after.plannedHit.targetUnitId).toBe(enemyUnit.id);
-    expect(after.tacticalActionsRemaining).toBe(tacticalBefore - 1);
+    expect(after.actionsRemaining).toBe(tacticalBefore - 1);
     // MARK must NOT spend an action-step token
     expect(after.actionsRemaining).toBe(actionsBefore);
   });
@@ -130,15 +130,15 @@ describe("plan_hit — two-turn contract", () => {
         plannedOnTurn: s.turn,
         expiresOnTurn: s.turn + 3,
       };
-      s.tacticalActionsRemaining = 2;
+      s.actionsRemaining = 2;
     });
 
-    const tacticalBefore = result.current.gameState.tacticalActionsRemaining;
+    const tacticalBefore = result.current.gameState.actionsRemaining;
     act(() => result.current.performAction({ type: "cancel_planned_hit" }));
 
     const after: any = result.current.gameState;
     expect(after.plannedHit).toBeNull();
-    expect(after.tacticalActionsRemaining).toBe(tacticalBefore);
+    expect(after.actionsRemaining).toBe(tacticalBefore);
     const note = (after.pendingNotifications || []).find((n: any) =>
       /Plan Hit Cancelled/i.test(n.title || "")
     );
@@ -163,11 +163,11 @@ describe("plan_hit — two-turn contract", () => {
     expect(warn).toBeTruthy();
   });
 
-  it("cancel_planned_hit outside Tactical is rejected and keeps the plan", () => {
+  it("cancel_planned_hit is rejected while rivals are resolving and keeps the plan", () => {
     const { result } = setupGame();
     act(() => {
       const s: any = result.current.gameState;
-      s.turnPhase = "action";
+      s.turnPhase = "waiting";
       s.plannedHit = {
         q: 0, r: 0, s: 0,
         targetFamily: "lucchese",
@@ -182,7 +182,7 @@ describe("plan_hit — two-turn contract", () => {
     const after: any = result.current.gameState;
     expect(after.plannedHit).toBeTruthy();
     const warn = (after.pendingNotifications || []).find((n: any) =>
-      /Wrong Phase/i.test(n.title || "")
+      /Turn Resolving/i.test(n.title || "")
     );
     expect(warn).toBeTruthy();
   });

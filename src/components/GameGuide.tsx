@@ -66,7 +66,7 @@ const sections: GuideSection[] = [
             <span className="text-xs text-muted-foreground">— Combat, economy, diplomacy</span>
           </div>
         </div>
-        <Tip>Use "Skip to Action Phase" to jump straight to combat if no deployment needed.</Tip>
+        <Tip>One open turn: deploy, move, scout and strike in any order until your actions run out.</Tip>
       </div>
     ),
   },
@@ -289,7 +289,7 @@ const sections: GuideSection[] = [
     keywords: ['scout', 'fortify', 'safehouse', 'escort', 'recruit', 'tactical', 'action budget'],
     content: (
       <div className="space-y-3">
-        <p className="text-xs text-muted-foreground">3-action budget per turn during Tactical Phase:</p>
+        <p className="text-xs text-muted-foreground">Shared action budget per turn (base 3, plus bonuses):</p>
         <div className="space-y-1">
           <Stat label="🔍 Scout" value="Reveal enemy info (1-hex soldier, 2-hex capo)" />
           <Stat label="🏰 Fortify" value="+25% defense bonus, max 4 per family" />
@@ -365,7 +365,7 @@ const sections: GuideSection[] = [
           <Stat label="📢 War Summit" value="Rally allies for coordinated attack" />
         </div>
         <div className="space-y-1">
-          <p className="text-xs font-semibold">Family Powers (Tactical Phase):</p>
+          <p className="text-xs font-semibold">Family Powers (cost actions):</p>
           <Stat label="Each family" value="1 unique active ability" />
           <Stat label="👑 Colombo — Persico Succession" value="Active: click then select a soldier to instantly promote to Capo. One use per game." color="text-purple-400" />
         </div>

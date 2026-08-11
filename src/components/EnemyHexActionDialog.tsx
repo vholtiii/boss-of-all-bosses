@@ -93,7 +93,7 @@ const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({
   if (!open || !targetInfo) return null;
 
   const canSabotage = targetInfo.hasBusiness && playerMoney >= SABOTAGE_COST;
-  // "Plan Hit" is now a two-turn flow: MARK in Tactical step, EXECUTE in Action step.
+  // "Plan Hit" is a two-turn flow: MARK this turn, EXECUTE next turn.
   // The dialog only surfaces the EXECUTE option when a plannedHit already exists for this hex.
   const canExecutePlan = !!(targetInfo.planMatchesHere || targetInfo.planRelocatedHere);
   const familyName = targetInfo.controllingFamily.charAt(0).toUpperCase() + targetInfo.controllingFamily.slice(1);
@@ -225,7 +225,7 @@ const EnemyHexActionDialog: React.FC<EnemyHexActionProps> = ({
                 <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground flex items-start gap-2">
                   <Target className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 opacity-70" />
                   <span>
-                    To Plan Hit this target, mark it in the <strong className="text-foreground">Tactical step</strong>, then execute next turn's Action.
+                    To Plan Hit this target, mark it now with the Plan Hit action, then execute it next turn.
                   </span>
                 </div>
               )}
