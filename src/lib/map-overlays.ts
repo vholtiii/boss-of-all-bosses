@@ -96,7 +96,7 @@ export const isHexProtected = (state: any, hex: { q: number; r: number; s: numbe
   if (units.some(u => u.family === family && hexDistancePure(u, hex) <= EROSION_PROTECTION_RANGE)) return true;
   const hexMap: any[] = state.hexMap || [];
   if (hexMap.some(t =>
-    t.controllingFamily === family && t.anchor && !t.anchor.isExtorted &&
+    t.controllingFamily === family && !!t.buildings && Object.keys(t.buildings).length > 0 &&
     hexDistancePure(t, hex) <= EROSION_PROTECTION_RANGE)) return true;
   if (hexMap.some(t =>
     t.controllingFamily === family && t.supplyNode &&
@@ -192,9 +192,13 @@ export const computeMapOverlays = (state: any): MapOverlays => {
   });
   const disconnectedBusinesses = new Map<string, string[]>();
   playerHexes.forEach(t => {
-    if (!t.anchor) return;
-    const deps = SUPPLY_DEPENDENCIES[t.anchor.type];
-    if (!deps || deps.length === 0) return;
+    const earnerTypes: string[] = [
+      ...(t.anchor?.isExtorted ? [t.anchor.type] : []),
+      ...Object.keys(t.buildings || {}).filter(k => (t.buildings as any)[k]),
+    ];
+    if (!earnerTypes.length) return;
+    const deps = Array.from(new Set(earnerTypes.flatMap(bt => SUPPLY_DEPENDENCIES[bt] || [])));
+    if (!deps.length) return;
     const hasAccess = deps.some(dep => connectedNodeTypes.has(dep));
     if (!hasAccess) disconnectedBusinesses.set(hexKey(t.q, t.r, t.s), [...deps]);
   });

@@ -245,7 +245,7 @@ describe('map overlays', () => {
       // Enemy at war borders the chain tip
       { q: 3, r: 0, s: -3, controllingFamily: 'genovese', district: 'Manhattan' },
       // Business hex needing supply (no supply nodes anywhere → disconnected)
-      { q: 1, r: -1, s: 0, controllingFamily: 'gambino', district: 'Manhattan', business: { type: depBizType, income: 3000, isLegal: true } },
+      { q: 1, r: -1, s: 0, controllingFamily: 'gambino', district: 'Manhattan', buildings: { [depBizType]: 1 } },
       // Neutral expansion candidate adjacent to player
       { q: 0, r: 1, s: -1, controllingFamily: 'neutral', district: 'Manhattan' },
     ],
