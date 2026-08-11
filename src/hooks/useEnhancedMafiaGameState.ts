@@ -434,19 +434,11 @@ export interface HexTile {
   district: 'Little Italy' | 'Bronx' | 'Brooklyn' | 'Queens' | 'Manhattan' | 'Staten Island';
   terrain: 'urban' | 'industrial' | 'residential' | 'docks' | 'commercial';
   controllingFamily: 'neutral' | 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo';
-  business?: {
-    type: string;
-    income: number;
-    isLegal: boolean;
-    heatLevel: number;
-    launderingCapacity?: number;
-    turnsUntilComplete?: number;
-    constructionProgress?: number;
-    constructionGoal?: number;
-    isExtorted?: boolean;
-    seizurePenaltyTurns?: number;  // turns remaining at 50% income after rival seizes a player-built business
-    wasPlayerBuilt?: boolean;       // tracks that this was originally a player-built business (cleared when penalty expires)
-  };
+  /** Pre-placed lucrative racket. Extort it for tribute, buy it out to develop it. */
+  anchor?: AnchorRacket;
+  /** Turns remaining at 50% earnings after a rival seized this developed block. */
+  seizurePenaltyTurns?: number;
+
   isHeadquarters?: string;
   supplyNode?: SupplyNodeType;
   // Phase 3 influence system
