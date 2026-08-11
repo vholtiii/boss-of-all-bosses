@@ -5,7 +5,10 @@ import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
+import { businessSprite } from '@/lib/sprites';
 import SelectedUnitDock from '@/components/SelectedUnitDock';
+import TileDevelopmentPanel from '@/components/TileDevelopmentPanel';
+import type { BuildingType, TilePolicy } from '@/types/game-mechanics';
 import MapEffectsLayer from '@/components/MapEffectsLayer';
 import { useMapEffects } from '@/hooks/useMapEffects';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
@@ -41,6 +44,8 @@ interface EnhancedMafiaHexGridProps {
   bossHighlightHex?: { q: number; r: number; s: number } | null;
   highlightedFamily?: string | null;
   onClearHighlight?: () => void;
+  onStartBuild?: (q: number, r: number, s: number, type: BuildingType) => void;
+  onSetTilePolicy?: (q: number, r: number, s: number, policy: TilePolicy) => void;
 }
 
 const familyColors: Record<string, string> = FAMILY_COLORS;
@@ -58,7 +63,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   width, height, onBusinessClick, selectedBusiness, playerFamily,
   gameState, onAction, onSelectUnit, onMoveUnit, onSelectHeadquarters,
   onSelectUnitFromHeadquarters, onDeployUnit, planHitMode, planHitStep, planHitPlannerId, onPlanHitSelect, onPlanHitSelectSoldier, onCancelPlanHit,
-  bossHighlightHex, highlightedFamily, onClearHighlight
+  bossHighlightHex, highlightedFamily, onClearHighlight, onStartBuild, onSetTilePolicy
 }, ref) => {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -823,6 +828,11 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         >
           {/* 1920s city-block terrain patterns (sepia palette, drawn once, tiled per hex) */}
           <defs>
+            <radialGradient id="tile-shade" cx="42%" cy="34%" r="72%">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.10" />
+              <stop offset="55%" stopColor="#000000" stopOpacity="0.05" />
+              <stop offset="100%" stopColor="#000000" stopOpacity="0.42" />
+            </radialGradient>
             {/* Urban: dense rooftops with tar seams */}
             <pattern id="terrain-urban" width="14" height="14" patternUnits="userSpaceOnUse">
               <rect width="14" height="14" fill={TERRAIN_FILLS.urban} />
@@ -1070,6 +1080,13 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                           stroke="none"
                           className="pointer-events-none"
                         />
+                        {/* Painterly shade — lamplight from upper-left, deep block shadow at the rim */}
+                        <polygon
+                          points={getHexPoints(x, y, baseHexRadius)}
+                          fill="url(#tile-shade)"
+                          stroke="none"
+                          className="pointer-events-none"
+                        />
                         {/* Family control ink-wash tint + interactive layer */}
                         <polygon
                           points={getHexPoints(x, y, baseHexRadius)}
@@ -1231,10 +1248,38 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                     </text>
                   )}
 
-                  {/* Business/HQ icon */}
-                  <text x={x} y={y + (tile.business && !tile.isHeadquarters ? 1 : 5)} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">
-                    {tile.isHeadquarters ? '🏛️' : tile.business ? (tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal ? '🚧' : (businessIcons[tile.business.type] || '🏢')) : ''}
-                  </text>
+                  {/* Business/HQ sprite */}
+                  {(() => {
+                    const underConstruction = !!tile.business?.constructionGoal && (tile.business!.constructionProgress ?? 0) < tile.business!.constructionGoal!;
+                    if (tile.isHeadquarters) {
+                      return (
+                        <text x={x} y={y + 5} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">🏛️</text>
+                      );
+                    }
+                    if (!tile.business) return null;
+                    if (underConstruction) {
+                      return (
+                        <text x={x} y={y + 1} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">🚧</text>
+                      );
+                    }
+                    const sprite = businessSprite(tile.business.type);
+                    if (!sprite) return null;
+                    return (
+                      <g className="pointer-events-none select-none">
+                        <ellipse cx={x} cy={y + 12} rx="15" ry="4.5" fill="#000000" opacity="0.4" />
+                        <image
+                          href={sprite}
+                          x={x - 22}
+                          y={y - 22}
+                          width={44}
+                          height={38}
+                          preserveAspectRatio="xMidYMax meet"
+                          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.65))' }}
+                        />
+                      </g>
+                    );
+                  })()}
+
                   {/* Construction progress label */}
                   {tile.business && tile.business.constructionGoal && (tile.business.constructionProgress ?? 0) < tile.business.constructionGoal && !tile.isHeadquarters && (() => {
                     const hexKey = `${tile.q},${tile.r},${tile.s}`;
@@ -1669,6 +1714,49 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                 </g>
               );
             })}
+
+            {/* ═══ TERRITORY BORDERS — thick brass-edged outlines on owner boundaries ═══ */}
+            {(() => {
+              const centerKey = (px: number, py: number) => `${Math.round(px)}|${Math.round(py)}`;
+              const ownerAt = new Map<string, string | null>();
+              hexMap.forEach(t => {
+                const { x, y } = getHexPosition(t.q, t.r);
+                ownerAt.set(centerKey(x, y), t.controllingFamily || null);
+              });
+              const segs: { d: string; color: string; key: string }[] = [];
+              hexMap.forEach(t => {
+                const owner = t.controllingFamily;
+                if (!owner) return;
+                const { x, y } = getHexPosition(t.q, t.r);
+                const R = baseHexRadius;
+                for (let i = 0; i < 6; i++) {
+                  const a1 = (Math.PI / 3) * i;
+                  const a2 = (Math.PI / 3) * (i + 1);
+                  const x1 = x + R * Math.cos(a1), y1 = y + R * Math.sin(a1);
+                  const x2 = x + R * Math.cos(a2), y2 = y + R * Math.sin(a2);
+                  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+                  const nx = x + (mx - x) * 2, ny = y + (my - y) * 2;
+                  const neighborOwner = ownerAt.get(centerKey(nx, ny));
+                  if (neighborOwner === owner) continue;
+                  segs.push({
+                    d: `M ${x1} ${y1} L ${x2} ${y2}`,
+                    color: familyColors[owner] || '#D4AF37',
+                    key: `${t.q},${t.r},${t.s}-${i}`,
+                  });
+                }
+              });
+              return (
+                <g className="pointer-events-none">
+                  {segs.map(s => (
+                    <path key={`tb-shadow-${s.key}`} d={s.d} stroke="#0a0a0a" strokeWidth="4.5" strokeOpacity="0.55" strokeLinecap="round" fill="none" />
+                  ))}
+                  {segs.map(s => (
+                    <path key={`tb-${s.key}`} d={s.d} stroke={s.color} strokeWidth="2.6" strokeOpacity="0.95" strokeLinecap="round" fill="none" />
+                  ))}
+                </g>
+              );
+            })()}
+
 
             {/* ═══ STRATEGIC OVERLAYS (war fronts, vulnerability, supply support) ═══ */}
             {showThreats && overlays && (
@@ -2447,6 +2535,20 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           gameState={gameState}
           playerFamily={playerFamily}
         />
+
+        {/* Block development — owned hexes only */}
+        <AnimatePresence>
+          {pinnedHex && pinnedHex.controllingFamily === playerFamily && (
+            <TileDevelopmentPanel
+              key={`dev-${pinnedHex.q},${pinnedHex.r},${pinnedHex.s}`}
+              tile={(gameState?.hexMap || []).find((t: HexTile) => t.q === pinnedHex.q && t.r === pinnedHex.r && t.s === pinnedHex.s) || pinnedHex}
+              gameState={gameState}
+              playerFamily={playerFamily}
+              onStartBuild={onStartBuild}
+              onSetTilePolicy={onSetTilePolicy}
+            />
+          )}
+        </AnimatePresence>
 
         {/* Hover Info */}
         <AnimatePresence>

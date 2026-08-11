@@ -1,10 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import capoGambino from '@/assets/units/capo-gambino.png';
-import capoGenovese from '@/assets/units/capo-genovese.png';
-import capoLucchese from '@/assets/units/capo-lucchese.png';
-import capoBonanno from '@/assets/units/capo-bonanno.png';
-import capoColombo from '@/assets/units/capo-colombo.png';
+import { UNIT_SPRITES } from '@/lib/sprites';
 
 interface CapoIconProps {
   x: number;
@@ -22,20 +18,13 @@ import { FAMILY_COLORS } from '@/lib/period-theme';
 
 const familyColors = FAMILY_COLORS;
 
-const capoImages = {
-  gambino: capoGambino,
-  genovese: capoGenovese,
-  lucchese: capoLucchese,
-  bonanno: capoBonanno,
-  colombo: capoColombo,
-};
 
 const CapoIcon: React.FC<CapoIconProps> = ({
   x, y, family, name, level, isPlayerFamily = false, selected = false, wounded = false, onClick
 }) => {
   const familyColor = familyColors[family];
-  const capoImg = capoImages[family];
-  const size = 34;
+  const capoImg = UNIT_SPRITES.capo;
+  const size = 36;
 
   // Deterministic 0..1 phase offset per capo so stacks don't pulse in lockstep
   let h = 0;
@@ -60,15 +49,17 @@ const CapoIcon: React.FC<CapoIconProps> = ({
       {/* Selected pulse ring */}
       {selected && (
         <motion.circle
-          cx={x} cy={y + 2} r={size / 2 + 8}
+          cx={x} cy={y + 8} r={size / 2 + 8}
           fill="none" stroke="#FFD700" strokeWidth="2.5"
           animate={{ r: [size / 2 + 6, size / 2 + 11, size / 2 + 6], opacity: [1, 0.4, 1] }}
           transition={{ duration: 1.2, repeat: Infinity }}
         />
       )}
 
-      {/* Family color glow */}
-      <circle cx={x} cy={y + 2} r={size / 2 + 3} fill={familyColor} opacity={selected ? 0.5 : 0.3} />
+      {/* Ground shadow */}
+      <ellipse cx={x} cy={y + 11} rx={size * 0.40} ry={size * 0.15} fill="#000000" opacity="0.5" />
+      {/* Family base disc */}
+      <ellipse cx={x} cy={y + 11} rx={size * 0.33} ry={size * 0.12} fill={familyColor} opacity={selected ? 0.95 : 0.8} stroke="#0a0a0a" strokeWidth="0.75" />
 
       {/* Capo figure image with idle presence */}
       <motion.g
@@ -79,18 +70,18 @@ const CapoIcon: React.FC<CapoIconProps> = ({
         <image
           href={capoImg}
           x={x - size / 2}
-          y={y - size / 2 - 6}
+          y={y - size * 0.94}
           width={size}
-          height={size * 1.4}
+          height={size * 1.25}
           preserveAspectRatio="xMidYMid meet"
-          style={{ filter: `drop-shadow(0 0 ${selected ? '8' : '4'}px ${selected ? '#FFD700' : familyColor})` }}
+          style={{ filter: selected ? 'drop-shadow(0 0 8px #FFD700)' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.75))' }}
         />
       </motion.g>
 
 
       {/* Player family gold ring */}
       {isPlayerFamily && !selected && (
-        <circle cx={x} cy={y + 2} r={size / 2 + 5} fill="none" stroke="#D4AF37" strokeWidth="2.25" opacity="0.85" />
+        <ellipse cx={x} cy={y + 11} rx={size * 0.42} ry={size * 0.16} fill="none" stroke="#D4AF37" strokeWidth="1.5" opacity="0.9" />
       )}
 
       {/* Level badge */}

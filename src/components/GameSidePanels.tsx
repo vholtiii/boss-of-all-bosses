@@ -43,7 +43,7 @@ import SitdownsPanel from '@/components/SitdownsPanel';
 import SupplyLedgerPanel from '@/components/SupplyLedgerPanel';
 import RivalComparisonStrip from '@/components/RivalComparisonStrip';
 import JustHappenedFeed from '@/components/JustHappenedFeed';
-import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType, SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, Safehouse, getTensionPairKey, WAR_TENSION_THRESHOLD, FAMILY_POWERS, PendingNegotiation, IncomingSitdown, COMMISSION_VOTE_COST, PROSECUTION_LAWYER_REDUCTION } from '@/types/game-mechanics';
+import { SOLDIER_COST, LOCAL_SOLDIER_COST, RECRUIT_TERRITORY_REQUIREMENT, CAPO_COST, PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_RELOCATED_BONUS, PLAN_HIT_RELOCATED_HEAT, PLAN_HIT_COOLDOWN, SUPPLY_NODE_CONFIG, SUPPLY_DEPENDENCIES, SUPPLY_DECAY_FLOOR, SUPPLY_STOCKPILE_BUFFER, SupplyNodeType, SAFEHOUSE_MAX_STOCKPILE, SAFEHOUSE_MAX_ALLOCATION, Safehouse, getTensionPairKey, WAR_TENSION_THRESHOLD, FAMILY_POWERS, PendingNegotiation, IncomingSitdown, COMMISSION_VOTE_COST, PROSECUTION_LAWYER_REDUCTION, DISTRICT_UPGRADES, DISTRICT_UPGRADE_IDS, type DistrictUpgradeId } from '@/types/game-mechanics';
 import { computeCommissionVoteProjection } from '@/lib/action-formulas';
 import { computeLegalBreakdown } from '@/lib/legal-breakdown';
 import { previewRecruitMercenary, previewRecruitLocal, previewBuildBusiness, type ActionPreview } from '@/lib/action-previews';
@@ -1437,7 +1437,8 @@ export const RightSidePanel: React.FC<{
   onFocusHex?: (q: number, r: number, s: number) => void;
   onJumpHex?: (hex: { q: number; r: number; s: number }) => void;
   onJumpUnit?: (unit: { type: 'soldier' | 'capo'; q: number; r: number; s: number }) => void;
-}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily, onSelectUnit, onOpenOutgoingSitdown, onAcceptIncomingSitdown, onDeclineIncomingSitdown, onCounterIncomingSitdown, onFocusHex, onJumpHex, onJumpUnit }) => {
+  onBuyDistrictUpgrade?: (id: DistrictUpgradeId) => void;
+}> = ({ gameState, onEventChoice, onAction, onHighlightSupplyNode, highlightedSupplyHex, onHighlightFamily, highlightedFamily, onSelectUnit, onOpenOutgoingSitdown, onAcceptIncomingSitdown, onDeclineIncomingSitdown, onCounterIncomingSitdown, onFocusHex, onJumpHex, onJumpUnit, onBuyDistrictUpgrade }) => {
   const [openSection, setOpenSection] = useState<string>('');
   const { playSound } = useSoundSystem();
   const toggle = (id: string) => {
@@ -1659,6 +1660,60 @@ export const RightSidePanel: React.FC<{
             />
           </CollapsibleSection>
         )}
+
+        {/* ── District Upgrades ── */}
+        <CollapsibleSection
+          title="District Upgrades"
+          icon={<Building2 className="h-4 w-4" />}
+          isOpen={openSection === 'districtUpgrades'}
+          onToggle={() => toggle('districtUpgrades')}
+        >
+          <div className="space-y-1.5">
+            {(() => {
+              const owned: string[] = (gameState as any).districtUpgrades || [];
+              const hexes = gameState.hexMap || [];
+              let best = 0;
+              new Set(hexes.map((t: any) => t.district)).forEach((d: any) => {
+                const all = hexes.filter((t: any) => t.district === d);
+                if (!all.length) return;
+                const mine = all.filter((t: any) => t.controllingFamily === gameState.playerFamily).length;
+                best = Math.max(best, mine / all.length);
+              });
+              return DISTRICT_UPGRADE_IDS.map(id => {
+                const def = DISTRICT_UPGRADES[id];
+                const has = owned.includes(id);
+                const canControl = best >= def.requiredControl;
+                const canAfford = (gameState.resources?.money || 0) >= def.cost;
+                return (
+                  <div key={id} className="rounded border border-border p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-foreground">{def.label}</span>
+                      {has ? (
+                        <span className="text-[10px] text-green-400">Owned</span>
+                      ) : (
+                        <span className="text-[10px] text-mafia-gold">${def.cost.toLocaleString()}</span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">{def.blurb}</p>
+                    {!has && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!canControl || !canAfford}
+                        onClick={() => onBuyDistrictUpgrade?.(id)}
+                        className="mt-1.5 h-7 w-full text-[11px]"
+                      >
+                        {!canControl
+                          ? `Needs ${Math.round(def.requiredControl * 100)}% of a district (best ${Math.round(best * 100)}%)`
+                          : !canAfford ? 'Not enough cash' : 'Buy'}
+                      </Button>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        </CollapsibleSection>
 
         {/* ── Businesses ── */}
         {gameState.businesses.length > 0 && (

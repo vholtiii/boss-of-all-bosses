@@ -1,3 +1,4 @@
+import { CREST_SPRITES } from '@/lib/sprites';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import mafiaSitdownBg from '@/assets/mafia-sitdown-bg.png';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -139,71 +140,18 @@ export const FAMILIES: FamilyInfo[] = [
   },
 ];
 
-// --- Family Crests (inline SVGs) ---
-const FamilyCrest: React.FC<{ familyId: FamilyId; color: string; size?: number }> = React.memo(({ familyId, color, size = 32 }) => {
-  const s = size;
-  const crests: Record<FamilyId, React.ReactNode> = {
-    gambino: (
-      // Crown with dollar sign
-      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
-        <path d="M6 22L8 10L12 16L16 8L20 16L24 10L26 22H6Z" stroke={color} strokeWidth="1.5" fill={color + '20'} />
-        <circle cx="8" cy="10" r="2" fill={color} />
-        <circle cx="16" cy="8" r="2" fill={color} />
-        <circle cx="24" cy="10" r="2" fill={color} />
-        <text x="16" y="20" textAnchor="middle" fontSize="8" fontWeight="bold" fill={color}>$</text>
-        <line x1="6" y1="24" x2="26" y2="24" stroke={color} strokeWidth="1.5" />
-      </svg>
-    ),
-    genovese: (
-      // Eye with serpent
-      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
-        <ellipse cx="16" cy="16" rx="12" ry="7" stroke={color} strokeWidth="1.5" fill={color + '10'} />
-        <circle cx="16" cy="16" r="3.5" fill={color} opacity="0.8" />
-        <circle cx="16" cy="16" r="1.5" fill="black" />
-        <path d="M4 16C4 16 8 9 16 9C24 9 28 16 28 16" stroke={color} strokeWidth="1.2" fill="none" />
-        <path d="M4 16C4 16 8 23 16 23C24 23 28 16 28 16" stroke={color} strokeWidth="1.2" fill="none" />
-        <path d="M26 11C28 9 30 10 29 12" stroke={color} strokeWidth="1" opacity="0.6" />
-      </svg>
-    ),
-    lucchese: (
-      // Crossed keys
-      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
-        <line x1="8" y1="8" x2="24" y2="24" stroke={color} strokeWidth="1.5" />
-        <line x1="24" y1="8" x2="8" y2="24" stroke={color} strokeWidth="1.5" />
-        <circle cx="8" cy="8" r="3" stroke={color} strokeWidth="1.5" fill={color + '15'} />
-        <circle cx="24" cy="8" r="3" stroke={color} strokeWidth="1.5" fill={color + '15'} />
-        <line x1="20" y1="20" x2="22" y2="18" stroke={color} strokeWidth="1.2" />
-        <line x1="20" y1="20" x2="18" y2="18" stroke={color} strokeWidth="1.2" />
-        <line x1="12" y1="20" x2="14" y2="18" stroke={color} strokeWidth="1.2" />
-        <line x1="12" y1="20" x2="10" y2="18" stroke={color} strokeWidth="1.2" />
-      </svg>
-    ),
-    bonanno: (
-      // Shield with fist
-      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
-        <path d="M16 4L6 8V18C6 23 10 27 16 28C22 27 26 23 26 18V8L16 4Z" stroke={color} strokeWidth="1.5" fill={color + '12'} />
-        <path d="M13 14H19V17C19 17 19 20 16 20C13 20 13 17 13 17V14Z" fill={color} opacity="0.7" />
-        <line x1="14" y1="14" x2="14" y2="12" stroke={color} strokeWidth="1.2" />
-        <line x1="16" y1="14" x2="16" y2="11" stroke={color} strokeWidth="1.2" />
-        <line x1="18" y1="14" x2="18" y2="12" stroke={color} strokeWidth="1.2" />
-      </svg>
-    ),
-    colombo: (
-      // Crossed swords with skull
-      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
-        <line x1="6" y1="6" x2="26" y2="26" stroke={color} strokeWidth="1.5" />
-        <line x1="26" y1="6" x2="6" y2="26" stroke={color} strokeWidth="1.5" />
-        <polygon points="6,6 4,8 8,8" fill={color} />
-        <polygon points="26,6 24,8 28,8" fill={color} />
-        <circle cx="16" cy="15" r="4" stroke={color} strokeWidth="1.2" fill={color + '15'} />
-        <circle cx="14.5" cy="14" r="1" fill={color} />
-        <circle cx="17.5" cy="14" r="1" fill={color} />
-        <path d="M14 17.5C14 17.5 15 18.5 16 17.5C17 18.5 18 17.5 18 17.5" stroke={color} strokeWidth="0.8" fill="none" />
-      </svg>
-    ),
-  };
-  return <>{crests[familyId]}</>;
-});
+// --- Family Crests (painted sprite pack) ---
+const FamilyCrest: React.FC<{ familyId: FamilyId; color: string; size?: number }> = React.memo(({ familyId, color, size = 32 }) => (
+  <img
+    src={CREST_SPRITES[familyId]}
+    alt={`${familyId} family crest`}
+    width={size}
+    height={size}
+    className="select-none object-contain"
+    style={{ width: size, height: size, filter: `drop-shadow(0 1px 3px rgba(0,0,0,0.7)) drop-shadow(0 0 6px ${color}55)` }}
+    loading="lazy"
+  />
+));
 FamilyCrest.displayName = 'FamilyCrest';
 
 // Industrial stat bar

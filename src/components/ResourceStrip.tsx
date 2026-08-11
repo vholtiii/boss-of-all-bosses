@@ -75,7 +75,7 @@ const ResourceStrip: React.FC<Props> = ({ turn, values, lastTurnIncome, supplySn
   }, [turn]);
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-background/40 border border-noir-light/60 backdrop-blur-sm">
+    <div className="panel-noir flex items-center gap-1 px-2 py-1 rounded-lg backdrop-blur-sm">
       {ITEMS.map((item, i) => {
         const v = values[item.key] ?? 0;
         const p = prev[item.key] ?? v;

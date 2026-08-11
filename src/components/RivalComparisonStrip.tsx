@@ -66,9 +66,9 @@ const RivalComparisonStrip: React.FC<Props> = ({ gameState, highlightedFamily, o
   if (rows.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-border bg-card/60 p-2.5 space-y-1.5">
+    <div className="panel-noir rounded-lg p-2.5 space-y-1.5">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="label-caps text-[10px] text-muted-foreground">
           At a Glance
         </p>
         <p className="text-[9px] text-muted-foreground/60 italic">vs current leader</p>

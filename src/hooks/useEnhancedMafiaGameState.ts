@@ -21,6 +21,10 @@ import {
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType, NegotiationScope, PERSONALITY_BONUSES,
   NEGOTIATION_TYPES, NEGOTIATION_REFUND_RATE, ShareProfitsPact, SafePassagePact, SupplyDealPact,
   ScoutedHex, Safehouse, MoveAction, PlannedHit, PendingNegotiation,
+  BuildingType, BuildingTier, TilePolicy, DistrictUpgradeId,
+  BUILDING_DEFS, BUILDING_TYPES, MAX_BUILDING_TIER, TILE_POLICIES, DEFAULT_TILE_POLICY,
+  RECRUIT_PROGRESS_GOAL, RECRUIT_PROGRESS_PER_INFRA, DISTRICT_UPGRADES,
+  TURF_TAX_PER_HEX, EMPTY_BLOCK_OVERHEAD, garrisonShare, tileBuildingTotals,
   FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, MAX_FORTIFICATIONS, FortifiedHex, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
   SAFEHOUSE_COST, SAFEHOUSE_DEFENSE_BONUS, SAFEHOUSE_CAPTURE_BOUNTY, SAFEHOUSE_CAPTURE_INTEL_DURATION, SAFEHOUSE_TERRITORY_THRESHOLD, MAX_SAFEHOUSES,
   PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_FAIL_REPUTATION, PLAN_HIT_FAIL_LOYALTY,
@@ -452,6 +456,15 @@ export interface HexTile {
   // A1: Pending claim — tile is "contested" by a family but not finalized.
   // Does not count toward victory, district control, or income until finalized.
   pendingClaim?: { family: string; sinceTurn: number };
+  // === Tile development layer ===
+  /** Built buildings on this block: type -> tier (1..3). */
+  buildings?: Partial<Record<BuildingType, BuildingTier>>;
+  /** In-progress build/upgrade order. */
+  build?: { type: BuildingType; tier: BuildingTier; monthsRemaining: number };
+  /** Standing order for this block. */
+  policy?: TilePolicy;
+  /** Accumulated crew growth (0..RECRUIT_PROGRESS_GOAL). */
+  recruitProgress?: number;
 }
 
 export type TurnPhase = 'deploy' | 'move' | 'action' | 'waiting';
@@ -557,6 +570,8 @@ export interface EnhancedMafiaGameState {
   victoryType: VictoryType;
   familyBonuses: FamilyBonuses;
   lastTurnIncome: number;
+  /** Global district upgrades the player has purchased. */
+  districtUpgrades: DistrictUpgradeId[];
   pendingNotifications: Array<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; message?: string }>;
   alertsLog: AlertEntry[];
   alertsLastSeenTurn?: number;
@@ -1334,6 +1349,7 @@ export const createInitialGameState = (
     aiVictor: null,
     familyBonuses: bonuses,
     lastTurnIncome: 0,
+    districtUpgrades: [],
     pendingNotifications: [],
     alertsLog: [],
     alertsLastSeenTurn: 0,
@@ -5677,18 +5693,18 @@ export const useEnhancedMafiaGameState = (
           u.q === tile.q && u.r === tile.r && u.s === tile.s
         );
         
-        let tileIncome = 0;
+        // ── Garrison share: who is standing on the block decides what it earns ──
+        const soldiersHere = units.filter(u =>
+          u.family === state.playerFamily && u.type === 'soldier' &&
+          u.q === tile.q && u.r === tile.r && u.s === tile.s
+        ).length;
         const isPlayerBuilt = !tile.business.isExtorted && tile.controllingFamily === state.playerFamily;
-        if (isPlayerBuilt) {
-          // Player-built businesses earn 100% regardless of unit presence
-          tileIncome = tile.business.income;
-        } else if (hasCapo) {
-          tileIncome = tile.business.income; // 100%
-        } else if (hasSoldier) {
-          tileIncome = Math.floor(tile.business.income * 0.3); // 30%
-        } else {
-          tileIncome = Math.floor(tile.business.income * 0.1); // 10% passive
-        }
+        const share = isPlayerBuilt ? 1 : garrisonShare(hasCapo, soldiersHere);
+        let tileIncome = Math.floor(tile.business.income * share);
+
+        // ── Tile policy (Earn / Muscle Up / Lay Low / Fortify Up) ──
+        const tilePolicyDef = TILE_POLICIES[(tile.policy || DEFAULT_TILE_POLICY) as TilePolicy];
+        tileIncome = Math.floor(tileIncome * tilePolicyDef.incomeMult);
 
         // Apply family bonuses
         if (bonuses.businessIncome > 0) tileIncome = Math.floor(tileIncome * (1 + bonuses.businessIncome / 100));
@@ -5750,6 +5766,102 @@ export const useEnhancedMafiaGameState = (
       }
     });
 
+    // ══════════════════════════════════════════════════════════
+    // TILE DEVELOPMENT — build orders, building income, crew growth
+    // ══════════════════════════════════════════════════════════
+    const upgrades = state.districtUpgrades || [];
+    const hasSupplyRoutes = upgrades.includes('supply_routes');
+    const hasLocalMuscle = upgrades.includes('local_muscle');
+    const hasGoodwill = upgrades.includes('community_goodwill');
+    const hasPolitics = upgrades.includes('political_connections');
+
+    let buildingIncome = 0;
+    let buildingHeat = 0;
+    let recruitsSpawned = 0;
+
+    (state.hexMap || []).forEach(tile => {
+      if (tile.controllingFamily !== state.playerFamily) return;
+
+      // 1) advance any build order
+      if (tile.build) {
+        tile.build = { ...tile.build, monthsRemaining: tile.build.monthsRemaining - 1 };
+        if (tile.build.monthsRemaining <= 0) {
+          const { type, tier } = tile.build;
+          tile.buildings = { ...(tile.buildings || {}), [type]: tier };
+          tile.build = undefined;
+          const def = BUILDING_DEFS[type].tiers[tier];
+          state.pendingNotifications = [...(state.pendingNotifications || []), {
+            type: 'success' as const,
+            title: `🏗️ ${def.name} Opened`,
+            message: `${BUILDING_DEFS[type].label} tier ${tier} is running in ${tile.district}. +$${def.income.toLocaleString()}/month before garrison share.`,
+          }];
+          if (turnReport) turnReport.events.push(`🏗️ ${def.name} opened in ${tile.district}`);
+        }
+      }
+
+      const totals = tileBuildingTotals(tile.buildings);
+      if (totals.income === 0 && totals.infra === 0) return;
+
+      const policyDef = TILE_POLICIES[(tile.policy || DEFAULT_TILE_POLICY) as TilePolicy];
+      const capoHere = units.some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+      const soldierCount = units.filter(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
+
+      // 2) income from built tiers, garrison-shared and policy-adjusted
+      let earned = Math.floor(totals.income * garrisonShare(capoHere, soldierCount) * policyDef.incomeMult);
+      if (hasSupplyRoutes) earned = Math.floor(earned * 1.1);
+      buildingIncome += earned;
+      buildingHeat += totals.heat * policyDef.heatMult;
+
+      // 3) crew growth
+      let growth = totals.infra * RECRUIT_PROGRESS_PER_INFRA * policyDef.growthMult;
+      if (hasLocalMuscle) growth *= 1.25;
+      const progress = (tile.recruitProgress || 0) + growth;
+      if (progress >= RECRUIT_PROGRESS_GOAL) {
+        tile.recruitProgress = progress - RECRUIT_PROGRESS_GOAL;
+        recruitsSpawned += 1;
+      } else {
+        tile.recruitProgress = progress;
+      }
+    });
+
+    if (buildingIncome > 0) {
+      income += buildingIncome;
+      illegalIncome += buildingIncome;
+      if (turnReport?.hexIncome) {
+        // building income is already attributed per tile in the loop above
+      }
+    }
+    if (buildingHeat > 0) applyPlayerHeat(state, Math.round(buildingHeat));
+    if (hasGoodwill && state.policeHeat) {
+      state.policeHeat.level = Math.max(0, (state.policeHeat.level || 0) - 2);
+    }
+    if (hasPolitics) {
+      state.resources.influence = Math.min(100, (state.resources.influence || 0) + 2);
+    }
+    if (recruitsSpawned > 0) {
+      state.resources.soldiers += recruitsSpawned;
+      state.pendingNotifications = [...(state.pendingNotifications || []), {
+        type: 'success' as const,
+        title: `👥 ${recruitsSpawned} New ${recruitsSpawned === 1 ? 'Recruit' : 'Recruits'}`,
+        message: `Your blocks turned out ${recruitsSpawned} fresh ${recruitsSpawned === 1 ? 'soldier' : 'soldiers'} this month. Deploy them from the HQ.`,
+      }];
+      if (turnReport) turnReport.events.push(`👥 ${recruitsSpawned} soldier(s) came up through the neighborhood`);
+    }
+
+    // Turf tax — every block you hold inside a district you dominate pays tribute
+    const dominatedDistricts = new Set(
+      (state.activeDistrictBonuses || []).filter(b => b.family === state.playerFamily).map(b => b.district)
+    );
+    let turfTaxIncome = 0;
+    if (dominatedDistricts.size > 0) {
+      const taxedHexes = (state.hexMap || []).filter(t => t.controllingFamily === state.playerFamily && dominatedDistricts.has(t.district)).length;
+      turfTaxIncome = taxedHexes * TURF_TAX_PER_HEX;
+      income += turfTaxIncome;
+      legalIncome += turfTaxIncome;
+    }
+    (state as any)._turfTaxIncome = turfTaxIncome;
+    (state as any)._buildingIncome = buildingIncome;
+
     // Share Profits pact income — earn 30% of target hex's income
     let shareProfitsIncome = 0;
     (state.shareProfitsPacts || []).filter(p => p.active).forEach(pact => {
@@ -5785,10 +5897,16 @@ export const useEnhancedMafiaGameState = (
     const soldierMaintenance = playerSoldiers.length * SOLDIER_MAINTENANCE;
 
     // Community upkeep — $150/turn for each empty claimed hex (neighborhood expenses)
-    const communityHexCount = (state.hexMap || []).filter(tile =>
-      tile.controllingFamily === state.playerFamily && !tile.business && !tile.isHeadquarters
-    ).length;
-    const communityUpkeep = communityHexCount * 150;
+    const communityHexCount = (state.hexMap || []).filter(tile => {
+      if (tile.controllingFamily !== state.playerFamily) return false;
+      if (tile.isHeadquarters || tile.business) return false;
+      if (tile.buildings && Object.keys(tile.buildings).length > 0) return false;
+      const garrisoned = state.deployedUnits.some(u =>
+        u.family === state.playerFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s
+      );
+      return !garrisoned;
+    }).length;
+    const communityUpkeep = communityHexCount * EMPTY_BLOCK_OVERHEAD;
 
     // Store gross income before penalties
     let grossIncome = income;
@@ -12870,6 +12988,91 @@ export const useEnhancedMafiaGameState = (
     }));
   }, []);
 
+  // ============ TILE DEVELOPMENT ACTIONS ============
+  /** Queue a build/upgrade order on an owned block. Costs 1 action + cash. */
+  const startBuild = useCallback((q: number, r: number, s: number, type: BuildingType) => {
+    setGameState(prev => {
+      const state: EnhancedMafiaGameState = JSON.parse(JSON.stringify(prev));
+      const tile = state.hexMap.find(t => t.q === q && t.r === r && t.s === s);
+      const notify = (title: string, message: string, type2: 'warning' | 'success' = 'warning') => {
+        state.pendingNotifications = [...(state.pendingNotifications || []), { type: type2, title, message }];
+      };
+      if (!tile || tile.controllingFamily !== state.playerFamily) {
+        notify('🚫 Not Your Block', 'You can only build on blocks you control.');
+        return state;
+      }
+      if (tile.build) {
+        notify('🏗️ Already Building', 'Crews are already working this block.');
+        return state;
+      }
+      if (state.actionsRemaining <= 0) {
+        notify('⏳ No Actions Left', 'Building costs 1 action.');
+        return state;
+      }
+      const currentTier = (tile.buildings || {})[type];
+      const nextTier = ((currentTier || 0) + 1) as BuildingTier;
+      if (nextTier > MAX_BUILDING_TIER) {
+        notify('🏆 Fully Upgraded', `${BUILDING_DEFS[type].label} is already at the top tier here.`);
+        return state;
+      }
+      const def = BUILDING_DEFS[type].tiers[nextTier];
+      if (state.resources.money < def.cost) {
+        notify('💵 Short On Cash', `${def.name} costs $${def.cost.toLocaleString()}.`);
+        return state;
+      }
+      state.resources.money -= def.cost;
+      state.actionsRemaining = Math.max(0, state.actionsRemaining - 1);
+      tile.build = { type, tier: nextTier, monthsRemaining: def.months };
+      notify('🏗️ Ground Broken', `${def.name} — ready in ${def.months} month${def.months > 1 ? 's' : ''}.`, 'success');
+      return state;
+    });
+  }, []);
+
+  /** Set the standing order on an owned block. Free. */
+  const setTilePolicy = useCallback((q: number, r: number, s: number, policy: TilePolicy) => {
+    setGameState(prev => {
+      const state: EnhancedMafiaGameState = JSON.parse(JSON.stringify(prev));
+      const tile = state.hexMap.find(t => t.q === q && t.r === r && t.s === s);
+      if (!tile || tile.controllingFamily !== state.playerFamily) return prev;
+      tile.policy = policy;
+      return state;
+    });
+  }, []);
+
+  /** Buy a global district upgrade. Requires district dominance + cash. */
+  const buyDistrictUpgrade = useCallback((id: DistrictUpgradeId) => {
+    setGameState(prev => {
+      const state: EnhancedMafiaGameState = JSON.parse(JSON.stringify(prev));
+      const notify = (title: string, message: string, type2: 'warning' | 'success' = 'warning') => {
+        state.pendingNotifications = [...(state.pendingNotifications || []), { type: type2, title, message }];
+      };
+      const def = DISTRICT_UPGRADES[id];
+      state.districtUpgrades = state.districtUpgrades || [];
+      if (state.districtUpgrades.includes(id)) return prev;
+      // Best single-district control ratio
+      let best = 0;
+      const districts = new Set(state.hexMap.map(t => t.district));
+      districts.forEach(d => {
+        const all = state.hexMap.filter(t => t.district === d);
+        if (!all.length) return;
+        const mine = all.filter(t => t.controllingFamily === state.playerFamily).length;
+        best = Math.max(best, mine / all.length);
+      });
+      if (best < def.requiredControl) {
+        notify('🏙️ Not Enough Pull', `${def.label} needs ${Math.round(def.requiredControl * 100)}% control of a single district. Your best is ${Math.round(best * 100)}%.`);
+        return state;
+      }
+      if (state.resources.money < def.cost) {
+        notify('💵 Short On Cash', `${def.label} costs $${def.cost.toLocaleString()}.`);
+        return state;
+      }
+      state.resources.money -= def.cost;
+      state.districtUpgrades = [...state.districtUpgrades, id];
+      notify('🤝 Deal Made', `${def.label} — ${def.blurb}`, 'success');
+      return state;
+    });
+  }, []);
+
   // ============ WINNER CHECK ============
   const isWinner = gameState.victoryType !== null;
 
@@ -12904,6 +13107,9 @@ export const useEnhancedMafiaGameState = (
     setMoveAction,
     startEscort,
     resolveEnemyHexAction,
+    startBuild,
+    setTilePolicy,
+    buyDistrictUpgrade,
     loadGameState,
   };
 };
