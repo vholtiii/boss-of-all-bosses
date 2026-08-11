@@ -21,6 +21,10 @@ import {
   FamilyBonuses, CapoPersonality, AlliancePact, CeasefirePact, AllianceCondition, NegotiationType, NegotiationScope, PERSONALITY_BONUSES,
   NEGOTIATION_TYPES, NEGOTIATION_REFUND_RATE, ShareProfitsPact, SafePassagePact, SupplyDealPact,
   ScoutedHex, Safehouse, MoveAction, PlannedHit, PendingNegotiation,
+  BuildingType, BuildingTier, TilePolicy, DistrictUpgradeId,
+  BUILDING_DEFS, BUILDING_TYPES, MAX_BUILDING_TIER, TILE_POLICIES, DEFAULT_TILE_POLICY,
+  RECRUIT_PROGRESS_GOAL, RECRUIT_PROGRESS_PER_INFRA, DISTRICT_UPGRADES,
+  TURF_TAX_PER_HEX, EMPTY_BLOCK_OVERHEAD, garrisonShare, tileBuildingTotals,
   FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, MAX_FORTIFICATIONS, FortifiedHex, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
   SAFEHOUSE_COST, SAFEHOUSE_DEFENSE_BONUS, SAFEHOUSE_CAPTURE_BOUNTY, SAFEHOUSE_CAPTURE_INTEL_DURATION, SAFEHOUSE_TERRITORY_THRESHOLD, MAX_SAFEHOUSES,
   PLAN_HIT_BONUS, PLAN_HIT_DURATION, PLAN_HIT_FAIL_REPUTATION, PLAN_HIT_FAIL_LOYALTY,
@@ -452,6 +456,15 @@ export interface HexTile {
   // A1: Pending claim — tile is "contested" by a family but not finalized.
   // Does not count toward victory, district control, or income until finalized.
   pendingClaim?: { family: string; sinceTurn: number };
+  // === Tile development layer ===
+  /** Built buildings on this block: type -> tier (1..3). */
+  buildings?: Partial<Record<BuildingType, BuildingTier>>;
+  /** In-progress build/upgrade order. */
+  build?: { type: BuildingType; tier: BuildingTier; monthsRemaining: number };
+  /** Standing order for this block. */
+  policy?: TilePolicy;
+  /** Accumulated crew growth (0..RECRUIT_PROGRESS_GOAL). */
+  recruitProgress?: number;
 }
 
 export type TurnPhase = 'deploy' | 'move' | 'action' | 'waiting';
