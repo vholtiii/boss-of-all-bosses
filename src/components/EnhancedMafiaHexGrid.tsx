@@ -1256,13 +1256,17 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                         <text x={x} y={y + 5} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">🏛️</text>
                       );
                     }
-                    if (!tile.anchor) return null;
-                    if (underConstruction) {
+                    if (tile.build) {
                       return (
                         <text x={x} y={y + 1} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">🚧</text>
                       );
                     }
-                    const sprite = businessSprite(tile.anchor.type);
+                    const builtTypes = Object.keys(tile.buildings || {}).filter(k => (tile.buildings as any)[k]);
+                    const spriteType = tile.anchor?.type || builtTypes.sort(
+                      (a, b) => ((tile.buildings as any)[b] || 0) - ((tile.buildings as any)[a] || 0)
+                    )[0];
+                    if (!spriteType) return null;
+                    const sprite = businessSprite(spriteType);
                     if (!sprite) return null;
                     return (
                       <g className="pointer-events-none select-none">
@@ -1281,18 +1285,22 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                   })()}
 
                   {/* District shorthand yields to operational markers so the map stays legible. */}
-                  {!tile.isHeadquarters && !tile.anchor && !tile.supplyNode && unitsHere.length === 0 && !isHexHighlighted(tile) && (
+                  {!tile.isHeadquarters && !tile.anchor && !tile.build && !tileHasBuildings(tile) && !tile.supplyNode && unitsHere.length === 0 && !isHexHighlighted(tile) && (
                     <text x={x} y={y + 3} textAnchor="middle" fontSize="7" fill="#E8D5A3" fillOpacity="0.38" fontWeight="600" fontFamily="'Playfair Display', serif" letterSpacing="1" className="pointer-events-none select-none">
                       {districtAbbreviations[tile.district] || ''}
                     </text>
                   )}
 
-                  {/* Always-visible income label (hide during construction) */}
-                  {tile.anchor && !tile.isHeadquarters && (
-                    <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#10B981" fontWeight="700" className="pointer-events-none select-none">
-                      ${tile.anchor.tribute >= 1000 ? `${(tile.anchor.tribute / 1000).toFixed(1)}k` : tile.anchor.tribute}
-                    </text>
-                  )}
+                  {/* Always-visible earnings label */}
+                  {!tile.isHeadquarters && !tile.build && (() => {
+                    const earn = tileEarnPotential(tile);
+                    if (earn <= 0) return null;
+                    return (
+                      <text x={x} y={y + 14} textAnchor="middle" fontSize="7" fill="#10B981" fontWeight="700" className="pointer-events-none select-none">
+                        ${earn >= 1000 ? `${(earn / 1000).toFixed(1)}k` : earn}
+                      </text>
+                    );
+                  })()}
 
                   {/* Supply halted indicator (player businesses only) */}
                   {tile.anchor && tile.controllingFamily === playerFamily && (() => {
