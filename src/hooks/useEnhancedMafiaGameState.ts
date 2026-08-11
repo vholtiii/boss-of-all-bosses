@@ -171,11 +171,10 @@ const syncRespect = (state: any, value: number) => {
 
 // ============ BUILT BUSINESS SEIZURE HELPER ============
 const applyBuiltBusinessSeizure = (state: any, tile: any, seizingFamily: string, losingFamily: string) => {
-  if (!tile.anchor || tile.anchor.isExtorted) return; // Only applies to player-built businesses
-  
-  // Mark business with seizure penalty
-  tile.anchor.seizurePenaltyTurns = BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION;
-  tile.anchor.wasPlayerBuilt = true;
+  if (!tileHasBuildings(tile)) return; // Only applies to developed blocks
+
+  // Mark the block with a seizure penalty
+  tile.seizurePenaltyTurns = BUILT_BIZ_SEIZURE_CEASEFIRE_DURATION;
   
   // Auto-ceasefire between the two families
   const existingCeasefire = (state.ceasefires || []).some(
@@ -6455,19 +6454,28 @@ export const useEnhancedMafiaGameState = (
         }
       });
       state.hexMap.forEach(tile => {
-        if (tile.controllingFamily === fam && tile.anchor) {
+        if (tile.controllingFamily !== fam) return;
+        // Advance AI build orders — rivals develop their blocks on the same clock.
+        if (tile.build) {
+          tile.build = { ...tile.build, monthsRemaining: tile.build.monthsRemaining - 1 };
+          if (tile.build.monthsRemaining <= 0) {
+            tile.buildings = { ...(tile.buildings || {}), [tile.build.type]: tile.build.tier };
+            tile.build = undefined;
+          }
+        }
+        const aiTileEarn = tileEarnPotential(tile);
+        if (aiTileEarn > 0) {
           let tileInc = 0;
           const hasCapo = state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
-          const hasSoldier = state.deployedUnits.some(u => u.family === fam && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
-          if (hasCapo) tileInc = tile.anchor.tribute;
-          else if (hasSoldier) tileInc = Math.floor(tile.anchor.tribute * 0.3);
-          else tileInc = Math.floor(tile.anchor.tribute * 0.1);
+          const soldiersHere = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
+          const hasSoldier = soldiersHere > 0;
+          tileInc = Math.floor(aiTileEarn * garrisonShare(hasCapo, soldiersHere));
           // Seized player-built business runs at 50% during penalty period
-          if (tile.anchor.seizurePenaltyTurns && tile.anchor.seizurePenaltyTurns > 0) {
+          if (tile.seizurePenaltyTurns && tile.seizurePenaltyTurns > 0) {
             tileInc = Math.floor(tileInc * BUILT_BIZ_SEIZURE_INCOME_PENALTY);
           }
           // Apply supply line decay for AI families
-          const deps = SUPPLY_DEPENDENCIES[tile.anchor.type];
+          const deps = tile.anchor ? SUPPLY_DEPENDENCIES[tile.anchor.type] : undefined;
           if (deps && deps.length > 0) {
             const hexKey = `${tile.q},${tile.r},${tile.s}`;
             const decayMultiplier = getBusinessSupplyDecayMultiplier(hexKey, state.businessSupplyStatus);
@@ -6491,7 +6499,7 @@ export const useEnhancedMafiaGameState = (
             tileInc = Math.floor(tileInc * (1 - aiWarPenalty));
           }
           aiIncome += tileInc;
-          if (SUPPLY_DEPENDENCIES[tile.anchor.type]?.length) {
+          if (deps?.length) {
             aiSupplyDependentIncome += tileInc;
           }
         }
@@ -6517,7 +6525,7 @@ export const useEnhancedMafiaGameState = (
       // ===== AI ECONOMY PARITY: soldier maintenance + community upkeep (mirrors player lines 5236–5244) =====
       const aiDeployedSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier').length;
       const aiSoldierMaintenance = aiDeployedSoldiers * SOLDIER_MAINTENANCE;
-      const aiCommunityHexCount = state.hexMap.filter(t => t.controllingFamily === fam && !t.anchor && !t.isHeadquarters).length;
+      const aiCommunityHexCount = state.hexMap.filter(t => t.controllingFamily === fam && tileEarnPotential(t) === 0 && !t.isHeadquarters).length;
       const aiCommunityUpkeep = aiCommunityHexCount * 150;
       const aiTotalExpenses = aiSoldierMaintenance + aiCommunityUpkeep;
       const aiNetIncome = aiIncome - aiTotalExpenses;
@@ -12760,11 +12768,10 @@ export const useEnhancedMafiaGameState = (
   const processPacts = (state: EnhancedMafiaGameState) => {
     // Tick down seizure penalties on businesses
     state.hexMap.forEach(tile => {
-      if (tile.anchor && tile.anchor.seizurePenaltyTurns && tile.anchor.seizurePenaltyTurns > 0) {
-        tile.anchor.seizurePenaltyTurns -= 1;
-        if (tile.anchor.seizurePenaltyTurns <= 0) {
-          tile.anchor.seizurePenaltyTurns = undefined;
-          tile.anchor.wasPlayerBuilt = undefined;
+      if (tile.seizurePenaltyTurns && tile.seizurePenaltyTurns > 0) {
+        tile.seizurePenaltyTurns -= 1;
+        if (tile.seizurePenaltyTurns <= 0) {
+          tile.seizurePenaltyTurns = undefined;
           state.pendingNotifications = [...state.pendingNotifications, {
             type: 'info', title: '💼 Business Stabilized',
             message: `${tile.controllingFamily.charAt(0).toUpperCase() + tile.controllingFamily.slice(1)}'s seized business in ${tile.district} now runs at full revenue.`,
