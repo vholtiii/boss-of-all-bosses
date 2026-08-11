@@ -1,10 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import soldierGambino from '@/assets/units/soldier-gambino.png';
-import soldierGenovese from '@/assets/units/soldier-genovese.png';
-import soldierLucchese from '@/assets/units/soldier-lucchese.png';
-import soldierBonanno from '@/assets/units/soldier-bonanno.png';
-import soldierColombo from '@/assets/units/soldier-colombo.png';
+import { UNIT_SPRITES } from '@/lib/sprites';
 
 interface SoldierIconProps {
   x: number;
@@ -21,20 +17,14 @@ import { FAMILY_COLORS } from '@/lib/period-theme';
 
 const familyColors = FAMILY_COLORS;
 
-const soldierImages = {
-  gambino: soldierGambino,
-  genovese: soldierGenovese,
-  lucchese: soldierLucchese,
-  bonanno: soldierBonanno,
-  colombo: soldierColombo,
-};
+
 
 const SoldierIcon: React.FC<SoldierIconProps> = ({
   x, y, family, count, isPlayerFamily = false, selected = false, markedForDeath = false, onClick
 }) => {
   const familyColor = familyColors[family];
-  const soldierImg = soldierImages[family];
-  const size = 20;
+  const soldierImg = UNIT_SPRITES.soldier;
+  const size = 26;
 
   // Deterministic 0..1 phase offset so stacked units don't pulse in lockstep
   const seedStr = `${family}-${x}-${y}`;
@@ -57,15 +47,17 @@ const SoldierIcon: React.FC<SoldierIconProps> = ({
       {/* Selected pulse ring */}
       {selected && (
         <motion.circle
-          cx={x} cy={y + 2} r={size / 2 + 7}
+          cx={x} cy={y + 6} r={size / 2 + 7}
           fill="none" stroke="#FFD700" strokeWidth="2"
           animate={{ r: [size / 2 + 5, size / 2 + 9, size / 2 + 5], opacity: [1, 0.4, 1] }}
           transition={{ duration: 1.2, repeat: Infinity }}
         />
       )}
 
-      {/* Family color glow */}
-      <circle cx={x} cy={y + 2} r={size / 2 + 2} fill={familyColor} opacity={selected ? 0.5 : 0.25} />
+      {/* Ground shadow */}
+      <ellipse cx={x} cy={y + 9} rx={size * 0.42} ry={size * 0.16} fill="#000000" opacity="0.45" />
+      {/* Family base disc */}
+      <ellipse cx={x} cy={y + 9} rx={size * 0.34} ry={size * 0.13} fill={familyColor} opacity={selected ? 0.95 : 0.75} stroke="#0a0a0a" strokeWidth="0.75" />
 
       {/* Soldier figure image with idle breathing */}
       <motion.g
@@ -76,18 +68,18 @@ const SoldierIcon: React.FC<SoldierIconProps> = ({
         <image
           href={soldierImg}
           x={x - size / 2}
-          y={y - size / 2 - 4}
+          y={y - size * 0.92}
           width={size}
-          height={size * 1.5}
+          height={size * 1.23}
           preserveAspectRatio="xMidYMid meet"
-          style={{ filter: `drop-shadow(0 0 ${selected ? '6' : '3'}px ${selected ? '#FFD700' : familyColor})` }}
+          style={{ filter: selected ? 'drop-shadow(0 0 6px #FFD700)' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.7))' }}
         />
       </motion.g>
 
 
       {/* Player family gold ring */}
       {isPlayerFamily && !selected && (
-        <circle cx={x} cy={y + 2} r={size / 2 + 4} fill="none" stroke="#D4AF37" strokeWidth="1.5" opacity="0.8" />
+        <ellipse cx={x} cy={y + 9} rx={size * 0.44} ry={size * 0.17} fill="none" stroke="#D4AF37" strokeWidth="1.25" opacity="0.85" />
       )}
 
       {/* Soldier count badge */}
