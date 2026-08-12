@@ -1091,21 +1091,29 @@ const placeAnchorRackets = (
   const placed: HexTile[] = [];
   const usedNames = new Set<string>();
 
-  const eligible = (t: HexTile) =>
+  const baseEligible = (t: HexTile) =>
     !t.isHeadquarters && !t.supplyNode && !t.anchor &&
-    !hqPositions.some(hq => hexDistance(hq, t) <= ANCHOR_HQ_EXCLUSION) &&
-    !placed.some(p => hexDistance(p, t) < ANCHOR_MIN_SPACING);
+    !hqPositions.some(hq => hexDistance(hq, t) <= ANCHOR_HQ_EXCLUSION);
+
+  const eligible = (t: HexTile, spacing = ANCHOR_MIN_SPACING) =>
+    baseEligible(t) && !placed.some(p => hexDistance(p, t) < spacing);
 
   for (let i = 0; i < target; i++) {
     const arch = ANCHOR_ARCHETYPES[i % ANCHOR_ARCHETYPES.length];
     let pool = tiles.filter(t => eligible(t) && arch.districts.includes(t.district as any));
-    if (!pool.length) pool = tiles.filter(eligible);
+    if (!pool.length) pool = tiles.filter(t => eligible(t));
+    // Relax spacing progressively rather than dropping an anchor entirely.
+    for (let sp = ANCHOR_MIN_SPACING - 1; !pool.length && sp >= 2; sp--) {
+      pool = tiles.filter(t => eligible(t, sp));
+    }
     if (!pool.length) break;
     const tile = pool[Math.floor(rng() * pool.length)];
     const names = arch.names.filter(n => !usedNames.has(n));
     const name = (names.length ? names : arch.names)[Math.floor(rng() * Math.max(1, names.length))] || arch.names[0];
     usedNames.add(name);
-    const tribute = Math.round((arch.tribute * (0.85 + rng() * 0.3)) / 50) * 50;
+    // Fewer anchors, so each one carries a bit more weight.
+    const tribute = Math.round((arch.tribute * (1.0 + rng() * 0.35)) / 50) * 50;
+
     tile.anchor = {
       type: arch.type,
       name,

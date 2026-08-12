@@ -1276,26 +1276,32 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                     const topBuilt = builtTypes.sort(
                       (a, b) => ((tile.buildings as any)[b] || 0) - ((tile.buildings as any)[a] || 0)
                     )[0];
-                    const spriteType = tile.anchor?.type || topBuilt;
+                    // A standing anchor racket is somebody else's operation until it is bought
+                    // out — draw it smaller and dimmer so it never reads as one of your builds.
+                    const showAnchorOnly = !!tile.anchor && !topBuilt;
+                    const spriteType = topBuilt || tile.anchor?.type;
                     if (!spriteType) return null;
-                    const spriteTier = tile.anchor && !topBuilt ? 1 : ((tile.buildings as any)?.[spriteType] || 1);
+                    const spriteTier = showAnchorOnly ? 1 : ((tile.buildings as any)?.[spriteType] || 1);
                     const sprite = buildingSprite(spriteType, spriteTier);
                     if (!sprite) return null;
+                    const size = showAnchorOnly ? 32 : 44;
+                    const h = showAnchorOnly ? 28 : 38;
 
                     return (
-                      <g className="pointer-events-none select-none">
-                        <ellipse cx={x} cy={y + 12} rx="15" ry="4.5" fill="#000000" opacity="0.4" />
+                      <g className="pointer-events-none select-none" opacity={showAnchorOnly ? 0.72 : 1}>
+                        <ellipse cx={x} cy={y + 12} rx={showAnchorOnly ? 11 : 15} ry={showAnchorOnly ? 3.5 : 4.5} fill="#000000" opacity="0.4" />
                         <image
                           href={sprite}
-                          x={x - 22}
-                          y={y - 22}
-                          width={44}
-                          height={38}
+                          x={x - size / 2}
+                          y={y - (h - 6)}
+                          width={size}
+                          height={h}
                           preserveAspectRatio="xMidYMax meet"
-                          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.65))' }}
+                          style={{ filter: showAnchorOnly ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.65)) saturate(0.55)' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.65))' }}
                         />
                       </g>
                     );
+
                   })()}
 
                   {/* District shorthand yields to operational markers so the map stays legible. */}
