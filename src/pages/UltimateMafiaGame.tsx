@@ -382,6 +382,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   // cannot overwrite the saved session before it has been read.
   useEffect(() => {
     let cancelled = false;
+    // A brand new game must never inherit the old autosave — wipe it first so
+    // the fresh, mostly-bare map is what the player actually sees.
+    if (!config.resume) {
+      import('@/lib/gameStorage')
+        .then(m => m.deleteSlot('auto'))
+        .catch(() => {})
+        .finally(() => { if (!cancelled) setIsRestoringSession(false); });
+      return () => { cancelled = true; };
+    }
     loadGame('auto', 'local').then(result => {
       if (cancelled) return;
       if (result.success && result.gameState && result.gameState.playerFamily === config.family) {
@@ -392,7 +401,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       if (!cancelled) setIsRestoringSession(false);
     });
     return () => { cancelled = true; };
-  }, [config.family, loadGame, loadGameState]);
+  }, [config.family, config.resume, loadGame, loadGameState]);
 
   // ---- Heat history (last 8 turns, excluding current) for HeatMeter sparkline + delta ----
   const [heatHistory, setHeatHistory] = useState<number[]>([]);
@@ -2445,7 +2454,8 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
 };
 
 const UltimateMafiaGame: React.FC = () => {
-  const [gameConfig, setGameConfig] = useState<GameConfig | null>(() => readSessionConfig());
+  const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
+  const [savedSession] = useState<GameConfig | null>(() => readSessionConfig());
 
   const exitToMenu = useCallback(() => {
     clearSessionConfig();
@@ -2475,8 +2485,10 @@ const UltimateMafiaGame: React.FC = () => {
   if (!gameConfig) {
     return (
       <FamilySelectionScreen
+        savedSession={savedSession}
+        onContinue={() => { if (savedSession) setGameConfig({ ...savedSession, resume: true }); }}
         onSelectFamily={(family, resources, difficulty, seed, mapSize) => {
-          const nextConfig = { family, resources, difficulty, seed, mapSize };
+          const nextConfig = { family, resources, difficulty, seed, mapSize, resume: false };
           persistSessionConfig(nextConfig);
           setGameConfig(nextConfig);
         }}
