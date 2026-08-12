@@ -1188,10 +1188,43 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
       3: { name: 'Bank Interest', cost: 17000, months: 3, income: 3600, heat: 6, infra: 5, cover: 3 },
     },
   },
+  legal_front: {
+    type: 'legal_front',
+    label: 'Legal Front',
+    blurb: 'Laundry, waste hauling, construction. Clean paper, dirty money.',
+    phase: 2,
+    tiers: {
+      1: { name: 'Laundry Route',   cost: 6000,  months: 2, income: 500,  heat: -2, infra: 1, cover: 4 },
+      2: { name: 'Hauling Company', cost: 12000, months: 2, income: 1100, heat: -3, infra: 2, cover: 7 },
+      3: { name: 'Construction Co', cost: 24000, months: 3, income: 2200, heat: -4, infra: 3, cover: 11 },
+    },
+  },
+  safehouse: {
+    type: 'safehouse',
+    label: 'Safehouse',
+    blurb: 'A quiet apartment for soldiers who need to disappear.',
+    phase: 2,
+    maxTier: 2,
+    tiers: {
+      1: { name: 'Rented Flat',   cost: 4500, months: 1, income: 0, heat: 0,  infra: 2, cover: 2 },
+      2: { name: 'Tenement Wing', cost: 9000, months: 2, income: 0, heat: -1, infra: 3, cover: 4 },
+    },
+  },
 };
 
 export const BUILDING_TYPES = Object.keys(BUILDING_DEFS) as BuildingType[];
 export const MAX_BUILDING_TIER: BuildingTier = 3;
+
+/** Highest tier a given building type can reach. */
+export function buildingMaxTier(type: BuildingType): BuildingTier {
+  return BUILDING_DEFS[type]?.maxTier ?? MAX_BUILDING_TIER;
+}
+
+/** Milestone phase required before a building type can be started. */
+export function buildingUnlockPhase(type: BuildingType): number {
+  return BUILDING_DEFS[type]?.phase ?? 1;
+}
+
 
 export type TilePolicy = 'earn' | 'muscle' | 'lay_low' | 'fortify';
 
