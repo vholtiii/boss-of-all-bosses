@@ -1263,12 +1263,15 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                       );
                     }
                     const builtTypes = Object.keys(tile.buildings || {}).filter(k => (tile.buildings as any)[k]);
-                    const spriteType = tile.anchor?.type || builtTypes.sort(
+                    const topBuilt = builtTypes.sort(
                       (a, b) => ((tile.buildings as any)[b] || 0) - ((tile.buildings as any)[a] || 0)
                     )[0];
+                    const spriteType = tile.anchor?.type || topBuilt;
                     if (!spriteType) return null;
-                    const sprite = businessSprite(spriteType);
+                    const spriteTier = tile.anchor && !topBuilt ? 1 : ((tile.buildings as any)?.[spriteType] || 1);
+                    const sprite = buildingSprite(spriteType, spriteTier);
                     if (!sprite) return null;
+
                     return (
                       <g className="pointer-events-none select-none">
                         <ellipse cx={x} cy={y + 12} rx="15" ry="4.5" fill="#000000" opacity="0.4" />
