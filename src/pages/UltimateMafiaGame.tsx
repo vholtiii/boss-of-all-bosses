@@ -64,7 +64,10 @@ interface GameConfig {
   difficulty: 'easy' | 'normal' | 'hard';
   seed?: number;
   mapSize?: MapSize;
+  /** True only when the player explicitly continued a previous session. */
+  resume?: boolean;
 }
+
 
 const SESSION_CONFIG_KEY = 'mafia_game_session_config';
 
