@@ -1122,7 +1122,7 @@ export const DISTRICT_BONUSES: Record<string, DistrictBonusDef> = {
 // district upgrades, and the garrison-share income model.
 // ============================================================
 
-export type BuildingType = 'store_front' | 'brothel' | 'gambling_den' | 'loan_sharking';
+export type BuildingType = 'store_front' | 'brothel' | 'gambling_den' | 'loan_sharking' | 'legal_front' | 'safehouse';
 export type BuildingTier = 1 | 2 | 3;
 
 export interface BuildingTierDef {
@@ -1139,8 +1139,13 @@ export interface BuildingDef {
   type: BuildingType;
   label: string;
   blurb: string;
-  tiers: Record<BuildingTier, BuildingTierDef>;
+  /** Highest tier this building can reach. Defaults to 3. */
+  maxTier?: BuildingTier;
+  /** Milestone phase that unlocks this building. Defaults to 1. */
+  phase?: number;
+  tiers: Partial<Record<BuildingTier, BuildingTierDef>> & { 1: BuildingTierDef };
 }
+
 
 export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
   store_front: {
