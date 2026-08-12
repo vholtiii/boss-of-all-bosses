@@ -72,7 +72,7 @@ const CityPanel: React.FC<CityPanelProps> = ({
 
   const progress = tile.recruitProgress || 0;
   const progressPct = Math.min(100, Math.round((progress / RECRUIT_PROGRESS_GOAL) * 100));
-  const perMonth = totals.infra * RECRUIT_PROGRESS_PER_INFRA * (policyDef.recruitMult ?? 1);
+  const perMonth = totals.infra * RECRUIT_PROGRESS_PER_INFRA * (policyDef.growthMult ?? 1);
   const etaMonths = perMonth > 0 ? Math.ceil((RECRUIT_PROGRESS_GOAL - progress) / perMonth) : null;
 
   const ownedUpgrades: string[] = gameState?.districtUpgrades || [];

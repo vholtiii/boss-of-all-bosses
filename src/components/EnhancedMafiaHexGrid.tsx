@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
-import { businessSprite } from '@/lib/sprites';
+import { businessSprite, buildingSprite } from '@/lib/sprites';
 import SelectedUnitDock from '@/components/SelectedUnitDock';
 import TileDevelopmentPanel from '@/components/TileDevelopmentPanel';
 import type { BuildingType, TilePolicy } from '@/types/game-mechanics';
