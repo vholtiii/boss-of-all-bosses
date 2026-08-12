@@ -12996,10 +12996,20 @@ export const useEnhancedMafiaGameState = (
         notify('🚫 Not Your Block', 'You can only build on blocks you control.');
         return state;
       }
+      if (tile.anchor) {
+        notify(
+          '🏚️ Racket Still Standing',
+          tile.anchor.isExtorted
+            ? `${tile.anchor.name} is only paying tribute. Buy it out before your crews can develop this block.`
+            : `${tile.anchor.name} isn't yours yet. Shake it down, buy it out, then build.`
+        );
+        return state;
+      }
       if (tile.build) {
         notify('🏗️ Already Building', 'Crews are already working this block.');
         return state;
       }
+
       if (state.actionsRemaining <= 0) {
         notify('⏳ No Actions Left', 'Building costs 1 action.');
         return state;
