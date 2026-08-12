@@ -2550,6 +2550,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
               onStartBuild={onStartBuild}
               onBuyOutAnchor={onBuyOutAnchor}
               onSetTilePolicy={onSetTilePolicy}
+              onOpenCityPanel={() => setCityHex({ q: pinnedHex.q, r: pinnedHex.r, s: pinnedHex.s })}
             />
           )}
         </AnimatePresence>

@@ -533,6 +533,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onStartBuild={startBuild}
             onBuyOutAnchor={buyOutAnchor}
             onSetTilePolicy={setTilePolicy}
+            onBuyDistrictUpgrade={buyDistrictUpgrade}
             planHitMode={planHitMode}
             planHitStep={planHitStep}
             planHitPlannerId={planHitPlannerId}
@@ -1855,6 +1856,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             onStartBuild={startBuild}
             onBuyOutAnchor={buyOutAnchor}
             onSetTilePolicy={setTilePolicy}
+            onBuyDistrictUpgrade={buyDistrictUpgrade}
             planHitMode={planHitMode}
             planHitStep={planHitStep}
             planHitPlannerId={planHitPlannerId}
