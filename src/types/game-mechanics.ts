@@ -844,6 +844,7 @@ export const SUPPLY_DEPENDENCIES: Record<string, SupplyNodeType[]> = {
   gambling_den: ['liquor_route'],
   brothel: ['trucking_depot'],
   loan_sharking: ['union_hall'],
+  legal_front: ['trucking_depot'],
   store_front: ['food_market', 'docks'], // needs at least one
   construction: ['union_hall'],
   store: ['food_market', 'docks'],
