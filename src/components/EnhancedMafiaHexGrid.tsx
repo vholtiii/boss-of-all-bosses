@@ -2973,7 +2973,29 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           </div>
         )}
       </div>
+
+      {/* Full block management panel (double-click an owned block) */}
+      <AnimatePresence>
+        {cityHex && (() => {
+          const tile = (gameState?.hexMap || []).find((t: HexTile) => t.q === cityHex.q && t.r === cityHex.r && t.s === cityHex.s);
+          if (!tile || tile.controllingFamily !== playerFamily) return null;
+          return (
+            <CityPanel
+              key={`city-${cityHex.q},${cityHex.r},${cityHex.s}`}
+              tile={tile}
+              gameState={gameState}
+              playerFamily={playerFamily}
+              onClose={() => setCityHex(null)}
+              onStartBuild={onStartBuild}
+              onSetTilePolicy={onSetTilePolicy}
+              onBuyOutAnchor={onBuyOutAnchor}
+              onBuyDistrictUpgrade={onBuyDistrictUpgrade}
+            />
+          );
+        })()}
+      </AnimatePresence>
     </div>
+
   );
 });
 
