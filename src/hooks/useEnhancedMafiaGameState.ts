@@ -6277,6 +6277,28 @@ export const useEnhancedMafiaGameState = (
       oppAny.posture = posture;
       const policy = posturePolicy(posture);
 
+      // ── Standing orders parity: rivals run their blocks off their posture ──
+      {
+        const aiHeatNow = (oppAny.heat ?? oppAny.policeHeat ?? 0) as number;
+        const rebuildingCrew = (opponent.resources?.soldiers ?? 0) < 4;
+        state.hexMap.forEach(t => {
+          if (t.controllingFamily !== fam || t.isHeadquarters) return;
+          let next: TilePolicy = 'earn';
+          if (posture === 'COOL_OFF' || aiHeatNow >= 60) {
+            next = 'lay_low';
+          } else if (posture === 'TURTLE' || posture === 'WAR') {
+            const frontier = getHexNeighbors(t.q, t.r, t.s).some(n => {
+              const nt = state.hexMap.find(h => h.q === n.q && h.r === n.r && h.s === n.s);
+              return !!nt && nt.controllingFamily !== 'neutral' && nt.controllingFamily !== fam;
+            });
+            next = frontier ? 'fortify' : 'earn';
+          } else if (rebuildingCrew || posture === 'CONSOLIDATE') {
+            next = 'muscle';
+          }
+          t.policy = next;
+        });
+      }
+
       // Report the family's strategic motive for this turn
       if (turnReport?.aiMotives) {
         const motiveParts: string[] = [];
@@ -7046,7 +7068,9 @@ export const useEnhancedMafiaGameState = (
                 const aiQueensHitBonus = hasFamilyDistrictBonus(state, fam, 'hit_bonus') ? 0.05 : 0;
                 // Scout-tier hit modifier (mirrors player): scouted +15% / blind -20%
                 const scoutMod = isAIScoutedHit ? (SCOUT_INTEL_BONUS / 100) : -BLIND_HIT_PENALTY;
-                const baseKillChance = (isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) - builtBizDefBonus : 0.7 - builtBizDefBonus) + aiQueensHitBonus + scoutMod;
+                // Standing order: a block on Fortify Up is dug in and harder to take
+                const defPolicyBonus = (TILE_POLICIES[(tile.policy || DEFAULT_TILE_POLICY) as TilePolicy]?.defenseBonus || 0) / 100;
+                const baseKillChance = (isTargetSafehouse ? 0.7 - (SAFEHOUSE_DEFENSE_BONUS / 100) - builtBizDefBonus : 0.7 - builtBizDefBonus) + aiQueensHitBonus + scoutMod - defPolicyBonus;
                 enemyUnitsHere.forEach(eu => {
                   // Capos cannot be killed in regular combat — only wounded
                   if (eu.type === 'capo') {
