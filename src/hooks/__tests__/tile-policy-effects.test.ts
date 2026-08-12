@@ -35,8 +35,8 @@ describe('Standing orders have real effects', () => {
   });
 
   it('a hit on a Fortify Up block is harder than on an Earn block', () => {
-    const earn = computeHitCore(baseState('earn'), { targetQ: 0, targetR: 0, targetS: 0 });
-    const fort = computeHitCore(baseState('fortify'), { targetQ: 0, targetR: 0, targetS: 0 });
+    const earn = computeHitCore(baseState('earn'), { targetQ: 0, targetR: 0, targetS: 0, selectedUnitId: 'p1' });
+    const fort = computeHitCore(baseState('fortify'), { targetQ: 0, targetR: 0, targetS: 0, selectedUnitId: 'p1' });
     expect(earn.ok).toBe(true);
     expect(fort.ok).toBe(true);
     expect(fort.chance).toBeLessThan(earn.chance);
