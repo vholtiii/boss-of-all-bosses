@@ -257,9 +257,12 @@ const MapSizeHexPreview: React.FC<{ gridRadius: number; highlighted: boolean; re
 
 interface Props {
   onSelectFamily: (familyId: FamilyId, resources: FamilyInfo['startingResources'], difficulty: 'easy' | 'normal' | 'hard', seed?: number, mapSize?: MapSize) => void;
+  /** Previous session config, if one is stored locally. */
+  savedSession?: { family: FamilyId; difficulty: 'easy' | 'normal' | 'hard' } | null;
+  onContinue?: () => void;
 }
 
-const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
+const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily, savedSession, onContinue }) => {
   const [selectedFamily, setSelectedFamily] = useState<FamilyId | null>(null);
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
   const [mapSize, setMapSize] = useState<MapSize>('medium');
@@ -456,6 +459,18 @@ const FamilySelectionScreen: React.FC<Props> = ({ onSelectFamily }) => {
         <p className="text-sm text-muted-foreground mt-4 font-source max-w-md mx-auto">
           Choose your family and difficulty. Each has unique strengths, weaknesses, and strategies for domination.
         </p>
+
+        {savedSession && onContinue && (
+          <div className="relative z-[3] mt-6 flex justify-center">
+            <button
+              type="button"
+              onClick={onContinue}
+              className="rounded-md border border-primary/60 bg-primary/10 px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] text-primary transition-colors hover:bg-primary/20"
+            >
+              ▶ Continue · {savedSession.family} ({savedSession.difficulty})
+            </button>
+          </div>
+        )}
 
         {/* STEP 1 header */}
         <div className="mt-10 mb-3 flex items-center justify-center gap-3 relative z-[3]">
