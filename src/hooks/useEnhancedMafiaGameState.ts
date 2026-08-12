@@ -22,7 +22,7 @@ import {
   NEGOTIATION_TYPES, NEGOTIATION_REFUND_RATE, ShareProfitsPact, SafePassagePact, SupplyDealPact,
   ScoutedHex, Safehouse, MoveAction, PlannedHit, PendingNegotiation,
   BuildingType, BuildingTier, TilePolicy, DistrictUpgradeId,
-  BUILDING_DEFS, BUILDING_TYPES, MAX_BUILDING_TIER, TILE_POLICIES, DEFAULT_TILE_POLICY,
+  BUILDING_DEFS, BUILDING_TYPES, MAX_BUILDING_TIER, buildingMaxTier, buildingUnlockPhase, TILE_POLICIES, DEFAULT_TILE_POLICY,
   RECRUIT_PROGRESS_GOAL, RECRUIT_PROGRESS_PER_INFRA, DISTRICT_UPGRADES,
   TURF_TAX_PER_HEX, EMPTY_BLOCK_OVERHEAD, garrisonShare, tileBuildingTotals,
   AnchorRacket, ANCHOR_ARCHETYPES, ANCHOR_COUNT_BY_MAP_SIZE, ANCHOR_MIN_SPACING, ANCHOR_HQ_EXCLUSION,
@@ -12972,13 +12972,19 @@ export const useEnhancedMafiaGameState = (
         notify('⏳ No Actions Left', 'Building costs 1 action.');
         return state;
       }
+      const unlockPhase = buildingUnlockPhase(type);
+      if ((state.gamePhase || 1) < unlockPhase) {
+        notify('🔒 Not Yet', `${BUILDING_DEFS[type].label} unlocks in phase ${unlockPhase}.`);
+        return state;
+      }
       const currentTier = (tile.buildings || {})[type];
       const nextTier = ((currentTier || 0) + 1) as BuildingTier;
-      if (nextTier > MAX_BUILDING_TIER) {
+      if (nextTier > buildingMaxTier(type)) {
         notify('🏆 Fully Upgraded', `${BUILDING_DEFS[type].label} is already at the top tier here.`);
         return state;
       }
-      const def = BUILDING_DEFS[type].tiers[nextTier];
+      const def = BUILDING_DEFS[type].tiers[nextTier]!;
+
       if (state.resources.money < def.cost) {
         notify('💵 Short On Cash', `${def.name} costs $${def.cost.toLocaleString()}.`);
         return state;

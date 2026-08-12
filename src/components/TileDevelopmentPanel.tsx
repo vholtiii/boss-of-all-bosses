@@ -24,12 +24,13 @@ interface TileDevelopmentPanelProps {
   onStartBuild?: (q: number, r: number, s: number, type: BuildingType) => void;
   onSetTilePolicy?: (q: number, r: number, s: number, policy: TilePolicy) => void;
   onBuyOutAnchor?: (q: number, r: number, s: number) => void;
+  onOpenCityPanel?: () => void;
 }
 
 const POLICY_ORDER: TilePolicy[] = ['earn', 'muscle', 'lay_low', 'fortify'];
 
 const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
-  tile, gameState, playerFamily, onStartBuild, onSetTilePolicy, onBuyOutAnchor,
+  tile, gameState, playerFamily, onStartBuild, onSetTilePolicy, onBuyOutAnchor, onOpenCityPanel,
 }) => {
   const [tab, setTab] = useState<'orders' | 'build'>('orders');
   if (!tile || tile.controllingFamily !== playerFamily) return null;
@@ -61,9 +62,20 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
     >
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="label-caps text-xs text-mafia-gold">The Block · {tile.district}</h3>
-        <span className="text-[10px] text-muted-foreground">
-          {monthly > 0 ? `$${monthly.toLocaleString()}/mo` : 'no earners'}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-[10px] text-muted-foreground">
+            {monthly > 0 ? `$${monthly.toLocaleString()}/mo` : 'no earners'}
+          </span>
+          {onOpenCityPanel && (
+            <button
+              type="button"
+              onClick={onOpenCityPanel}
+              className="rounded border border-mafia-gold/50 px-1.5 py-0.5 text-[9px] label-caps text-mafia-gold transition-colors hover:bg-mafia-gold/15"
+            >
+              Manage
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mb-2 grid grid-cols-2 gap-1 text-[10px]">

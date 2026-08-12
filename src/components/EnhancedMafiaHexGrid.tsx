@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import SoldierIcon from '@/components/SoldierIcon';
 import CapoIcon from '@/components/CapoIcon';
-import { businessSprite } from '@/lib/sprites';
+import { businessSprite, buildingSprite } from '@/lib/sprites';
 import SelectedUnitDock from '@/components/SelectedUnitDock';
 import TileDevelopmentPanel from '@/components/TileDevelopmentPanel';
-import type { BuildingType, TilePolicy } from '@/types/game-mechanics';
+import CityPanel from '@/components/CityPanel';
+import type { BuildingType, TilePolicy, DistrictUpgradeId } from '@/types/game-mechanics';
 import { tileEarnPotential, tileHasBuildings } from '@/types/game-mechanics';
 import MapEffectsLayer from '@/components/MapEffectsLayer';
 import { useMapEffects } from '@/hooks/useMapEffects';
@@ -48,6 +49,7 @@ interface EnhancedMafiaHexGridProps {
   onStartBuild?: (q: number, r: number, s: number, type: BuildingType) => void;
   onBuyOutAnchor?: (q: number, r: number, s: number) => void;
   onSetTilePolicy?: (q: number, r: number, s: number, policy: TilePolicy) => void;
+  onBuyDistrictUpgrade?: (id: DistrictUpgradeId) => void;
 }
 
 const familyColors: Record<string, string> = FAMILY_COLORS;
@@ -65,7 +67,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   width, height, onBusinessClick, selectedBusiness, playerFamily,
   gameState, onAction, onSelectUnit, onMoveUnit, onSelectHeadquarters,
   onSelectUnitFromHeadquarters, onDeployUnit, planHitMode, planHitStep, planHitPlannerId, onPlanHitSelect, onPlanHitSelectSoldier, onCancelPlanHit,
-  bossHighlightHex, highlightedFamily, onClearHighlight, onStartBuild, onBuyOutAnchor, onSetTilePolicy
+  bossHighlightHex, highlightedFamily, onClearHighlight, onStartBuild, onBuyOutAnchor, onSetTilePolicy, onBuyDistrictUpgrade
 }, ref) => {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -122,6 +124,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   const [showThreats, setShowThreats] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
   const [pinnedHex, setPinnedHex] = useState<HexTile | null>(null);
+  const [cityHex, setCityHex] = useState<{ q: number; r: number; s: number } | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; canAssaultHQ?: boolean; canFlipSoldier?: boolean; negotiateCapoId?: string; pendingNegotiationId?: string; reasons?: Record<string, string> } | null>(null);
   const [planHitUnitMenu, setPlanHitUnitMenu] = useState<{ tile: HexTile; enemyUnits: DeployedUnit[] } | null>(null);
   const [flipTargetMenu, setFlipTargetMenu] = useState<{ tile: HexTile; actingCapo: DeployedUnit; targets: Array<{ unit: DeployedUnit; loyalty: number; chance: number; cost: number }> } | null>(null);
@@ -1099,6 +1102,13 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                           opacity={isHovered ? Math.min(1, getHexOpacity(tile) + 0.2) : getHexOpacity(tile)}
                           className={cn('cursor-pointer hex-interactive', isHovered && 'hex-interactive-hover')}
                           onClick={() => handleHexClick(tile)}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            if (tile.controllingFamily === playerFamily && !tile.isHeadquarters) {
+                              setPinnedHex(tile);
+                              setCityHex({ q: tile.q, r: tile.r, s: tile.s });
+                            }
+                          }}
                           onMouseEnter={() => { setHoveredHex(tile); }}
                           onMouseLeave={() => setHoveredHex(null)}
                         />
@@ -1263,12 +1273,15 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                       );
                     }
                     const builtTypes = Object.keys(tile.buildings || {}).filter(k => (tile.buildings as any)[k]);
-                    const spriteType = tile.anchor?.type || builtTypes.sort(
+                    const topBuilt = builtTypes.sort(
                       (a, b) => ((tile.buildings as any)[b] || 0) - ((tile.buildings as any)[a] || 0)
                     )[0];
+                    const spriteType = tile.anchor?.type || topBuilt;
                     if (!spriteType) return null;
-                    const sprite = businessSprite(spriteType);
+                    const spriteTier = tile.anchor && !topBuilt ? 1 : ((tile.buildings as any)?.[spriteType] || 1);
+                    const sprite = buildingSprite(spriteType, spriteTier);
                     if (!sprite) return null;
+
                     return (
                       <g className="pointer-events-none select-none">
                         <ellipse cx={x} cy={y + 12} rx="15" ry="4.5" fill="#000000" opacity="0.4" />
@@ -2528,7 +2541,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
 
         {/* Block development — owned hexes only */}
         <AnimatePresence>
-          {pinnedHex && pinnedHex.controllingFamily === playerFamily && (
+          {pinnedHex && pinnedHex.controllingFamily === playerFamily && !cityHex && (
             <TileDevelopmentPanel
               key={`dev-${pinnedHex.q},${pinnedHex.r},${pinnedHex.s}`}
               tile={(gameState?.hexMap || []).find((t: HexTile) => t.q === pinnedHex.q && t.r === pinnedHex.r && t.s === pinnedHex.s) || pinnedHex}
@@ -2537,6 +2550,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
               onStartBuild={onStartBuild}
               onBuyOutAnchor={onBuyOutAnchor}
               onSetTilePolicy={onSetTilePolicy}
+              onOpenCityPanel={() => setCityHex({ q: pinnedHex.q, r: pinnedHex.r, s: pinnedHex.s })}
             />
           )}
         </AnimatePresence>
@@ -2960,7 +2974,29 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           </div>
         )}
       </div>
+
+      {/* Full block management panel (double-click an owned block) */}
+      <AnimatePresence>
+        {cityHex && (() => {
+          const tile = (gameState?.hexMap || []).find((t: HexTile) => t.q === cityHex.q && t.r === cityHex.r && t.s === cityHex.s);
+          if (!tile || tile.controllingFamily !== playerFamily) return null;
+          return (
+            <CityPanel
+              key={`city-${cityHex.q},${cityHex.r},${cityHex.s}`}
+              tile={tile}
+              gameState={gameState}
+              playerFamily={playerFamily}
+              onClose={() => setCityHex(null)}
+              onStartBuild={onStartBuild}
+              onSetTilePolicy={onSetTilePolicy}
+              onBuyOutAnchor={onBuyOutAnchor}
+              onBuyDistrictUpgrade={onBuyDistrictUpgrade}
+            />
+          );
+        })()}
+      </AnimatePresence>
     </div>
+
   );
 });
 
