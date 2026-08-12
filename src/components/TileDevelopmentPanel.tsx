@@ -157,7 +157,12 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
                   ${anchor.tribute.toLocaleString()}/mo tribute
                 </span>
               </div>
-              {anchor.isExtorted ? (
+              <p className="mt-1 text-[9px] leading-snug text-muted-foreground">
+                {anchor.isExtorted
+                  ? 'Paying you tribute. Buy it out to own the place, then you can build and upgrade here.'
+                  : 'Shake it down for tribute first, then buy it out, then build.'}
+              </p>
+              {anchor.isExtorted && (
                 <button
                   type="button"
                   disabled={money < buyoutCost || actions <= 0}
@@ -169,10 +174,6 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
                 >
                   Buy it out · ${buyoutCost.toLocaleString()}
                 </button>
-              ) : (
-                <p className="mt-1 text-[9px] text-muted-foreground">
-                  Set up the racket here first, then you can buy it outright.
-                </p>
               )}
             </div>
           )}
@@ -187,7 +188,7 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
             const next = ((cur || 0) + 1) as BuildingTier;
             const maxed = next > MAX_BUILDING_TIER;
             const def = maxed ? BUILDING_DEFS[type].tiers[MAX_BUILDING_TIER] : BUILDING_DEFS[type].tiers[next];
-            const blocked = maxed || !!tile.build || money < def.cost || actions <= 0;
+            const blocked = maxed || !!anchor || !!tile.build || money < def.cost || actions <= 0;
             return (
               <button
                 key={type}
