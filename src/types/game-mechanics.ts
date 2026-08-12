@@ -1380,18 +1380,20 @@ export const ANCHOR_ARCHETYPES: AnchorArchetype[] = [
   },
 ];
 
-/** How many anchors get placed, by map size. */
+/** How many anchors get placed, by map size. Deliberately scarce — the map is
+ *  meant to be built up from bare ground, not inherited. */
 export const ANCHOR_COUNT_BY_MAP_SIZE: Record<string, number> = {
-  small: 8,
-  medium: 10,
-  large: 12,
+  small: 4,
+  medium: 5,
+  large: 6,
 };
 
 /** Buy-out price = tribute x this multiplier. */
 export const ANCHOR_BUYOUT_MULTIPLIER = 6;
 
 /** Minimum hex distance between two anchors. */
-export const ANCHOR_MIN_SPACING = 3;
+export const ANCHOR_MIN_SPACING = 5;
+
 
 /** No anchor may spawn within this many hexes of any family HQ. */
 export const ANCHOR_HQ_EXCLUSION = 3;
