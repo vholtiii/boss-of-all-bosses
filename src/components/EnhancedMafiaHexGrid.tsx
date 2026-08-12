@@ -9,7 +9,7 @@ import { businessSprite, buildingSprite } from '@/lib/sprites';
 import SelectedUnitDock from '@/components/SelectedUnitDock';
 import TileDevelopmentPanel from '@/components/TileDevelopmentPanel';
 import CityPanel from '@/components/CityPanel';
-import type { BuildingType, TilePolicy } from '@/types/game-mechanics';
+import type { BuildingType, TilePolicy, DistrictUpgradeId } from '@/types/game-mechanics';
 import { tileEarnPotential, tileHasBuildings } from '@/types/game-mechanics';
 import MapEffectsLayer from '@/components/MapEffectsLayer';
 import { useMapEffects } from '@/hooks/useMapEffects';
@@ -2541,7 +2541,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
 
         {/* Block development — owned hexes only */}
         <AnimatePresence>
-          {pinnedHex && pinnedHex.controllingFamily === playerFamily && (
+          {pinnedHex && pinnedHex.controllingFamily === playerFamily && !cityHex && (
             <TileDevelopmentPanel
               key={`dev-${pinnedHex.q},${pinnedHex.r},${pinnedHex.s}`}
               tile={(gameState?.hexMap || []).find((t: HexTile) => t.q === pinnedHex.q && t.r === pinnedHex.r && t.s === pinnedHex.s) || pinnedHex}
