@@ -11,6 +11,20 @@ import crestColombo from '@/assets/sprites/crest-colombo.png.asset.json';
 import crestGambino from '@/assets/sprites/crest-gambino.png.asset.json';
 import crestGenovese from '@/assets/sprites/crest-genovese.png.asset.json';
 import crestLucchese from '@/assets/sprites/crest-lucchese.png.asset.json';
+import storefrontT2 from '@/assets/sprites/biz-storefront-t2.png';
+import storefrontT3 from '@/assets/sprites/biz-storefront-t3.png';
+import brothelT2 from '@/assets/sprites/biz-brothel-t2.png';
+import brothelT3 from '@/assets/sprites/biz-brothel-t3.png';
+import gamblingT2 from '@/assets/sprites/biz-gambling-t2.png';
+import gamblingT3 from '@/assets/sprites/biz-gambling-t3.png';
+import loanT2 from '@/assets/sprites/biz-loan-t2.png';
+import loanT3 from '@/assets/sprites/biz-loan-t3.png';
+import legalT1 from '@/assets/sprites/biz-legal-t1.png';
+import legalT2 from '@/assets/sprites/biz-legal-t2.png';
+import legalT3 from '@/assets/sprites/biz-legal-t3.png';
+import safehouseT1 from '@/assets/sprites/biz-safehouse-t1.png';
+import safehouseT2 from '@/assets/sprites/biz-safehouse-t2.png';
+
 
 export const UNIT_SPRITES = {
   soldier: unitSoldier.url,
