@@ -105,6 +105,7 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
             {POLICY_ORDER.map(id => {
               const def = TILE_POLICIES[id];
               const active = policy === id;
+              const heatPct = Math.round((def.heatMult - 1) * 100);
               return (
                 <button
                   key={id}
@@ -116,12 +117,18 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
                       ? 'border-mafia-gold/70 bg-mafia-gold/10 text-mafia-gold'
                       : 'border-noir-light text-muted-foreground hover:border-mafia-gold/40 hover:text-white')}
                 >
-                  {def.label}
+                  <span className="block">{def.label}</span>
+                  <span className="mt-0.5 block text-[9px] leading-tight opacity-80">
+                    ${Math.floor((totals.income + anchorTribute) * share * def.incomeMult).toLocaleString()}/mo
+                    {' · '}heat {heatPct === 0 ? 'std' : `${heatPct > 0 ? '+' : ''}${heatPct}%`}
+                    {def.defenseBonus > 0 ? ` · +${def.defenseBonus} def` : ''}
+                  </span>
                 </button>
               );
             })}
           </div>
           <p className="text-[10px] leading-snug text-muted-foreground">{policyDef.blurb}</p>
+
           <div className="flex items-center justify-between text-[10px] text-muted-foreground">
             <span>Garrison share</span>
             <span className="text-white">{Math.round(share * 100)}%</span>

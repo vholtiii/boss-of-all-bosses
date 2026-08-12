@@ -41,6 +41,8 @@ import {
   TENSION_TERRITORY_HIT,
   TENSION_EXTORT_RIVAL,
   TENSION_ENCROACHMENT,
+  TILE_POLICIES,
+  DEFAULT_TILE_POLICY,
 } from '@/types/game-mechanics';
 
 // ---------------------------------------------------------------------------
@@ -76,6 +78,14 @@ const hasDistrictBonus = (state: any, family: string, bonusType: string): boolea
 
 const isHexFortifiedFor = (state: any, q: number, r: number, s: number, family: string): boolean =>
   (state.fortifiedHexes || []).some((f: any) => f.q === q && f.r === r && f.s === s && f.family === family);
+
+/** Defence points contributed by the tile's standing order (Fortify Up = +25). */
+export const tilePolicyDefenseBonus = (state: any, q: number, r: number, s: number): number => {
+  const tile = (state.hexMap || []).find((t: any) => t.q === q && t.r === r && t.s === s);
+  if (!tile) return 0;
+  const def = (TILE_POLICIES as any)[tile.policy || DEFAULT_TILE_POLICY];
+  return def?.defenseBonus || 0;
+};
 
 const findTile = (state: any, q: number, r: number, s: number) =>
   (state.hexMap || []).find((t: any) => t.q === q && t.r === r && t.s === s);
@@ -186,6 +196,11 @@ export const computeHitCore = (
   if ((state.safehouses || []).some((s: any) => s.q === targetQ && s.r === targetR && s.s === targetS)) {
     chance -= SAFEHOUSE_DEFENSE_BONUS / 100;
     modifiers.push({ label: 'Defender safehouse', delta: -SAFEHOUSE_DEFENSE_BONUS });
+  }
+  const policyDef = tilePolicyDefenseBonus(state, targetQ, targetR, targetS);
+  if (policyDef > 0 && !isExecutingPlanHit) {
+    chance -= policyDef / 100;
+    modifiers.push({ label: 'Defender dug in (Fortify Up)', delta: -policyDef });
   }
   const isDefenderBuiltBiz = tile.anchor && !tile.anchor.isExtorted && tile.controllingFamily !== state.playerFamily;
   if (isDefenderBuiltBiz) {
@@ -372,6 +387,11 @@ export const computePushOutCore = (
   if ((state.safehouses || []).some((s: any) => s.q === targetQ && s.r === targetR && s.s === targetS)) {
     chance -= SAFEHOUSE_DEFENSE_BONUS / 100;
     modifiers.push({ label: 'Defender safehouse', delta: -SAFEHOUSE_DEFENSE_BONUS });
+  }
+  const pushPolicyDef = tilePolicyDefenseBonus(state, targetQ, targetR, targetS);
+  if (pushPolicyDef > 0) {
+    chance -= pushPolicyDef / 100;
+    modifiers.push({ label: 'Defender dug in (Fortify Up)', delta: -pushPolicyDef });
   }
   const fam = state.familyBonuses || FAMILY_BONUSES[state.playerFamily] || FAMILY_BONUSES.gambino;
   if (fam.combatBonus) {

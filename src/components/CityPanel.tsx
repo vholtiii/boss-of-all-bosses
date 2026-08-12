@@ -145,6 +145,13 @@ const CityPanel: React.FC<CityPanelProps> = ({
             {POLICY_ORDER.map(id => {
               const def = TILE_POLICIES[id];
               const active = policy === id;
+              const gross = totals.income + anchorTribute;
+              const inc = Math.floor(gross * share * def.incomeMult);
+              const growth = totals.infra * RECRUIT_PROGRESS_PER_INFRA * (def.growthMult ?? 1);
+              const eta = growth > 0
+                ? Math.max(1, Math.ceil((RECRUIT_PROGRESS_GOAL - (tile.recruitProgress || 0)) / growth))
+                : null;
+              const heatPct = Math.round((def.heatMult - 1) * 100);
               return (
                 <button
                   key={id}
@@ -156,11 +163,24 @@ const CityPanel: React.FC<CityPanelProps> = ({
                       : 'border-noir-light text-muted-foreground hover:border-mafia-gold/40 hover:text-white')}
                 >
                   <span className="block text-[11px] font-semibold">{def.label}</span>
-                  <span className="mt-0.5 block text-[9px] leading-tight opacity-80">{def.blurb}</span>
+                  <span className="mt-1 block space-y-0.5 text-[9px] leading-tight">
+                    <span className="block">${inc.toLocaleString()}/mo</span>
+                    <span className="block">
+                      heat {heatPct === 0 ? 'normal' : `${heatPct > 0 ? '+' : ''}${heatPct}%`}
+                    </span>
+                    <span className="block">
+                      {totals.infra > 0 ? (eta ? `crew ~${eta} mo` : 'no crew growth') : 'no crew growth'}
+                    </span>
+                    {def.defenseBonus > 0 && (
+                      <span className="block text-emerald-400">+{def.defenseBonus} defence</span>
+                    )}
+                  </span>
                 </button>
               );
             })}
           </div>
+          <p className="mt-1.5 text-[9px] leading-snug text-muted-foreground">{policyDef.blurb}</p>
+
         </Section>
 
         {/* Anchor racket */}
