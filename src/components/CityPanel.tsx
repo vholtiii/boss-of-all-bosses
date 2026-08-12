@@ -193,6 +193,15 @@ const CityPanel: React.FC<CityPanelProps> = ({
                   ${anchor.tribute.toLocaleString()}/mo
                 </span>
               </div>
+              <ol className="mt-2 space-y-1 text-[10px]">
+                <li className={anchor.isExtorted ? 'text-emerald-300' : 'text-white'}>
+                  {anchor.isExtorted ? '✓' : '1.'} Shake it down — collects ${anchor.tribute.toLocaleString()}/mo tribute
+                </li>
+                <li className={anchor.isExtorted ? 'text-white' : 'text-muted-foreground'}>
+                  2. Buy it out — ${buyoutCost.toLocaleString()}, makes the place yours (Tier 1)
+                </li>
+                <li className="text-muted-foreground">3. Build &amp; upgrade it T1 → T3 like any block you own</li>
+              </ol>
               {anchor.isExtorted ? (
                 <button
                   type="button"
@@ -216,6 +225,11 @@ const CityPanel: React.FC<CityPanelProps> = ({
 
         {/* Buildings */}
         <Section title="Development" icon={<Hammer className="h-3 w-3" />}>
+          {anchor && (
+            <div className="mb-2 rounded border border-noir-light bg-noir-dark/60 px-2 py-1.5 text-[10px] text-muted-foreground">
+              🔒 {anchor.name} still runs this block. Buy the racket out before your crews can break ground.
+            </div>
+          )}
           {tile.build && (
             <div className="mb-2 rounded border border-amber-500/40 bg-amber-900/25 px-2 py-1.5 text-[10px] text-amber-200">
               🏗️ {BUILDING_DEFS[tile.build.type].tiers[tile.build.tier]?.name} — {tile.build.monthsRemaining} month
@@ -223,6 +237,7 @@ const CityPanel: React.FC<CityPanelProps> = ({
             </div>
           )}
           <div className="space-y-1.5">
+
             {BUILDING_TYPES.map(type => {
               const cur = (tile.buildings || {})[type] as BuildingTier | undefined;
               const max = buildingMaxTier(type);
