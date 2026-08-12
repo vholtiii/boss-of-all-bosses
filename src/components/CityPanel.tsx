@@ -246,7 +246,7 @@ const CityPanel: React.FC<CityPanelProps> = ({
               const unlock = buildingUnlockPhase(type);
               const locked = phase < unlock;
               const def = BUILDING_DEFS[type].tiers[(maxed ? max : next) as BuildingTier]!;
-              const blocked = maxed || locked || !!tile.build || money < def.cost || actions <= 0;
+              const blocked = maxed || locked || !!anchor || !!tile.build || money < def.cost || actions <= 0;
               const art = buildingSprite(type, cur || 1);
               return (
                 <button
