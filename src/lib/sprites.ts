@@ -48,3 +48,25 @@ export function businessSprite(type?: string | null): string | null {
   if (!type) return null;
   return BUSINESS_SPRITES[type] ?? bizStorefront.url;
 }
+
+/**
+ * Tier-variant art for the development layer: each building track gets a
+ * distinct painting per tier so upgrades read on the map.
+ */
+export const BUILDING_TIER_SPRITES: Record<string, Record<number, string>> = {
+  store_front: { 1: bizStorefront.url, 2: storefrontT2, 3: storefrontT3 },
+  brothel: { 1: bizBrothel.url, 2: brothelT2, 3: brothelT3 },
+  gambling_den: { 1: bizGambling.url, 2: gamblingT2, 3: gamblingT3 },
+  loan_sharking: { 1: bizLoan.url, 2: loanT2, 3: loanT3 },
+  legal_front: { 1: legalT1, 2: legalT2, 3: legalT3 },
+  safehouse: { 1: safehouseT1, 2: safehouseT2 },
+};
+
+/** Sprite for a building track at a given tier (falls back to tier 1 art). */
+export function buildingSprite(type?: string | null, tier: number = 1): string | null {
+  if (!type) return null;
+  const track = BUILDING_TIER_SPRITES[type];
+  if (!track) return businessSprite(type);
+  return track[tier] ?? track[1] ?? null;
+}
+
