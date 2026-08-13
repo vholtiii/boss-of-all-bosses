@@ -16,6 +16,7 @@ import { LeftSidePanel, RightSidePanel } from '@/components/GameSidePanels';
 import { useEnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { getBusinessSupplyDecayMultiplier } from '@/lib/supply-flow';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
+import { useAmbience } from '@/hooks/useAmbience';
 import SaveLoadDialog from '@/components/SaveLoadDialog';
 import { useGameSaveLoad } from '@/hooks/useGameSaveLoad';
 import EnemyHexActionDialog from '@/components/EnemyHexActionDialog';
@@ -126,7 +127,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   } = useEnhancedMafiaGameState(config.family, config.resources, config.difficulty, config.seed, config.mapSize);
 
   const { notifySuccess, notifyError, notifyWarning, notifyInfo, notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
-  const { playSound, playSoundSequence, updateSoundConfig, soundConfig } = useSoundSystem();
+  const { playSound, playSoundSequence, playBark, updateSoundConfig, soundConfig } = useSoundSystem();
   const [showSoundSettings, setShowSoundSettings] = useState(false);
 
   // Drain pending notifications from game state into the notification system
