@@ -16,10 +16,10 @@ That makes development the one economic system that ignores the map, which fight
 
 | Track | Who can break ground |
 |---|---|
-| Store Front, Loan Office (shylock), Legal Front, Safehouse | Soldier, capo, or boss |
-| Brothel, Gambling Den | Capo or boss only |
+| Store Front, Loan Office (shylock), Legal Front | Soldier, capo, or boss |
+| Brothel, Gambling Den, Safehouse | Capo or boss only |
 
-A soldier who tries to break ground on a brothel or den gets a clear refusal: *"This is capo work. Send someone with rank."*
+A soldier who tries to break ground on a brothel, den, or safehouse gets a clear refusal: *"This is capo work. Send someone with rank."*
 
 **Crew on site sets the pace.** Construction months are no longer fixed — each turn a block under construction advances by:
 
