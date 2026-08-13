@@ -12546,9 +12546,10 @@ export const useEnhancedMafiaGameState = (
         addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_BRIBE_TERRITORY);
         state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: '💵 Territory Acquired!',
+          type: 'success', title: '🤝 Sitdown Accepted — 💵 Territory Acquired!',
           message: `Peacefully bribed for the hex. Cost: $${cost.toLocaleString()}. Tension -${TENSION_REDUCE_BRIBE_TERRITORY}.`,
         }];
+
         break;
       }
       case 'alliance': {
