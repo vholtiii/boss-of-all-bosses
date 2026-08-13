@@ -1155,6 +1155,41 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                             className="pointer-events-none"
                           />
                         )}
+                        {/* Claim range — dashed family ring on blocks this soldier can stake */}
+                        {(() => {
+                          const hint = claimHints.get(key);
+                          if (!hint) return null;
+                          const fc = familyColors[playerFamily] || '#D4AF37';
+                          const ready = hint === 'ready';
+                          return (
+                            <>
+                              <polygon
+                                points={getHexPoints(x, y, baseHexRadius - 3)}
+                                fill="none"
+                                stroke={fc}
+                                strokeOpacity={ready ? 0.9 : 0.3}
+                                strokeWidth={ready ? 2 : 1.2}
+                                strokeDasharray="3 4"
+                                className="pointer-events-none"
+                              >
+                                {ready && <animate attributeName="stroke-opacity" values="0.9;0.35;0.9" dur="2.2s" repeatCount="indefinite" />}
+                              </polygon>
+                              <text
+                                x={x}
+                                y={y + baseHexRadius * 0.62}
+                                textAnchor="middle"
+                                fontSize="7"
+                                fill={fc}
+                                fillOpacity={ready ? 0.95 : 0.4}
+                                fontWeight="bold"
+                                className="pointer-events-none select-none"
+                              >
+                                🏴 CLAIM
+                              </text>
+                            </>
+                          );
+                        })()}
+
                         {isPlayerTerritory && !tile.isHeadquarters && (
                           <polygon
                             points={getHexPoints(x, y, baseHexRadius - 2)}
