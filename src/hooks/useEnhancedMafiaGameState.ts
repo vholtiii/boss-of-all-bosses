@@ -12603,9 +12603,10 @@ export const useEnhancedMafiaGameState = (
         addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_SHARE_PROFITS);
         state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: '💰 Profit Sharing Deal!',
+          type: 'success', title: '🤝 Sitdown Accepted — 💰 Profit Sharing Deal!',
           message: `You'll earn 30% of this hex's income for ${duration} turns. Cost: $${cost.toLocaleString()}. Tension -${TENSION_REDUCE_SHARE_PROFITS}.`,
         }];
+
         break;
       }
       case 'safe_passage': {
