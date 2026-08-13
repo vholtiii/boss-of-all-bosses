@@ -328,4 +328,83 @@ export const useAmbience = ({ soundConfig, ambience, active = true }: UseAmbienc
     ramp(gains.siren, m.siren, 2);
     ramp(gains.gunfire, m.gunfire, 2);
   }, [mixKey]);
+
+  // --- One-shot accents when the environment *changes state* ---
+  const prevRef = useRef<AmbienceState | null>(null);
+  const heatTier = (h: number) => (h >= 90 ? 4 : h >= 80 ? 3 : h >= 60 ? 2 : h >= 40 ? 1 : 0);
+
+  useEffect(() => {
+    const prev = prevRef.current;
+    prevRef.current = state;
+    const ctx = ctxRef.current;
+    const master = masterRef.current;
+    if (!prev || !ctx || !master || levelRef.current <= 0 || !reactive) return;
+
+    const now = ctx.currentTime;
+
+    /** Doppler siren sweeping past */
+    const sirenPass = () => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(760, now);
+      osc.frequency.exponentialRampToValueAtTime(430, now + 2.6);
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 1200;
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.linearRampToValueAtTime(0.12, now + 0.7);
+      g.gain.linearRampToValueAtTime(0.0001, now + 2.8);
+      osc.connect(lp); lp.connect(g); g.connect(master);
+      osc.start(now); osc.stop(now + 2.9);
+    };
+
+    /** Low transition hit (war on/off) */
+    const transitionHit = (up: boolean) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(up ? 48 : 96, now);
+      osc.frequency.exponentialRampToValueAtTime(up ? 96 : 40, now + 1.6);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.linearRampToValueAtTime(0.22, now + 0.15);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 2.2);
+      osc.connect(g); g.connect(master);
+      osc.start(now); osc.stop(now + 2.3);
+    };
+
+    /** The city audibly opens up on a milestone */
+    const citySwell = () => {
+      const gains = gainsRef.current;
+      const node = gains.crowd;
+      if (!node) return;
+      try {
+        const target = mixRef.current.crowd;
+        node.gain.cancelScheduledValues(now);
+        node.gain.setValueAtTime(node.gain.value, now);
+        node.gain.linearRampToValueAtTime(Math.min(0.6, target + 0.22), now + 1.2);
+        node.gain.linearRampToValueAtTime(target, now + 5);
+      } catch { /* noop */ }
+    };
+
+    /** Wind gust when things go cold */
+    const windSurge = () => {
+      const node = gainsRef.current.wind;
+      if (!node) return;
+      try {
+        const target = mixRef.current.wind;
+        node.gain.cancelScheduledValues(now);
+        node.gain.setValueAtTime(node.gain.value, now);
+        node.gain.linearRampToValueAtTime(Math.min(0.5, target + 0.25), now + 1.5);
+        node.gain.linearRampToValueAtTime(target, now + 6);
+      } catch { /* noop */ }
+    };
+
+    if (heatTier(state.heat) > heatTier(prev.heat)) sirenPass();
+    if (state.atWar !== prev.atWar) transitionHit(state.atWar);
+    if (state.phase > prev.phase) citySwell();
+    if (prev.prosperity - state.prosperity > 0.18) windSurge();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.heat, state.atWar, state.phase, state.prosperity, state.ricoActive]);
 };
+
