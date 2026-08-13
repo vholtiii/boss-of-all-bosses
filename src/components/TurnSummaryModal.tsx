@@ -216,6 +216,9 @@ const TurnSummaryModal: React.FC<TurnSummaryModalProps> = ({ report, open, onClo
                     {ib.shareProfits > 0 && (
                       <div className="flex justify-between"><span className="text-muted-foreground">Share-profits pacts</span><span className="font-mono text-green-400">+${ib.shareProfits.toLocaleString()}</span></div>
                     )}
+                    {(ib.shakedowns ?? 0) > 0 && (
+                      <div className="flex justify-between"><span className="text-muted-foreground">Shakedowns (one-off extortion)</span><span className="font-mono text-green-400">+${(ib.shakedowns ?? 0).toLocaleString()}</span></div>
+                    )}
                     {ib.penalties.map((p, i) => (
                       <div key={`p${i}`} className="flex justify-between">
                         <span className="text-amber-400/90">{p.label}</span>
