@@ -129,6 +129,8 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   const [planHitUnitMenu, setPlanHitUnitMenu] = useState<{ tile: HexTile; enemyUnits: DeployedUnit[] } | null>(null);
   const [flipTargetMenu, setFlipTargetMenu] = useState<{ tile: HexTile; actingCapo: DeployedUnit; targets: Array<{ unit: DeployedUnit; loyalty: number; chance: number; cost: number }> } | null>(null);
   const [expandedHQKey, setExpandedHQKey] = useState<string | null>(null);
+  const [claimFlash, setClaimFlash] = useState<{ q: number; r: number; s: number; id: number } | null>(null);
+
   const [showLegend, setShowLegend] = useState(false);
   // Clear action menu when phase changes
   const turnPhaseRef = gameState?.turnPhase;
@@ -266,6 +268,22 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
     () => deployedUnits.find(u => u.id === gameState?.selectedUnitId) || null,
     [deployedUnits, gameState?.selectedUnitId],
   );
+
+  /** Blocks the selected soldier could stake this turn: 'ready' = claimable now, 'blocked' = in range but gated. */
+  const claimHints = useMemo(() => {
+    const hints = new Map<string, 'ready' | 'blocked'>();
+    if (!selectedUnit || selectedUnit.type !== 'soldier' || selectedUnit.family !== playerFamily) return hints;
+    if ((gameState?.gamePhase || 1) >= 3) return hints;
+    const noActions = (gameState?.actionsRemaining ?? 0) <= 0;
+    hexMap.forEach(t => {
+      const neutral = !t.controllingFamily || t.controllingFamily === 'neutral';
+      if (!neutral || t.isHeadquarters || t.pendingClaim) return;
+      if (hexDistance(selectedUnit, t) > 1) return;
+      hints.set(`${t.q},${t.r},${t.s}`, (t.anchor || noActions) ? 'blocked' : 'ready');
+    });
+    return hints;
+  }, [selectedUnit, hexMap, playerFamily, gameState?.gamePhase, gameState?.actionsRemaining]);
+
 
   /** Flat unit layer positions (non-HQ), keyed by unit id for motion tweening. */
   const unitRenderList = useMemo(() => {
