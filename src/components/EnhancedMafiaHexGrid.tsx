@@ -616,10 +616,10 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           (isSoldier && unitOnTargetHex) || 
           (isCapo && (unitOnTargetHex || true))
         ) && (isNeutral || isEnemy) && !tile.isHeadquarters && !enemyExtortLocked;
-        // Engine accepts a claim from a soldier OR capo that is on or adjacent to the hex.
+        // Claiming is a SOLDIER action costing 1 action. Capos claim for free by moving on.
         const noActionsLeft = (gameState?.actionsRemaining ?? 0) <= 0;
         const unitAdjacentToTarget = !!selectedUnit && hexDistance(selectedUnit, tile) === 1;
-        const canClaim = !phase3Locked && isNeutral && (isSoldier || isCapo) &&
+        const canClaim = !phase3Locked && isNeutral && isSoldier &&
           (unitOnTargetHex || unitAdjacentToTarget) && !tile.anchor && !tile.isHeadquarters && !noActionsLeft;
         const isCapoWounded = isCapo && (selectedUnit as any).woundedTurnsRemaining > 0;
         // Negotiate: only available during action phase when a pending negotiation is ready on this hex
@@ -661,8 +661,9 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         if (!canClaim && isNeutral) {
           if (phase3Locked) reasons.claim = '🔒 Phase 3 — shifts through influence';
           else if (tile.anchor) reasons.claim = 'Standing racket — extort or buy it out first';
-          else if (!isSoldier && !isCapo) reasons.claim = 'Need a soldier or capo';
-          else if (!unitOnTargetHex && !unitAdjacentToTarget) reasons.claim = 'Move a unit onto or next to the hex';
+          else if (isCapo) reasons.claim = 'Capos claim by moving onto the block — no action spent';
+          else if (!isSoldier) reasons.claim = 'Need a soldier (1 action)';
+          else if (!unitOnTargetHex && !unitAdjacentToTarget) reasons.claim = 'Move a soldier onto or next to the block';
           else if (noActionsLeft) reasons.claim = 'No actions left';
         }
         if (!canSabotage && isEnemy) {
@@ -2145,6 +2146,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                           });
                           setActionMenu(null);
                         }}
+                        title={selectedUnit && (selectedUnit.q !== actionMenu.tile.q || selectedUnit.r !== actionMenu.tile.r || selectedUnit.s !== actionMenu.tile.s) ? 'Moves your soldier onto the block · 1 action' : 'Claim this block · 1 action'}
                         className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-secondary/90 hover:bg-secondary text-secondary-foreground text-xs font-bold transition-colors", isRec('claim') && recCls)}
                       >
                         🏴 Claim<CostChip k="claim" />
