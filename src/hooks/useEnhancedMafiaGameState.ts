@@ -7737,9 +7737,10 @@ export const useEnhancedMafiaGameState = (
           state.incomingSitdowns.push(newSitdown);
           state.pendingNotifications.push({
             type: 'info' as const,
-            title: `📩 ${capo.name} (${famLabel2}) Wants to Talk`,
+            title: `📩 Sitdown Proposed — ${capo.name} (${famLabel2})`,
             message: `Proposes a ${dealLabel2} on your hex at (${bestTile.q}, ${bestTile.r}) for $${proposedAmount.toLocaleString()}. 2 turns to respond.`,
           });
+
           state.combatLog = state.combatLog || [];
           state.combatLog.push(`📩 ${famLabel2} capo ${capo.name} proposed ${dealLabel2} on (${bestTile.q}, ${bestTile.r}) — $${proposedAmount.toLocaleString()}`);
           if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: `${capo.name} requested territory sitdown (${dealLabel2})` });
