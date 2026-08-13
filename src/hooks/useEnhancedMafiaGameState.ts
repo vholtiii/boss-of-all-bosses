@@ -754,7 +754,10 @@ export interface EnhancedMafiaGameState {
       capo?: { name: string; family: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo'; level: number };
     }>;
   }>;
+  /** Transient: set when a capo escorts soldiers into a new hex, so the UI can play the escort movement sound. Cleared by UI. */
+  _escortMoved?: boolean;
 }
+
 
 // ============ HEX MATH ============
 const hexDistance = (a: {q:number;r:number;s:number}, b: {q:number;r:number;s:number}) =>
