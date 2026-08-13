@@ -2704,8 +2704,8 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
 
         {/* Hover Info */}
         <AnimatePresence>
-          {(hoveredHex || pinnedHex) && (() => {
-            const displayHex = pinnedHex || hoveredHex!;
+          {(delayedHoverHex || pinnedHex) && (() => {
+            const displayHex = pinnedHex || delayedHoverHex!;
             return (
             <motion.div
               key={`${displayHex.q},${displayHex.r},${displayHex.s}`}
@@ -2713,7 +2713,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
               className="pointer-events-auto w-full max-w-none cursor-pointer rounded-lg border border-noir-light bg-noir-dark/90 p-4 text-white backdrop-blur-sm transition-colors hover:border-mafia-gold/60"
-            onClick={() => { handleHexClick(displayHex); setPinnedHex(null); }}
+            onClick={() => { handleHexClick(displayHex); setPinnedHex(null); setDelayedHoverHex(null); if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current); }}
           >
             {(() => {
               const districtHexes = (gameState?.hexMap || []).filter(t => t.district === displayHex.district);
