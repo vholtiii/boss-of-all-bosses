@@ -2539,7 +2539,7 @@ export const useEnhancedMafiaGameState = (
             ...prev, deployedUnits: newUnits, hexMap: prev.hexMap,
             resources: prev.resources,
             contestedHexes: newContested,
-            selectedUnitId: updatedUnit.movesRemaining > 0 ? updatedUnit.id : null,
+            selectedUnitId: updatedUnit.id, // stay selected even with 0 moves left so actions (claim, extort…) remain available
             availableMoveHexes: [],
             pendingNotifications: contestNotifications,
           };
@@ -2694,7 +2694,7 @@ export const useEnhancedMafiaGameState = (
       const newState = {
         ...prev, deployedUnits: newUnits, hexMap: newHexMap,
         resources: newResources,
-        selectedUnitId: updatedUnit.movesRemaining > 0 ? updatedUnit.id : null,
+        selectedUnitId: updatedUnit.id, // stay selected even with 0 moves left so actions (claim, extort…) remain available
         availableMoveHexes: newAvailableMoves,
         pendingNotifications: notifications,
       };
