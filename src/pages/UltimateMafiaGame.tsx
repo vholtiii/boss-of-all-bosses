@@ -34,6 +34,7 @@ import WarDeclarationModal from '@/components/WarDeclarationModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
 import { GameErrorBoundary } from '@/components/GameErrorBoundary';
 import { PanelErrorBoundary } from '@/components/PanelErrorBoundary';
+import { devLog } from '@/lib/devLog';
 
 import { Button } from '@/components/ui/button';
 import { 
