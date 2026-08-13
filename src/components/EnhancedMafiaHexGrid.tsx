@@ -128,7 +128,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [cityHex, setCityHex] = useState<{ q: number; r: number; s: number } | null>(null);
-  const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; canAssaultHQ?: boolean; canFlipSoldier?: boolean; negotiateCapoId?: string; pendingNegotiationId?: string; reasons?: Record<string, string> } | null>(null);
+  const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; canAssaultHQ?: boolean; canFlipSoldier?: boolean; canDevelop?: boolean; negotiateCapoId?: string; pendingNegotiationId?: string; reasons?: Record<string, string> } | null>(null);
   const [planHitUnitMenu, setPlanHitUnitMenu] = useState<{ tile: HexTile; enemyUnits: DeployedUnit[] } | null>(null);
   const [flipTargetMenu, setFlipTargetMenu] = useState<{ tile: HexTile; actingCapo: DeployedUnit; targets: Array<{ unit: DeployedUnit; loyalty: number; chance: number; cost: number }> } | null>(null);
   const [expandedHQKey, setExpandedHQKey] = useState<string | null>(null);
@@ -478,7 +478,8 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   const handleHexClick = (tile: HexTile) => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     onClearHighlight?.();
-    setPinnedHex(null);
+    // Keep blocks you control pinned so the development panel stays open
+    setPinnedHex(tile.controllingFamily === playerFamily && !tile.isHeadquarters ? tile : null);
     setDelayedHoverHex(null);
     const turnPhase = gameState?.turnPhase || 'waiting';
 
@@ -670,6 +671,9 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         const hasSabotageTarget = !!tile.anchor || tileHasBuildings(tile);
         const canSabotage = isEnemy && isSoldier && hasSabotageTarget && !tile.isHeadquarters;
         const canSafehouse = isOwned && !tile.isHeadquarters && !isCapoWounded;
+        // Develop the Block — open the development panel (free, no action cost)
+        const nearTile = unitOnTargetHex || unitAdjacentToTarget;
+        const canDevelop = isOwned && !tile.isHeadquarters && !tile.anchor && nearTile;
         const negotiateCapoId = readyPending?.capoId || (isCapo ? selectedUnit.id : undefined);
         
         // HQ Assault: soldier adjacent to enemy HQ — Phase 4 required
@@ -735,17 +739,23 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           else if (!hasCapoWithin3) reasons.flip_soldier = 'Need a Capo within 3 hexes of enemy HQ';
         }
         
+        if (!canDevelop && !tile.isHeadquarters && nearTile) {
+          if (tile.anchor && isOwned) reasons.develop = 'Buy out the racket first';
+          else if (tile.anchor && !isOwned) reasons.develop = 'Extort, then buy out the racket';
+          else if (!isOwned) reasons.develop = 'Claim this block first';
+        }
+
         // Filter out empty reasons
         Object.keys(reasons).forEach(k => { if (!reasons[k]) delete reasons[k]; });
         
-        const hasAnyAction = canHit || canExtort || canClaim || canNegotiate || canSabotage || canSafehouse || canAssaultHQ || canFlipSoldier;
+        const hasAnyAction = canHit || canExtort || canClaim || canNegotiate || canSabotage || canSafehouse || canAssaultHQ || canFlipSoldier || canDevelop;
         const hasAnyReason = Object.keys(reasons).length > 0;
         
         if (hasAnyAction || hasAnyReason) {
           if (actionMenu && actionMenu.tile.q === tile.q && actionMenu.tile.r === tile.r) {
             setActionMenu(null);
           } else {
-            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, canAssaultHQ, canFlipSoldier, negotiateCapoId, pendingNegotiationId: readyPending?.id, reasons });
+            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, canAssaultHQ, canFlipSoldier, canDevelop, negotiateCapoId, pendingNegotiationId: readyPending?.id, reasons });
           }
           return;
         }
@@ -2102,7 +2112,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
             {actionMenu && (() => {
               const { x, y } = getHexPosition(actionMenu.tile.q, actionMenu.tile.r);
               const menuWidth = 150;
-              const activeCount = [actionMenu.canHit, actionMenu.canExtort, actionMenu.canClaim, actionMenu.canNegotiate, actionMenu.canSabotage, actionMenu.canSafehouse, actionMenu.canAssaultHQ, actionMenu.canFlipSoldier].filter(Boolean).length;
+              const activeCount = [actionMenu.canHit, actionMenu.canExtort, actionMenu.canClaim, actionMenu.canNegotiate, actionMenu.canSabotage, actionMenu.canSafehouse, actionMenu.canAssaultHQ, actionMenu.canFlipSoldier, actionMenu.canDevelop].filter(Boolean).length;
               const disabledCount = Object.keys(actionMenu.reasons || {}).length;
               const totalItems = activeCount + disabledCount;
               const menuHeight = totalItems * 38 + 30;
@@ -2120,6 +2130,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                 negotiate: '1 action',
                 safehouse: '1 action · $5k',
                 assault_hq: '2 actions',
+                develop: 'free',
                 flip_soldier: `1 action · $${flipCost.toLocaleString()}`,
               };
 
@@ -2326,6 +2337,22 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                       </button>
                     ) : reasons.safehouse ? (
                       <DisabledAction icon="🏠" label="Safehouse" reason={reasons.safehouse} />
+                    ) : null}
+                    {actionMenu.canDevelop ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPinnedHex(actionMenu.tile);
+                          setCityHex({ q: actionMenu.tile.q, r: actionMenu.tile.r, s: actionMenu.tile.s });
+                          setActionMenu(null);
+                        }}
+                        title="Open build orders for this block · no action cost"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-emerald-700/90 hover:bg-emerald-700 text-white text-xs font-bold transition-colors"
+                      >
+                        🏗️ Develop Block<CostChip k="develop" />
+                      </button>
+                    ) : reasons.develop ? (
+                      <DisabledAction icon="🏗️" label="Develop Block" reason={reasons.develop} />
                     ) : null}
                     {actionMenu.canAssaultHQ ? (
                       <button
@@ -2688,9 +2715,9 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           playerFamily={playerFamily}
         />
 
-        {/* Block development — owned hexes only */}
+        {/* Block development — owned hexes, or a blocker note when our crew stands on someone else's block */}
         <AnimatePresence>
-          {pinnedHex && pinnedHex.controllingFamily === playerFamily && !cityHex && (
+          {pinnedHex && !cityHex && (
             <TileDevelopmentPanel
               key={`dev-${pinnedHex.q},${pinnedHex.r},${pinnedHex.s}`}
               tile={(gameState?.hexMap || []).find((t: HexTile) => t.q === pinnedHex.q && t.r === pinnedHex.r && t.s === pinnedHex.s) || pinnedHex}

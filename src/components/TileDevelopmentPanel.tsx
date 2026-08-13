@@ -37,7 +37,32 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
   tile, gameState, playerFamily, onStartBuild, onSetTilePolicy, onBuyOutAnchor, onOpenCityPanel,
 }) => {
   const [tab, setTab] = useState<'orders' | 'build'>('orders');
-  if (!tile || tile.controllingFamily !== playerFamily) return null;
+  if (!tile) return null;
+
+  // Not ours (yet) — if our crew is standing here, explain the blocker instead of showing nothing
+  if (tile.controllingFamily !== playerFamily) {
+    const crewHere = (gameState?.deployedUnits || []).some(
+      (u: any) => u.family === playerFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s
+    );
+    if (!crewHere) return null;
+    const blocked = tile.anchor
+      ? (tile.anchor.isExtorted
+        ? 'The racket still belongs to its owner. Buy it out to convert the block, then you can build.'
+        : 'A standing racket runs this block. Extort it first, then buy it out before building.')
+      : 'This block is not yours yet. Claim it with a soldier (1 action) before you can build.';
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 12 }}
+        className="panel-noir pointer-events-auto w-full rounded-lg border border-noir-light bg-noir-dark/92 p-3 text-white backdrop-blur-sm"
+      >
+        <div className="text-[11px] font-bold uppercase tracking-wider text-amber-300/90">No build orders here</div>
+        <p className="mt-1 text-[11px] leading-relaxed text-white/70">{blocked}</p>
+        <div className="mt-2 text-[10px] uppercase tracking-wider text-white/40">Extort → Buy Out → Build</div>
+      </motion.div>
+    );
+  }
 
   const money = gameState?.resources?.money ?? 0;
   const actions = gameState?.actionsRemaining ?? 0;
