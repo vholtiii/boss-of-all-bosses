@@ -129,6 +129,8 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   const [planHitUnitMenu, setPlanHitUnitMenu] = useState<{ tile: HexTile; enemyUnits: DeployedUnit[] } | null>(null);
   const [flipTargetMenu, setFlipTargetMenu] = useState<{ tile: HexTile; actingCapo: DeployedUnit; targets: Array<{ unit: DeployedUnit; loyalty: number; chance: number; cost: number }> } | null>(null);
   const [expandedHQKey, setExpandedHQKey] = useState<string | null>(null);
+  const [claimFlash, setClaimFlash] = useState<{ q: number; r: number; s: number; id: number } | null>(null);
+
   const [showLegend, setShowLegend] = useState(false);
   // Clear action menu when phase changes
   const turnPhaseRef = gameState?.turnPhase;
@@ -266,6 +268,22 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
     () => deployedUnits.find(u => u.id === gameState?.selectedUnitId) || null,
     [deployedUnits, gameState?.selectedUnitId],
   );
+
+  /** Blocks the selected soldier could stake this turn: 'ready' = claimable now, 'blocked' = in range but gated. */
+  const claimHints = useMemo(() => {
+    const hints = new Map<string, 'ready' | 'blocked'>();
+    if (!selectedUnit || selectedUnit.type !== 'soldier' || selectedUnit.family !== playerFamily) return hints;
+    if ((gameState?.gamePhase || 1) >= 3) return hints;
+    const noActions = (gameState?.actionsRemaining ?? 0) <= 0;
+    hexMap.forEach(t => {
+      const neutral = !t.controllingFamily || t.controllingFamily === 'neutral';
+      if (!neutral || t.isHeadquarters || t.pendingClaim) return;
+      if (hexDistance(selectedUnit, t) > 1) return;
+      hints.set(`${t.q},${t.r},${t.s}`, (t.anchor || noActions) ? 'blocked' : 'ready');
+    });
+    return hints;
+  }, [selectedUnit, hexMap, playerFamily, gameState?.gamePhase, gameState?.actionsRemaining]);
+
 
   /** Flat unit layer positions (non-HQ), keyed by unit id for motion tweening. */
   const unitRenderList = useMemo(() => {
@@ -659,13 +677,14 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           else if (noActions) reasons.extort = 'No actions left';
         }
         if (!canClaim && isNeutral) {
-          if (phase3Locked) reasons.claim = '🔒 Phase 3 — shifts through influence';
-          else if (tile.anchor) reasons.claim = 'Standing racket — extort or buy it out first';
-          else if (isCapo) reasons.claim = 'Capos claim by moving onto the block — no action spent';
-          else if (!isSoldier) reasons.claim = 'Need a soldier (1 action)';
-          else if (!unitOnTargetHex && !unitAdjacentToTarget) reasons.claim = 'Move a soldier onto or next to the block';
-          else if (noActionsLeft) reasons.claim = 'No actions left';
+          if (phase3Locked) reasons.claim = '🔒 Phase 3 — turf shifts through influence';
+          else if (tile.anchor) reasons.claim = 'Extort or buy out the racket first';
+          else if (isCapo) reasons.claim = 'Capos claim free by moving on';
+          else if (!isSoldier) reasons.claim = 'Send a soldier — 1 action';
+          else if (!unitOnTargetHex && !unitAdjacentToTarget) reasons.claim = 'Move within one block';
+          else if (noActionsLeft) reasons.claim = 'Out of actions — end the turn';
         }
+
         if (!canSabotage && isEnemy) {
           if (!hasSabotageTarget) reasons.sabotage = 'No business to sabotage';
           else if (!isSoldier) reasons.sabotage = 'Need a soldier';
@@ -1137,6 +1156,41 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                             className="pointer-events-none"
                           />
                         )}
+                        {/* Claim range — dashed family ring on blocks this soldier can stake */}
+                        {(() => {
+                          const hint = claimHints.get(key);
+                          if (!hint) return null;
+                          const fc = familyColors[playerFamily] || '#D4AF37';
+                          const ready = hint === 'ready';
+                          return (
+                            <>
+                              <polygon
+                                points={getHexPoints(x, y, baseHexRadius - 3)}
+                                fill="none"
+                                stroke={fc}
+                                strokeOpacity={ready ? 0.9 : 0.3}
+                                strokeWidth={ready ? 2 : 1.2}
+                                strokeDasharray="3 4"
+                                className="pointer-events-none"
+                              >
+                                {ready && <animate attributeName="stroke-opacity" values="0.9;0.35;0.9" dur="2.2s" repeatCount="indefinite" />}
+                              </polygon>
+                              <text
+                                x={x}
+                                y={y + baseHexRadius * 0.62}
+                                textAnchor="middle"
+                                fontSize="7"
+                                fill={fc}
+                                fillOpacity={ready ? 0.95 : 0.4}
+                                fontWeight="bold"
+                                className="pointer-events-none select-none"
+                              >
+                                🏴 CLAIM
+                              </text>
+                            </>
+                          );
+                        })()}
+
                         {isPlayerTerritory && !tile.isHeadquarters && (
                           <polygon
                             points={getHexPoints(x, y, baseHexRadius - 2)}
@@ -1251,9 +1305,38 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                               >
                                 ⏳
                               </text>
+                              <text
+                                x={x}
+                                y={y + baseHexRadius * 0.62}
+                                textAnchor="middle"
+                                fontSize="6.5"
+                                fill={claimColor}
+                                fontWeight="bold"
+                                className="pointer-events-none select-none"
+                              >
+                                {tile.pendingClaim.family === playerFamily ? 'YOURS NEXT TURN' : 'CLAIM PENDING'}
+                              </text>
                             </>
                           );
                         })()}
+                        {/* Claim confirmation flash */}
+                        {claimFlash && claimFlash.q === tile.q && claimFlash.r === tile.r && claimFlash.s === tile.s && (
+                          <text
+                            key={claimFlash.id}
+                            x={x}
+                            y={y - baseHexRadius * 0.7}
+                            textAnchor="middle"
+                            fontSize="9"
+                            fill={familyColors[playerFamily] || '#D4AF37'}
+                            fontWeight="bold"
+                            className="pointer-events-none select-none"
+                          >
+                            <animate attributeName="y" from={y - baseHexRadius * 0.7} to={y - baseHexRadius * 1.5} dur="1.1s" fill="freeze" />
+                            <animate attributeName="opacity" values="0;1;1;0" dur="1.1s" fill="freeze" />
+                            🏴 CLAIM STAKED
+                          </text>
+                        )}
+
                       </>
                     );
                   })()}
@@ -2059,10 +2142,12 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                         key={i}
                         className={cn(
                           "w-1.5 h-1.5 rounded-full transition-colors",
-                          i < ar ? "bg-primary shadow-[0_0_4px_hsl(var(--primary))]" : "bg-muted-foreground/25"
+                          i < ar ? "bg-primary shadow-[0_0_4px_hsl(var(--primary))]" : "bg-muted-foreground/25",
+                          i === ar - 1 && "animate-pulse"
                         )}
                       />
                     ))}
+
                     <span className="text-[9px] font-bold text-muted-foreground ml-0.5">{ar}/{am}</span>
                   </div>
                   {recArr.length > 0 && (
@@ -2133,27 +2218,40 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                     ) : reasons.extort ? (
                       <DisabledAction icon="💰" label="Extort" reason={reasons.extort} />
                     ) : null}
-                    {actionMenu.canClaim ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onAction) onAction({
-                            type: 'claim_territory',
-                            targetQ: actionMenu.tile.q,
-                            targetR: actionMenu.tile.r,
-                            targetS: actionMenu.tile.s,
-                            unitId: gameState.selectedUnitId,
-                          });
-                          setActionMenu(null);
-                        }}
-                        title={selectedUnit && (selectedUnit.q !== actionMenu.tile.q || selectedUnit.r !== actionMenu.tile.r || selectedUnit.s !== actionMenu.tile.s) ? 'Moves your soldier onto the block · 1 action' : 'Claim this block · 1 action'}
-                        className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-secondary/90 hover:bg-secondary text-secondary-foreground text-xs font-bold transition-colors", isRec('claim') && recCls)}
-                      >
-                        🏴 Claim<CostChip k="claim" />
-                      </button>
-                    ) : reasons.claim ? (
-                      <DisabledAction icon="🏴" label="Claim Territory" reason={reasons.claim} />
+                    {actionMenu.canClaim ? (() => {
+                      const needsMove = !!selectedUnit && (selectedUnit.q !== actionMenu.tile.q || selectedUnit.r !== actionMenu.tile.r || selectedUnit.s !== actionMenu.tile.s);
+                      const fc = familyColors[playerFamily] || 'hsl(var(--primary))';
+                      return (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onAction) onAction({
+                              type: 'claim_territory',
+                              targetQ: actionMenu.tile.q,
+                              targetR: actionMenu.tile.r,
+                              targetS: actionMenu.tile.s,
+                              unitId: gameState.selectedUnitId,
+                            });
+                            setClaimFlash({ q: actionMenu.tile.q, r: actionMenu.tile.r, s: actionMenu.tile.s, id: Date.now() });
+                            window.setTimeout(() => setClaimFlash(null), 1200);
+                            setActionMenu(null);
+                          }}
+                          title={needsMove ? 'Your soldier moves onto the block and stakes it · 1 action' : 'Stake this block for the family · 1 action'}
+                          style={{ borderLeft: `3px solid ${fc}` }}
+                          className={cn("flex flex-col items-start px-2.5 py-1.5 rounded-md bg-secondary/90 hover:bg-secondary text-secondary-foreground transition-colors", isRec('claim') && recCls)}
+                        >
+                          <span className="flex items-center gap-1.5 w-full text-xs font-bold">
+                            🏴 {needsMove ? 'Move In & Claim' : 'Claim Block'}<CostChip k="claim" />
+                          </span>
+                          <span className="text-[8px] font-medium opacity-70">
+                            {needsMove ? 'Soldier moves in · yours next turn' : 'Yours next turn if uncontested'}
+                          </span>
+                        </button>
+                      );
+                    })() : reasons.claim ? (
+                      <DisabledAction icon="🏴" label="Claim Block" reason={reasons.claim} />
                     ) : null}
+
                     {actionMenu.canNegotiate ? (
                       <button
                         onClick={(e) => {
