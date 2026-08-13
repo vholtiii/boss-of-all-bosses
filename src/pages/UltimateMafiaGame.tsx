@@ -419,6 +419,51 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
   }, [gameState.turn]);
 
+  // ---- Ambient city bed (procedural; sirens scale with heat) ----
+  useAmbience({
+    soundConfig,
+    heat: (gameState as any).policeHeat?.level ?? 0,
+    active: !isWinner && !gameState.gameOver,
+  });
+
+  // ---- Turn start beat + income shimmer ----
+  const lastTurnSoundRef = useRef<number>(gameState.turn);
+  useEffect(() => {
+    if (gameState.turn === lastTurnSoundRef.current) return;
+    lastTurnSoundRef.current = gameState.turn;
+    playSound('turn_start');
+    const income = (gameState as any).lastTurnIncome ?? 0;
+    if (income > 0) setTimeout(() => playSound('coin'), 420);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.turn]);
+
+  // ---- Heat threshold crossings ----
+  const lastHeatTierRef = useRef<number>(-1);
+  useEffect(() => {
+    const heat = (gameState as any).policeHeat?.level ?? 0;
+    const tier = heat >= 80 ? 3 : heat >= 60 ? 2 : heat >= 35 ? 1 : 0;
+    if (lastHeatTierRef.current === -1) { lastHeatTierRef.current = tier; return; }
+    if (tier > lastHeatTierRef.current) {
+      playSound('heat_warning');
+      if (tier >= 3) setTimeout(() => playSound('danger'), 260);
+    }
+    lastHeatTierRef.current = tier;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(gameState as any).policeHeat?.level]);
+
+  // ---- War declared sting ----
+  const lastWarSigRef = useRef<string>('');
+  useEffect(() => {
+    const wd: any = (gameState as any).warDeclaration;
+    const sig = wd ? `${wd.family ?? wd.attacker ?? 'x'}-${wd.turn ?? gameState.turn}` : '';
+    if (sig && sig !== lastWarSigRef.current) {
+      lastWarSigRef.current = sig;
+      playSound('war_declared');
+      playBark('war');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(gameState as any).warDeclaration]);
+
   const handleLoadGame = (loadedGameState: any) => {
     try {
       loadGameState(loadedGameState);
