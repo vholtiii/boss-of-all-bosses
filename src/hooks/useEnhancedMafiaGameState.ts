@@ -2460,7 +2460,9 @@ export const useEnhancedMafiaGameState = (
       }
 
       const newUnits = [...prev.deployedUnits];
+      let escortMoved = false;
       let remainingMoves = unit.movesRemaining - moveCost;
+
 
       // FIX #5: Zone of control applies even on free moves — free movement skips COST but not ZoC
       // Territorial ZoC: Phase 3+ only — soldiers stop near enemy units OR rival-claimed territory
