@@ -5509,6 +5509,11 @@ export const useEnhancedMafiaGameState = (
       };
       
       newState.turnReport = turnReport;
+      // Rolling history for Game Analysis (last 12 turns)
+      newState.turnReportHistory = [
+        ...((newState.turnReportHistory || []).filter(r => r.turn !== turnReport.turn)),
+        turnReport,
+      ].slice(-12);
       
       syncLegacyUnits(newState);
       newState.territories = buildLegacyTerritories(newState.hexMap);
