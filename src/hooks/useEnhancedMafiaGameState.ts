@@ -13175,7 +13175,16 @@ export const useEnhancedMafiaGameState = (
     setGameState(next);
   }, []);
 
+  const clearSoundFlags = useCallback(() => {
+    setGameState(prev => {
+      const next = { ...prev };
+      delete (next as any)._escortMoved;
+      return next;
+    });
+  }, []);
+
   return {
+
     gameState,
     endTurn,
     selectTerritory,
