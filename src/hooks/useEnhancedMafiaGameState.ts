@@ -2375,10 +2375,11 @@ export const useEnhancedMafiaGameState = (
           selectedUnitId: null, availableMoveHexes: [],
           actionsRemaining: prev.actionsRemaining - 1,
           pendingNotifications: [...prev.pendingNotifications, {
-            type: 'info' as const, title: '🚗 Escort Summoned',
+            type: 'info' as const, title: '🚗 Escort Formed',
             message: `${capo.name || 'The Capo'} sent word — a soldier's been called to the meeting point.`,
           }],
         };
+
       }
 
       // Handle "Send Word" action (tactical phase only) — capo requests negotiation on enemy hex
