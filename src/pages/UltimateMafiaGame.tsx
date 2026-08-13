@@ -113,7 +113,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     deployUnit,
     isWinner,
     clearNotifications,
+    clearSoundFlags,
     clearWarDeclaration,
+
     markAlertsRead,
     fortifyUnit,
     setMoveAction,
