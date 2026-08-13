@@ -31,7 +31,7 @@ So a capo can start a casino and hand it off to a soldier — the job continues,
 
 **Buy-out needs presence too.** Buying an anchor racket out requires any unit of yours (soldier, capo, or boss) standing on that block — money changes hands at the table. Standing orders stay free and remote, as they are now.
 
-**AI plays the same rules.** The AI's capo-only build restriction is relaxed to match: its soldiers can start store fronts, loan offices, legal fronts, and safehouses; brothels and dens still need a capo. AI sites tick with the same crew-speed table.
+**AI plays the same rules.** The AI's capo-only build restriction is relaxed to match: its soldiers can start store fronts, loan offices, and legal fronts; brothels, dens, and safehouses still need a capo. AI sites tick with the same crew-speed table.
 
 ## Player-facing changes
 
