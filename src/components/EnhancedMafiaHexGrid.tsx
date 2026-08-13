@@ -2130,6 +2130,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                 negotiate: '1 action',
                 safehouse: '1 action · $5k',
                 assault_hq: '2 actions',
+                develop: 'free',
                 flip_soldier: `1 action · $${flipCost.toLocaleString()}`,
               };
 
