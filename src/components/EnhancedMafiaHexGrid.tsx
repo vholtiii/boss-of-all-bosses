@@ -673,7 +673,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         const canSafehouse = isOwned && !tile.isHeadquarters && !isCapoWounded;
         // Develop the Block — open the development panel (free, no action cost)
         const nearTile = unitOnTargetHex || unitAdjacentToTarget;
-        const canDevelop = isOwned && !tile.isHeadquarters && !tile.anchor?.isAnchor === false ? (isOwned && !tile.isHeadquarters && !(tile.anchor && !tile.anchor.isBoughtOut) && nearTile) : false;
+        const canDevelop = isOwned && !tile.isHeadquarters && !tile.anchor && nearTile;
         const negotiateCapoId = readyPending?.capoId || (isCapo ? selectedUnit.id : undefined);
         
         // HQ Assault: soldier adjacent to enemy HQ — Phase 4 required
