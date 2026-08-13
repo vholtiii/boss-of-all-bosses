@@ -489,6 +489,14 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [(gameState as any).warDeclaration]);
 
+  // ---- Sound-wrapped action callbacks ----
+  const selectUnitSfx = useCallback((...args: any[]) => { playSound('select'); return (selectUnit as any)(...args); }, [selectUnit, playSound]);
+  const moveUnitSfx = useCallback((...args: any[]) => { playSound('unit_move'); return (moveUnit as any)(...args); }, [moveUnit, playSound]);
+  const startBuildSfx = useCallback((...args: any[]) => { playSound('construction_start'); return (startBuild as any)(...args); }, [startBuild, playSound]);
+  const buyOutAnchorSfx = useCallback((...args: any[]) => { playSound('buyout'); return (buyOutAnchor as any)(...args); }, [buyOutAnchor, playSound]);
+  const setTilePolicySfx = useCallback((...args: any[]) => { playSound('policy_set'); return (setTilePolicy as any)(...args); }, [setTilePolicy, playSound]);
+  const buyDistrictUpgradeSfx = useCallback((...args: any[]) => { playSound('upgrade'); return (buyDistrictUpgrade as any)(...args); }, [buyDistrictUpgrade, playSound]);
+
   const handleLoadGame = (loadedGameState: any) => {
     try {
       loadGameState(loadedGameState);
@@ -607,15 +615,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             playerFamily={gameState.playerFamily}
             gameState={gameState}
             onAction={handleAction}
-            onSelectUnit={selectUnit}
-            onMoveUnit={moveUnit}
+            onSelectUnit={selectUnitSfx}
+            onMoveUnit={moveUnitSfx}
             onSelectHeadquarters={handleHeadquartersClick}
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
-            onStartBuild={startBuild}
-            onBuyOutAnchor={buyOutAnchor}
-            onSetTilePolicy={setTilePolicy}
-            onBuyDistrictUpgrade={buyDistrictUpgrade}
+            onStartBuild={startBuildSfx}
+            onBuyOutAnchor={buyOutAnchorSfx}
+            onSetTilePolicy={setTilePolicySfx}
+            onBuyDistrictUpgrade={buyDistrictUpgradeSfx}
             planHitMode={planHitMode}
             planHitStep={planHitStep}
             planHitPlannerId={planHitPlannerId}
@@ -633,16 +641,16 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       id: 'actions',
       label: 'Actions',
       icon: <Swords className="h-4 w-4" />,
-      content: <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} onSelectUnit={selectUnit} />
+      content: <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} onSelectUnit={selectUnitSfx} />
     },
     {
       id: 'intel',
       label: 'Intel',
       icon: <Eye className="h-4 w-4" />,
-      content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} onHighlightFamily={setHighlightedFamily} highlightedFamily={highlightedFamily} onSelectUnit={selectUnit} onOpenOutgoingSitdown={handleOpenOutgoingSitdown} onAcceptIncomingSitdown={handleAcceptIncomingSitdown} onDeclineIncomingSitdown={handleDeclineIncomingSitdown} onCounterIncomingSitdown={handleCounterIncomingSitdown} onJumpHex={(hex) => {
+      content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} onHighlightFamily={setHighlightedFamily} highlightedFamily={highlightedFamily} onSelectUnit={selectUnitSfx} onOpenOutgoingSitdown={handleOpenOutgoingSitdown} onAcceptIncomingSitdown={handleAcceptIncomingSitdown} onDeclineIncomingSitdown={handleDeclineIncomingSitdown} onCounterIncomingSitdown={handleCounterIncomingSitdown} onJumpHex={(hex) => {
         const tile = (gameState.hexMap || []).find((t: any) => t.q === hex.q && t.r === hex.r && t.s === hex.s);
         if (tile) selectTerritory(tile);
-      }} onJumpUnit={(u) => selectUnit(u.type, { q: u.q, r: u.r, s: u.s })} onBuyDistrictUpgrade={buyDistrictUpgrade} />
+      }} onJumpUnit={(u) => selectUnit(u.type, { q: u.q, r: u.r, s: u.s })} onBuyDistrictUpgrade={buyDistrictUpgradeSfx} />
     },
   ];
 
@@ -921,7 +929,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   }
 
   const leftSidebar = (
-    <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} onSelectUnit={selectUnit} />
+    <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} onSelectUnit={selectUnitSfx} />
   );
 
   const rightSidebar = (
@@ -933,7 +941,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       highlightedSupplyHex={bossHighlightHex}
       onHighlightFamily={setHighlightedFamily}
       highlightedFamily={highlightedFamily}
-      onSelectUnit={selectUnit}
+      onSelectUnit={selectUnitSfx}
       onOpenOutgoingSitdown={handleOpenOutgoingSitdown}
       onAcceptIncomingSitdown={handleAcceptIncomingSitdown}
       onDeclineIncomingSitdown={handleDeclineIncomingSitdown}
@@ -943,7 +951,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         if (tile) selectTerritory(tile);
       }}
       onJumpUnit={(u) => selectUnit(u.type, { q: u.q, r: u.r, s: u.s })}
-      onBuyDistrictUpgrade={buyDistrictUpgrade}
+      onBuyDistrictUpgrade={buyDistrictUpgradeSfx}
     />
   );
 
@@ -1930,15 +1938,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             playerFamily={gameState.playerFamily}
             gameState={gameState}
             onAction={handleAction}
-            onSelectUnit={selectUnit}
-            onMoveUnit={moveUnit}
+            onSelectUnit={selectUnitSfx}
+            onMoveUnit={moveUnitSfx}
             onSelectHeadquarters={handleHeadquartersClick}
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
-            onStartBuild={startBuild}
-            onBuyOutAnchor={buyOutAnchor}
-            onSetTilePolicy={setTilePolicy}
-            onBuyDistrictUpgrade={buyDistrictUpgrade}
+            onStartBuild={startBuildSfx}
+            onBuyOutAnchor={buyOutAnchorSfx}
+            onSetTilePolicy={setTilePolicySfx}
+            onBuyDistrictUpgrade={buyDistrictUpgradeSfx}
             planHitMode={planHitMode}
             planHitStep={planHitStep}
             planHitPlannerId={planHitPlannerId}
@@ -1979,7 +1987,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               if (gameState.turnPhase !== 'waiting') {
                 if (!window.confirm('End your turn early? You still have actions remaining.')) return;
               }
-              playSound('notification');
+              playSound('turn_end');
               endTurn();
             }}
             icon={<Play className="h-5 w-5" />}
