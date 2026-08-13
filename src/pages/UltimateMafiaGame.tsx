@@ -1946,7 +1946,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             width={12}
             height={12}
             onBusinessClick={(business) => {
-              console.log('🏢 Business clicked:', business);
+              devLog('🏢 Business clicked:', business);
               selectTerritory({
                 q: business.q,
                 r: business.r,
