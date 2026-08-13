@@ -2619,10 +2619,14 @@ export const useEnhancedMafiaGameState = (
               autoExtortNotification = {
                 type: 'success' as const,
                 title: '💰 Capo Auto-Extortion!',
-                message: `${unit.name || 'Your Capo'} set up a protection racket on the ${workingTile.anchor.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
+                message: `${unit.name || 'Your Capo'} set up a protection racket on the ${workingTile.anchor.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect. It now pays $${(workingTile.anchor.tribute || 0).toLocaleString()}/turn tribute while garrisoned.`,
               };
-              // Auto-extort still finalizes ownership immediately (untouched per plan).
-              return { ...workingTile, controllingFamily: prev.playerFamily, business: workingTile.anchor ? { ...workingTile.anchor, isExtorted: true } : undefined };
+              // Auto-extort finalizes ownership AND flags the anchor as extorted so it pays tribute.
+              return {
+                ...workingTile,
+                controllingFamily: prev.playerFamily,
+                anchor: { ...workingTile.anchor, isExtorted: true, extortedBy: prev.playerFamily },
+              };
             } else {
               // A1: Capo auto-claim now produces a PENDING claim, not finalized.
               // A3: heat applies on initiation.
