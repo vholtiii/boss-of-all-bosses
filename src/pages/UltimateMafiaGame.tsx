@@ -16,7 +16,9 @@ import { LeftSidePanel, RightSidePanel } from '@/components/GameSidePanels';
 import { useEnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { getBusinessSupplyDecayMultiplier } from '@/lib/supply-flow';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
+import { getSoundsForNotification } from '@/lib/sound-mapping';
 import { useAmbience } from '@/hooks/useAmbience';
+
 import SaveLoadDialog from '@/components/SaveLoadDialog';
 import { useGameSaveLoad } from '@/hooks/useGameSaveLoad';
 import EnemyHexActionDialog from '@/components/EnemyHexActionDialog';
