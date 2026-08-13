@@ -13134,6 +13134,18 @@ export const useEnhancedMafiaGameState = (
         return state;
       }
 
+      // Presence gate — somebody of yours has to be standing on the block.
+      const capoHere = state.deployedUnits.some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === q && u.r === r && u.s === s);
+      const soldiersHere = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === q && u.r === r && u.s === s).length;
+      if (!capoHere && soldiersHere === 0 && !tile.isHeadquarters) {
+        notify('👤 Nobody On The Block', 'Send a crew to this block before breaking ground.');
+        return state;
+      }
+      if (BUILD_RANK_REQUIREMENT[type] === 'capo' && !capoHere && !tile.isHeadquarters) {
+        notify('🎩 Capo Work', `${BUILDING_DEFS[type].label} is capo work. Send someone with rank.`);
+        return state;
+      }
+
       if (state.actionsRemaining <= 0) {
         notify('⏳ No Actions Left', 'Building costs 1 action.');
         return state;
@@ -13158,7 +13170,9 @@ export const useEnhancedMafiaGameState = (
       state.resources.money -= def.cost;
       state.actionsRemaining = Math.max(0, state.actionsRemaining - 1);
       tile.build = { type, tier: nextTier, monthsRemaining: def.months };
-      notify('🏗️ Ground Broken', `${def.name} — ready in ${def.months} month${def.months > 1 ? 's' : ''}.`, 'success');
+      const eta = buildEtaTurns(def.months, capoHere, soldiersHere);
+      notify('🏗️ Ground Broken', `${def.name} — done in ${eta} turn${eta > 1 ? 's' : ''} at the current crew's pace.`, 'success');
+
       return state;
     });
   }, []);
