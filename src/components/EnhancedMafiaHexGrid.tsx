@@ -616,7 +616,11 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           (isSoldier && unitOnTargetHex) || 
           (isCapo && (unitOnTargetHex || true))
         ) && (isNeutral || isEnemy) && !tile.isHeadquarters && !enemyExtortLocked;
-        const canClaim = !phase3Locked && isNeutral && isSoldier && unitOnTargetHex && !tile.anchor && !tile.isHeadquarters;
+        // Engine accepts a claim from a soldier OR capo that is on or adjacent to the hex.
+        const noActionsLeft = (gameState?.actionsRemaining ?? 0) <= 0;
+        const unitAdjacentToTarget = !!selectedUnit && hexDistance(selectedUnit, tile) === 1;
+        const canClaim = !phase3Locked && isNeutral && (isSoldier || isCapo) &&
+          (unitOnTargetHex || unitAdjacentToTarget) && !tile.anchor && !tile.isHeadquarters && !noActionsLeft;
         const isCapoWounded = isCapo && (selectedUnit as any).woundedTurnsRemaining > 0;
         // Negotiate: only available during action phase when a pending negotiation is ready on this hex
         const readyPending = (gameState?.pendingNegotiations || []).find((p: any) => p.ready && p.targetQ === tile.q && p.targetR === tile.r && p.targetS === tile.s);
@@ -656,9 +660,10 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         }
         if (!canClaim && isNeutral) {
           if (phase3Locked) reasons.claim = '🔒 Phase 3 — shifts through influence';
-          else if (tile.anchor) reasons.claim = 'Has business (extort instead)';
-          else if (!isSoldier) reasons.claim = 'Need a soldier';
-          else if (!unitOnTargetHex) reasons.claim = 'Move the soldier onto the hex first';
+          else if (tile.anchor) reasons.claim = 'Standing racket — extort or buy it out first';
+          else if (!isSoldier && !isCapo) reasons.claim = 'Need a soldier or capo';
+          else if (!unitOnTargetHex && !unitAdjacentToTarget) reasons.claim = 'Move a unit onto or next to the hex';
+          else if (noActionsLeft) reasons.claim = 'No actions left';
         }
         if (!canSabotage && isEnemy) {
           if (!hasSabotageTarget) reasons.sabotage = 'No business to sabotage';

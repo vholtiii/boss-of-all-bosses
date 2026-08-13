@@ -2539,7 +2539,7 @@ export const useEnhancedMafiaGameState = (
             ...prev, deployedUnits: newUnits, hexMap: prev.hexMap,
             resources: prev.resources,
             contestedHexes: newContested,
-            selectedUnitId: updatedUnit.movesRemaining > 0 ? updatedUnit.id : null,
+            selectedUnitId: updatedUnit.id, // stay selected even with 0 moves left so actions (claim, extort…) remain available
             availableMoveHexes: [],
             pendingNotifications: contestNotifications,
           };
@@ -2694,7 +2694,7 @@ export const useEnhancedMafiaGameState = (
       const newState = {
         ...prev, deployedUnits: newUnits, hexMap: newHexMap,
         resources: newResources,
-        selectedUnitId: updatedUnit.movesRemaining > 0 ? updatedUnit.id : null,
+        selectedUnitId: updatedUnit.id, // stay selected even with 0 moves left so actions (claim, extort…) remain available
         availableMoveHexes: newAvailableMoves,
         pendingNotifications: notifications,
       };
@@ -3259,6 +3259,23 @@ export const useEnhancedMafiaGameState = (
       return newState;
     });
   }, []);
+
+  // ============ ACTION POOL ============
+  /**
+   * Recompute the per-turn action budget and refill it. Called at the start of the
+   * new turn AND again at the tail of endTurn so nothing in between can leave the
+   * player stranded on 0 actions.
+   */
+  const refillActionPool = (state: EnhancedMafiaGameState) => {
+    const hasBonus = state.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD &&
+                     state.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
+    const manhattanAP = hasPlayerDistrictBonus(state, 'extra_ap') ? 1 : 0;
+    state.maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0) + manhattanAP;
+    state.actionsRemaining = state.maxActions;
+    // Legacy mirrors (save compatibility)
+    state.tacticalActionsRemaining = state.actionsRemaining;
+    state.maxTacticalActions = state.maxActions;
+  };
 
   // ============ END TURN ============
   const endTurn = useCallback(() => {
@@ -3906,15 +3923,8 @@ export const useEnhancedMafiaGameState = (
       newState.aiBounties = newState.aiBounties.filter(b => newState.turn < b.expiresOnTurn);
       newState.selectedMoveAction = 'move' as MoveAction;
       
-      // Reset the single action pool for the new turn
-      const hasBonus = newState.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD && 
-                       newState.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
-      const manhattanAP = hasPlayerDistrictBonus(newState, 'extra_ap') ? 1 : 0;
-      newState.maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0) + manhattanAP;
-      newState.actionsRemaining = newState.maxActions;
-      // Legacy mirrors (save compatibility)
-      newState.tacticalActionsRemaining = newState.actionsRemaining;
-      newState.maxTacticalActions = newState.maxActions;
+      // Reset the single action pool for the new turn (recomputed again at the tail of endTurn)
+      refillActionPool(newState);
 
       // ============ SECONDARY: BRONX FREE RECRUIT (every 3 turns) ============
       // Double-check actual current Bronx ownership to prevent stale-bonus spawns.
@@ -5493,7 +5503,10 @@ export const useEnhancedMafiaGameState = (
         if (!a.read && (a.type === 'error' || a.type === 'warning') && a.turn >= criticalCutoff) return true;
         return false;
       });
-      
+
+      // Final safety net: the player always starts their turn with a full pool.
+      refillActionPool(newState);
+
       return newState;
      } catch (err) {
       console.error('[endTurn] crashed — rolling back turn', err);
