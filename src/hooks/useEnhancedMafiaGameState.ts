@@ -7575,9 +7575,10 @@ export const useEnhancedMafiaGameState = (
           const dealLabel = deal === 'ceasefire' ? 'Ceasefire' : deal === 'alliance' ? 'Alliance' : deal === 'supply_deal' ? 'Supply Deal' : 'Safe Passage';
           state.pendingNotifications.push({
             type: 'info' as const,
-            title: `📩 ${famLabel} Wants to Talk`,
+            title: `📩 Sitdown Proposed — ${famLabel}`,
             message: `The ${famLabel} family proposes a ${dealLabel}. You have 2 turns to respond — accept it from the Incoming Sitdowns chip in the top bar.`,
           });
+
           state.combatLog = state.combatLog || [];
           state.combatLog.push(`📩 ${famLabel} requested a sitdown — proposed: ${dealLabel} (expires in 2 turns)`);
         };
