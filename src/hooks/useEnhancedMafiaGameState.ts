@@ -476,6 +476,8 @@ export interface TurnReportIncomeBreakdown {
   legalGross: number;
   illegalGross: number;
   shareProfits: number;
+  /** One-off shakedown payouts collected during the turn (capo auto-extort + soldier extort). */
+  shakedowns?: number;
   penalties: Array<{ label: string; amount: number }>;
   expenses: Array<{ label: string; amount: number }>;
   net: number;
@@ -520,6 +522,9 @@ export interface EnhancedMafiaGameState {
   turn: number;
   season: 'spring' | 'summer' | 'fall' | 'winter';
   mapSize: 'small' | 'medium' | 'large';
+  /** One-off shakedown cash collected since the last turn rollover (for the turn summary ledger). */
+  shakedownIncomeThisTurn?: number;
+  
   
   resources: {
     money: number;
@@ -2614,10 +2619,14 @@ export const useEnhancedMafiaGameState = (
               autoExtortNotification = {
                 type: 'success' as const,
                 title: '💰 Capo Auto-Extortion!',
-                message: `${unit.name || 'Your Capo'} set up a protection racket on the ${workingTile.anchor.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
+                message: `${unit.name || 'Your Capo'} set up a protection racket on the ${workingTile.anchor.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect. It now pays $${(workingTile.anchor.tribute || 0).toLocaleString()}/turn tribute while garrisoned.`,
               };
-              // Auto-extort still finalizes ownership immediately (untouched per plan).
-              return { ...workingTile, controllingFamily: prev.playerFamily, business: workingTile.anchor ? { ...workingTile.anchor, isExtorted: true } : undefined };
+              // Auto-extort finalizes ownership AND flags the anchor as extorted so it pays tribute.
+              return {
+                ...workingTile,
+                controllingFamily: prev.playerFamily,
+                anchor: { ...workingTile.anchor, isExtorted: true, extortedBy: prev.playerFamily },
+              };
             } else {
               // A1: Capo auto-claim now produces a PENDING claim, not finalized.
               // A3: heat applies on initiation.
@@ -2650,6 +2659,7 @@ export const useEnhancedMafiaGameState = (
 
       // Apply capo extortion bonuses
       let newResources = prev.resources;
+      const newShakedownTotal = (prev.shakedownIncomeThisTurn || 0) + (bonusMoney > 0 ? bonusMoney : 0);
       if (bonusMoney > 0) {
         newResources = { ...prev.resources, money: prev.resources.money + bonusMoney, respect: Math.min(100, prev.resources.respect + bonusRespect) };
         // Sync reputation.respect to match
@@ -2716,6 +2726,7 @@ export const useEnhancedMafiaGameState = (
       const newState: EnhancedMafiaGameState = {
         ...prev, deployedUnits: newUnits, hexMap: newHexMap,
         resources: newResources,
+        shakedownIncomeThisTurn: newShakedownTotal,
         selectedUnitId: updatedUnit.id, // stay selected even with 0 moves left so actions (claim, extort…) remain available
         availableMoveHexes: newAvailableMoves,
         pendingNotifications: notifications,
@@ -5536,6 +5547,8 @@ export const useEnhancedMafiaGameState = (
 
       // Final safety net: the player always starts their turn with a full pool.
       refillActionPool(newState);
+      // One-off shakedown cash is reported for the turn that just ended — reset for the new turn.
+      newState.shakedownIncomeThisTurn = 0;
 
       return newState;
      } catch (err) {
@@ -6050,6 +6063,7 @@ export const useEnhancedMafiaGameState = (
         legalGross: grossLegalIncome,
         illegalGross: grossIllegalIncome,
         shareProfits: shareProfitsIncome,
+        shakedowns: state.shakedownIncomeThisTurn || 0,
         penalties,
         expenses,
         net: totalProfit,
@@ -12284,6 +12298,7 @@ export const useEnhancedMafiaGameState = (
         const moneyGain = Math.floor(baseMoneyGain * respectPayoutMultiplier);
         const respectGain = isEnemy ? 3 : 5;
         state.resources.money += moneyGain;
+        state.shakedownIncomeThisTurn = (state.shakedownIncomeThisTurn || 0) + moneyGain;
         syncRespect(state, Math.min(100, state.reputation.respect + respectGain));
         // Tension: extorting rival territory
         if (isEnemy) {
