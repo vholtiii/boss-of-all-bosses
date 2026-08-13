@@ -152,6 +152,10 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             } else if (/Promoted|Promotion|New Capo/i.test(t)) {
               playSound('levelup');
               playBark('promotion');
+            } else if (t.includes('Supply Deal Active')) {
+              playSound('supply_deal');
+            } else if (t.includes('Sitdown Accepted')) {
+              playSound('sitdown_accepted');
             } else if (/Pact|Alliance|Deal Struck|Agreement/i.test(t)) {
               playSound('pact_signed');
             } else if (/Tribute|Income|Payout|Collected/i.test(t)) {
@@ -161,6 +165,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             }
             break;
           }
+
           case 'error': {
             notifyError(n.title, n.message);
             const t = typeof n.title === 'string' ? n.title : '';
