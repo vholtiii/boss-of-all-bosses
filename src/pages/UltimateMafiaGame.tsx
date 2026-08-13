@@ -135,22 +135,38 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     if (gameState.pendingNotifications.length > 0) {
       gameState.pendingNotifications.forEach(n => {
         switch (n.type) {
-          case 'success':
+          case 'success': {
             notifySuccess(n.title, n.message);
-            if (typeof n.title === 'string' && n.title.includes('Contract Fulfilled')) {
+            const t = typeof n.title === 'string' ? n.title : '';
+            if (t.includes('Contract Fulfilled')) {
               playSound('assassin_kill');
-            } else if (typeof n.title === 'string' && n.title.includes('Construction Started')) {
+              playBark('hit_success');
+            } else if (t.includes('Construction Started')) {
               playSound('construction_start');
-            } else if (typeof n.title === 'string' && n.title.includes('Business Complete')) {
+            } else if (t.includes('Business Complete')) {
               playSound('construction_complete');
+            } else if (/Bought Out|Buy[- ]Out|Racket Acquired/i.test(t)) {
+              playSound('buyout');
+            } else if (/Upgraded|Upgrade Complete|Tier/i.test(t)) {
+              playSound('upgrade');
+            } else if (/Promoted|Promotion|New Capo/i.test(t)) {
+              playSound('levelup');
+              playBark('promotion');
+            } else if (/Pact|Alliance|Deal Struck|Agreement/i.test(t)) {
+              playSound('pact_signed');
+            } else if (/Tribute|Income|Payout|Collected/i.test(t)) {
+              playSound('coin');
             } else {
               playSound('success');
             }
             break;
+          }
           case 'error': {
             notifyError(n.title, n.message);
             const t = typeof n.title === 'string' ? n.title : '';
-            if (t.includes('Arrested')) playSound('arrest');
+            if (t.includes('Arrested')) { playSound('arrest'); playBark('arrest'); }
+            else if (/Not Enough|Insufficient|Cannot Afford|Can't Afford|No Actions/i.test(t)) playSound('deny');
+            else if (/Pact Broken|Betray|Treachery|Truce Broken/i.test(t)) playSound('pact_broken');
             else playSound('danger');
             break;
           }
