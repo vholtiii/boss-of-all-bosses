@@ -6539,14 +6539,18 @@ export const useEnhancedMafiaGameState = (
       });
       state.hexMap.forEach(tile => {
         if (tile.controllingFamily !== fam) return;
-        // Advance AI build orders — rivals develop their blocks on the same clock.
+        // Advance AI build orders — rivals develop their blocks on the same crew-speed clock.
         if (tile.build) {
-          tile.build = { ...tile.build, monthsRemaining: tile.build.monthsRemaining - 1 };
+          const aiSiteCapo = state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+          const aiSiteSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
+          const aiRate = buildProgressRate(aiSiteCapo, aiSiteSoldiers);
+          tile.build = { ...tile.build, monthsRemaining: Math.round((tile.build.monthsRemaining - aiRate) * 100) / 100 };
           if (tile.build.monthsRemaining <= 0) {
             tile.buildings = { ...(tile.buildings || {}), [tile.build.type]: tile.build.tier };
             tile.build = undefined;
           }
         }
+
         const aiTileEarn = tileEarnPotential(tile);
         if (aiTileEarn > 0) {
           let tileInc = 0;
