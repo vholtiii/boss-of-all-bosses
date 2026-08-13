@@ -12650,10 +12650,11 @@ export const useEnhancedMafiaGameState = (
         state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         const famLabel = enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1);
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: '🚚 Supply Deal Struck!',
+          type: 'success', title: '💰 Supply Deal Active',
           message: `Access to ${famLabel}'s supply lines for ${duration} turns. $${cost.toLocaleString()} paid to ${famLabel}. Tension -${TENSION_REDUCE_SUPPLY_DEAL}.`,
         }];
         break;
+
       }
     }
 
