@@ -754,7 +754,10 @@ export interface EnhancedMafiaGameState {
       capo?: { name: string; family: 'gambino' | 'genovese' | 'lucchese' | 'bonanno' | 'colombo'; level: number };
     }>;
   }>;
+  /** Transient: set when a capo escorts soldiers into a new hex, so the UI can play the escort movement sound. Cleared by UI. */
+  _escortMoved?: boolean;
 }
+
 
 // ============ HEX MATH ============
 const hexDistance = (a: {q:number;r:number;s:number}, b: {q:number;r:number;s:number}) =>
@@ -2375,10 +2378,11 @@ export const useEnhancedMafiaGameState = (
           selectedUnitId: null, availableMoveHexes: [],
           actionsRemaining: prev.actionsRemaining - 1,
           pendingNotifications: [...prev.pendingNotifications, {
-            type: 'info' as const, title: '🚗 Escort Summoned',
+            type: 'info' as const, title: '🚗 Escort Formed',
             message: `${capo.name || 'The Capo'} sent word — a soldier's been called to the meeting point.`,
           }],
         };
+
       }
 
       // Handle "Send Word" action (tactical phase only) — capo requests negotiation on enemy hex
@@ -2459,7 +2463,9 @@ export const useEnhancedMafiaGameState = (
       }
 
       const newUnits = [...prev.deployedUnits];
+      let escortMoved = false;
       let remainingMoves = unit.movesRemaining - moveCost;
+
 
       // FIX #5: Zone of control applies even on free moves — free movement skips COST but not ZoC
       // Territorial ZoC: Phase 3+ only — soldiers stop near enemy units OR rival-claimed territory
@@ -2499,7 +2505,9 @@ export const useEnhancedMafiaGameState = (
               }
             });
             newUnits[unitIdx] = { ...newUnits[unitIdx], escortingSoldierIds: [] };
+            escortMoved = true;
           }
+
         } else {
           // Normal territory — move escorts normally
           unit.escortingSoldierIds.forEach(soldierIdToEscort => {
@@ -2509,8 +2517,10 @@ export const useEnhancedMafiaGameState = (
             }
           });
           newUnits[unitIdx] = { ...newUnits[unitIdx], escortingSoldierIds: [] };
+          escortMoved = true;
         }
       }
+
 
       // ============ ENEMY HEX ENTRY CHECK ============
       const targetTileForEntry = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
@@ -2691,15 +2701,18 @@ export const useEnhancedMafiaGameState = (
         ? [...prev.pendingNotifications, autoExtortNotification]
         : prev.pendingNotifications;
 
-      const newState = {
+      const newState: EnhancedMafiaGameState = {
         ...prev, deployedUnits: newUnits, hexMap: newHexMap,
         resources: newResources,
         selectedUnitId: updatedUnit.id, // stay selected even with 0 moves left so actions (claim, extort…) remain available
         availableMoveHexes: newAvailableMoves,
         pendingNotifications: notifications,
+        _escortMoved: escortMoved || undefined,
       };
       syncLegacyUnits(newState);
       return newState;
+
+
     });
   }, []);
 
@@ -5647,6 +5660,11 @@ export const useEnhancedMafiaGameState = (
       connectedNodeTypes.forEach(t => {
         if (!prevConnected.includes(t)) {
           turnReport.supplyChanges!.push({ nodeType: t, event: 'connected', detail: `${t} supply now reaches your HQ network.` });
+          state.pendingNotifications.push({
+            type: 'success' as const,
+            title: '📡 Supply Line Established',
+            message: `${t.replace(/_/g, ' ')} supply now reaches your HQ network.`,
+          });
         }
       });
       prevConnected.forEach(t => {
@@ -5656,6 +5674,7 @@ export const useEnhancedMafiaGameState = (
       });
     }
     (state as any)._prevConnectedSupply = [...connectedNodeTypes];
+
 
     let legalIncome = 0;
     let illegalIncome = 0;
@@ -7558,9 +7577,10 @@ export const useEnhancedMafiaGameState = (
           const dealLabel = deal === 'ceasefire' ? 'Ceasefire' : deal === 'alliance' ? 'Alliance' : deal === 'supply_deal' ? 'Supply Deal' : 'Safe Passage';
           state.pendingNotifications.push({
             type: 'info' as const,
-            title: `📩 ${famLabel} Wants to Talk`,
+            title: `📩 Sitdown Proposed — ${famLabel}`,
             message: `The ${famLabel} family proposes a ${dealLabel}. You have 2 turns to respond — accept it from the Incoming Sitdowns chip in the top bar.`,
           });
+
           state.combatLog = state.combatLog || [];
           state.combatLog.push(`📩 ${famLabel} requested a sitdown — proposed: ${dealLabel} (expires in 2 turns)`);
         };
@@ -7719,9 +7739,10 @@ export const useEnhancedMafiaGameState = (
           state.incomingSitdowns.push(newSitdown);
           state.pendingNotifications.push({
             type: 'info' as const,
-            title: `📩 ${capo.name} (${famLabel2}) Wants to Talk`,
+            title: `📩 Sitdown Proposed — ${capo.name} (${famLabel2})`,
             message: `Proposes a ${dealLabel2} on your hex at (${bestTile.q}, ${bestTile.r}) for $${proposedAmount.toLocaleString()}. 2 turns to respond.`,
           });
+
           state.combatLog = state.combatLog || [];
           state.combatLog.push(`📩 ${famLabel2} capo ${capo.name} proposed ${dealLabel2} on (${bestTile.q}, ${bestTile.r}) — $${proposedAmount.toLocaleString()}`);
           if (turnReport) turnReport.aiActions.push({ family: fam, action: 'diplomacy', detail: `${capo.name} requested territory sitdown (${dealLabel2})` });
@@ -10298,9 +10319,10 @@ export const useEnhancedMafiaGameState = (
             const famLabel = buyerFam.charAt(0).toUpperCase() + buyerFam.slice(1);
             newState.pendingNotifications.push({
               type: 'success' as const,
-              title: '💰 Supply Deal Signed',
+              title: '💰 Supply Deal Active',
               message: `${famLabel} paid $${paid.toLocaleString()} up front and owes you ${Math.round(royaltyRate * 100)}% of their supply-dependent take for ${duration} turns.`,
             });
+
             newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
             syncLegacyUnits(newState);
             return newState;
@@ -12509,9 +12531,10 @@ export const useEnhancedMafiaGameState = (
         // Hole #3: cooling period
         state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: '🤝 Ceasefire Agreed!',
+          type: 'success', title: '🤝 Sitdown Accepted — Ceasefire Agreed!',
           message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} won't attack for ${duration} turns. -${config.reputationCost} respect. Tension -${TENSION_REDUCE_CEASEFIRE}.`,
         }];
+
         break;
       }
       case 'bribe_territory': {
@@ -12526,9 +12549,10 @@ export const useEnhancedMafiaGameState = (
         addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_BRIBE_TERRITORY);
         state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: '💵 Territory Acquired!',
+          type: 'success', title: '🤝 Sitdown Accepted — 💵 Territory Acquired!',
           message: `Peacefully bribed for the hex. Cost: $${cost.toLocaleString()}. Tension -${TENSION_REDUCE_BRIBE_TERRITORY}.`,
         }];
+
         break;
       }
       case 'alliance': {
@@ -12558,9 +12582,10 @@ export const useEnhancedMafiaGameState = (
         addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_ALLIANCE);
         state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: '⚖️ Alliance Formed!',
+          type: 'success', title: '🤝 Sitdown Accepted — ⚖️ Alliance Formed!',
           message: `Pact with ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} for ${duration} turns. Condition: ${condition.type.replace(/_/g, ' ')}. Tension -${TENSION_REDUCE_ALLIANCE}.`,
         }];
+
         break;
       }
       case 'share_profits': {
@@ -12581,9 +12606,10 @@ export const useEnhancedMafiaGameState = (
         addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_SHARE_PROFITS);
         state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: '💰 Profit Sharing Deal!',
+          type: 'success', title: '🤝 Sitdown Accepted — 💰 Profit Sharing Deal!',
           message: `You'll earn 30% of this hex's income for ${duration} turns. Cost: $${cost.toLocaleString()}. Tension -${TENSION_REDUCE_SHARE_PROFITS}.`,
         }];
+
         break;
       }
       case 'safe_passage': {
@@ -12599,9 +12625,10 @@ export const useEnhancedMafiaGameState = (
         addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_SAFE_PASSAGE);
         state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: '🛤️ Safe Passage Granted!',
+          type: 'success', title: '🤝 Sitdown Accepted — 🛤️ Safe Passage Granted!',
           message: `Free movement through ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} territory for ${duration} turns. Cost: $${cost.toLocaleString()}. Tension -${TENSION_REDUCE_SAFE_PASSAGE}.`,
         }];
+
         break;
       }
       case 'supply_deal': {
@@ -12626,10 +12653,11 @@ export const useEnhancedMafiaGameState = (
         state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         const famLabel = enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1);
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: '🚚 Supply Deal Struck!',
+          type: 'success', title: '💰 Supply Deal Active',
           message: `Access to ${famLabel}'s supply lines for ${duration} turns. $${cost.toLocaleString()} paid to ${famLabel}. Tension -${TENSION_REDUCE_SUPPLY_DEAL}.`,
         }];
         break;
+
       }
     }
 
@@ -13149,7 +13177,17 @@ export const useEnhancedMafiaGameState = (
     setGameState(next);
   }, []);
 
+  const clearSoundFlags = useCallback(() => {
+    setGameState(prev => {
+      const next = { ...prev };
+      delete (next as Partial<EnhancedMafiaGameState> & { _escortMoved?: boolean })._escortMoved;
+      return next;
+    });
+  }, []);
+
+
   return {
+
     gameState,
     endTurn,
     selectTerritory,
@@ -13168,7 +13206,9 @@ export const useEnhancedMafiaGameState = (
     deployUnit,
     isWinner,
     clearNotifications,
+    clearSoundFlags,
     clearWarDeclaration,
+
     markAlertsRead,
     fortifyUnit,
     setMoveAction,

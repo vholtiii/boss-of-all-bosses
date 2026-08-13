@@ -336,7 +336,50 @@ export const useSoundSystem = () => {
       tone(ctx, d, 415, 'sawtooth', t, 0.42, v * 0.30, 300);
       tone(ctx, d, 440, 'sawtooth', t, 0.42, v * 0.26, 320);
     },
+
+    // --- Supply lines ------------------------------------------------------
+    supply_connect: (ctx, d, v, t) => {
+      tone(ctx, d, 180, 'sawtooth', t, 0.28, v * 0.26, 260);
+      tone(ctx, d, 220, 'triangle', t + 0.18, 0.32, v * 0.30, 340);
+      tone(ctx, d, 440, 'sine', t + 0.42, 0.55, v * 0.22);
+    },
+    supply_deal: (ctx, d, v, t) => {
+      tone(ctx, d, 1600, 'square', t, 0.06, v * 0.22);
+      tone(ctx, d, 1120, 'sine', t + 0.08, 0.12, v * 0.28);
+      tone(ctx, d, 880, 'sine', t + 0.20, 0.18, v * 0.20);
+    },
+
+    // --- Escort ------------------------------------------------------------
+    escort_attach: (ctx, d, v, t) => {
+      tone(ctx, d, 620, 'square', t, 0.04, v * 0.20);
+      tone(ctx, d, 820, 'square', t + 0.05, 0.04, v * 0.18);
+    },
+    escort_move: (ctx, d, v, t) => {
+      noiseBurst(ctx, d, t, 0.08, v * 0.18, 260);
+      tone(ctx, d, 160, 'sine', t + 0.02, 0.14, v * 0.22, 110);
+      tone(ctx, d, 95, 'sine', t + 0.10, 0.18, v * 0.16, 70);
+    },
+
+    // --- Sitdowns ------------------------------------------------------------
+    sitdown_proposed: (ctx, d, v, t) => {
+      tone(ctx, d, 740, 'sine', t, 0.32, v * 0.26);
+      tone(ctx, d, 1110, 'sine', t + 0.14, 0.24, v * 0.14);
+    },
+    sitdown_ready: (ctx, d, v, t) => {
+      tone(ctx, d, 520, 'sine', t, 0.24, v * 0.28);
+      tone(ctx, d, 660, 'sine', t + 0.08, 0.28, v * 0.24);
+      tone(ctx, d, 880, 'sine', t + 0.18, 0.34, v * 0.20);
+    },
+    sitdown_accepted: (ctx, d, v, t) => {
+      tone(ctx, d, 480, 'sine', t, 0.20, v * 0.32);
+      tone(ctx, d, 720, 'sine', t + 0.12, 0.30, v * 0.28);
+    },
+    sitdown_declined: (ctx, d, v, t) => {
+      tone(ctx, d, 340, 'sawtooth', t, 0.18, v * 0.26);
+      tone(ctx, d, 290, 'sawtooth', t + 0.10, 0.22, v * 0.24);
+    },
   };
+
 
   const playSound = useCallback((type: string, _frequency?: number, _duration?: number) => {
     // File-based voices (mp3) on the voice channel

@@ -16,7 +16,9 @@ import { LeftSidePanel, RightSidePanel } from '@/components/GameSidePanels';
 import { useEnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { getBusinessSupplyDecayMultiplier } from '@/lib/supply-flow';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
+import { getSoundsForNotification } from '@/lib/sound-mapping';
 import { useAmbience } from '@/hooks/useAmbience';
+
 import SaveLoadDialog from '@/components/SaveLoadDialog';
 import { useGameSaveLoad } from '@/hooks/useGameSaveLoad';
 import EnemyHexActionDialog from '@/components/EnemyHexActionDialog';
@@ -113,7 +115,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     deployUnit,
     isWinner,
     clearNotifications,
+    clearSoundFlags,
     clearWarDeclaration,
+
     markAlertsRead,
     fortifyUnit,
     setMoveAction,
@@ -137,75 +141,54 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         switch (n.type) {
           case 'success': {
             notifySuccess(n.title, n.message);
-            const t = typeof n.title === 'string' ? n.title : '';
-            if (t.includes('Contract Fulfilled')) {
-              playSound('assassin_kill');
-              playBark('hit_success');
-            } else if (t.includes('Construction Started')) {
-              playSound('construction_start');
-            } else if (t.includes('Business Complete')) {
-              playSound('construction_complete');
-            } else if (/Bought Out|Buy[- ]Out|Racket Acquired/i.test(t)) {
-              playSound('buyout');
-            } else if (/Upgraded|Upgrade Complete|Tier/i.test(t)) {
-              playSound('upgrade');
-            } else if (/Promoted|Promotion|New Capo/i.test(t)) {
-              playSound('levelup');
-              playBark('promotion');
-            } else if (/Pact|Alliance|Deal Struck|Agreement/i.test(t)) {
-              playSound('pact_signed');
-            } else if (/Tribute|Income|Payout|Collected/i.test(t)) {
-              playSound('coin');
-            } else {
-              playSound('success');
-            }
+            getSoundsForNotification(n.title, n.type).forEach(({ sound, kind }) => {
+              if (kind === 'voice-bark') playBark(sound);
+              else playSound(sound);
+            });
             break;
           }
           case 'error': {
             notifyError(n.title, n.message);
-            const t = typeof n.title === 'string' ? n.title : '';
-            if (t.includes('Arrested')) { playSound('arrest'); playBark('arrest'); }
-            else if (/Not Enough|Insufficient|Cannot Afford|Can't Afford|No Actions/i.test(t)) playSound('deny');
-            else if (/Pact Broken|Betray|Treachery|Truce Broken/i.test(t)) playSound('pact_broken');
-            else playSound('danger');
+            getSoundsForNotification(n.title, n.type).forEach(({ sound, kind }) => {
+              if (kind === 'voice-bark') playBark(sound);
+              else playSound(sound);
+            });
             break;
           }
           case 'warning': {
             notifyWarning(n.title, n.message);
-            const t = typeof n.title === 'string' ? n.title : '';
-            if (
-              t.includes('Assassination Foiled') ||
-              t.includes('Enemy Capo Wounded') ||
-              t.includes('Capo Wounded') ||
-              t.includes('Plan Hit Expired')
-            ) {
-              playSound('capo_fail');
-              playBark('hit_fail');
-            } else if (/Heat|Investigation|RICO|Subpoena|Indict/i.test(t)) {
-              playSound('heat_warning');
-            } else if (/War Declared|At War/i.test(t)) {
-              playSound('war_declared');
-            } else {
-              playSound('error');
-            }
+            getSoundsForNotification(n.title, n.type).forEach(({ sound, kind }) => {
+              if (kind === 'voice-bark') playBark(sound);
+              else playSound(sound);
+            });
             break;
           }
           case 'info': {
             notifyInfo(n.title, n.message);
-            const t = typeof n.title === 'string' ? n.title : '';
-            if (t.includes('Hex Fortified')) playSound('fortify');
-            else if (/Sitdown|Negotiation|Meeting/i.test(t)) playSound('bell');
-            else if (/Standing Order|Policy/i.test(t)) playSound('policy_set');
-            else playSound('notification');
+            getSoundsForNotification(n.title, n.type).forEach(({ sound, kind }) => {
+              if (kind === 'voice-bark') playBark(sound);
+              else playSound(sound);
+            });
             break;
           }
         }
       });
       clearNotifications();
     }
-  }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications]);
+  }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications, playSound, playBark]);
+
+
+  // Escort movement sound (transient flag from moveUnit)
+  useEffect(() => {
+    if (gameState._escortMoved) {
+      playSound('escort_move');
+      clearSoundFlags();
+    }
+  }, [gameState._escortMoved, playSound, clearSoundFlags]);
+
 
   // Clear planHitMode when phase changes
+
   useEffect(() => { setPlanHitMode(false); setPlanHitStep('selectSoldier'); setPlanHitPlannerId(null); setShowPlanHitSoldierMenu(false); }, [gameState.turnPhase]);
 
   // Global button click sound
