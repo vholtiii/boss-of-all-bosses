@@ -73,3 +73,38 @@ describe("Claim on empty blocks + action pool refill", () => {
     expect(s.actionsRemaining).toBe(s.maxActions);
   });
 });
+
+describe("Capo claiming is free", () => {
+  it("a capo moving onto an empty neutral block contests it without spending an action", () => {
+    const { result } = renderHook(() =>
+      useEnhancedMafiaGameState("gambino", undefined, "normal", 1, "medium")
+    );
+
+    const s = result.current.gameState;
+    const capo = s.deployedUnits.find((u: any) => u.family === s.playerFamily && u.type === "capo");
+    expect(capo).toBeTruthy();
+
+    // Find an empty neutral tile adjacent to the capo.
+    let target: any = null;
+    for (const d of HEX_DIRS) {
+      const t = s.hexMap.find((x: any) => x.q === capo.q + d.q && x.r === capo.r + d.r && x.s === capo.s + d.s);
+      if (t && t.controllingFamily === "neutral" && !t.anchor && !t.isHeadquarters && !t.pendingClaim) {
+        target = t;
+        break;
+      }
+    }
+    expect(target).toBeTruthy();
+
+    const before = result.current.gameState.actionsRemaining;
+
+    act(() => {
+      result.current.selectUnit?.(capo.id);
+      result.current.moveUnit({ q: target.q, r: target.r, s: target.s });
+    });
+
+    const after = result.current.gameState;
+    const tile = after.hexMap.find((t: any) => t.q === target.q && t.r === target.r && t.s === target.s);
+    expect(tile.pendingClaim?.family ?? tile.controllingFamily).toBe(after.playerFamily);
+    expect(after.actionsRemaining).toBe(before);
+  });
+});
