@@ -476,8 +476,10 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   };
 
   const handleHexClick = (tile: HexTile) => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     onClearHighlight?.();
     setPinnedHex(null);
+    setDelayedHoverHex(null);
     const turnPhase = gameState?.turnPhase || 'waiting';
 
     // Plan Hit mode — 2-step selection
