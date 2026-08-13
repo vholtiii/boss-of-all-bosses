@@ -6061,6 +6061,7 @@ export const useEnhancedMafiaGameState = (
         legalGross: grossLegalIncome,
         illegalGross: grossIllegalIncome,
         shareProfits: shareProfitsIncome,
+        shakedowns: state.shakedownIncomeThisTurn || 0,
         penalties,
         expenses,
         net: totalProfit,
