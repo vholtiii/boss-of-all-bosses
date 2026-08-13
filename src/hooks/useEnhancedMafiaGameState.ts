@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
+import { devLog } from '@/lib/devLog';
+
 import { 
   EconomySystem, 
   AIOpponent, 
