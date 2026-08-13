@@ -2659,6 +2659,7 @@ export const useEnhancedMafiaGameState = (
 
       // Apply capo extortion bonuses
       let newResources = prev.resources;
+      const newShakedownTotal = (prev.shakedownIncomeThisTurn || 0) + (bonusMoney > 0 ? bonusMoney : 0);
       if (bonusMoney > 0) {
         newResources = { ...prev.resources, money: prev.resources.money + bonusMoney, respect: Math.min(100, prev.resources.respect + bonusRespect) };
         // Sync reputation.respect to match
