@@ -180,11 +180,12 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
 
   // Escort movement sound (transient flag from moveUnit)
   useEffect(() => {
-    if ((gameState as any)._escortMoved) {
+    if (gameState._escortMoved) {
       playSound('escort_move');
       clearSoundFlags();
     }
   }, [gameState._escortMoved, playSound, clearSoundFlags]);
+
 
   // Clear planHitMode when phase changes
 
