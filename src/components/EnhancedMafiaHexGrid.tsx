@@ -797,6 +797,8 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         background: 'radial-gradient(ellipse at center, hsl(32 22% 15%) 0%, hsl(30 28% 10%) 55%, hsl(30 33% 6%) 100%)',
       }}
       onClick={e => e.stopPropagation()}
+      onMouseEnter={cancelPanelClose}
+      onMouseLeave={schedulePanelClose}
     >
       {/* Business placement banner */}
       {isBusinessPlacementMode && (
