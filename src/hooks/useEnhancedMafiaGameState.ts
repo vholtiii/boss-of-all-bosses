@@ -2726,6 +2726,7 @@ export const useEnhancedMafiaGameState = (
       const newState: EnhancedMafiaGameState = {
         ...prev, deployedUnits: newUnits, hexMap: newHexMap,
         resources: newResources,
+        shakedownIncomeThisTurn: newShakedownTotal,
         selectedUnitId: updatedUnit.id, // stay selected even with 0 moves left so actions (claim, extort…) remain available
         availableMoveHexes: newAvailableMoves,
         pendingNotifications: notifications,
