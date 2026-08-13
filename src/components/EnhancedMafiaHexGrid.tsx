@@ -1401,7 +1401,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                         <g className="pointer-events-none select-none">
                           <text x={x} y={y + 1} textAnchor="middle" fontSize="16">🚧</text>
                           <rect x={x - 12} y={y + 5} width={24} height={11} rx={5.5} fill="#1a1410" stroke="#F0B429" strokeOpacity="0.7" strokeWidth="0.8" />
-                          <text x={x} y={y + 13} textAnchor="middle" fontSize="8" fill="#F0B429" fontWeight="700">{eta}T</text>
+                          <text x={x} y={y + 13} textAnchor="middle" fontSize="8" fill="#F0B429" fontWeight="700">{eta === 0 ? 'II' : `${eta}T`}</text>
                         </g>
                       );
                     }

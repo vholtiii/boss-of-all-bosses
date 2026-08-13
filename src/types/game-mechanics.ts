@@ -1288,7 +1288,7 @@ export const BUILD_RANK_REQUIREMENT: Record<BuildingType, 'soldier' | 'capo'> = 
 export const BUILD_SPEED = {
   capo: 1.5,
   soldier: 0.6,
-  unattended: 0.35,
+  unattended: 0,
 } as const;
 
 export function buildProgressRate(capoOrBoss: boolean, soldiers: number): number {
@@ -1299,14 +1299,15 @@ export function buildProgressRate(capoOrBoss: boolean, soldiers: number): number
 
 /** Turns left until a build order completes at the current crew rate. */
 export function buildEtaTurns(monthsRemaining: number, capoOrBoss: boolean, soldiers: number): number {
-  return Math.max(1, Math.ceil(monthsRemaining / buildProgressRate(capoOrBoss, soldiers)));
+  const rate = buildProgressRate(capoOrBoss, soldiers);
+  return rate > 0 ? Math.max(1, Math.ceil(monthsRemaining / rate)) : 0;
 }
 
 /** Human label for the crew currently working a site. */
 export function buildCrewLabel(capoOrBoss: boolean, soldiers: number): string {
   if (capoOrBoss) return 'Capo on site';
   if (soldiers > 0) return `${soldiers} soldier${soldiers > 1 ? 's' : ''} on site`;
-  return 'No one on site';
+  return 'Paused — send a crew';
 }
 
 

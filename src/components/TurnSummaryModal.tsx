@@ -213,6 +213,9 @@ const TurnSummaryModal: React.FC<TurnSummaryModalProps> = ({ report, open, onClo
                   <div className="space-y-0.5 text-xs">
                     <div className="flex justify-between"><span className="text-muted-foreground">Legal business income</span><span className="font-mono text-green-400">+${ib.legalGross.toLocaleString()}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Illegal rackets income</span><span className="font-mono text-green-400">+${ib.illegalGross.toLocaleString()}</span></div>
+                    {(ib.racketTribute ?? 0) > 0 && (
+                      <div className="flex justify-between pl-2 text-[11px]"><span className="text-muted-foreground">↳ Racket tribute (included above)</span><span className="font-mono text-green-400">+${(ib.racketTribute ?? 0).toLocaleString()}</span></div>
+                    )}
                     {ib.shareProfits > 0 && (
                       <div className="flex justify-between"><span className="text-muted-foreground">Share-profits pacts</span><span className="font-mono text-green-400">+${ib.shareProfits.toLocaleString()}</span></div>
                     )}
