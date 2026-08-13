@@ -655,6 +655,8 @@ export interface EnhancedMafiaGameState {
   }>;
 
   turnReport: TurnReport | null;
+  /** Rolling history of the last 12 finalised turn reports — powers Game Analysis. */
+  turnReportHistory?: TurnReport[];
   lastCombatResult?: {
     q: number; r: number; s: number;
     success: boolean;
