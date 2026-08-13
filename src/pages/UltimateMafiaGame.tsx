@@ -180,6 +180,11 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               t.includes('Plan Hit Expired')
             ) {
               playSound('capo_fail');
+              playBark('hit_fail');
+            } else if (/Heat|Investigation|RICO|Subpoena|Indict/i.test(t)) {
+              playSound('heat_warning');
+            } else if (/War Declared|At War/i.test(t)) {
+              playSound('war_declared');
             } else {
               playSound('error');
             }
@@ -187,7 +192,10 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           }
           case 'info': {
             notifyInfo(n.title, n.message);
-            if (n.title && n.title.includes('Hex Fortified')) playSound('fortify');
+            const t = typeof n.title === 'string' ? n.title : '';
+            if (t.includes('Hex Fortified')) playSound('fortify');
+            else if (/Sitdown|Negotiation|Meeting/i.test(t)) playSound('bell');
+            else if (/Standing Order|Policy/i.test(t)) playSound('policy_set');
             else playSound('notification');
             break;
           }
