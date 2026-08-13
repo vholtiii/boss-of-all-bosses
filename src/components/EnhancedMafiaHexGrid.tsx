@@ -2338,6 +2338,22 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                     ) : reasons.safehouse ? (
                       <DisabledAction icon="🏠" label="Safehouse" reason={reasons.safehouse} />
                     ) : null}
+                    {actionMenu.canDevelop ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPinnedHex(actionMenu.tile);
+                          setCityHex({ q: actionMenu.tile.q, r: actionMenu.tile.r, s: actionMenu.tile.s });
+                          setActionMenu(null);
+                        }}
+                        title="Open build orders for this block · no action cost"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-emerald-700/90 hover:bg-emerald-700 text-white text-xs font-bold transition-colors"
+                      >
+                        🏗️ Develop Block<CostChip k="develop" />
+                      </button>
+                    ) : reasons.develop ? (
+                      <DisabledAction icon="🏗️" label="Develop Block" reason={reasons.develop} />
+                    ) : null}
                     {actionMenu.canAssaultHQ ? (
                       <button
                         onClick={(e) => {
