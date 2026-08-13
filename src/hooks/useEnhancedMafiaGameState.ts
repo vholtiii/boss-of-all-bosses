@@ -2701,18 +2701,17 @@ export const useEnhancedMafiaGameState = (
         ? [...prev.pendingNotifications, autoExtortNotification]
         : prev.pendingNotifications;
 
-      const newState = {
+      const newState: EnhancedMafiaGameState = {
         ...prev, deployedUnits: newUnits, hexMap: newHexMap,
         resources: newResources,
         selectedUnitId: updatedUnit.id, // stay selected even with 0 moves left so actions (claim, extort…) remain available
         availableMoveHexes: newAvailableMoves,
         pendingNotifications: notifications,
+        _escortMoved: escortMoved || undefined,
       };
-      if (escortMoved) {
-        (newState as any)._escortMoved = true;
-      }
       syncLegacyUnits(newState);
       return newState;
+
 
     });
   }, []);
