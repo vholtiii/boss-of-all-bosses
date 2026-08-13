@@ -2216,27 +2216,40 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                     ) : reasons.extort ? (
                       <DisabledAction icon="💰" label="Extort" reason={reasons.extort} />
                     ) : null}
-                    {actionMenu.canClaim ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onAction) onAction({
-                            type: 'claim_territory',
-                            targetQ: actionMenu.tile.q,
-                            targetR: actionMenu.tile.r,
-                            targetS: actionMenu.tile.s,
-                            unitId: gameState.selectedUnitId,
-                          });
-                          setActionMenu(null);
-                        }}
-                        title={selectedUnit && (selectedUnit.q !== actionMenu.tile.q || selectedUnit.r !== actionMenu.tile.r || selectedUnit.s !== actionMenu.tile.s) ? 'Moves your soldier onto the block · 1 action' : 'Claim this block · 1 action'}
-                        className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-secondary/90 hover:bg-secondary text-secondary-foreground text-xs font-bold transition-colors", isRec('claim') && recCls)}
-                      >
-                        🏴 Claim<CostChip k="claim" />
-                      </button>
-                    ) : reasons.claim ? (
-                      <DisabledAction icon="🏴" label="Claim Territory" reason={reasons.claim} />
+                    {actionMenu.canClaim ? (() => {
+                      const needsMove = !!selectedUnit && (selectedUnit.q !== actionMenu.tile.q || selectedUnit.r !== actionMenu.tile.r || selectedUnit.s !== actionMenu.tile.s);
+                      const fc = familyColors[playerFamily] || 'hsl(var(--primary))';
+                      return (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onAction) onAction({
+                              type: 'claim_territory',
+                              targetQ: actionMenu.tile.q,
+                              targetR: actionMenu.tile.r,
+                              targetS: actionMenu.tile.s,
+                              unitId: gameState.selectedUnitId,
+                            });
+                            setClaimFlash({ q: actionMenu.tile.q, r: actionMenu.tile.r, s: actionMenu.tile.s, id: Date.now() });
+                            window.setTimeout(() => setClaimFlash(null), 1200);
+                            setActionMenu(null);
+                          }}
+                          title={needsMove ? 'Your soldier moves onto the block and stakes it · 1 action' : 'Stake this block for the family · 1 action'}
+                          style={{ borderLeft: `3px solid ${fc}` }}
+                          className={cn("flex flex-col items-start px-2.5 py-1.5 rounded-md bg-secondary/90 hover:bg-secondary text-secondary-foreground transition-colors", isRec('claim') && recCls)}
+                        >
+                          <span className="flex items-center gap-1.5 w-full text-xs font-bold">
+                            🏴 {needsMove ? 'Move In & Claim' : 'Claim Block'}<CostChip k="claim" />
+                          </span>
+                          <span className="text-[8px] font-medium opacity-70">
+                            {needsMove ? 'Soldier moves in · yours next turn' : 'Yours next turn if uncontested'}
+                          </span>
+                        </button>
+                      );
+                    })() : reasons.claim ? (
+                      <DisabledAction icon="🏴" label="Claim Block" reason={reasons.claim} />
                     ) : null}
+
                     {actionMenu.canNegotiate ? (
                       <button
                         onClick={(e) => {
