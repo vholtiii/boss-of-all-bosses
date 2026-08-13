@@ -739,17 +739,23 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           else if (!hasCapoWithin3) reasons.flip_soldier = 'Need a Capo within 3 hexes of enemy HQ';
         }
         
+        if (!canDevelop && !tile.isHeadquarters && nearTile) {
+          if (tile.anchor && isOwned) reasons.develop = 'Buy out the racket first';
+          else if (tile.anchor && !isOwned) reasons.develop = 'Extort, then buy out the racket';
+          else if (!isOwned) reasons.develop = 'Claim this block first';
+        }
+
         // Filter out empty reasons
         Object.keys(reasons).forEach(k => { if (!reasons[k]) delete reasons[k]; });
         
-        const hasAnyAction = canHit || canExtort || canClaim || canNegotiate || canSabotage || canSafehouse || canAssaultHQ || canFlipSoldier;
+        const hasAnyAction = canHit || canExtort || canClaim || canNegotiate || canSabotage || canSafehouse || canAssaultHQ || canFlipSoldier || canDevelop;
         const hasAnyReason = Object.keys(reasons).length > 0;
         
         if (hasAnyAction || hasAnyReason) {
           if (actionMenu && actionMenu.tile.q === tile.q && actionMenu.tile.r === tile.r) {
             setActionMenu(null);
           } else {
-            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, canAssaultHQ, canFlipSoldier, negotiateCapoId, pendingNegotiationId: readyPending?.id, reasons });
+            setActionMenu({ tile, canHit, canExtort, canClaim, canNegotiate, canSabotage, canSafehouse, canAssaultHQ, canFlipSoldier, canDevelop, negotiateCapoId, pendingNegotiationId: readyPending?.id, reasons });
           }
           return;
         }
