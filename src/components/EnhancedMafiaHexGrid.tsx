@@ -139,6 +139,25 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   const turnPhaseRef = gameState?.turnPhase;
   useEffect(() => { setActionMenu(null); }, [turnPhaseRef]);
 
+  // Delayed + sticky hover info panel: 1s settle, then stays until another tile is hovered
+  const scheduleHoverPanel = (tile: HexTile | null) => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
+    if (!tile) return;
+    hoverTimerRef.current = setTimeout(() => setDelayedHoverHex(tile), 1000);
+  };
+  const schedulePanelClose = () => {
+    if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
+    leaveTimerRef.current = setTimeout(() => setDelayedHoverHex(null), 500);
+  };
+  const cancelPanelClose = () => {
+    if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
+  };
+  useEffect(() => () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
+  }, []);
+
   const baseHexRadius = 22;
   const hexWidth = baseHexRadius * 2;
   const hexHeight = Math.sqrt(3) * baseHexRadius;
