@@ -318,6 +318,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   deployedUnits: (state.deployedUnits || []).map(u => ({ ...u, escortingSoldierIds: u.escortingSoldierIds ? [...u.escortingSoldierIds] : undefined })),
   pendingNotifications: [...(state.pendingNotifications || [])],
   alertsLog: [...(state.alertsLog || [])],
+  turnReportHistory: [...(state.turnReportHistory || [])],
   soldierStats: Object.fromEntries(
     Object.entries(state.soldierStats || {}).map(([k, v]) => [k, { ...v }])
   ),
@@ -1487,6 +1488,7 @@ export const createInitialGameState = (
     selectedTerritory: null,
     activeEvent: null,
     turnReport: null,
+    turnReportHistory: [],
     familyControl: { gambino: 20, genovese: 20, lucchese: 20, bonanno: 20, colombo: 20 },
     territories,
   };
