@@ -2514,8 +2514,10 @@ export const useEnhancedMafiaGameState = (
             }
           });
           newUnits[unitIdx] = { ...newUnits[unitIdx], escortingSoldierIds: [] };
+          escortMoved = true;
         }
       }
+
 
       // ============ ENEMY HEX ENTRY CHECK ============
       const targetTileForEntry = prev.hexMap.find(t => t.q === targetLocation.q && t.r === targetLocation.r && t.s === targetLocation.s);
