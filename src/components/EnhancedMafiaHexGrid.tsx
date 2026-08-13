@@ -677,13 +677,14 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           else if (noActions) reasons.extort = 'No actions left';
         }
         if (!canClaim && isNeutral) {
-          if (phase3Locked) reasons.claim = '🔒 Phase 3 — shifts through influence';
-          else if (tile.anchor) reasons.claim = 'Standing racket — extort or buy it out first';
-          else if (isCapo) reasons.claim = 'Capos claim by moving onto the block — no action spent';
-          else if (!isSoldier) reasons.claim = 'Need a soldier (1 action)';
-          else if (!unitOnTargetHex && !unitAdjacentToTarget) reasons.claim = 'Move a soldier onto or next to the block';
-          else if (noActionsLeft) reasons.claim = 'No actions left';
+          if (phase3Locked) reasons.claim = '🔒 Phase 3 — turf shifts through influence';
+          else if (tile.anchor) reasons.claim = 'Extort or buy out the racket first';
+          else if (isCapo) reasons.claim = 'Capos claim free by moving on';
+          else if (!isSoldier) reasons.claim = 'Send a soldier — 1 action';
+          else if (!unitOnTargetHex && !unitAdjacentToTarget) reasons.claim = 'Move within one block';
+          else if (noActionsLeft) reasons.claim = 'Out of actions — end the turn';
         }
+
         if (!canSabotage && isEnemy) {
           if (!hasSabotageTarget) reasons.sabotage = 'No business to sabotage';
           else if (!isSoldier) reasons.sabotage = 'Need a soldier';
