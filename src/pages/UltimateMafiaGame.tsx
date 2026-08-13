@@ -427,10 +427,45 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
   }, [gameState.turn]);
 
-  // ---- Ambient city bed (procedural; sirens scale with heat) ----
+  // ---- Ambient city bed (procedural; re-mixes itself from the live game state) ----
+  const ambienceSignals = useMemo(() => {
+    const gs: any = gameState;
+    const playerHexes = gs.hexMap.filter((h: any) => h.controllingFamily === gs.playerFamily).length;
+    const totalClaimedHexes = gs.hexMap.filter((h: any) => !!h.controllingFamily).length;
+    const atWar = (gs.activeWars || []).some(
+      (w: any) => w.family1 === gs.playerFamily || w.family2 === gs.playerFamily
+    );
+    const maxTension = Object.entries(gs.familyTensions || {}).reduce((max: number, [key, val]) => {
+      if (!key.includes(gs.playerFamily)) return max;
+      return Math.max(max, Number(val) || 0);
+    }, 0);
+    return {
+      heat: gs.policeHeat?.level ?? 0,
+      atWar,
+      maxTension,
+      prosperity: computeProsperity({
+        playerHexes,
+        totalClaimedHexes,
+        netIncome: gs.lastTurnIncome ?? 0,
+        money: gs.resources?.money ?? 0,
+      }),
+      phase: gs.gamePhase || 1,
+      ricoActive: (gs.ricoTimer || 0) > 0,
+    };
+  }, [
+    gameState.turn,
+    (gameState as any).policeHeat?.level,
+    (gameState as any).ricoTimer,
+    (gameState as any).gamePhase,
+    (gameState as any).activeWars,
+    (gameState as any).familyTensions,
+    gameState.hexMap,
+    gameState.resources.money,
+  ]);
+
   useAmbience({
     soundConfig,
-    heat: (gameState as any).policeHeat?.level ?? 0,
+    ambience: ambienceSignals,
     active: !isWinner && !gameState.gameOver,
   });
 
