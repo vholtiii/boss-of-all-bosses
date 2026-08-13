@@ -146,6 +146,8 @@ import {
   getSupplyNodeScoreBonus, getSupplyNodeRoutingChance, getSupplyStrikeRadius,
 } from '@/lib/ai-difficulty';
 import { computeSupplyDealPrice, relationshipSway, LEADER_WARINESS_PENALTY } from '@/lib/negotiation-odds';
+import { FAVOR_DURATION } from '@/lib/sitdown-valuation';
+import type { DiplomaticFavor } from '@/types/negotiation';
 import {
   processSupplyFlow, migrateSupplyState, seedInitialFamilySupplyStorage,
   destroySafehouseWithTransfer, formatTransferSummary, hasTransferActivity,
