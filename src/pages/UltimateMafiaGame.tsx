@@ -2291,7 +2291,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
       {/* Sound Settings */}
       <SoundSettingsDialog
         open={showSoundSettings}
-        onOpenChange={setShowSoundSettings}
+        onOpenChange={(o) => { if (!o) playSound('close'); setShowSoundSettings(o); }}
         soundConfig={soundConfig}
         onUpdateConfig={updateSoundConfig}
         onTestSound={playSound}
