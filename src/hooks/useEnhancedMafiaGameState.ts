@@ -3260,6 +3260,23 @@ export const useEnhancedMafiaGameState = (
     });
   }, []);
 
+  // ============ ACTION POOL ============
+  /**
+   * Recompute the per-turn action budget and refill it. Called at the start of the
+   * new turn AND again at the tail of endTurn so nothing in between can leave the
+   * player stranded on 0 actions.
+   */
+  const refillActionPool = (state: EnhancedMafiaGameState) => {
+    const hasBonus = state.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD &&
+                     state.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
+    const manhattanAP = hasPlayerDistrictBonus(state, 'extra_ap') ? 1 : 0;
+    state.maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0) + manhattanAP;
+    state.actionsRemaining = state.maxActions;
+    // Legacy mirrors (save compatibility)
+    state.tacticalActionsRemaining = state.actionsRemaining;
+    state.maxTacticalActions = state.maxActions;
+  };
+
   // ============ END TURN ============
   const endTurn = useCallback(() => {
     setGameState(prev => {
