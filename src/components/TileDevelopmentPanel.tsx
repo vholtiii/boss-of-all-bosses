@@ -50,6 +50,10 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
   const capoHere = unitsHere.some((u: any) => u.type === 'capo' || u.type === 'boss');
   const soldiers = unitsHere.filter((u: any) => u.type === 'soldier').length;
   const share = garrisonShare(capoHere, soldiers);
+  const anyoneHere = capoHere || soldiers > 0 || !!tile.isHeadquarters;
+  const crewRate = buildProgressRate(capoHere, soldiers);
+  const crewLabel = buildCrewLabel(capoHere, soldiers);
+  const buildEta = tile.build ? buildEtaTurns(tile.build.monthsRemaining, capoHere, soldiers) : null;
   const policyDef = TILE_POLICIES[policy];
   const anchor = tile.anchor;
   const anchorTribute = anchor?.isExtorted ? anchor.tribute : 0;
