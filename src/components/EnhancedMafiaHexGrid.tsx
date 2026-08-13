@@ -10,7 +10,7 @@ import SelectedUnitDock from '@/components/SelectedUnitDock';
 import TileDevelopmentPanel from '@/components/TileDevelopmentPanel';
 import CityPanel from '@/components/CityPanel';
 import type { BuildingType, TilePolicy, DistrictUpgradeId } from '@/types/game-mechanics';
-import { tileEarnPotential, tileHasBuildings } from '@/types/game-mechanics';
+import { tileEarnPotential, tileHasBuildings, buildEtaTurns } from '@/types/game-mechanics';
 import MapEffectsLayer from '@/components/MapEffectsLayer';
 import { useMapEffects } from '@/hooks/useMapEffects';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
