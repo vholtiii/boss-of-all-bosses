@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Volume2, VolumeX, Bell, Mic } from 'lucide-react';
+import { Volume2, VolumeX, Bell, Mic, Music, CloudRain } from 'lucide-react';
 import type { SoundConfig } from '@/hooks/useSoundSystem';
 
 interface SoundSettingsDialogProps {
@@ -26,13 +26,14 @@ interface CategorySliderProps {
   description: string;
   value: number;
   onChange: (v: number) => void;
-  onTest: () => void;
-  testLabel: string;
+  onTest?: () => void;
+  testLabel?: string;
+  note?: string;
   disabled: boolean;
 }
 
 const CategorySlider: React.FC<CategorySliderProps> = ({
-  icon, label, description, value, onChange, onTest, testLabel, disabled,
+  icon, label, description, value, onChange, onTest, testLabel, note, disabled,
 }) => {
   const isMuted = value <= 0;
 
@@ -67,16 +68,19 @@ const CategorySlider: React.FC<CategorySliderProps> = ({
         />
         <span className="w-9 text-right text-xs font-mono text-muted-foreground">{Math.round(value * 100)}%</span>
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full text-xs"
-        data-no-sound
-        onClick={onTest}
-        disabled={isMuted}
-      >
-        🔊 Test {testLabel}
-      </Button>
+      {onTest && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full text-xs"
+          data-no-sound
+          onClick={onTest}
+          disabled={isMuted}
+        >
+          🔊 Test {testLabel}
+        </Button>
+      )}
+      {note && <p className="text-[11px] italic text-muted-foreground">{note}</p>}
     </div>
   );
 };
@@ -90,7 +94,7 @@ const SoundSettingsDialog: React.FC<SoundSettingsDialogProps> = ({
 }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border max-w-md">
+      <DialogContent className="bg-card border-border max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
             <Volume2 className="h-5 w-5 text-primary" />
@@ -108,7 +112,7 @@ const SoundSettingsDialog: React.FC<SoundSettingsDialogProps> = ({
               }
               <div>
                 <Label className="text-sm font-bold text-foreground">Master Sound</Label>
-                <p className="text-xs text-muted-foreground">Toggle all sound effects</p>
+                <p className="text-xs text-muted-foreground">Toggle all audio</p>
               </div>
             </div>
             <Switch
@@ -120,12 +124,32 @@ const SoundSettingsDialog: React.FC<SoundSettingsDialogProps> = ({
 
           {/* Channel sliders */}
           <CategorySlider
+            icon={<Music className="h-4 w-4 text-amber-400" />}
+            label="Music"
+            description="Menu theme"
+            value={soundConfig.musicVolume ?? 0.35}
+            onChange={(musicVolume) => onUpdateConfig({ musicVolume })}
+            note="Plays on the family selection screen."
+            disabled={!soundConfig.enabled}
+          />
+
+          <CategorySlider
+            icon={<CloudRain className="h-4 w-4 text-slate-300" />}
+            label="Ambience"
+            description="City bed under the map"
+            value={soundConfig.ambienceVolume ?? 0.3}
+            onChange={(ambienceVolume) => onUpdateConfig({ ambienceVolume })}
+            note="Rain, traffic and distant sirens — sirens pick up as heat rises."
+            disabled={!soundConfig.enabled}
+          />
+
+          <CategorySlider
             icon={<Bell className="h-4 w-4 text-blue-400" />}
             label="SFX"
             description="Beeps, clicks & alerts"
             value={soundConfig.sfxVolume}
             onChange={(sfxVolume) => onUpdateConfig({ sfxVolume })}
-            onTest={() => onTestSound('click')}
+            onTest={() => onTestSound('upgrade')}
             testLabel="SFX"
             disabled={!soundConfig.enabled}
           />

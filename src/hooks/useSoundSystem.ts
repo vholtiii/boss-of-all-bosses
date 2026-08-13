@@ -2,9 +2,10 @@ import { useCallback, useRef, useEffect, useState } from 'react';
 
 export interface SoundConfig {
   enabled: boolean;
-  sfxVolume: number;    // 0-1, synthesized voices
-  voiceVolume: number;  // 0-1, recorded mp3 clips
-  musicVolume?: number; // 0-1, background music (optional, defaults to sfxVolume * 0.7)
+  sfxVolume: number;       // 0-1, synthesized tones
+  voiceVolume: number;     // 0-1, recorded clips / barks
+  musicVolume: number;     // 0-1, menu music
+  ambienceVolume: number;  // 0-1, looping city bed
 }
 
 const STORAGE_KEY = 'mafia-sound-settings';
@@ -13,25 +14,41 @@ const DEFAULT_CONFIG: SoundConfig = {
   enabled: true,
   sfxVolume: 0.5,
   voiceVolume: 0.5,
+  musicVolume: 0.35,
+  ambienceVolume: 0.3,
 };
+
+const clamp01 = (n: number) => Math.max(0, Math.min(1, Number.isFinite(n) ? n : 0));
 
 const loadConfig = (): SoundConfig => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed && (parsed.uiVolume !== undefined || parsed.alertVolume !== undefined || parsed.combatVolume !== undefined)) {
+      const parsed = JSON.parse(saved) || {};
+      // Legacy shape (uiVolume / alertVolume / combatVolume)
+      if (parsed.uiVolume !== undefined || parsed.alertVolume !== undefined || parsed.combatVolume !== undefined) {
         const sfxVolume = Math.max(parsed.uiVolume ?? 0.5, parsed.alertVolume ?? 0.5);
         const voiceVolume = parsed.combatVolume ?? 0.5;
         const migrated: SoundConfig = {
           enabled: parsed.enabled ?? true,
-          sfxVolume,
-          voiceVolume,
+          sfxVolume: clamp01(sfxVolume),
+          voiceVolume: clamp01(voiceVolume),
+          musicVolume: clamp01(parsed.musicVolume ?? sfxVolume * 0.7),
+          ambienceVolume: clamp01(parsed.ambienceVolume ?? 0.3),
         };
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated)); } catch {}
         return migrated;
       }
-      return { ...DEFAULT_CONFIG, ...parsed };
+      const next: SoundConfig = {
+        enabled: parsed.enabled ?? true,
+        sfxVolume: clamp01(parsed.sfxVolume ?? DEFAULT_CONFIG.sfxVolume),
+        voiceVolume: clamp01(parsed.voiceVolume ?? DEFAULT_CONFIG.voiceVolume),
+        // Previously music implicitly derived from sfx * 0.7
+        musicVolume: clamp01(parsed.musicVolume ?? (parsed.sfxVolume ?? DEFAULT_CONFIG.sfxVolume) * 0.7),
+        ambienceVolume: clamp01(parsed.ambienceVolume ?? DEFAULT_CONFIG.ambienceVolume),
+      };
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+      return next;
     }
   } catch {}
   return DEFAULT_CONFIG;
@@ -55,12 +72,27 @@ const FILE_ONLY_SOUNDS = new Set([
   'put_out_hit', 'fortify',
 ]);
 
+/**
+ * Voice barks: spoken/recorded variants per event. Missing files are skipped
+ * gracefully, so the layer can be filled in later without code changes.
+ */
+const BARKS: Record<string, string[]> = {
+  hit_success: ['/sounds/barks/hit-success-1.mp3', '/sounds/barks/hit-success-2.mp3'],
+  hit_fail: ['/sounds/barks/hit-fail-1.mp3', '/sounds/barks/hit-fail-2.mp3'],
+  arrest: ['/sounds/barks/arrest-1.mp3', '/sounds/barks/arrest-2.mp3'],
+  promotion: ['/sounds/barks/promotion-1.mp3', '/sounds/barks/promotion-2.mp3'],
+  war: ['/sounds/barks/war-1.mp3', '/sounds/barks/war-2.mp3'],
+};
+const BARK_COOLDOWN_MS = 4000;
+
 export const useSoundSystem = () => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const softClipRef = useRef<WaveShaperNode | null>(null);
   const noiseBufferRef = useRef<AudioBuffer | null>(null);
   const audioFileCacheRef = useRef<Record<string, HTMLAudioElement>>({});
+  const lastBarkRef = useRef<number>(0);
+  const lastToneAtRef = useRef<Record<string, number>>({});
   const [soundConfig, setSoundConfig] = useState<SoundConfig>(loadConfig);
   const soundConfigRef = useRef(soundConfig);
 
@@ -73,12 +105,11 @@ export const useSoundSystem = () => {
       try {
         const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
         audioContextRef.current = ctx;
-        // Soft-clip curve to prevent layered triggers from popping
         const shaper = ctx.createWaveShaper();
         const curve = new Float32Array(1024);
         for (let i = 0; i < curve.length; i++) {
           const x = (i / (curve.length - 1)) * 2 - 1;
-          curve[i] = Math.tanh(x * 1.3); // gentle saturation
+          curve[i] = Math.tanh(x * 1.3);
         }
         shaper.curve = curve;
         shaper.oversample = '2x';
@@ -88,7 +119,6 @@ export const useSoundSystem = () => {
         master.connect(ctx.destination);
         softClipRef.current = shaper;
         masterGainRef.current = master;
-        // Pre-build a half-second white-noise buffer for impacts
         const noise = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.5), ctx.sampleRate);
         const data = noise.getChannelData(0);
         for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
@@ -128,7 +158,6 @@ export const useSoundSystem = () => {
   }, []);
 
   // --- Synth voices --------------------------------------------------------
-  // Each voice receives (ctx, dest, vol, now) and renders one shot.
 
   type VoiceFn = (ctx: AudioContext, dest: AudioNode, vol: number, t: number) => void;
 
@@ -175,7 +204,24 @@ export const useSoundSystem = () => {
   };
 
   const VOICES: Record<string, VoiceFn> = {
-    click: (ctx, d, v, t) => tone(ctx, d, 900, 'square', t, 0.05, v * 0.35),
+    // --- UI tone set -------------------------------------------------------
+    hover: (ctx, d, v, t) => tone(ctx, d, 1500, 'sine', t, 0.03, v * 0.06),
+    click: (ctx, d, v, t) => tone(ctx, d, 900, 'square', t, 0.05, v * 0.28),
+    open: (ctx, d, v, t) => {
+      tone(ctx, d, 420, 'triangle', t, 0.14, v * 0.28, 720);
+      tone(ctx, d, 840, 'sine', t + 0.03, 0.12, v * 0.12);
+    },
+    close: (ctx, d, v, t) => tone(ctx, d, 700, 'triangle', t, 0.13, v * 0.24, 380),
+    toggle: (ctx, d, v, t) => {
+      tone(ctx, d, 620, 'square', t, 0.045, v * 0.20);
+      tone(ctx, d, 980, 'square', t + 0.05, 0.05, v * 0.18);
+    },
+    deny: (ctx, d, v, t) => {
+      tone(ctx, d, 150, 'square', t, 0.16, v * 0.40, 95);
+      noiseBurst(ctx, d, t, 0.09, v * 0.22, 500);
+    },
+
+    // --- Core feedback -----------------------------------------------------
     success: (ctx, d, v, t) => {
       tone(ctx, d, 880, 'sine', t, 0.22, v * 0.45);
       tone(ctx, d, 1320, 'sine', t + 0.04, 0.20, v * 0.30);
@@ -185,6 +231,10 @@ export const useSoundSystem = () => {
       tone(ctx, d, 322, 'sawtooth', t, 0.32, v * 0.22, 222);
     },
     notification: (ctx, d, v, t) => tone(ctx, d, 660, 'triangle', t, 0.18, v * 0.40, 880),
+    bell: (ctx, d, v, t) => {
+      tone(ctx, d, 1180, 'sine', t, 0.6, v * 0.30);
+      tone(ctx, d, 1770, 'sine', t + 0.01, 0.45, v * 0.14);
+    },
     combat: (ctx, d, v, t) => {
       tone(ctx, d, 180, 'square', t, 0.25, v * 0.40, 80);
       noiseBurst(ctx, d, t, 0.18, v * 0.5, 1800);
@@ -228,6 +278,64 @@ export const useSoundSystem = () => {
       tone(ctx, d, 2100, 'sine', t + 0.05, 0.18, v * 0.25);
     },
     extort_fail: (ctx, d, v, t) => tone(ctx, d, 220, 'sawtooth', t, 0.38, v * 0.38, 160),
+
+    // --- Turn flow ---------------------------------------------------------
+    turn_start: (ctx, d, v, t) => {
+      tone(ctx, d, 220, 'triangle', t, 0.45, v * 0.34);
+      tone(ctx, d, 330, 'sine', t + 0.06, 0.38, v * 0.20);
+    },
+    turn_end: (ctx, d, v, t) => {
+      tone(ctx, d, 330, 'sine', t, 0.30, v * 0.28);
+      tone(ctx, d, 220, 'sine', t + 0.12, 0.40, v * 0.30);
+    },
+
+    // --- Economy -----------------------------------------------------------
+    coin: (ctx, d, v, t) => {
+      tone(ctx, d, 1600, 'sine', t, 0.10, v * 0.22);
+      tone(ctx, d, 2400, 'sine', t + 0.05, 0.10, v * 0.16);
+      tone(ctx, d, 3200, 'sine', t + 0.10, 0.12, v * 0.10);
+    },
+    buyout: (ctx, d, v, t) => {
+      tone(ctx, d, 1500, 'square', t, 0.07, v * 0.22);
+      tone(ctx, d, 900, 'sine', t + 0.06, 0.16, v * 0.28);
+      noiseBurst(ctx, d, t + 0.16, 0.10, v * 0.30, 700); // stamp
+      tone(ctx, d, 160, 'square', t + 0.16, 0.12, v * 0.30, 110);
+    },
+    upgrade: (ctx, d, v, t) => {
+      tone(ctx, d, 520, 'triangle', t, 0.14, v * 0.30);
+      tone(ctx, d, 780, 'triangle', t + 0.10, 0.14, v * 0.30);
+      tone(ctx, d, 1040, 'sine', t + 0.20, 0.28, v * 0.34);
+    },
+    policy_set: (ctx, d, v, t) => {
+      tone(ctx, d, 740, 'square', t, 0.05, v * 0.18);
+      tone(ctx, d, 1110, 'sine', t + 0.06, 0.10, v * 0.20);
+    },
+
+    // --- Units -------------------------------------------------------------
+    select: (ctx, d, v, t) => tone(ctx, d, 520, 'square', t, 0.04, v * 0.20),
+    unit_move: (ctx, d, v, t) => {
+      noiseBurst(ctx, d, t, 0.09, v * 0.28, 420);
+      tone(ctx, d, 130, 'sine', t, 0.10, v * 0.22, 90);
+    },
+
+    // --- Threat / diplomacy ------------------------------------------------
+    heat_warning: (ctx, d, v, t) => {
+      tone(ctx, d, 480, 'sawtooth', t, 0.30, v * 0.28, 620);
+      tone(ctx, d, 620, 'sawtooth', t + 0.28, 0.34, v * 0.26, 470);
+    },
+    war_declared: (ctx, d, v, t) => {
+      tone(ctx, d, 110, 'sawtooth', t, 0.9, v * 0.40, 85);
+      tone(ctx, d, 165, 'square', t + 0.02, 0.75, v * 0.22, 130);
+      noiseBurst(ctx, d, t, 0.35, v * 0.30, 600);
+    },
+    pact_signed: (ctx, d, v, t) => {
+      tone(ctx, d, 440, 'sine', t, 0.28, v * 0.32);
+      tone(ctx, d, 660, 'sine', t + 0.10, 0.34, v * 0.30);
+    },
+    pact_broken: (ctx, d, v, t) => {
+      tone(ctx, d, 415, 'sawtooth', t, 0.42, v * 0.30, 300);
+      tone(ctx, d, 440, 'sawtooth', t, 0.42, v * 0.26, 320);
+    },
   };
 
   const playSound = useCallback((type: string, _frequency?: number, _duration?: number) => {
@@ -243,7 +351,7 @@ export const useSoundSystem = () => {
             audio.preload = 'auto';
             audioFileCacheRef.current[type] = audio;
           }
-          audio.volume = Math.max(0, Math.min(1, voiceVol));
+          audio.volume = clamp01(voiceVol);
           audio.currentTime = 0;
           void audio.play().catch(() => {});
         } catch {}
@@ -258,6 +366,12 @@ export const useSoundSystem = () => {
     if (ctx.state === 'suspended') {
       ctx.resume().catch(() => {});
     }
+    // Cheap de-dupe so rapid repeats (hover, move) don't stack into mush
+    const now = Date.now();
+    const minGap = type === 'hover' ? 60 : 25;
+    if (now - (lastToneAtRef.current[type] ?? 0) < minGap) return;
+    lastToneAtRef.current[type] = now;
+
     const voice = VOICES[type] || VOICES.click;
     try {
       voice(ctx, softClipRef.current, sfxVol, ctx.currentTime);
@@ -270,6 +384,29 @@ export const useSoundSystem = () => {
     });
   }, [playSound]);
 
+  /** Random spoken variant for a big beat; rate-limited and silent if assets are absent. */
+  const playBark = useCallback((event: keyof typeof BARKS | string) => {
+    const variants = BARKS[event as string];
+    if (!variants || variants.length === 0) return;
+    const vol = getVoiceVolume();
+    if (vol <= 0) return;
+    const now = Date.now();
+    if (now - lastBarkRef.current < BARK_COOLDOWN_MS) return;
+    lastBarkRef.current = now;
+    const url = variants[Math.floor(Math.random() * variants.length)];
+    try {
+      let audio = audioFileCacheRef.current[url];
+      if (!audio) {
+        audio = new Audio(url);
+        audio.preload = 'auto';
+        audioFileCacheRef.current[url] = audio;
+      }
+      audio.volume = clamp01(vol);
+      audio.currentTime = 0;
+      void audio.play().catch(() => {}); // missing asset → silent
+    } catch {}
+  }, [getVoiceVolume]);
+
   const updateSoundConfig = useCallback((config: Partial<SoundConfig>) => {
     setSoundConfig(prev => {
       const next = { ...prev, ...config };
@@ -281,6 +418,7 @@ export const useSoundSystem = () => {
   return {
     playSound,
     playSoundSequence,
+    playBark,
     updateSoundConfig,
     soundConfig,
   };

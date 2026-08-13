@@ -16,6 +16,7 @@ import { LeftSidePanel, RightSidePanel } from '@/components/GameSidePanels';
 import { useEnhancedMafiaGameState } from '@/hooks/useEnhancedMafiaGameState';
 import { getBusinessSupplyDecayMultiplier } from '@/lib/supply-flow';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
+import { useAmbience } from '@/hooks/useAmbience';
 import SaveLoadDialog from '@/components/SaveLoadDialog';
 import { useGameSaveLoad } from '@/hooks/useGameSaveLoad';
 import EnemyHexActionDialog from '@/components/EnemyHexActionDialog';
@@ -126,7 +127,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   } = useEnhancedMafiaGameState(config.family, config.resources, config.difficulty, config.seed, config.mapSize);
 
   const { notifySuccess, notifyError, notifyWarning, notifyInfo, notifyTerritoryCaptured, notifyReputationChange } = useMafiaNotifications();
-  const { playSound, playSoundSequence, updateSoundConfig, soundConfig } = useSoundSystem();
+  const { playSound, playSoundSequence, playBark, updateSoundConfig, soundConfig } = useSoundSystem();
   const [showSoundSettings, setShowSoundSettings] = useState(false);
 
   // Drain pending notifications from game state into the notification system
@@ -134,22 +135,38 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     if (gameState.pendingNotifications.length > 0) {
       gameState.pendingNotifications.forEach(n => {
         switch (n.type) {
-          case 'success':
+          case 'success': {
             notifySuccess(n.title, n.message);
-            if (typeof n.title === 'string' && n.title.includes('Contract Fulfilled')) {
+            const t = typeof n.title === 'string' ? n.title : '';
+            if (t.includes('Contract Fulfilled')) {
               playSound('assassin_kill');
-            } else if (typeof n.title === 'string' && n.title.includes('Construction Started')) {
+              playBark('hit_success');
+            } else if (t.includes('Construction Started')) {
               playSound('construction_start');
-            } else if (typeof n.title === 'string' && n.title.includes('Business Complete')) {
+            } else if (t.includes('Business Complete')) {
               playSound('construction_complete');
+            } else if (/Bought Out|Buy[- ]Out|Racket Acquired/i.test(t)) {
+              playSound('buyout');
+            } else if (/Upgraded|Upgrade Complete|Tier/i.test(t)) {
+              playSound('upgrade');
+            } else if (/Promoted|Promotion|New Capo/i.test(t)) {
+              playSound('levelup');
+              playBark('promotion');
+            } else if (/Pact|Alliance|Deal Struck|Agreement/i.test(t)) {
+              playSound('pact_signed');
+            } else if (/Tribute|Income|Payout|Collected/i.test(t)) {
+              playSound('coin');
             } else {
               playSound('success');
             }
             break;
+          }
           case 'error': {
             notifyError(n.title, n.message);
             const t = typeof n.title === 'string' ? n.title : '';
-            if (t.includes('Arrested')) playSound('arrest');
+            if (t.includes('Arrested')) { playSound('arrest'); playBark('arrest'); }
+            else if (/Not Enough|Insufficient|Cannot Afford|Can't Afford|No Actions/i.test(t)) playSound('deny');
+            else if (/Pact Broken|Betray|Treachery|Truce Broken/i.test(t)) playSound('pact_broken');
             else playSound('danger');
             break;
           }
@@ -163,6 +180,11 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               t.includes('Plan Hit Expired')
             ) {
               playSound('capo_fail');
+              playBark('hit_fail');
+            } else if (/Heat|Investigation|RICO|Subpoena|Indict/i.test(t)) {
+              playSound('heat_warning');
+            } else if (/War Declared|At War/i.test(t)) {
+              playSound('war_declared');
             } else {
               playSound('error');
             }
@@ -170,7 +192,10 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           }
           case 'info': {
             notifyInfo(n.title, n.message);
-            if (n.title && n.title.includes('Hex Fortified')) playSound('fortify');
+            const t = typeof n.title === 'string' ? n.title : '';
+            if (t.includes('Hex Fortified')) playSound('fortify');
+            else if (/Sitdown|Negotiation|Meeting/i.test(t)) playSound('bell');
+            else if (/Standing Order|Policy/i.test(t)) playSound('policy_set');
             else playSound('notification');
             break;
           }
@@ -419,6 +444,59 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
   }, [gameState.turn]);
 
+  // ---- Ambient city bed (procedural; sirens scale with heat) ----
+  useAmbience({
+    soundConfig,
+    heat: (gameState as any).policeHeat?.level ?? 0,
+    active: !isWinner && !gameState.gameOver,
+  });
+
+  // ---- Turn start beat + income shimmer ----
+  const lastTurnSoundRef = useRef<number>(gameState.turn);
+  useEffect(() => {
+    if (gameState.turn === lastTurnSoundRef.current) return;
+    lastTurnSoundRef.current = gameState.turn;
+    playSound('turn_start');
+    const income = (gameState as any).lastTurnIncome ?? 0;
+    if (income > 0) setTimeout(() => playSound('coin'), 420);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.turn]);
+
+  // ---- Heat threshold crossings ----
+  const lastHeatTierRef = useRef<number>(-1);
+  useEffect(() => {
+    const heat = (gameState as any).policeHeat?.level ?? 0;
+    const tier = heat >= 80 ? 3 : heat >= 60 ? 2 : heat >= 35 ? 1 : 0;
+    if (lastHeatTierRef.current === -1) { lastHeatTierRef.current = tier; return; }
+    if (tier > lastHeatTierRef.current) {
+      playSound('heat_warning');
+      if (tier >= 3) setTimeout(() => playSound('danger'), 260);
+    }
+    lastHeatTierRef.current = tier;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(gameState as any).policeHeat?.level]);
+
+  // ---- War declared sting ----
+  const lastWarSigRef = useRef<string>('');
+  useEffect(() => {
+    const wd: any = (gameState as any).warDeclaration;
+    const sig = wd ? `${wd.family ?? wd.attacker ?? 'x'}-${wd.turn ?? gameState.turn}` : '';
+    if (sig && sig !== lastWarSigRef.current) {
+      lastWarSigRef.current = sig;
+      playSound('war_declared');
+      playBark('war');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(gameState as any).warDeclaration]);
+
+  // ---- Sound-wrapped action callbacks ----
+  const selectUnitSfx = useCallback((...args: any[]) => { playSound('select'); return (selectUnit as any)(...args); }, [selectUnit, playSound]);
+  const moveUnitSfx = useCallback((...args: any[]) => { playSound('unit_move'); return (moveUnit as any)(...args); }, [moveUnit, playSound]);
+  const startBuildSfx = useCallback((...args: any[]) => { playSound('construction_start'); return (startBuild as any)(...args); }, [startBuild, playSound]);
+  const buyOutAnchorSfx = useCallback((...args: any[]) => { playSound('buyout'); return (buyOutAnchor as any)(...args); }, [buyOutAnchor, playSound]);
+  const setTilePolicySfx = useCallback((...args: any[]) => { playSound('policy_set'); return (setTilePolicy as any)(...args); }, [setTilePolicy, playSound]);
+  const buyDistrictUpgradeSfx = useCallback((...args: any[]) => { playSound('upgrade'); return (buyDistrictUpgrade as any)(...args); }, [buyDistrictUpgrade, playSound]);
+
   const handleLoadGame = (loadedGameState: any) => {
     try {
       loadGameState(loadedGameState);
@@ -537,15 +615,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             playerFamily={gameState.playerFamily}
             gameState={gameState}
             onAction={handleAction}
-            onSelectUnit={selectUnit}
-            onMoveUnit={moveUnit}
+            onSelectUnit={selectUnitSfx}
+            onMoveUnit={moveUnitSfx}
             onSelectHeadquarters={handleHeadquartersClick}
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
-            onStartBuild={startBuild}
-            onBuyOutAnchor={buyOutAnchor}
-            onSetTilePolicy={setTilePolicy}
-            onBuyDistrictUpgrade={buyDistrictUpgrade}
+            onStartBuild={startBuildSfx}
+            onBuyOutAnchor={buyOutAnchorSfx}
+            onSetTilePolicy={setTilePolicySfx}
+            onBuyDistrictUpgrade={buyDistrictUpgradeSfx}
             planHitMode={planHitMode}
             planHitStep={planHitStep}
             planHitPlannerId={planHitPlannerId}
@@ -563,16 +641,16 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       id: 'actions',
       label: 'Actions',
       icon: <Swords className="h-4 w-4" />,
-      content: <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} onSelectUnit={selectUnit} />
+      content: <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} onSelectUnit={selectUnitSfx} />
     },
     {
       id: 'intel',
       label: 'Intel',
       icon: <Eye className="h-4 w-4" />,
-      content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} onHighlightFamily={setHighlightedFamily} highlightedFamily={highlightedFamily} onSelectUnit={selectUnit} onOpenOutgoingSitdown={handleOpenOutgoingSitdown} onAcceptIncomingSitdown={handleAcceptIncomingSitdown} onDeclineIncomingSitdown={handleDeclineIncomingSitdown} onCounterIncomingSitdown={handleCounterIncomingSitdown} onJumpHex={(hex) => {
+      content: <RightSidePanel gameState={gameState} onEventChoice={handleEventChoice} onAction={handleAction} onHighlightSupplyNode={setBossHighlightHex} highlightedSupplyHex={bossHighlightHex} onHighlightFamily={setHighlightedFamily} highlightedFamily={highlightedFamily} onSelectUnit={selectUnitSfx} onOpenOutgoingSitdown={handleOpenOutgoingSitdown} onAcceptIncomingSitdown={handleAcceptIncomingSitdown} onDeclineIncomingSitdown={handleDeclineIncomingSitdown} onCounterIncomingSitdown={handleCounterIncomingSitdown} onJumpHex={(hex) => {
         const tile = (gameState.hexMap || []).find((t: any) => t.q === hex.q && t.r === hex.r && t.s === hex.s);
         if (tile) selectTerritory(tile);
-      }} onJumpUnit={(u) => selectUnit(u.type, { q: u.q, r: u.r, s: u.s })} onBuyDistrictUpgrade={buyDistrictUpgrade} />
+      }} onJumpUnit={(u) => selectUnit(u.type, { q: u.q, r: u.r, s: u.s })} onBuyDistrictUpgrade={buyDistrictUpgradeSfx} />
     },
   ];
 
@@ -851,7 +929,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   }
 
   const leftSidebar = (
-    <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} onSelectUnit={selectUnit} />
+    <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} onSelectUnit={selectUnitSfx} />
   );
 
   const rightSidebar = (
@@ -863,7 +941,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       highlightedSupplyHex={bossHighlightHex}
       onHighlightFamily={setHighlightedFamily}
       highlightedFamily={highlightedFamily}
-      onSelectUnit={selectUnit}
+      onSelectUnit={selectUnitSfx}
       onOpenOutgoingSitdown={handleOpenOutgoingSitdown}
       onAcceptIncomingSitdown={handleAcceptIncomingSitdown}
       onDeclineIncomingSitdown={handleDeclineIncomingSitdown}
@@ -873,7 +951,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         if (tile) selectTerritory(tile);
       }}
       onJumpUnit={(u) => selectUnit(u.type, { q: u.q, r: u.r, s: u.s })}
-      onBuyDistrictUpgrade={buyDistrictUpgrade}
+      onBuyDistrictUpgrade={buyDistrictUpgradeSfx}
     />
   );
 
@@ -1225,7 +1303,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           jailed={gameState.legalStatus.jailTime > 0}
           jailTime={gameState.legalStatus.jailTime}
           resolving={gameState.turnPhase === 'waiting'}
-          onEndTurn={() => { playSound('notification'); endTurn(); }}
+          onEndTurn={() => { playSound('turn_end'); endTurn(); }}
         />
 
         <SaveLoadDialog 
@@ -1250,7 +1328,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           variant="outline"
           size="sm"
           data-no-sound
-          onClick={() => setShowSoundSettings(true)}
+          onClick={() => { playSound('open'); setShowSoundSettings(true); }}
         >
           <Settings className="h-4 w-4" />
         </Button>
@@ -1280,7 +1358,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           gameState={gameState}
           jailed={gameState.legalStatus.jailTime > 0}
           jailTime={gameState.legalStatus.jailTime}
-          onEndTurn={() => { playSound('notification'); endTurn(); }}
+          onEndTurn={() => { playSound('turn_end'); endTurn(); }}
           onResolveItem={(item: PendingItem) => {
             playSound('select' as any);
             if (item.kind === 'incoming_sitdown' || item.kind === 'ready_sitdown') {
@@ -1860,15 +1938,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             playerFamily={gameState.playerFamily}
             gameState={gameState}
             onAction={handleAction}
-            onSelectUnit={selectUnit}
-            onMoveUnit={moveUnit}
+            onSelectUnit={selectUnitSfx}
+            onMoveUnit={moveUnitSfx}
             onSelectHeadquarters={handleHeadquartersClick}
             onSelectUnitFromHeadquarters={selectUnitFromHeadquarters}
             onDeployUnit={deployUnit}
-            onStartBuild={startBuild}
-            onBuyOutAnchor={buyOutAnchor}
-            onSetTilePolicy={setTilePolicy}
-            onBuyDistrictUpgrade={buyDistrictUpgrade}
+            onStartBuild={startBuildSfx}
+            onBuyOutAnchor={buyOutAnchorSfx}
+            onSetTilePolicy={setTilePolicySfx}
+            onBuyDistrictUpgrade={buyDistrictUpgradeSfx}
             planHitMode={planHitMode}
             planHitStep={planHitStep}
             planHitPlannerId={planHitPlannerId}
@@ -1909,7 +1987,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               if (gameState.turnPhase !== 'waiting') {
                 if (!window.confirm('End your turn early? You still have actions remaining.')) return;
               }
-              playSound('notification');
+              playSound('turn_end');
               endTurn();
             }}
             icon={<Play className="h-5 w-5" />}
@@ -2213,7 +2291,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
       {/* Sound Settings */}
       <SoundSettingsDialog
         open={showSoundSettings}
-        onOpenChange={setShowSoundSettings}
+        onOpenChange={(o) => { if (!o) playSound('close'); setShowSoundSettings(o); }}
         soundConfig={soundConfig}
         onUpdateConfig={updateSoundConfig}
         onTestSound={playSound}
