@@ -13196,6 +13196,11 @@ export const useEnhancedMafiaGameState = (
         notify('🤝 Set Up The Racket First', 'Shake the place down before you talk about owning it.');
         return state;
       }
+      const buyerHere = state.deployedUnits.some(u => u.family === state.playerFamily && (u.type === 'capo' || u.type === 'soldier') && u.q === q && u.r === r && u.s === s);
+      if (!buyerHere && !tile.isHeadquarters) {
+        notify('👤 Nobody At The Table', 'Send someone to close the deal on this block.');
+        return state;
+      }
       const cost = tile.anchor.buyoutCost ?? anchorBuyoutCost(tile.anchor.tribute);
       if (state.resources.money < cost) {
         notify('💵 Short On Cash', `Buying out ${tile.anchor.name} costs $${cost.toLocaleString()}.`);
