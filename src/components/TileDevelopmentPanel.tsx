@@ -14,6 +14,10 @@ import {
   type BuildingTier,
   type TilePolicy,
   anchorBuyoutCost,
+  BUILD_RANK_REQUIREMENT,
+  buildEtaTurns,
+  buildProgressRate,
+  buildCrewLabel,
 } from '@/types/game-mechanics';
 import type { HexTile } from '@/hooks/useEnhancedMafiaGameState';
 
