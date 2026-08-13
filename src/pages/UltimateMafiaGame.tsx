@@ -220,7 +220,16 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
   }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications]);
 
+  // Escort movement sound (transient flag from moveUnit)
+  useEffect(() => {
+    if ((gameState as any)._escortMoved) {
+      playSound('escort_move');
+      clearSoundFlags();
+    }
+  }, [gameState._escortMoved, playSound, clearSoundFlags]);
+
   // Clear planHitMode when phase changes
+
   useEffect(() => { setPlanHitMode(false); setPlanHitStep('selectSoldier'); setPlanHitPlannerId(null); setShowPlanHitSoldierMenu(false); }, [gameState.turnPhase]);
 
   // Global button click sound
