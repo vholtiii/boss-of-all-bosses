@@ -141,86 +141,42 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         switch (n.type) {
           case 'success': {
             notifySuccess(n.title, n.message);
-            const t = typeof n.title === 'string' ? n.title : '';
-            if (t.includes('Contract Fulfilled')) {
-              playSound('assassin_kill');
-              playBark('hit_success');
-            } else if (t.includes('Construction Started')) {
-              playSound('construction_start');
-            } else if (t.includes('Business Complete')) {
-              playSound('construction_complete');
-            } else if (/Bought Out|Buy[- ]Out|Racket Acquired/i.test(t)) {
-              playSound('buyout');
-            } else if (/Upgraded|Upgrade Complete|Tier/i.test(t)) {
-              playSound('upgrade');
-            } else if (/Promoted|Promotion|New Capo/i.test(t)) {
-              playSound('levelup');
-              playBark('promotion');
-            } else if (t.includes('Supply Deal Active')) {
-              playSound('supply_deal');
-            } else if (t.includes('Sitdown Accepted')) {
-              playSound('sitdown_accepted');
-            } else if (/Pact|Alliance|Deal Struck|Agreement/i.test(t)) {
-              playSound('pact_signed');
-            } else if (/Tribute|Income|Payout|Collected/i.test(t)) {
-              playSound('coin');
-            } else {
-              playSound('success');
-            }
+            getSoundsForNotification(n.title, n.type).forEach(({ sound, kind }) => {
+              if (kind === 'voice-bark') playBark(sound);
+              else playSound(sound);
+            });
             break;
           }
-
           case 'error': {
             notifyError(n.title, n.message);
-            const t = typeof n.title === 'string' ? n.title : '';
-            if (t.includes('Arrested')) { playSound('arrest'); playBark('arrest'); }
-            else if (/Not Enough|Insufficient|Cannot Afford|Can't Afford|No Actions/i.test(t)) playSound('deny');
-            else if (/Pact Broken|Betray|Treachery|Truce Broken/i.test(t)) playSound('pact_broken');
-            else playSound('danger');
+            getSoundsForNotification(n.title, n.type).forEach(({ sound, kind }) => {
+              if (kind === 'voice-bark') playBark(sound);
+              else playSound(sound);
+            });
             break;
           }
           case 'warning': {
             notifyWarning(n.title, n.message);
-            const t = typeof n.title === 'string' ? n.title : '';
-            if (
-              t.includes('Assassination Foiled') ||
-              t.includes('Enemy Capo Wounded') ||
-              t.includes('Capo Wounded') ||
-              t.includes('Plan Hit Expired')
-            ) {
-              playSound('capo_fail');
-              playBark('hit_fail');
-            } else if (/Heat|Investigation|RICO|Subpoena|Indict/i.test(t)) {
-              playSound('heat_warning');
-            } else if (/War Declared|At War/i.test(t)) {
-              playSound('war_declared');
-            } else if (t.includes('Sitdown Declined') || t.includes('Counter Rejected')) {
-              playSound('sitdown_declined');
-            } else {
-              playSound('error');
-            }
+            getSoundsForNotification(n.title, n.type).forEach(({ sound, kind }) => {
+              if (kind === 'voice-bark') playBark(sound);
+              else playSound(sound);
+            });
             break;
           }
-
           case 'info': {
             notifyInfo(n.title, n.message);
-            const t = typeof n.title === 'string' ? n.title : '';
-            if (t.includes('Hex Fortified')) playSound('fortify');
-            else if (t.includes('Escort Formed')) playSound('escort_attach');
-            else if (t.includes('Supply Line Established')) playSound('supply_connect');
-            else if (t.includes('Sitdown Proposed')) playSound('sitdown_proposed');
-            else if (t.includes('Sitdown Ready')) playSound('sitdown_ready');
-            else if (/Sitdown|Negotiation|Meeting/i.test(t)) playSound('bell');
-            else if (/Standing Order|Policy/i.test(t)) playSound('policy_set');
-            else playSound('notification');
+            getSoundsForNotification(n.title, n.type).forEach(({ sound, kind }) => {
+              if (kind === 'voice-bark') playBark(sound);
+              else playSound(sound);
+            });
             break;
           }
-
         }
       });
       clearNotifications();
     }
-  }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications]);
+  }, [gameState.pendingNotifications, notifySuccess, notifyError, notifyWarning, notifyInfo, clearNotifications, playSound, playBark]);
+
 
   // Escort movement sound (transient flag from moveUnit)
   useEffect(() => {
