@@ -38,6 +38,7 @@ const loadConfig = (): SoundConfig => {
           voiceVolume: clamp01(voiceVolume),
           musicVolume: clamp01(parsed.musicVolume ?? sfxVolume * 0.7),
           ambienceVolume: clamp01(parsed.ambienceVolume ?? 0.3),
+          ambienceReactive: parsed.ambienceReactive ?? true,
         };
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated)); } catch {}
         return migrated;
