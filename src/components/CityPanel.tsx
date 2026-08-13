@@ -333,7 +333,7 @@ const CityPanel: React.FC<CityPanelProps> = ({
                   {!maxed && !locked && (
                     <span className="shrink-0 text-right text-[10px] text-mafia-gold">
                       ${def.cost.toLocaleString()}
-                      <span className="block text-[9px] text-muted-foreground">{def.months}mo · 1 action</span>
+                      <span className="block text-[9px] text-muted-foreground">~{startEta} turn{startEta !== 1 ? 's' : ''} · 1 action</span>
                     </span>
                   )}
                 </button>
