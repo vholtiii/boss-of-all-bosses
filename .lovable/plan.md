@@ -36,7 +36,11 @@ So a capo can start a casino and hand it off to a soldier — the job continues,
 ## Player-facing changes
 
 - Build buttons in the City Panel and Tile Development Panel show a lock with the reason when the crew on the block can't do that trade ("Capo work" / "Send a crew to this block").
-- A block under construction shows: current tier being built, progress, the speed the crew on site is producing, and the ETA at that speed.
+- **Completion ETA, everywhere it matters.** The moment construction starts, the block gets a live ETA — "Done in 4 turns" — recalculated at the top of every turn from whoever is standing on the site right now. It appears in three places:
+  - City Panel / Tile Development Panel: full line — tier being built, progress bar, crew on site, rate ("Capo on site — 1.5/turn"), and ETA.
+  - Hex info panel for the selected block: compact "Under construction — Casino, 3 turns left".
+  - On the map: a small turn-count badge on the construction icon of the block.
+- If the crew changes, the ETA visibly shifts that turn (with a short "ETA now 7 turns" note in the just-happened feed when it slips or improves by 2+ turns), so walking a capo off a job site has an immediate, readable cost. With nobody on site the ETA reads at the slack rate rather than showing "stalled" — work never stops entirely.
 - Buy-out button locks with "Send someone to close the deal" when the block is empty.
 
 ## Technical notes
@@ -48,5 +52,5 @@ So a capo can start a casino and hand it off to a soldier — the job continues,
   - Construction ticks (~5789 and ~6527): subtract `buildProgressRate(...)` instead of 1; complete when `<= 0`.
   - AI build block (~8245): swap the capo-only candidate filter for the same rank table; keep the interior-hex preference.
   - Remove the dead `build_business` / `place_business_on_hex` legacy cases so there is one rule set.
-- `src/components/CityPanel.tsx` and `src/components/TileDevelopmentPanel.tsx`: use the existing `capoHere` / `soldiers` values already computed in CityPanel to disable and annotate build buttons, render the crew-speed line and ETA, and gate the buy-out button.
-- Tests: extend the existing build/policy test suites with cases for soldier-built store front allowed, soldier-built casino rejected, capo speed vs soldier speed vs unattended progress, buy-out requiring presence, and AI parity.
+- `src/components/CityPanel.tsx` and `src/components/TileDevelopmentPanel.tsx`: use the existing `capoHere` / `soldiers` values already computed in CityPanel to disable and annotate build buttons, render the crew-speed line and ETA, and gate the buy-out button. ETA = `ceil(monthsRemaining / buildProgressRate(...))` turns, computed in a shared helper so panel, hex info, and map badge all read the same number.
+- Tests: extend the existing build/policy test suites with cases for soldier-built store front allowed, soldier-built casino rejected, capo speed vs soldier speed vs unattended progress, ETA recalculation when the crew changes, buy-out requiring presence, and AI parity.
