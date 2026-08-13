@@ -18,6 +18,7 @@ import { getBusinessSupplyDecayMultiplier } from '@/lib/supply-flow';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import { getSoundsForNotification } from '@/lib/sound-mapping';
 import { useAmbience } from '@/hooks/useAmbience';
+import { computeProsperity } from '@/lib/ambience-state';
 
 import SaveLoadDialog from '@/components/SaveLoadDialog';
 import { useGameSaveLoad } from '@/hooks/useGameSaveLoad';
