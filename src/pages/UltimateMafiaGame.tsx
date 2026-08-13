@@ -614,7 +614,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               fedBugDiscoveredCount={((gameState as any).wiretaps || []).filter((w: any) => w.plantedBy === 'feds' && w.targetFamily === gameState.playerFamily && w.discovered).length}
             />
           </div>
+          <PanelErrorBoundary label="Map">
           <EnhancedMafiaHexGrid 
+
             ref={hexFxRef}
             key="hex-grid-mobile"
             width={12}
