@@ -3906,15 +3906,8 @@ export const useEnhancedMafiaGameState = (
       newState.aiBounties = newState.aiBounties.filter(b => newState.turn < b.expiresOnTurn);
       newState.selectedMoveAction = 'move' as MoveAction;
       
-      // Reset the single action pool for the new turn
-      const hasBonus = newState.resources.respect >= BONUS_ACTION_RESPECT_THRESHOLD && 
-                       newState.resources.influence >= BONUS_ACTION_INFLUENCE_THRESHOLD;
-      const manhattanAP = hasPlayerDistrictBonus(newState, 'extra_ap') ? 1 : 0;
-      newState.maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0) + manhattanAP;
-      newState.actionsRemaining = newState.maxActions;
-      // Legacy mirrors (save compatibility)
-      newState.tacticalActionsRemaining = newState.actionsRemaining;
-      newState.maxTacticalActions = newState.maxActions;
+      // Reset the single action pool for the new turn (recomputed again at the tail of endTurn)
+      refillActionPool(newState);
 
       // ============ SECONDARY: BRONX FREE RECRUIT (every 3 turns) ============
       // Double-check actual current Bronx ownership to prevent stale-bonus spawns.
