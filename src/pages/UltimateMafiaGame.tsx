@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import NegotiationDialog from '@/components/NegotiationDialog';
+import SitdownScene from '@/components/sitdown/SitdownScene';
 import TurnActionMeter from '@/components/TurnActionMeter';
 import SmartEndTurnButton from '@/components/SmartEndTurnButton';
 import type { PendingItem } from '@/lib/pending-actions';
@@ -2207,101 +2207,101 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
           const capoPersonality = capo?.personality || pendingEntry?.capoPersonality || 'diplomat';
           const enemyFamily = (negotiationState as any).targetFamilyOverride || tile.controllingFamily;
           const enemyUnitsOnHex = gameState.deployedUnits.filter((u: any) => u.family === enemyFamily && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+          const playerUnitsNear = gameState.deployedUnits.filter((u: any) => u.family === gameState.playerFamily
+            && Math.max(Math.abs(u.q - tile.q), Math.abs(u.r - tile.r), Math.abs(u.s - tile.s)) <= 1);
           const incomingSitdownId = (negotiationState as any).incomingSitdownId;
           return (
-            <NegotiationDialog
+            <SitdownScene
               open={negotiationState.open}
+              gameState={gameState}
               onClose={() => setNegotiationState(null)}
-              scope="territory"
-              negotiationUsedThisTurn={((gameState as any).capoNegotiationCooldown || 0) > 0}
-              onNegotiate={(type, extraData, offeredPrice) => {
-                if (incomingSitdownId) {
-                  performAction({
-                    type: 'accept_incoming_sitdown',
-                    sitdownId: incomingSitdownId,
-                    negotiationType: type,
-                    extraData,
-                  });
-                } else {
-                  performAction({
-                    type: 'negotiate',
-                    negotiationType: type,
-                    targetQ: negotiationState.targetQ,
-                    targetR: negotiationState.targetR,
-                    targetS: negotiationState.targetS,
-                    capoId: negotiationState.capoId,
-                    pendingNegotiationId: (negotiationState as any).pendingNegotiationId,
-                    offeredPrice,
-                    extraData,
-                  });
+              session={{
+                scope: 'territory',
+                targetFamily: enemyFamily,
+                capoName,
+                capoPersonality,
+                hex: { q: tile.q, r: tile.r, s: tile.s },
+                hexIncome: tile.anchor?.tribute || 0,
+                playerForce: playerUnitsNear.length,
+                enemyForce: enemyUnitsOnHex.length,
+                lockedDealType: (negotiationState as any).lockedDealType,
+                proposedAmount: (negotiationState as any).proposedAmount,
+                proposerLabel: (negotiationState as any).proposerLabel,
+                theyAskedForThis: !!incomingSitdownId,
+                cooldown: ((gameState as any).capoNegotiationCooldown || 0) > 0,
+              }}
+              onSubmit={({ dealType, cash, accepted, extras }) => {
+                if (dealType) {
+                  if (incomingSitdownId) {
+                    performAction({
+                      type: 'accept_incoming_sitdown',
+                      sitdownId: incomingSitdownId,
+                      negotiationType: dealType,
+                      forcedOutcome: accepted ? 'accept' : 'reject',
+                      sitdownExtras: extras,
+                    });
+                  } else {
+                    performAction({
+                      type: 'negotiate',
+                      negotiationType: dealType,
+                      targetQ: negotiationState.targetQ,
+                      targetR: negotiationState.targetR,
+                      targetS: negotiationState.targetS,
+                      capoId: negotiationState.capoId,
+                      pendingNegotiationId: (negotiationState as any).pendingNegotiationId,
+                      offeredPrice: cash || undefined,
+                      forcedOutcome: accepted ? 'accept' : 'reject',
+                      sitdownExtras: extras,
+                    });
+                  }
                 }
                 setNegotiationState(null);
               }}
-
-              capoName={capoName}
-              capoPersonality={capoPersonality}
-              enemyFamily={enemyFamily}
-              playerReputation={gameState.reputation.respect}
-              playerMoney={gameState.resources.money}
-              enemyStrength={enemyUnitsOnHex.length}
-              hexIncome={tile.anchor?.tribute || 0}
-              treacheryTurnsRemaining={(gameState as any).treacheryDebuff?.turnsRemaining || 0}
-              lockedDealType={(negotiationState as any).lockedDealType}
-              proposedAmount={(negotiationState as any).proposedAmount}
-              proposerLabel={(negotiationState as any).proposerLabel}
-              successBonus={(negotiationState as any).successBonus || 0}
-              relationshipWithTarget={gameState.reputation.familyRelationships[enemyFamily] || 0}
-              playerIsRunawayLeader={playerIsRunawayLeaderNeg}
             />
           );
         } else {
-          // Boss (family-level) negotiation
+          // Boss (family-level) sitdown
           const enemyFamilies = gameState.aiOpponents.map((o: any) => o.family).filter((f: string) => !(gameState as any).eliminatedFamilies?.includes(f));
           const targetFam = negotiationState.targetFamily || enemyFamilies[0] || '';
           const incomingSitdownId = (negotiationState as any).incomingSitdownId;
-          const successBonus = (negotiationState as any).successBonus || 0;
           return (
-            <NegotiationDialog
+            <SitdownScene
               open={negotiationState.open}
+              gameState={gameState}
               onClose={() => setNegotiationState(null)}
-              scope="family"
-              negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
-              onNegotiate={(type, extraData, offeredPrice) => {
-                if (incomingSitdownId) {
-                  performAction({
-                    type: 'accept_incoming_sitdown',
-                    sitdownId: incomingSitdownId,
-                    negotiationType: type,
-                    targetFamily: targetFam,
-                    extraData,
-                  });
-                } else {
-                  performAction({
-                    type: 'boss_negotiate',
-                    negotiationType: type,
-                    targetFamily: targetFam,
-                    offeredPrice,
-                    extraData,
-                  });
+              session={{
+                scope: 'family',
+                targetFamily: targetFam,
+                lockedDealType: (negotiationState as any).lockedDealType,
+                proposedAmount: (negotiationState as any).proposedAmount,
+                proposerLabel: (negotiationState as any).proposerLabel,
+                theyAskedForThis: !!incomingSitdownId,
+                cooldown: ((gameState as any).bossNegotiationCooldown || 0) > 0,
+              }}
+              onSubmit={({ dealType, cash, accepted, extras }) => {
+                if (dealType) {
+                  if (incomingSitdownId) {
+                    performAction({
+                      type: 'accept_incoming_sitdown',
+                      sitdownId: incomingSitdownId,
+                      negotiationType: dealType,
+                      targetFamily: targetFam,
+                      forcedOutcome: accepted ? 'accept' : 'reject',
+                      sitdownExtras: extras,
+                    });
+                  } else {
+                    performAction({
+                      type: 'boss_negotiate',
+                      negotiationType: dealType,
+                      targetFamily: targetFam,
+                      offeredPrice: cash || undefined,
+                      forcedOutcome: accepted ? 'accept' : 'reject',
+                      sitdownExtras: extras,
+                    });
+                  }
                 }
                 setNegotiationState(null);
               }}
-
-              enemyFamily={targetFam}
-              playerReputation={gameState.reputation.respect}
-              playerInfluence={gameState.resources.influence || 0}
-              playerFear={(gameState.reputation as any).fear || 0}
-              playerMoney={gameState.resources.money}
-              enemyStrength={0}
-              hexIncome={0}
-              availableEnemyFamilies={incomingSitdownId ? undefined : enemyFamilies}
-              successBonus={successBonus}
-              treacheryTurnsRemaining={(gameState as any).treacheryDebuff?.turnsRemaining || 0}
-              lockedDealType={(negotiationState as any).lockedDealType}
-              proposedAmount={(negotiationState as any).proposedAmount}
-              proposerLabel={(negotiationState as any).proposerLabel}
-              relationshipWithTarget={gameState.reputation.familyRelationships[targetFam] || 0}
-              playerIsRunawayLeader={playerIsRunawayLeaderNeg}
             />
           );
         }
