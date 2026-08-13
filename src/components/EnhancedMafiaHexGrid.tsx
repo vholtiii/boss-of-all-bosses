@@ -2142,10 +2142,12 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                         key={i}
                         className={cn(
                           "w-1.5 h-1.5 rounded-full transition-colors",
-                          i < ar ? "bg-primary shadow-[0_0_4px_hsl(var(--primary))]" : "bg-muted-foreground/25"
+                          i < ar ? "bg-primary shadow-[0_0_4px_hsl(var(--primary))]" : "bg-muted-foreground/25",
+                          i === ar - 1 && "animate-pulse"
                         )}
                       />
                     ))}
+
                     <span className="text-[9px] font-bold text-muted-foreground ml-0.5">{ar}/{am}</span>
                   </div>
                   {recArr.length > 0 && (
