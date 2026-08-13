@@ -190,11 +190,14 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               playSound('heat_warning');
             } else if (/War Declared|At War/i.test(t)) {
               playSound('war_declared');
+            } else if (t.includes('Sitdown Declined') || t.includes('Counter Rejected')) {
+              playSound('sitdown_declined');
             } else {
               playSound('error');
             }
             break;
           }
+
           case 'info': {
             notifyInfo(n.title, n.message);
             const t = typeof n.title === 'string' ? n.title : '';
