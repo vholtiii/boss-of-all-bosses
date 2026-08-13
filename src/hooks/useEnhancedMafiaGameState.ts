@@ -5658,6 +5658,11 @@ export const useEnhancedMafiaGameState = (
       connectedNodeTypes.forEach(t => {
         if (!prevConnected.includes(t)) {
           turnReport.supplyChanges!.push({ nodeType: t, event: 'connected', detail: `${t} supply now reaches your HQ network.` });
+          state.pendingNotifications.push({
+            type: 'success' as const,
+            title: '📡 Supply Line Established',
+            message: `${t.replace(/_/g, ' ')} supply now reaches your HQ network.`,
+          });
         }
       });
       prevConnected.forEach(t => {
@@ -5667,6 +5672,7 @@ export const useEnhancedMafiaGameState = (
       });
     }
     (state as any)._prevConnectedSupply = [...connectedNodeTypes];
+
 
     let legalIncome = 0;
     let illegalIncome = 0;
