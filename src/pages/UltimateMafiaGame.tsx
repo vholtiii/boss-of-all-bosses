@@ -202,11 +202,16 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             notifyInfo(n.title, n.message);
             const t = typeof n.title === 'string' ? n.title : '';
             if (t.includes('Hex Fortified')) playSound('fortify');
+            else if (t.includes('Escort Formed')) playSound('escort_attach');
+            else if (t.includes('Supply Line Established')) playSound('supply_connect');
+            else if (t.includes('Sitdown Proposed')) playSound('sitdown_proposed');
+            else if (t.includes('Sitdown Ready')) playSound('sitdown_ready');
             else if (/Sitdown|Negotiation|Meeting/i.test(t)) playSound('bell');
             else if (/Standing Order|Policy/i.test(t)) playSound('policy_set');
             else playSound('notification');
             break;
           }
+
         }
       });
       clearNotifications();
