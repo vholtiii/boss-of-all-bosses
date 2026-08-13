@@ -10,7 +10,7 @@ import SelectedUnitDock from '@/components/SelectedUnitDock';
 import TileDevelopmentPanel from '@/components/TileDevelopmentPanel';
 import CityPanel from '@/components/CityPanel';
 import type { BuildingType, TilePolicy, DistrictUpgradeId } from '@/types/game-mechanics';
-import { tileEarnPotential, tileHasBuildings } from '@/types/game-mechanics';
+import { tileEarnPotential, tileHasBuildings, buildEtaTurns } from '@/types/game-mechanics';
 import MapEffectsLayer from '@/components/MapEffectsLayer';
 import { useMapEffects } from '@/hooks/useMapEffects';
 import { HexTile, DeployedUnit } from '@/hooks/useEnhancedMafiaGameState';
@@ -1357,10 +1357,19 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                       );
                     }
                     if (tile.build) {
+                      const crew = unitsHere.filter((u: any) => u.family === tile.controllingFamily);
+                      const capoOn = crew.some((u: any) => u.type === 'capo' || u.type === 'boss');
+                      const soldierCount = crew.filter((u: any) => u.type === 'soldier').length;
+                      const eta = buildEtaTurns(tile.build.monthsRemaining, capoOn, soldierCount);
                       return (
-                        <text x={x} y={y + 1} textAnchor="middle" fontSize="16" className="pointer-events-none select-none">🚧</text>
+                        <g className="pointer-events-none select-none">
+                          <text x={x} y={y + 1} textAnchor="middle" fontSize="16">🚧</text>
+                          <rect x={x - 12} y={y + 5} width={24} height={11} rx={5.5} fill="#1a1410" stroke="#F0B429" strokeOpacity="0.7" strokeWidth="0.8" />
+                          <text x={x} y={y + 13} textAnchor="middle" fontSize="8" fill="#F0B429" fontWeight="700">{eta}T</text>
+                        </g>
                       );
                     }
+
                     const builtTypes = Object.keys(tile.buildings || {}).filter(k => (tile.buildings as any)[k]);
                     const topBuilt = builtTypes.sort(
                       (a, b) => ((tile.buildings as any)[b] || 0) - ((tile.buildings as any)[a] || 0)

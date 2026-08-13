@@ -25,6 +25,7 @@ import {
   BUILDING_DEFS, BUILDING_TYPES, MAX_BUILDING_TIER, buildingMaxTier, buildingUnlockPhase, TILE_POLICIES, DEFAULT_TILE_POLICY,
   RECRUIT_PROGRESS_GOAL, RECRUIT_PROGRESS_PER_INFRA, DISTRICT_UPGRADES,
   TURF_TAX_PER_HEX, EMPTY_BLOCK_OVERHEAD, garrisonShare, tileBuildingTotals,
+  BUILD_RANK_REQUIREMENT, buildProgressRate, buildEtaTurns,
   AnchorRacket, ANCHOR_ARCHETYPES, ANCHOR_COUNT_BY_MAP_SIZE, ANCHOR_MIN_SPACING, ANCHOR_HQ_EXCLUSION,
   ANCHOR_EXTORT_RESPECT, ANCHOR_BUYOUT_INFLUENCE, anchorBuyoutCost, tileHasBuildings, tileEarnPotential,
 
@@ -5784,9 +5785,13 @@ export const useEnhancedMafiaGameState = (
     (state.hexMap || []).forEach(tile => {
       if (tile.controllingFamily !== state.playerFamily) return;
 
-      // 1) advance any build order
+      // 1) advance any build order — pace set by the crew standing on the site
       if (tile.build) {
-        tile.build = { ...tile.build, monthsRemaining: tile.build.monthsRemaining - 1 };
+        const siteCapo = units.some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+        const siteSoldiers = units.filter(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
+        const rate = buildProgressRate(siteCapo, siteSoldiers);
+        const prevEta = buildEtaTurns(tile.build.monthsRemaining, siteCapo, siteSoldiers);
+        tile.build = { ...tile.build, monthsRemaining: Math.round((tile.build.monthsRemaining - rate) * 100) / 100 };
         if (tile.build.monthsRemaining <= 0) {
           const { type, tier } = tile.build;
           tile.buildings = { ...(tile.buildings || {}), [type]: tier };
@@ -5798,8 +5803,20 @@ export const useEnhancedMafiaGameState = (
             message: `${BUILDING_DEFS[type].label} tier ${tier} is running in ${tile.district}. +$${def.income.toLocaleString()}/month before garrison share.`,
           }];
           if (turnReport) turnReport.events.push(`🏗️ ${def.name} opened in ${tile.district}`);
+        } else {
+          const newEta = buildEtaTurns(tile.build.monthsRemaining, siteCapo, siteSoldiers);
+          // Flag only meaningful swings so the feed stays quiet on normal progress
+          if (Math.abs(newEta - (prevEta - 1)) >= 2 && turnReport) {
+            const label = BUILDING_DEFS[tile.build.type].tiers[tile.build.tier]?.name || 'Construction';
+            turnReport.events.push(
+              newEta > prevEta - 1
+                ? `🐌 ${label} in ${tile.district} slipped — ETA now ${newEta} turn${newEta > 1 ? 's' : ''}`
+                : `⚡ ${label} in ${tile.district} sped up — ETA now ${newEta} turn${newEta > 1 ? 's' : ''}`
+            );
+          }
         }
       }
+
 
       const totals = tileBuildingTotals(tile.buildings);
       if (totals.income === 0 && totals.infra === 0) return;
@@ -6522,14 +6539,18 @@ export const useEnhancedMafiaGameState = (
       });
       state.hexMap.forEach(tile => {
         if (tile.controllingFamily !== fam) return;
-        // Advance AI build orders — rivals develop their blocks on the same clock.
+        // Advance AI build orders — rivals develop their blocks on the same crew-speed clock.
         if (tile.build) {
-          tile.build = { ...tile.build, monthsRemaining: tile.build.monthsRemaining - 1 };
+          const aiSiteCapo = state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+          const aiSiteSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
+          const aiRate = buildProgressRate(aiSiteCapo, aiSiteSoldiers);
+          tile.build = { ...tile.build, monthsRemaining: Math.round((tile.build.monthsRemaining - aiRate) * 100) / 100 };
           if (tile.build.monthsRemaining <= 0) {
             tile.buildings = { ...(tile.buildings || {}), [tile.build.type]: tile.build.tier };
             tile.build = undefined;
           }
         }
+
         const aiTileEarn = tileEarnPotential(tile);
         if (aiTileEarn > 0) {
           let tileInc = 0;
@@ -8219,16 +8240,18 @@ export const useEnhancedMafiaGameState = (
       }
 
 
-      // ── B3: AI BUILD BUSINESS — instant illegal-style racket on owned empty hex with a Capo ──
-      // Mirrors the player build (requires Capo on hex, costs money, occupies an action) but
-      // bypasses the multi-turn legal construction pipeline — AI builds an extorted-style biz
-      // that immediately produces income. Gated by posture economy focus + runway.
+      // ── B3: AI BUILD BUSINESS — presence-gated development on an owned block ──
+      // Same rules as the player: a unit must stand on the block, and capo-tier tracks
+      // (brothel, gambling den, safehouse) need a capo. Gated by posture economy focus + runway.
+      const aiUnitOn = (t: { q: number; r: number; s: number }) =>
+        state.deployedUnits.some(u => u.family === fam && u.q === t.q && u.r === t.r && u.s === t.s && (u.type === 'capo' || u.type === 'soldier'));
+      const aiCapoOn = (t: { q: number; r: number; s: number }) =>
+        state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s);
       const aiBuildPosture = posture === 'BUILD_ECONOMY' || posture === 'CONSOLIDATE' || posture === 'TURTLE';
       const aiBuildRunway = opponent.resources.money / upkeepForRunway;
       const aiBuildBudget = 12000; // store-tier cost
       const aiHasBuildableHex = state.hexMap.some(t =>
-        t.controllingFamily === fam && !t.build && !t.isHeadquarters &&
-        state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
+        t.controllingFamily === fam && !t.build && !t.isHeadquarters && aiUnitOn(t)
       );
       const aiBuildChance = aiBuildPosture ? 0.55 : (policy.economyFocusMul >= 1.1 ? 0.30 : 0.10);
       if (
@@ -8243,18 +8266,19 @@ export const useEnhancedMafiaGameState = (
           turnRng() < aiBuildChance
         ) {
           const buildCandidates = state.hexMap.filter(t =>
-            t.controllingFamily === fam && !t.build && !t.isHeadquarters &&
-            state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
+            t.controllingFamily === fam && !t.build && !t.isHeadquarters && aiUnitOn(t)
           );
           // Prefer interior hexes (away from contested borders) for build safety
           buildCandidates.sort((a, b) => hexDistance(a, hq) - hexDistance(b, hq));
           const buildTile = buildCandidates[0];
-          // Pick a building track by cash on hand; AI builds tier by tier like the player.
-          const aiTrack: BuildingType = opponent.resources.money >= 35000 && aiBuildRunway >= 8
+          const buildTileHasCapo = aiCapoOn(buildTile);
+          // Pick a building track by cash on hand; capo-tier tracks need rank on site.
+          let aiTrack: BuildingType = opponent.resources.money >= 35000 && aiBuildRunway >= 8
             ? 'gambling_den'
             : opponent.resources.money >= 20000 && aiBuildRunway >= 6
               ? 'loan_sharking'
               : 'store_front';
+          if (BUILD_RANK_REQUIREMENT[aiTrack] === 'capo' && !buildTileHasCapo) aiTrack = 'store_front';
           const aiTier = (((buildTile.buildings || {})[aiTrack] || 0) + 1) as BuildingTier;
           const aiDef = aiTier <= MAX_BUILDING_TIER ? BUILDING_DEFS[aiTrack].tiers[aiTier] : null;
           if (aiDef && opponent.resources.money >= aiDef.cost) {
@@ -8265,6 +8289,7 @@ export const useEnhancedMafiaGameState = (
           }
         }
       }
+
 
       // ── B5: AI HIRE HITMAN — Phase 3+ aggressive/opportunistic AI contracts a hit on a player capo ──
       const aiHitmanCount = (state.hitmanContracts || []).filter(c => c.hiredByFamily === fam).length;
@@ -13109,6 +13134,18 @@ export const useEnhancedMafiaGameState = (
         return state;
       }
 
+      // Presence gate — somebody of yours has to be standing on the block.
+      const capoHere = state.deployedUnits.some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === q && u.r === r && u.s === s);
+      const soldiersHere = state.deployedUnits.filter(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === q && u.r === r && u.s === s).length;
+      if (!capoHere && soldiersHere === 0 && !tile.isHeadquarters) {
+        notify('👤 Nobody On The Block', 'Send a crew to this block before breaking ground.');
+        return state;
+      }
+      if (BUILD_RANK_REQUIREMENT[type] === 'capo' && !capoHere && !tile.isHeadquarters) {
+        notify('🎩 Capo Work', `${BUILDING_DEFS[type].label} is capo work. Send someone with rank.`);
+        return state;
+      }
+
       if (state.actionsRemaining <= 0) {
         notify('⏳ No Actions Left', 'Building costs 1 action.');
         return state;
@@ -13133,7 +13170,9 @@ export const useEnhancedMafiaGameState = (
       state.resources.money -= def.cost;
       state.actionsRemaining = Math.max(0, state.actionsRemaining - 1);
       tile.build = { type, tier: nextTier, monthsRemaining: def.months };
-      notify('🏗️ Ground Broken', `${def.name} — ready in ${def.months} month${def.months > 1 ? 's' : ''}.`, 'success');
+      const eta = buildEtaTurns(def.months, capoHere, soldiersHere);
+      notify('🏗️ Ground Broken', `${def.name} — done in ${eta} turn${eta > 1 ? 's' : ''} at the current crew's pace.`, 'success');
+
       return state;
     });
   }, []);
@@ -13155,6 +13194,11 @@ export const useEnhancedMafiaGameState = (
       }
       if (!tile.anchor.isExtorted) {
         notify('🤝 Set Up The Racket First', 'Shake the place down before you talk about owning it.');
+        return state;
+      }
+      const buyerHere = state.deployedUnits.some(u => u.family === state.playerFamily && (u.type === 'capo' || u.type === 'soldier') && u.q === q && u.r === r && u.s === s);
+      if (!buyerHere && !tile.isHeadquarters) {
+        notify('👤 Nobody At The Table', 'Send someone to close the deal on this block.');
         return state;
       }
       const cost = tile.anchor.buyoutCost ?? anchorBuyoutCost(tile.anchor.tribute);

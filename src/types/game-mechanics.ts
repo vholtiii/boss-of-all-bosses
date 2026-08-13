@@ -1273,6 +1273,44 @@ export function garrisonShare(capoOrBoss: boolean, soldiers: number): number {
   return GARRISON_SHARE.unguarded;
 }
 
+// --- Presence-gated construction ---
+/** Minimum rank required to break ground on each building track. */
+export const BUILD_RANK_REQUIREMENT: Record<BuildingType, 'soldier' | 'capo'> = {
+  store_front: 'soldier',
+  loan_sharking: 'soldier',
+  legal_front: 'soldier',
+  brothel: 'capo',
+  gambling_den: 'capo',
+  safehouse: 'capo',
+};
+
+/** Construction progress (in "months") produced per turn by the crew on site. */
+export const BUILD_SPEED = {
+  capo: 1.5,
+  soldier: 0.6,
+  unattended: 0.35,
+} as const;
+
+export function buildProgressRate(capoOrBoss: boolean, soldiers: number): number {
+  if (capoOrBoss) return BUILD_SPEED.capo;
+  if (soldiers > 0) return BUILD_SPEED.soldier;
+  return BUILD_SPEED.unattended;
+}
+
+/** Turns left until a build order completes at the current crew rate. */
+export function buildEtaTurns(monthsRemaining: number, capoOrBoss: boolean, soldiers: number): number {
+  return Math.max(1, Math.ceil(monthsRemaining / buildProgressRate(capoOrBoss, soldiers)));
+}
+
+/** Human label for the crew currently working a site. */
+export function buildCrewLabel(capoOrBoss: boolean, soldiers: number): string {
+  if (capoOrBoss) return 'Capo on site';
+  if (soldiers > 0) return `${soldiers} soldier${soldiers > 1 ? 's' : ''} on site`;
+  return 'No one on site';
+}
+
+
+
 // --- District upgrades (global purchases) ---
 export type DistrictUpgradeId = 'supply_routes' | 'local_muscle' | 'community_goodwill' | 'political_connections';
 
