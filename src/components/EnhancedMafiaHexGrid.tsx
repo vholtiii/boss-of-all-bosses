@@ -478,7 +478,8 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   const handleHexClick = (tile: HexTile) => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     onClearHighlight?.();
-    setPinnedHex(null);
+    // Keep blocks you control pinned so the development panel stays open
+    setPinnedHex(tile.controllingFamily === playerFamily && !tile.isHeadquarters ? tile : null);
     setDelayedHoverHex(null);
     const turnPhase = gameState?.turnPhase || 'waiting';
 
