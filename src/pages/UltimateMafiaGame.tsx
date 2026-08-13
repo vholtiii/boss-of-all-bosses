@@ -33,6 +33,8 @@ import CommissionVoteModal from '@/components/CommissionVoteModal';
 import WarDeclarationModal from '@/components/WarDeclarationModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
 import { GameErrorBoundary } from '@/components/GameErrorBoundary';
+import { PanelErrorBoundary } from '@/components/PanelErrorBoundary';
+
 import { Button } from '@/components/ui/button';
 import { 
   Play, 
