@@ -63,4 +63,44 @@ describe("Capo auto-extortion", () => {
     // Counter resets for the new turn.
     expect(post.shakedownIncomeThisTurn).toBe(0);
   });
+
+  it("uses the anchor source of truth and tallies the shakedown when a capo deploys", () => {
+    const { result } = setup();
+    const initial = result.current.gameState;
+
+    act(() => { result.current.selectUnitFromHeadquarters("capo", initial.playerFamily); });
+    const deployState = result.current.gameState;
+    const targetCoord = deployState.availableDeployHexes.find((coord: any) => {
+      const tile = deployState.hexMap.find((candidate: any) => candidate.q === coord.q && candidate.r === coord.r && candidate.s === coord.s);
+      return tile && tile.controllingFamily === "neutral" && !tile.isHeadquarters;
+    });
+    expect(targetCoord).toBeTruthy();
+
+    const target = deployState.hexMap.find((tile: any) => tile.q === targetCoord.q && tile.r === targetCoord.r && tile.s === targetCoord.s);
+    target.anchor = {
+      id: "deployment-racket",
+      name: "Deployment Racket",
+      type: "store_front",
+      tribute: 1200,
+      isLegal: false,
+      isExtorted: false,
+      heatLevel: 0,
+    };
+    const moneyBefore = deployState.resources.money;
+
+    act(() => { result.current.deployUnit("capo", targetCoord, deployState.playerFamily); });
+
+    const after = result.current.gameState;
+    const extortedTile = after.hexMap.find((tile: any) => tile.q === targetCoord.q && tile.r === targetCoord.r && tile.s === targetCoord.s);
+    const gained = after.resources.money - moneyBefore;
+    expect(extortedTile.anchor.isExtorted).toBe(true);
+    expect(extortedTile.anchor.extortedBy).toBe(after.playerFamily);
+    expect(extortedTile.business).toBeUndefined();
+    expect(gained).toBeGreaterThan(0);
+    expect(after.shakedownIncomeThisTurn).toBe(gained);
+
+    act(() => { result.current.endTurn(); });
+    expect(result.current.gameState.turnReport?.incomeBreakdown?.shakedowns).toBe(gained);
+    expect(result.current.gameState.turnReport?.incomeBreakdown?.racketTribute).toBeGreaterThan(0);
+  });
 });

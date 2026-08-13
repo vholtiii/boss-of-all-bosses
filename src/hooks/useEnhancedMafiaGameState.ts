@@ -5820,7 +5820,7 @@ export const useEnhancedMafiaGameState = (
 
       // 1) advance any build order — pace set by the crew standing on the site
       if (tile.build) {
-        const siteCapo = units.some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+        const siteCapo = units.some(u => u.family === state.playerFamily && (u.type === 'capo' || u.type === 'boss') && u.q === tile.q && u.r === tile.r && u.s === tile.s);
         const siteSoldiers = units.filter(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
         const rate = buildProgressRate(siteCapo, siteSoldiers);
         if (rate > 0) {
@@ -6578,7 +6578,7 @@ export const useEnhancedMafiaGameState = (
         if (tile.controllingFamily !== fam) return;
         // Advance AI build orders — rivals develop their blocks on the same crew-speed clock.
         if (tile.build) {
-          const aiSiteCapo = state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+          const aiSiteCapo = state.deployedUnits.some(u => u.family === fam && (u.type === 'capo' || u.type === 'boss') && u.q === tile.q && u.r === tile.r && u.s === tile.s);
           const aiSiteSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
           const aiRate = buildProgressRate(aiSiteCapo, aiSiteSoldiers);
           if (aiRate > 0) {
