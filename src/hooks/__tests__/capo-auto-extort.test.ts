@@ -78,13 +78,14 @@ describe("Capo auto-extortion", () => {
 
     const target = deployState.hexMap.find((tile: any) => tile.q === targetCoord.q && tile.r === targetCoord.r && tile.s === targetCoord.s);
     target.anchor = {
-      id: "deployment-racket",
       name: "Deployment Racket",
       type: "store_front",
       tribute: 1200,
       isLegal: false,
       isExtorted: false,
       heatLevel: 0,
+      buyoutCost: 6000,
+      launderingCapacity: 0,
     };
     const moneyBefore = deployState.resources.money;
 
@@ -95,7 +96,7 @@ describe("Capo auto-extortion", () => {
     const gained = after.resources.money - moneyBefore;
     expect(extortedTile.anchor.isExtorted).toBe(true);
     expect(extortedTile.anchor.extortedBy).toBe(after.playerFamily);
-    expect(extortedTile.business).toBeUndefined();
+    expect((extortedTile as any).business).toBeUndefined();
     expect(gained).toBeGreaterThan(0);
     expect(after.shakedownIncomeThisTurn).toBe(gained);
 
