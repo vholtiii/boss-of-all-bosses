@@ -1284,12 +1284,15 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                     const spriteTier = showAnchorOnly ? 1 : ((tile.buildings as any)?.[spriteType] || 1);
                     const sprite = buildingSprite(spriteType, spriteTier);
                     if (!sprite) return null;
-                    const size = showAnchorOnly ? 32 : 44;
-                    const h = showAnchorOnly ? 28 : 38;
+                    const size = showAnchorOnly ? 42 : 44;
+                    const h = showAnchorOnly ? 36 : 38;
 
                     return (
-                      <g className="pointer-events-none select-none" opacity={showAnchorOnly ? 0.72 : 1}>
-                        <ellipse cx={x} cy={y + 12} rx={showAnchorOnly ? 11 : 15} ry={showAnchorOnly ? 3.5 : 4.5} fill="#000000" opacity="0.4" />
+                      <g className="pointer-events-none select-none">
+                        {showAnchorOnly && (
+                          <ellipse cx={x} cy={y + 12} rx={16} ry={5} fill="none" stroke="#E8D5A3" strokeOpacity="0.55" strokeWidth="1.2" strokeDasharray="3 2" />
+                        )}
+                        <ellipse cx={x} cy={y + 12} rx={15} ry={4.5} fill="#000000" opacity="0.4" />
                         <image
                           href={sprite}
                           x={x - size / 2}
@@ -1297,7 +1300,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                           width={size}
                           height={h}
                           preserveAspectRatio="xMidYMax meet"
-                          style={{ filter: showAnchorOnly ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.65)) saturate(0.55)' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.65))' }}
+                          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.65))' }}
                         />
                       </g>
                     );

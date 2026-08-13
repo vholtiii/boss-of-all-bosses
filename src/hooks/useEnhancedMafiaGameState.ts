@@ -1112,7 +1112,7 @@ const placeAnchorRackets = (
     const name = (names.length ? names : arch.names)[Math.floor(rng() * Math.max(1, names.length))] || arch.names[0];
     usedNames.add(name);
     // Fewer anchors, so each one carries a bit more weight.
-    const tribute = Math.round((arch.tribute * (1.0 + rng() * 0.35)) / 50) * 50;
+    const tribute = Math.round((arch.tribute * (1.12 + rng() * 0.38)) / 50) * 50;
 
     tile.anchor = {
       type: arch.type,

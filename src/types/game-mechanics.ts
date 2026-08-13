@@ -1383,9 +1383,9 @@ export const ANCHOR_ARCHETYPES: AnchorArchetype[] = [
 /** How many anchors get placed, by map size. Deliberately scarce — the map is
  *  meant to be built up from bare ground, not inherited. */
 export const ANCHOR_COUNT_BY_MAP_SIZE: Record<string, number> = {
-  small: 4,
-  medium: 5,
-  large: 6,
+  small: 3,
+  medium: 4,
+  large: 5,
 };
 
 /** Buy-out price = tribute x this multiplier. */
