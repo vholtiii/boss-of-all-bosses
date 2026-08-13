@@ -12622,9 +12622,10 @@ export const useEnhancedMafiaGameState = (
         addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_SAFE_PASSAGE);
         state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: '🛤️ Safe Passage Granted!',
+          type: 'success', title: '🤝 Sitdown Accepted — 🛤️ Safe Passage Granted!',
           message: `Free movement through ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} territory for ${duration} turns. Cost: $${cost.toLocaleString()}. Tension -${TENSION_REDUCE_SAFE_PASSAGE}.`,
         }];
+
         break;
       }
       case 'supply_deal': {
