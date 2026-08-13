@@ -12295,6 +12295,7 @@ export const useEnhancedMafiaGameState = (
         const moneyGain = Math.floor(baseMoneyGain * respectPayoutMultiplier);
         const respectGain = isEnemy ? 3 : 5;
         state.resources.money += moneyGain;
+        state.shakedownIncomeThisTurn = (state.shakedownIncomeThisTurn || 0) + moneyGain;
         syncRespect(state, Math.min(100, state.reputation.respect + respectGain));
         // Tension: extorting rival territory
         if (isEnemy) {
