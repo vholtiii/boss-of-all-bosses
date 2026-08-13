@@ -476,6 +476,8 @@ export interface TurnReportIncomeBreakdown {
   legalGross: number;
   illegalGross: number;
   shareProfits: number;
+  /** One-off shakedown payouts collected during the turn (capo auto-extort + soldier extort). */
+  shakedowns?: number;
   penalties: Array<{ label: string; amount: number }>;
   expenses: Array<{ label: string; amount: number }>;
   net: number;
