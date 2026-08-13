@@ -1295,7 +1295,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           jailed={gameState.legalStatus.jailTime > 0}
           jailTime={gameState.legalStatus.jailTime}
           resolving={gameState.turnPhase === 'waiting'}
-          onEndTurn={() => { playSound('notification'); endTurn(); }}
+          onEndTurn={() => { playSound('turn_end'); endTurn(); }}
         />
 
         <SaveLoadDialog 
@@ -1350,7 +1350,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           gameState={gameState}
           jailed={gameState.legalStatus.jailTime > 0}
           jailTime={gameState.legalStatus.jailTime}
-          onEndTurn={() => { playSound('notification'); endTurn(); }}
+          onEndTurn={() => { playSound('turn_end'); endTurn(); }}
           onResolveItem={(item: PendingItem) => {
             playSound('select' as any);
             if (item.kind === 'incoming_sitdown' || item.kind === 'ready_sitdown') {
