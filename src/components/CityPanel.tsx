@@ -69,6 +69,15 @@ const CityPanel: React.FC<CityPanelProps> = ({
   const capoHere = unitsHere.some((u: any) => u.type === 'capo' || u.type === 'boss');
   const soldiers = unitsHere.filter((u: any) => u.type === 'soldier').length;
   const share = garrisonShare(capoHere, soldiers);
+  const anyoneHere = capoHere || soldiers > 0 || !!tile.isHeadquarters;
+  const crewRate = buildProgressRate(capoHere, soldiers);
+  const crewLabel = buildCrewLabel(capoHere, soldiers);
+  const buildEta = tile.build ? buildEtaTurns(tile.build.monthsRemaining, capoHere, soldiers) : null;
+  const buildPct = tile.build
+    ? Math.min(100, Math.max(0, Math.round((1 - tile.build.monthsRemaining / Math.max(0.01, BUILDING_DEFS[tile.build.type].tiers[tile.build.tier]!.months)) * 100)))
+    : 0;
+
+
 
   const anchorTribute = anchor?.isExtorted ? anchor.tribute : 0;
   const monthly = Math.floor((totals.income + anchorTribute) * share * policyDef.incomeMult);
