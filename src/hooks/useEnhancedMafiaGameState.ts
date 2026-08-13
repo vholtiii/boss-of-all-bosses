@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
+import { devLog } from '@/lib/devLog';
+
 import { 
   EconomySystem, 
   AIOpponent, 
@@ -3857,7 +3859,7 @@ export const useEnhancedMafiaGameState = (
               maxMoves: 2,
               level: 1,
             });
-            console.log('[spawn] safehouse hidden soldier returned to HQ', { id: h.unitId, family: ownerFam, turn: newState.turn });
+            devLog('[spawn] safehouse hidden soldier returned to HQ', { id: h.unitId, family: ownerFam, turn: newState.turn });
             if (!newState.soldierStats[h.unitId]) {
               newState.soldierStats[h.unitId] = {
                 loyalty: 50, training: 0, hits: 0, extortions: 0,
@@ -3980,7 +3982,7 @@ export const useEnhancedMafiaGameState = (
             message: 'A local from the Bronx has joined the family for free (district control bonus).',
           });
           turnReport.events.push('🏠 Free soldier recruited from Bronx district control.');
-          console.log('[spawn] bronx free recruit', { turn: newState.turn, bronxPlayerCount, bronxTotal: bronxHexes.length });
+          devLog('[spawn] bronx free recruit', { turn: newState.turn, bronxPlayerCount, bronxTotal: bronxHexes.length });
         }
       }
 
@@ -4628,7 +4630,7 @@ export const useEnhancedMafiaGameState = (
                 movesRemaining: 2, maxMoves: 2, level: 1,
                 recruited: a.recruited,
               } as any);
-              console.log('[release] heat-arrest soldier returned to HQ', { id: a.unitId, turn: newState.turn });
+              devLog('[release] heat-arrest soldier returned to HQ', { id: a.unitId, turn: newState.turn });
               turnReport.events.push(`🔓 Soldier released from jail and returned to HQ.`);
               newState.pendingNotifications.push({
                 type: 'success' as const,
@@ -4656,7 +4658,7 @@ export const useEnhancedMafiaGameState = (
                 movesRemaining: 2, maxMoves: 2, level: 1,
                 recruited: a.recruited,
               } as any);
-              console.log('[release] AI heat-arrest soldier returned to AI HQ', { id: a.unitId, family: a.family, turn: newState.turn });
+              devLog('[release] AI heat-arrest soldier returned to AI HQ', { id: a.unitId, family: a.family, turn: newState.turn });
             }
           });
           newState.arrestedSoldiers = newState.arrestedSoldiers.filter(
@@ -4677,7 +4679,7 @@ export const useEnhancedMafiaGameState = (
                 name: a.name || 'Capo',
                 recruited: a.recruited,
               } as any);
-              console.log('[release] capo returned to HQ', { id: a.unitId, name: a.name, turn: newState.turn });
+              devLog('[release] capo returned to HQ', { id: a.unitId, name: a.name, turn: newState.turn });
               turnReport.events.push(`🔓 Capo ${a.name || ''} released from jail and returned to HQ.`);
               newState.pendingNotifications.push({
                 type: 'success' as const,
@@ -5027,7 +5029,7 @@ export const useEnhancedMafiaGameState = (
             if (stats) {
               stats.loyalty = Math.max(0, stats.loyalty - PROSECUTION_ARREST_LOYALTY_PENALTY);
             }
-            console.log('[release] prosecution soldier returned to HQ', { id: soldierId, turn: newState.turn });
+            devLog('[release] prosecution soldier returned to HQ', { id: soldierId, turn: newState.turn });
             turnReport.events.push(`⚖️ A soldier has been released from federal custody and returned to HQ (−${PROSECUTION_ARREST_LOYALTY_PENALTY} loyalty)`);
             newState.pendingNotifications.push({
               type: 'warning' as const,

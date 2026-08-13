@@ -33,6 +33,9 @@ import CommissionVoteModal from '@/components/CommissionVoteModal';
 import WarDeclarationModal from '@/components/WarDeclarationModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
 import { GameErrorBoundary } from '@/components/GameErrorBoundary';
+import { PanelErrorBoundary } from '@/components/PanelErrorBoundary';
+import { devLog } from '@/lib/devLog';
+
 import { Button } from '@/components/ui/button';
 import { 
   Play, 
@@ -612,7 +615,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
               fedBugDiscoveredCount={((gameState as any).wiretaps || []).filter((w: any) => w.plantedBy === 'feds' && w.targetFamily === gameState.playerFamily && w.discovered).length}
             />
           </div>
+          <PanelErrorBoundary label="Map">
           <EnhancedMafiaHexGrid 
+
             ref={hexFxRef}
             key="hex-grid-mobile"
             width={12}
@@ -653,6 +658,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             highlightedFamily={highlightedFamily}
             onClearHighlight={() => { setBossHighlightHex(null); setHighlightedFamily(null); }}
           />
+          </PanelErrorBoundary>
+
         </div>
       )
     },
@@ -948,10 +955,13 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   }
 
   const leftSidebar = (
-    <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} onSelectUnit={selectUnitSfx} />
+    <PanelErrorBoundary label="Left panel">
+      <LeftSidePanel gameState={gameState} onAction={handleAction} turnPhase={gameState.turnPhase} onSelectUnit={selectUnitSfx} />
+    </PanelErrorBoundary>
   );
 
   const rightSidebar = (
+    <PanelErrorBoundary label="Right panel">
     <RightSidePanel
       gameState={gameState}
       onEventChoice={handleEventChoice}
@@ -972,7 +982,9 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       onJumpUnit={(u) => selectUnit(u.type, { q: u.q, r: u.r, s: u.s })}
       onBuyDistrictUpgrade={buyDistrictUpgradeSfx}
     />
+    </PanelErrorBoundary>
   );
+
 
   const topBar = (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 w-full px-6 py-3 bg-gradient-to-r from-noir-dark to-background border-b border-noir-light">
@@ -1927,13 +1939,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
         gameState.season === 'winter' && "bg-blue-500"
       )} />
       
+          <PanelErrorBoundary label="Map">
           <EnhancedMafiaHexGrid 
+
             ref={hexFxRef}
             key="hex-grid-desktop"
             width={12}
             height={12}
             onBusinessClick={(business) => {
-              console.log('🏢 Business clicked:', business);
+              devLog('🏢 Business clicked:', business);
               selectTerritory({
                 q: business.q,
                 r: business.r,
@@ -1976,6 +1990,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             highlightedFamily={highlightedFamily}
             onClearHighlight={() => { setBossHighlightHex(null); setHighlightedFamily(null); }}
           />
+          </PanelErrorBoundary>
+
     </div>
   );
 
