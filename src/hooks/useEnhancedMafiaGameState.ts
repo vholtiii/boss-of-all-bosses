@@ -8240,16 +8240,18 @@ export const useEnhancedMafiaGameState = (
       }
 
 
-      // ── B3: AI BUILD BUSINESS — instant illegal-style racket on owned empty hex with a Capo ──
-      // Mirrors the player build (requires Capo on hex, costs money, occupies an action) but
-      // bypasses the multi-turn legal construction pipeline — AI builds an extorted-style biz
-      // that immediately produces income. Gated by posture economy focus + runway.
+      // ── B3: AI BUILD BUSINESS — presence-gated development on an owned block ──
+      // Same rules as the player: a unit must stand on the block, and capo-tier tracks
+      // (brothel, gambling den, safehouse) need a capo. Gated by posture economy focus + runway.
+      const aiUnitOn = (t: { q: number; r: number; s: number }) =>
+        state.deployedUnits.some(u => u.family === fam && u.q === t.q && u.r === t.r && u.s === t.s && (u.type === 'capo' || u.type === 'soldier'));
+      const aiCapoOn = (t: { q: number; r: number; s: number }) =>
+        state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s);
       const aiBuildPosture = posture === 'BUILD_ECONOMY' || posture === 'CONSOLIDATE' || posture === 'TURTLE';
       const aiBuildRunway = opponent.resources.money / upkeepForRunway;
       const aiBuildBudget = 12000; // store-tier cost
       const aiHasBuildableHex = state.hexMap.some(t =>
-        t.controllingFamily === fam && !t.build && !t.isHeadquarters &&
-        state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
+        t.controllingFamily === fam && !t.build && !t.isHeadquarters && aiUnitOn(t)
       );
       const aiBuildChance = aiBuildPosture ? 0.55 : (policy.economyFocusMul >= 1.1 ? 0.30 : 0.10);
       if (
@@ -8264,18 +8266,19 @@ export const useEnhancedMafiaGameState = (
           turnRng() < aiBuildChance
         ) {
           const buildCandidates = state.hexMap.filter(t =>
-            t.controllingFamily === fam && !t.build && !t.isHeadquarters &&
-            state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === t.q && u.r === t.r && u.s === t.s)
+            t.controllingFamily === fam && !t.build && !t.isHeadquarters && aiUnitOn(t)
           );
           // Prefer interior hexes (away from contested borders) for build safety
           buildCandidates.sort((a, b) => hexDistance(a, hq) - hexDistance(b, hq));
           const buildTile = buildCandidates[0];
-          // Pick a building track by cash on hand; AI builds tier by tier like the player.
-          const aiTrack: BuildingType = opponent.resources.money >= 35000 && aiBuildRunway >= 8
+          const buildTileHasCapo = aiCapoOn(buildTile);
+          // Pick a building track by cash on hand; capo-tier tracks need rank on site.
+          let aiTrack: BuildingType = opponent.resources.money >= 35000 && aiBuildRunway >= 8
             ? 'gambling_den'
             : opponent.resources.money >= 20000 && aiBuildRunway >= 6
               ? 'loan_sharking'
               : 'store_front';
+          if (BUILD_RANK_REQUIREMENT[aiTrack] === 'capo' && !buildTileHasCapo) aiTrack = 'store_front';
           const aiTier = (((buildTile.buildings || {})[aiTrack] || 0) + 1) as BuildingTier;
           const aiDef = aiTier <= MAX_BUILDING_TIER ? BUILDING_DEFS[aiTrack].tiers[aiTier] : null;
           if (aiDef && opponent.resources.money >= aiDef.cost) {
@@ -8286,6 +8289,7 @@ export const useEnhancedMafiaGameState = (
           }
         }
       }
+
 
       // ── B5: AI HIRE HITMAN — Phase 3+ aggressive/opportunistic AI contracts a hit on a player capo ──
       const aiHitmanCount = (state.hitmanContracts || []).filter(c => c.hiredByFamily === fam).length;
