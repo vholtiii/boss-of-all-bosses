@@ -12528,9 +12528,10 @@ export const useEnhancedMafiaGameState = (
         // Hole #3: cooling period
         state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: '🤝 Ceasefire Agreed!',
+          type: 'success', title: '🤝 Sitdown Accepted — Ceasefire Agreed!',
           message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} won't attack for ${duration} turns. -${config.reputationCost} respect. Tension -${TENSION_REDUCE_CEASEFIRE}.`,
         }];
+
         break;
       }
       case 'bribe_territory': {
