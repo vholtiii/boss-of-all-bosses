@@ -216,22 +216,30 @@ const CityPanel: React.FC<CityPanelProps> = ({
                 <li className="text-muted-foreground">3. Build &amp; upgrade it T1 → T3 like any block you own</li>
               </ol>
               {anchor.isExtorted ? (
-                <button
-                  type="button"
-                  disabled={money < buyoutCost || actions <= 0}
-                  onClick={() => onBuyOutAnchor?.(tile.q, tile.r, tile.s)}
-                  className={cn('mt-2 w-full rounded border px-2 py-1.5 text-[10px] label-caps transition-colors',
-                    money < buyoutCost || actions <= 0
-                      ? 'cursor-not-allowed border-noir-light/60 text-muted-foreground/60'
-                      : 'border-mafia-gold/60 text-mafia-gold hover:bg-mafia-gold/15')}
-                >
-                  Buy it out · ${buyoutCost.toLocaleString()}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    disabled={money < buyoutCost || actions <= 0 || !anyoneHere}
+                    onClick={() => onBuyOutAnchor?.(tile.q, tile.r, tile.s)}
+                    className={cn('mt-2 w-full rounded border px-2 py-1.5 text-[10px] label-caps transition-colors',
+                      money < buyoutCost || actions <= 0 || !anyoneHere
+                        ? 'cursor-not-allowed border-noir-light/60 text-muted-foreground/60'
+                        : 'border-mafia-gold/60 text-mafia-gold hover:bg-mafia-gold/15')}
+                  >
+                    Buy it out · ${buyoutCost.toLocaleString()}
+                  </button>
+                  {!anyoneHere && (
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      👤 Send someone to close the deal on this block.
+                    </p>
+                  )}
+                </>
               ) : (
                 <p className="mt-1 text-[10px] text-muted-foreground">
                   Shake it down first, then you can own it outright.
                 </p>
               )}
+
             </div>
           </Section>
         )}
