@@ -252,9 +252,25 @@ const CityPanel: React.FC<CityPanelProps> = ({
             </div>
           )}
           {tile.build && (
-            <div className="mb-2 rounded border border-amber-500/40 bg-amber-900/25 px-2 py-1.5 text-[10px] text-amber-200">
-              🏗️ {BUILDING_DEFS[tile.build.type].tiers[tile.build.tier]?.name} — {tile.build.monthsRemaining} month
-              {tile.build.monthsRemaining !== 1 ? 's' : ''} out
+            <div className="mb-2 rounded border border-amber-500/40 bg-amber-900/25 px-2 py-2 text-[10px] text-amber-200">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate">🏗️ {BUILDING_DEFS[tile.build.type].tiers[tile.build.tier]?.name}</span>
+                <span className="shrink-0 font-semibold text-amber-100">
+                  Done in {buildEta} turn{buildEta !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded bg-noir-dark/70">
+                <div className="h-full bg-amber-400/80 transition-all" style={{ width: `${buildPct}%` }} />
+              </div>
+              <p className="mt-1 text-[9px] text-amber-200/80">
+                {buildPct}% · {crewLabel} — {crewRate}/turn
+                {!anyoneHere && ' (crews slack with nobody watching)'}
+              </p>
+            </div>
+          )}
+          {!anchor && !anyoneHere && (
+            <div className="mb-2 rounded border border-noir-light bg-noir-dark/60 px-2 py-1.5 text-[10px] text-muted-foreground">
+              👤 Nobody on this block. Send a crew before breaking ground.
             </div>
           )}
           <div className="space-y-1.5">
@@ -266,9 +282,12 @@ const CityPanel: React.FC<CityPanelProps> = ({
               const maxed = next > max;
               const unlock = buildingUnlockPhase(type);
               const locked = phase < unlock;
+              const needsCapo = BUILD_RANK_REQUIREMENT[type] === 'capo';
+              const rankShort = needsCapo && !capoHere && !tile.isHeadquarters;
               const def = BUILDING_DEFS[type].tiers[(maxed ? max : next) as BuildingTier]!;
-              const blocked = maxed || locked || !!anchor || !!tile.build || money < def.cost || actions <= 0;
+              const blocked = maxed || locked || !!anchor || !!tile.build || money < def.cost || actions <= 0 || !anyoneHere || rankShort;
               const art = buildingSprite(type, cur || 1);
+              const startEta = buildEtaTurns(def.months, capoHere, soldiers);
               return (
                 <button
                   key={type}
@@ -296,16 +315,21 @@ const CityPanel: React.FC<CityPanelProps> = ({
                       <span className="text-[9px] font-normal text-muted-foreground">
                         {cur ? `T${cur}` : '—'}{!maxed ? ` → T${next}` : ' · max'}
                       </span>
-                      {locked && <Lock className="h-2.5 w-2.5 text-muted-foreground" />}
+                      {(locked || rankShort) && <Lock className="h-2.5 w-2.5 text-muted-foreground" />}
                     </span>
                     <span className="mt-0.5 block truncate text-[9px] text-muted-foreground">
                       {locked
                         ? `Unlocks in phase ${unlock}`
                         : maxed
                           ? BUILDING_DEFS[type].blurb
-                          : `${def.name} · $${def.income.toLocaleString()}/mo · heat ${def.heat >= 0 ? '+' : ''}${def.heat}`}
+                          : rankShort
+                            ? 'Capo work — send someone with rank'
+                            : !anyoneHere
+                              ? 'Send a crew to this block'
+                              : `${def.name} · $${def.income.toLocaleString()}/mo · heat ${def.heat >= 0 ? '+' : ''}${def.heat}`}
                     </span>
                   </span>
+
                   {!maxed && !locked && (
                     <span className="shrink-0 text-right text-[10px] text-mafia-gold">
                       ${def.cost.toLocaleString()}
