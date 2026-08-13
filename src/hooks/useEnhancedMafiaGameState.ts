@@ -318,6 +318,7 @@ const cloneStateForMutation = (state: EnhancedMafiaGameState): EnhancedMafiaGame
   deployedUnits: (state.deployedUnits || []).map(u => ({ ...u, escortingSoldierIds: u.escortingSoldierIds ? [...u.escortingSoldierIds] : undefined })),
   pendingNotifications: [...(state.pendingNotifications || [])],
   alertsLog: [...(state.alertsLog || [])],
+  turnReportHistory: [...(state.turnReportHistory || [])],
   soldierStats: Object.fromEntries(
     Object.entries(state.soldierStats || {}).map(([k, v]) => [k, { ...v }])
   ),
@@ -655,6 +656,8 @@ export interface EnhancedMafiaGameState {
   }>;
 
   turnReport: TurnReport | null;
+  /** Rolling history of the last 12 finalised turn reports — powers Game Analysis. */
+  turnReportHistory?: TurnReport[];
   lastCombatResult?: {
     q: number; r: number; s: number;
     success: boolean;
@@ -1485,6 +1488,7 @@ export const createInitialGameState = (
     selectedTerritory: null,
     activeEvent: null,
     turnReport: null,
+    turnReportHistory: [],
     familyControl: { gambino: 20, genovese: 20, lucchese: 20, bonanno: 20, colombo: 20 },
     territories,
   };
@@ -5507,6 +5511,11 @@ export const useEnhancedMafiaGameState = (
       };
       
       newState.turnReport = turnReport;
+      // Rolling history for Game Analysis (last 12 turns)
+      newState.turnReportHistory = [
+        ...((newState.turnReportHistory || []).filter(r => r.turn !== turnReport.turn)),
+        turnReport,
+      ].slice(-12);
       
       syncLegacyUnits(newState);
       newState.territories = buildLegacyTerritories(newState.hexMap);
