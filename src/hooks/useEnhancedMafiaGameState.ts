@@ -13203,7 +13203,9 @@ export const useEnhancedMafiaGameState = (
     deployUnit,
     isWinner,
     clearNotifications,
+    clearSoundFlags,
     clearWarDeclaration,
+
     markAlertsRead,
     fortifyUnit,
     setMoveAction,
