@@ -3308,6 +3308,8 @@ export const useEnhancedMafiaGameState = (
     const manhattanAP = hasPlayerDistrictBonus(state, 'extra_ap') ? 1 : 0;
     state.maxActions = BASE_ACTIONS_PER_TURN + (hasBonus ? 1 : 0) + manhattanAP;
     state.actionsRemaining = state.maxActions;
+    // New turn: one-off shakedown cash starts fresh for the next ledger
+    state.shakedownIncomeThisTurn = 0;
     // Legacy mirrors (save compatibility)
     state.tacticalActionsRemaining = state.actionsRemaining;
     state.maxTacticalActions = state.maxActions;
