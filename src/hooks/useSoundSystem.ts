@@ -6,6 +6,8 @@ export interface SoundConfig {
   voiceVolume: number;     // 0-1, recorded clips / barks
   musicVolume: number;     // 0-1, menu music
   ambienceVolume: number;  // 0-1, looping city bed
+  /** When false the city bed stays a flat, constant mix */
+  ambienceReactive: boolean;
 }
 
 const STORAGE_KEY = 'mafia-sound-settings';
@@ -16,6 +18,7 @@ const DEFAULT_CONFIG: SoundConfig = {
   voiceVolume: 0.5,
   musicVolume: 0.35,
   ambienceVolume: 0.3,
+  ambienceReactive: true,
 };
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, Number.isFinite(n) ? n : 0));
