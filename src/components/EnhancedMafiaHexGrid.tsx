@@ -1158,7 +1158,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                               setCityHex({ q: tile.q, r: tile.r, s: tile.s });
                             }
                           }}
-                          onMouseEnter={() => { setHoveredHex(tile); }}
+                          onMouseEnter={() => { setHoveredHex(tile); scheduleHoverPanel(tile); }}
                           onMouseLeave={() => setHoveredHex(null)}
                         />
                         {isSelectedUnitHex && (
