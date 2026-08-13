@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -123,7 +123,10 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   const [showSupplyLines, setShowSupplyLines] = useState(true);
   const [showThreats, setShowThreats] = useState(true);
   const [hoveredHex, setHoveredHex] = useState<HexTile | null>(null);
+  const [delayedHoverHex, setDelayedHoverHex] = useState<HexTile | null>(null);
   const [pinnedHex, setPinnedHex] = useState<HexTile | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [cityHex, setCityHex] = useState<{ q: number; r: number; s: number } | null>(null);
   const [actionMenu, setActionMenu] = useState<{ tile: HexTile; canHit: boolean; canExtort: boolean; canClaim: boolean; canNegotiate: boolean; canSabotage: boolean; canSafehouse: boolean; canAssaultHQ?: boolean; canFlipSoldier?: boolean; negotiateCapoId?: string; pendingNegotiationId?: string; reasons?: Record<string, string> } | null>(null);
   const [planHitUnitMenu, setPlanHitUnitMenu] = useState<{ tile: HexTile; enemyUnits: DeployedUnit[] } | null>(null);
@@ -135,6 +138,25 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   // Clear action menu when phase changes
   const turnPhaseRef = gameState?.turnPhase;
   useEffect(() => { setActionMenu(null); }, [turnPhaseRef]);
+
+  // Delayed + sticky hover info panel: 1s settle, then stays until another tile is hovered
+  const scheduleHoverPanel = (tile: HexTile | null) => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
+    if (!tile) return;
+    hoverTimerRef.current = setTimeout(() => setDelayedHoverHex(tile), 1000);
+  };
+  const schedulePanelClose = () => {
+    if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
+    leaveTimerRef.current = setTimeout(() => setDelayedHoverHex(null), 500);
+  };
+  const cancelPanelClose = () => {
+    if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
+  };
+  useEffect(() => () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
+  }, []);
 
   const baseHexRadius = 22;
   const hexWidth = baseHexRadius * 2;
@@ -454,8 +476,10 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   };
 
   const handleHexClick = (tile: HexTile) => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     onClearHighlight?.();
     setPinnedHex(null);
+    setDelayedHoverHex(null);
     const turnPhase = gameState?.turnPhase || 'waiting';
 
     // Plan Hit mode — 2-step selection
@@ -775,6 +799,8 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
         background: 'radial-gradient(ellipse at center, hsl(32 22% 15%) 0%, hsl(30 28% 10%) 55%, hsl(30 33% 6%) 100%)',
       }}
       onClick={e => e.stopPropagation()}
+      onMouseEnter={cancelPanelClose}
+      onMouseLeave={schedulePanelClose}
     >
       {/* Business placement banner */}
       {isBusinessPlacementMode && (
@@ -1134,7 +1160,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                               setCityHex({ q: tile.q, r: tile.r, s: tile.s });
                             }
                           }}
-                          onMouseEnter={() => { setHoveredHex(tile); }}
+                          onMouseEnter={() => { setHoveredHex(tile); scheduleHoverPanel(tile); }}
                           onMouseLeave={() => setHoveredHex(null)}
                         />
                         {isSelectedUnitHex && (
@@ -2680,8 +2706,8 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
 
         {/* Hover Info */}
         <AnimatePresence>
-          {(hoveredHex || pinnedHex) && (() => {
-            const displayHex = pinnedHex || hoveredHex!;
+          {(delayedHoverHex || pinnedHex) && (() => {
+            const displayHex = pinnedHex || delayedHoverHex!;
             return (
             <motion.div
               key={`${displayHex.q},${displayHex.r},${displayHex.s}`}
@@ -2689,7 +2715,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
               className="pointer-events-auto w-full max-w-none cursor-pointer rounded-lg border border-noir-light bg-noir-dark/90 p-4 text-white backdrop-blur-sm transition-colors hover:border-mafia-gold/60"
-            onClick={() => { handleHexClick(displayHex); setPinnedHex(null); }}
+            onClick={() => { handleHexClick(displayHex); setPinnedHex(null); setDelayedHoverHex(null); if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current); }}
           >
             {(() => {
               const districtHexes = (gameState?.hexMap || []).filter(t => t.district === displayHex.district);
