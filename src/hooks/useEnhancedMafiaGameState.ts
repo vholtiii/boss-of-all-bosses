@@ -5785,9 +5785,13 @@ export const useEnhancedMafiaGameState = (
     (state.hexMap || []).forEach(tile => {
       if (tile.controllingFamily !== state.playerFamily) return;
 
-      // 1) advance any build order
+      // 1) advance any build order — pace set by the crew standing on the site
       if (tile.build) {
-        tile.build = { ...tile.build, monthsRemaining: tile.build.monthsRemaining - 1 };
+        const siteCapo = units.some(u => u.family === state.playerFamily && (u.type === 'capo' || u.type === 'boss') && u.q === tile.q && u.r === tile.r && u.s === tile.s);
+        const siteSoldiers = units.filter(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
+        const rate = buildProgressRate(siteCapo, siteSoldiers);
+        const prevEta = buildEtaTurns(tile.build.monthsRemaining, siteCapo, siteSoldiers);
+        tile.build = { ...tile.build, monthsRemaining: Math.round((tile.build.monthsRemaining - rate) * 100) / 100 };
         if (tile.build.monthsRemaining <= 0) {
           const { type, tier } = tile.build;
           tile.buildings = { ...(tile.buildings || {}), [type]: tier };
@@ -5799,8 +5803,20 @@ export const useEnhancedMafiaGameState = (
             message: `${BUILDING_DEFS[type].label} tier ${tier} is running in ${tile.district}. +$${def.income.toLocaleString()}/month before garrison share.`,
           }];
           if (turnReport) turnReport.events.push(`🏗️ ${def.name} opened in ${tile.district}`);
+        } else {
+          const newEta = buildEtaTurns(tile.build.monthsRemaining, siteCapo, siteSoldiers);
+          // Flag only meaningful swings so the feed stays quiet on normal progress
+          if (Math.abs(newEta - (prevEta - 1)) >= 2 && turnReport) {
+            const label = BUILDING_DEFS[tile.build.type].tiers[tile.build.tier]?.name || 'Construction';
+            turnReport.events.push(
+              newEta > prevEta - 1
+                ? `🐌 ${label} in ${tile.district} slipped — ETA now ${newEta} turn${newEta > 1 ? 's' : ''}`
+                : `⚡ ${label} in ${tile.district} sped up — ETA now ${newEta} turn${newEta > 1 ? 's' : ''}`
+            );
+          }
         }
       }
+
 
       const totals = tileBuildingTotals(tile.buildings);
       if (totals.income === 0 && totals.infra === 0) return;
