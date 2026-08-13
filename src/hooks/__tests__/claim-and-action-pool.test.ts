@@ -61,8 +61,8 @@ describe("Claim on empty blocks + action pool refill", () => {
     );
 
     act(() => {
-      // Drain the pool through the public API path used by the HUD.
-      result.current.setGameState((prev: any) => ({ ...prev, actionsRemaining: 0 }));
+      // Drain the pool.
+      result.current.loadGameState({ ...result.current.gameState, actionsRemaining: 0 } as any);
     });
     expect(result.current.gameState.actionsRemaining).toBe(0);
 
