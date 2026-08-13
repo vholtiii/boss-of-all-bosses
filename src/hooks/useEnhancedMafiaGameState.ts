@@ -2705,8 +2705,12 @@ export const useEnhancedMafiaGameState = (
         availableMoveHexes: newAvailableMoves,
         pendingNotifications: notifications,
       };
+      if (escortMoved) {
+        (newState as any)._escortMoved = true;
+      }
       syncLegacyUnits(newState);
       return newState;
+
     });
   }, []);
 
