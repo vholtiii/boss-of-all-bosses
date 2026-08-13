@@ -10317,9 +10317,10 @@ export const useEnhancedMafiaGameState = (
             const famLabel = buyerFam.charAt(0).toUpperCase() + buyerFam.slice(1);
             newState.pendingNotifications.push({
               type: 'success' as const,
-              title: '💰 Supply Deal Signed',
+              title: '💰 Supply Deal Active',
               message: `${famLabel} paid $${paid.toLocaleString()} up front and owes you ${Math.round(royaltyRate * 100)}% of their supply-dependent take for ${duration} turns.`,
             });
+
             newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
             syncLegacyUnits(newState);
             return newState;
