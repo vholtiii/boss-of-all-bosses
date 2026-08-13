@@ -47,15 +47,7 @@ export const useAmbience = ({ soundConfig, ambience, active = true }: UseAmbienc
   useEffect(() => {
     let disposed = false;
 
-    const ramp = (node: GainNode | null | undefined, value: number, secs = 3) => {
-      const ctx = ctxRef.current;
-      if (!ctx || !node) return;
-      try {
-        node.gain.cancelScheduledValues(ctx.currentTime);
-        node.gain.setValueAtTime(node.gain.value, ctx.currentTime);
-        node.gain.linearRampToValueAtTime(value, ctx.currentTime + secs);
-      } catch { /* noop */ }
-    };
+
 
     const makeNoise = (ctx: AudioContext, brown: boolean) => {
       const len = Math.floor(ctx.sampleRate * 4);
