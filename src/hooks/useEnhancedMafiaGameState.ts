@@ -12579,9 +12579,10 @@ export const useEnhancedMafiaGameState = (
         addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_ALLIANCE);
         state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
         state.pendingNotifications = [...state.pendingNotifications, {
-          type: 'success', title: '⚖️ Alliance Formed!',
+          type: 'success', title: '🤝 Sitdown Accepted — ⚖️ Alliance Formed!',
           message: `Pact with ${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} for ${duration} turns. Condition: ${condition.type.replace(/_/g, ' ')}. Tension -${TENSION_REDUCE_ALLIANCE}.`,
         }];
+
         break;
       }
       case 'share_profits': {
