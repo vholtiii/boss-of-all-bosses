@@ -50,6 +50,7 @@ const loadConfig = (): SoundConfig => {
         // Previously music implicitly derived from sfx * 0.7
         musicVolume: clamp01(parsed.musicVolume ?? (parsed.sfxVolume ?? DEFAULT_CONFIG.sfxVolume) * 0.7),
         ambienceVolume: clamp01(parsed.ambienceVolume ?? DEFAULT_CONFIG.ambienceVolume),
+        ambienceReactive: parsed.ambienceReactive ?? DEFAULT_CONFIG.ambienceReactive,
       };
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
       return next;
