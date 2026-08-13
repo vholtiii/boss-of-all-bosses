@@ -5503,7 +5503,10 @@ export const useEnhancedMafiaGameState = (
         if (!a.read && (a.type === 'error' || a.type === 'warning') && a.turn >= criticalCutoff) return true;
         return false;
       });
-      
+
+      // Final safety net: the player always starts their turn with a full pool.
+      refillActionPool(newState);
+
       return newState;
      } catch (err) {
       console.error('[endTurn] crashed — rolling back turn', err);
