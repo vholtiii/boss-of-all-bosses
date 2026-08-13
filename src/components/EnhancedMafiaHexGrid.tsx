@@ -1304,9 +1304,38 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                               >
                                 ⏳
                               </text>
+                              <text
+                                x={x}
+                                y={y + baseHexRadius * 0.62}
+                                textAnchor="middle"
+                                fontSize="6.5"
+                                fill={claimColor}
+                                fontWeight="bold"
+                                className="pointer-events-none select-none"
+                              >
+                                {tile.pendingClaim.family === playerFamily ? 'YOURS NEXT TURN' : 'CLAIM PENDING'}
+                              </text>
                             </>
                           );
                         })()}
+                        {/* Claim confirmation flash */}
+                        {claimFlash && claimFlash.q === tile.q && claimFlash.r === tile.r && claimFlash.s === tile.s && (
+                          <text
+                            key={claimFlash.id}
+                            x={x}
+                            y={y - baseHexRadius * 0.7}
+                            textAnchor="middle"
+                            fontSize="9"
+                            fill={familyColors[playerFamily] || '#D4AF37'}
+                            fontWeight="bold"
+                            className="pointer-events-none select-none"
+                          >
+                            <animate attributeName="y" from={y - baseHexRadius * 0.7} to={y - baseHexRadius * 1.5} dur="1.1s" fill="freeze" />
+                            <animate attributeName="opacity" values="0;1;1;0" dur="1.1s" fill="freeze" />
+                            🏴 CLAIM STAKED
+                          </text>
+                        )}
+
                       </>
                     );
                   })()}
