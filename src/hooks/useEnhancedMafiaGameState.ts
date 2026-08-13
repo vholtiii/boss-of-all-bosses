@@ -5547,6 +5547,8 @@ export const useEnhancedMafiaGameState = (
 
       // Final safety net: the player always starts their turn with a full pool.
       refillActionPool(newState);
+      // One-off shakedown cash is reported for the turn that just ended — reset for the new turn.
+      newState.shakedownIncomeThisTurn = 0;
 
       return newState;
      } catch (err) {
