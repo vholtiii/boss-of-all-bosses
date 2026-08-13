@@ -3,7 +3,8 @@ import {
   valueChip, basketValue, computeLeverage, evaluateBasket, aiCounterCash,
   settleBasket, newChip, greedMultiplier,
 } from '@/lib/sitdown-valuation';
-import { Basket, LeverageInput } from '@/types/negotiation';
+import type { LeverageInput } from '@/lib/sitdown-valuation';
+import { Basket } from '@/types/negotiation';
 import { getStandingAgreements } from '@/lib/standing-agreements';
 
 const baseInput: LeverageInput = { scope: 'territory', respect: 40, influence: 20, fear: 0, tension: 30 };
