@@ -16,10 +16,10 @@ That makes development the one economic system that ignores the map, which fight
 
 | Track | Who can break ground |
 |---|---|
-| Store Front, Loan Office (shylock), Legal Front, Safehouse | Soldier, capo, or boss |
-| Brothel, Gambling Den | Capo or boss only |
+| Store Front, Loan Office (shylock), Legal Front | Soldier, capo, or boss |
+| Brothel, Gambling Den, Safehouse | Capo or boss only |
 
-A soldier who tries to break ground on a brothel or den gets a clear refusal: *"This is capo work. Send someone with rank."*
+A soldier who tries to break ground on a brothel, den, or safehouse gets a clear refusal: *"This is capo work. Send someone with rank."*
 
 **Crew on site sets the pace.** Construction months are no longer fixed — each turn a block under construction advances by:
 
@@ -31,7 +31,7 @@ So a capo can start a casino and hand it off to a soldier — the job continues,
 
 **Buy-out needs presence too.** Buying an anchor racket out requires any unit of yours (soldier, capo, or boss) standing on that block — money changes hands at the table. Standing orders stay free and remote, as they are now.
 
-**AI plays the same rules.** The AI's capo-only build restriction is relaxed to match: its soldiers can start store fronts, loan offices, legal fronts, and safehouses; brothels and dens still need a capo. AI sites tick with the same crew-speed table.
+**AI plays the same rules.** The AI's capo-only build restriction is relaxed to match: its soldiers can start store fronts, loan offices, and legal fronts; brothels, dens, and safehouses still need a capo. AI sites tick with the same crew-speed table.
 
 ## Player-facing changes
 
