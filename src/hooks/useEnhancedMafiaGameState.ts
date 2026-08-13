@@ -13181,10 +13181,11 @@ export const useEnhancedMafiaGameState = (
   const clearSoundFlags = useCallback(() => {
     setGameState(prev => {
       const next = { ...prev };
-      delete (next as any)._escortMoved;
+      delete (next as Partial<EnhancedMafiaGameState> & { _escortMoved?: boolean })._escortMoved;
       return next;
     });
   }, []);
+
 
   return {
 
