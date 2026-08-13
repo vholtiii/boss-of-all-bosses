@@ -84,16 +84,20 @@ describe("Capo claiming is free", () => {
     const capo = s.deployedUnits.find((u: any) => u.family === s.playerFamily && u.type === "capo");
     expect(capo).toBeTruthy();
 
-    // Find an empty neutral tile adjacent to the capo.
+    // Find an empty neutral tile, then park the capo next to it.
     let target: any = null;
-    for (const d of HEX_DIRS) {
-      const t = s.hexMap.find((x: any) => x.q === capo.q + d.q && x.r === capo.r + d.r && x.s === capo.s + d.s);
-      if (t && t.controllingFamily === "neutral" && !t.anchor && !t.isHeadquarters && !t.pendingClaim) {
-        target = t;
-        break;
+    let from: any = null;
+    for (const t of s.hexMap) {
+      if (t.controllingFamily !== "neutral" || t.anchor || t.isHeadquarters || t.pendingClaim) continue;
+      for (const d of HEX_DIRS) {
+        const n = s.hexMap.find((x: any) => x.q === t.q + d.q && x.r === t.r + d.r && x.s === t.s + d.s);
+        if (n) { target = t; from = n; break; }
       }
+      if (target) break;
     }
     expect(target).toBeTruthy();
+    capo.q = from.q; capo.r = from.r; capo.s = from.s;
+    capo.movesRemaining = Math.max(1, capo.movesRemaining || 1);
 
     const before = result.current.gameState.actionsRemaining;
 
