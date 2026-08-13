@@ -475,6 +475,8 @@ export interface TurnReportReason { reason: string; delta: number; }
 export interface TurnReportIncomeBreakdown {
   legalGross: number;
   illegalGross: number;
+  /** Recurring tribute from extorted anchor rackets; already included in legal/illegal gross. */
+  racketTribute?: number;
   shareProfits: number;
   /** One-off shakedown payouts collected during the turn (capo auto-extort + soldier extort). */
   shakedowns?: number;
@@ -3250,8 +3252,12 @@ export const useEnhancedMafiaGameState = (
                 title: '💰 Capo Auto-Extortion!',
                 message: `${deployedUnit?.name || 'Your Capo'} set up a protection racket on the ${tile.anchor.isLegal ? 'store front' : 'illegal business'}! +$${bonusMoney.toLocaleString()}, +${bonusRespect} respect.`,
               };
-              // Auto-extort still finalizes ownership immediately (untouched per plan).
-              return { ...tile, controllingFamily: family as any, business: tile.anchor ? { ...tile.anchor, isExtorted: true } : undefined };
+              // Deployment follows the same anchor-based source of truth as movement extortion.
+              return {
+                ...tile,
+                controllingFamily: family as any,
+                anchor: { ...tile.anchor, isExtorted: true, extortedBy: family },
+              };
             } else {
               // A1: pending claim, not finalized
               if (!tile.pendingClaim || tile.pendingClaim.family === family) {
@@ -3288,6 +3294,7 @@ export const useEnhancedMafiaGameState = (
       const newState = {
         ...prev, deployedUnits: newDeployedUnits, hexMap: newHexMap,
         resources: newResources, soldierStats: newSoldierStats,
+        shakedownIncomeThisTurn: (prev.shakedownIncomeThisTurn || 0) + (bonusMoney > 0 ? bonusMoney : 0),
         deployMode: null, availableDeployHexes: [],
         pendingNotifications: notifications,
       };
@@ -5708,6 +5715,7 @@ export const useEnhancedMafiaGameState = (
 
     let legalIncome = 0;
     let illegalIncome = 0;
+    let racketTributeIncome = 0;
     
     (state.hexMap || []).forEach(tile => {
       if (tile.controllingFamily === state.playerFamily && tile.anchor?.isExtorted) {
@@ -5783,6 +5791,7 @@ export const useEnhancedMafiaGameState = (
         } else {
           illegalIncome += tileIncome;
         }
+        racketTributeIncome += tileIncome;
         income += tileIncome;
         if (tileIncome > 0 && turnReport?.hexIncome) {
           turnReport.hexIncome.push({
@@ -5814,29 +5823,31 @@ export const useEnhancedMafiaGameState = (
         const siteCapo = units.some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
         const siteSoldiers = units.filter(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
         const rate = buildProgressRate(siteCapo, siteSoldiers);
-        const prevEta = buildEtaTurns(tile.build.monthsRemaining, siteCapo, siteSoldiers);
-        tile.build = { ...tile.build, monthsRemaining: Math.round((tile.build.monthsRemaining - rate) * 100) / 100 };
-        if (tile.build.monthsRemaining <= 0) {
-          const { type, tier } = tile.build;
-          tile.buildings = { ...(tile.buildings || {}), [type]: tier };
-          tile.build = undefined;
-          const def = BUILDING_DEFS[type].tiers[tier];
-          state.pendingNotifications = [...(state.pendingNotifications || []), {
-            type: 'success' as const,
-            title: `🏗️ ${def.name} Opened`,
-            message: `${BUILDING_DEFS[type].label} tier ${tier} is running in ${tile.district}. +$${def.income.toLocaleString()}/month before garrison share.`,
-          }];
-          if (turnReport) turnReport.events.push(`🏗️ ${def.name} opened in ${tile.district}`);
-        } else {
-          const newEta = buildEtaTurns(tile.build.monthsRemaining, siteCapo, siteSoldiers);
-          // Flag only meaningful swings so the feed stays quiet on normal progress
-          if (Math.abs(newEta - (prevEta - 1)) >= 2 && turnReport) {
-            const label = BUILDING_DEFS[tile.build.type].tiers[tile.build.tier]?.name || 'Construction';
-            turnReport.events.push(
-              newEta > prevEta - 1
-                ? `🐌 ${label} in ${tile.district} slipped — ETA now ${newEta} turn${newEta > 1 ? 's' : ''}`
-                : `⚡ ${label} in ${tile.district} sped up — ETA now ${newEta} turn${newEta > 1 ? 's' : ''}`
-            );
+        if (rate > 0) {
+          const prevEta = buildEtaTurns(tile.build.monthsRemaining, siteCapo, siteSoldiers);
+          tile.build = { ...tile.build, monthsRemaining: Math.round((tile.build.monthsRemaining - rate) * 100) / 100 };
+          if (tile.build.monthsRemaining <= 0) {
+            const { type, tier } = tile.build;
+            tile.buildings = { ...(tile.buildings || {}), [type]: tier };
+            tile.build = undefined;
+            const def = BUILDING_DEFS[type].tiers[tier];
+            state.pendingNotifications = [...(state.pendingNotifications || []), {
+              type: 'success' as const,
+              title: `🏗️ ${def.name} Opened`,
+              message: `${BUILDING_DEFS[type].label} tier ${tier} is running in ${tile.district}. +$${def.income.toLocaleString()}/month before garrison share.`,
+            }];
+            if (turnReport) turnReport.events.push(`🏗️ ${def.name} opened in ${tile.district}`);
+          } else {
+            const newEta = buildEtaTurns(tile.build.monthsRemaining, siteCapo, siteSoldiers);
+            // Flag only meaningful swings so the feed stays quiet on normal progress
+            if (Math.abs(newEta - (prevEta - 1)) >= 2 && turnReport) {
+              const label = BUILDING_DEFS[tile.build.type].tiers[tile.build.tier]?.name || 'Construction';
+              turnReport.events.push(
+                newEta > prevEta - 1
+                  ? `🐌 ${label} in ${tile.district} slipped — ETA now ${newEta} turn${newEta > 1 ? 's' : ''}`
+                  : `⚡ ${label} in ${tile.district} sped up — ETA now ${newEta} turn${newEta > 1 ? 's' : ''}`
+              );
+            }
           }
         }
       }
@@ -6062,6 +6073,7 @@ export const useEnhancedMafiaGameState = (
       turnReport.incomeBreakdown = {
         legalGross: grossLegalIncome,
         illegalGross: grossIllegalIncome,
+        racketTribute: racketTributeIncome,
         shareProfits: shareProfitsIncome,
         shakedowns: state.shakedownIncomeThisTurn || 0,
         penalties,
@@ -6569,10 +6581,12 @@ export const useEnhancedMafiaGameState = (
           const aiSiteCapo = state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
           const aiSiteSoldiers = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
           const aiRate = buildProgressRate(aiSiteCapo, aiSiteSoldiers);
-          tile.build = { ...tile.build, monthsRemaining: Math.round((tile.build.monthsRemaining - aiRate) * 100) / 100 };
-          if (tile.build.monthsRemaining <= 0) {
-            tile.buildings = { ...(tile.buildings || {}), [tile.build.type]: tile.build.tier };
-            tile.build = undefined;
+          if (aiRate > 0) {
+            tile.build = { ...tile.build, monthsRemaining: Math.round((tile.build.monthsRemaining - aiRate) * 100) / 100 };
+            if (tile.build.monthsRemaining <= 0) {
+              tile.buildings = { ...(tile.buildings || {}), [tile.build.type]: tile.build.tier };
+              tile.build = undefined;
+            }
           }
         }
 

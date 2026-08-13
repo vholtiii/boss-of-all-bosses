@@ -256,15 +256,14 @@ const CityPanel: React.FC<CityPanelProps> = ({
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate">🏗️ {BUILDING_DEFS[tile.build.type].tiers[tile.build.tier]?.name}</span>
                 <span className="shrink-0 font-semibold text-amber-100">
-                  Done in {buildEta} turn{buildEta !== 1 ? 's' : ''}
+                  {buildEta === 0 ? 'Paused' : `Done in ${buildEta} turn${buildEta !== 1 ? 's' : ''}`}
                 </span>
               </div>
               <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded bg-noir-dark/70">
                 <div className="h-full bg-amber-400/80 transition-all" style={{ width: `${buildPct}%` }} />
               </div>
               <p className="mt-1 text-[9px] text-amber-200/80">
-                {buildPct}% · {crewLabel} — {crewRate}/turn
-                {!anyoneHere && ' (crews slack with nobody watching)'}
+                {buildPct}% · {crewLabel}{crewRate > 0 ? ` — ${crewRate}/turn` : ''}
               </p>
             </div>
           )}

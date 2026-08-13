@@ -219,9 +219,11 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
             <div className="rounded border border-amber-500/40 bg-amber-900/25 px-2 py-1.5 text-[10px] text-amber-200">
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate">🏗️ {BUILDING_DEFS[tile.build.type].tiers[tile.build.tier].name}</span>
-                <span className="shrink-0 font-semibold text-amber-100">Done in {buildEta} turn{buildEta !== 1 ? 's' : ''}</span>
+                <span className="shrink-0 font-semibold text-amber-100">
+                  {buildEta === 0 ? 'Paused' : `Done in ${buildEta} turn${buildEta !== 1 ? 's' : ''}`}
+                </span>
               </div>
-              <p className="mt-0.5 text-[9px] text-amber-200/80">{crewLabel} — {crewRate}/turn</p>
+              <p className="mt-0.5 text-[9px] text-amber-200/80">{crewLabel}{crewRate > 0 ? ` — ${crewRate}/turn` : ''}</p>
             </div>
           )}
           {!anchor && !anyoneHere && (
