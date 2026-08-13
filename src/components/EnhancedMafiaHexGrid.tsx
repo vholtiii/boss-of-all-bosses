@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
