@@ -522,6 +522,9 @@ export interface EnhancedMafiaGameState {
   turn: number;
   season: 'spring' | 'summer' | 'fall' | 'winter';
   mapSize: 'small' | 'medium' | 'large';
+  /** One-off shakedown cash collected since the last turn rollover (for the turn summary ledger). */
+  shakedownIncomeThisTurn?: number;
+  
   
   resources: {
     money: number;
