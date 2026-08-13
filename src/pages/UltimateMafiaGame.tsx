@@ -657,6 +657,8 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
             highlightedFamily={highlightedFamily}
             onClearHighlight={() => { setBossHighlightHex(null); setHighlightedFamily(null); }}
           />
+          </PanelErrorBoundary>
+
         </div>
       )
     },
