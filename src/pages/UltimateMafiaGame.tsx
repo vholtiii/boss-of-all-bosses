@@ -1328,7 +1328,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
           variant="outline"
           size="sm"
           data-no-sound
-          onClick={() => setShowSoundSettings(true)}
+          onClick={() => { playSound('open'); setShowSoundSettings(true); }}
         >
           <Settings className="h-4 w-4" />
         </Button>
