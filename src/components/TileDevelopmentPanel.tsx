@@ -163,32 +163,47 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
                   : 'Shake it down for tribute first, then buy it out, then build.'}
               </p>
               {anchor.isExtorted && (
-                <button
-                  type="button"
-                  disabled={money < buyoutCost || actions <= 0}
-                  onClick={() => onBuyOutAnchor?.(tile.q, tile.r, tile.s)}
-                  className={cn('mt-1.5 w-full rounded border px-2 py-1 text-[10px] label-caps transition-colors',
-                    money < buyoutCost || actions <= 0
-                      ? 'cursor-not-allowed border-noir-light/60 text-muted-foreground/60'
-                      : 'border-mafia-gold/60 text-mafia-gold hover:bg-mafia-gold/15')}
-                >
-                  Buy it out · ${buyoutCost.toLocaleString()}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    disabled={money < buyoutCost || actions <= 0 || !anyoneHere}
+                    onClick={() => onBuyOutAnchor?.(tile.q, tile.r, tile.s)}
+                    className={cn('mt-1.5 w-full rounded border px-2 py-1 text-[10px] label-caps transition-colors',
+                      money < buyoutCost || actions <= 0 || !anyoneHere
+                        ? 'cursor-not-allowed border-noir-light/60 text-muted-foreground/60'
+                        : 'border-mafia-gold/60 text-mafia-gold hover:bg-mafia-gold/15')}
+                  >
+                    Buy it out · ${buyoutCost.toLocaleString()}
+                  </button>
+                  {!anyoneHere && (
+                    <p className="mt-1 text-[9px] text-muted-foreground">Send someone to close the deal.</p>
+                  )}
+                </>
               )}
             </div>
           )}
           {tile.build && (
             <div className="rounded border border-amber-500/40 bg-amber-900/25 px-2 py-1.5 text-[10px] text-amber-200">
-              🏗️ {BUILDING_DEFS[tile.build.type].tiers[tile.build.tier].name} — {tile.build.monthsRemaining} month
-              {tile.build.monthsRemaining !== 1 ? 's' : ''} out
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate">🏗️ {BUILDING_DEFS[tile.build.type].tiers[tile.build.tier].name}</span>
+                <span className="shrink-0 font-semibold text-amber-100">Done in {buildEta} turn{buildEta !== 1 ? 's' : ''}</span>
+              </div>
+              <p className="mt-0.5 text-[9px] text-amber-200/80">{crewLabel} — {crewRate}/turn</p>
             </div>
+          )}
+          {!anchor && !anyoneHere && (
+            <p className="rounded border border-noir-light bg-noir-dark/60 px-2 py-1.5 text-[9px] text-muted-foreground">
+              👤 Nobody on this block — send a crew before breaking ground.
+            </p>
           )}
           {BUILDING_TYPES.map(type => {
             const cur = (tile.buildings || {})[type] as BuildingTier | undefined;
             const next = ((cur || 0) + 1) as BuildingTier;
             const maxed = next > MAX_BUILDING_TIER;
             const def = maxed ? BUILDING_DEFS[type].tiers[MAX_BUILDING_TIER] : BUILDING_DEFS[type].tiers[next];
-            const blocked = maxed || !!anchor || !!tile.build || money < def.cost || actions <= 0;
+            const rankShort = BUILD_RANK_REQUIREMENT[type] === 'capo' && !capoHere && !tile.isHeadquarters;
+            const blocked = maxed || !!anchor || !!tile.build || money < def.cost || actions <= 0 || !anyoneHere || rankShort;
+            const startEta = buildEtaTurns(def.months, capoHere, soldiers);
             return (
               <button
                 key={type}
@@ -204,16 +219,18 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
                   {BUILDING_DEFS[type].label}
                   <span className="ml-1 text-[9px] text-muted-foreground">
                     {cur ? `T${cur}` : '—'}{!maxed ? ` → T${next}` : ' max'}
+                    {rankShort && ' · capo work'}
                   </span>
                 </span>
                 {!maxed && (
                   <span className="shrink-0 text-[10px] text-mafia-gold">
-                    ${def.cost.toLocaleString()} · {def.months}mo
+                    ${def.cost.toLocaleString()} · ~{startEta}t
                   </span>
                 )}
               </button>
             );
           })}
+
           <p className="text-[9px] text-muted-foreground">Breaking ground costs 1 action.</p>
         </div>
       )}
