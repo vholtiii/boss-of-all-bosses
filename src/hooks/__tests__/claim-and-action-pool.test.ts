@@ -102,7 +102,9 @@ describe("Capo claiming is free", () => {
     const before = result.current.gameState.actionsRemaining;
 
     act(() => {
-      result.current.selectUnit?.(capo.id);
+      result.current.selectUnit("capo", { q: from.q, r: from.r, s: from.s });
+    });
+    act(() => {
       result.current.moveUnit({ q: target.q, r: target.r, s: target.s });
     });
 
