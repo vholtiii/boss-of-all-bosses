@@ -2228,6 +2228,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
                 proposedAmount: (negotiationState as any).proposedAmount,
                 proposerLabel: (negotiationState as any).proposerLabel,
                 theyAskedForThis: !!incomingSitdownId,
+                playerIsRunawayLeader: playerIsRunawayLeaderNeg,
                 cooldown: ((gameState as any).capoNegotiationCooldown || 0) > 0,
               }}
               onSubmit={({ dealType, cash, accepted, extras }) => {
@@ -2276,6 +2277,7 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
                 proposedAmount: (negotiationState as any).proposedAmount,
                 proposerLabel: (negotiationState as any).proposerLabel,
                 theyAskedForThis: !!incomingSitdownId,
+                playerIsRunawayLeader: playerIsRunawayLeaderNeg,
                 cooldown: ((gameState as any).bossNegotiationCooldown || 0) > 0,
               }}
               onSubmit={({ dealType, cash, accepted, extras }) => {

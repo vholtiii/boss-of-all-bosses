@@ -31,6 +31,7 @@ export interface SitdownSession {
   playerForce?: number;
   enemyForce?: number;
   theyAskedForThis?: boolean;
+  playerIsRunawayLeader?: boolean;
   cooldown?: boolean;
 }
 
@@ -81,6 +82,7 @@ const SitdownScene: React.FC<SitdownSceneProps> = ({ open, session, gameState, o
     capoPersonality: session.scope === 'territory' ? session.capoPersonality : undefined,
     treacheryActive: (gameState?.treacheryDebuff?.turnsRemaining || 0) > 0,
     atWar: !!gameState?.warsWith?.includes?.(session.targetFamily),
+    playerIsRunawayLeader: !!session.playerIsRunawayLeader,
     theyAskedForThis: !!session.theyAskedForThis,
     theyOweFavor: theyOweFavor && chips.some(c => c.kind === 'favor' && c.from === 'them'),
   }), [session, gameState, theyOweFavor, chips]);
