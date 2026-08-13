@@ -2715,9 +2715,9 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           playerFamily={playerFamily}
         />
 
-        {/* Block development — owned hexes only */}
+        {/* Block development — owned hexes, or a blocker note when our crew stands on someone else's block */}
         <AnimatePresence>
-          {pinnedHex && pinnedHex.controllingFamily === playerFamily && !cityHex && (
+          {pinnedHex && !cityHex && (
             <TileDevelopmentPanel
               key={`dev-${pinnedHex.q},${pinnedHex.r},${pinnedHex.s}`}
               tile={(gameState?.hexMap || []).find((t: HexTile) => t.q === pinnedHex.q && t.r === pinnedHex.r && t.s === pinnedHex.s) || pinnedHex}
