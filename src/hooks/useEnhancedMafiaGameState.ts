@@ -2502,7 +2502,9 @@ export const useEnhancedMafiaGameState = (
               }
             });
             newUnits[unitIdx] = { ...newUnits[unitIdx], escortingSoldierIds: [] };
+            escortMoved = true;
           }
+
         } else {
           // Normal territory — move escorts normally
           unit.escortingSoldierIds.forEach(soldierIdToEscort => {
