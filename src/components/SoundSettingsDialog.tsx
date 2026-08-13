@@ -139,9 +139,24 @@ const SoundSettingsDialog: React.FC<SoundSettingsDialogProps> = ({
             description="City bed under the map"
             value={soundConfig.ambienceVolume ?? 0.3}
             onChange={(ambienceVolume) => onUpdateConfig({ ambienceVolume })}
-            note="Rain, traffic and distant sirens — sirens pick up as heat rises."
+            note="Rain, traffic, crowds, sirens and distant gunfire."
             disabled={!soundConfig.enabled}
           />
+
+          <div className={`flex items-center justify-between rounded-lg border border-border/50 bg-card/50 p-4 ${!soundConfig.enabled || (soundConfig.ambienceVolume ?? 0) <= 0 ? 'opacity-40 pointer-events-none' : ''}`}>
+            <div>
+              <Label className="text-sm font-semibold text-foreground">Ambience reacts to the game</Label>
+              <p className="text-xs text-muted-foreground">
+                Sirens with heat, gunfire in wartime, crowds when you're thriving.
+              </p>
+            </div>
+            <Switch
+              checked={soundConfig.ambienceReactive !== false}
+              onCheckedChange={(ambienceReactive) => onUpdateConfig({ ambienceReactive })}
+              data-no-sound
+            />
+          </div>
+
 
           <CategorySlider
             icon={<Bell className="h-4 w-4 text-blue-400" />}
