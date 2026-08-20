@@ -15,6 +15,7 @@ export function getSoundsForNotification(title: string, type: NotificationType):
       if (t.includes('Business Complete')) return [{ sound: 'construction_complete' }];
       if (/Bought Out|Buy[- ]Out|Racket Acquired/i.test(t)) return [{ sound: 'buyout' }];
       if (/Upgraded|Upgrade Complete|Tier/i.test(t)) return [{ sound: 'upgrade' }];
+      if (/New Soldier|New Recruit|Recruits?\b/i.test(t)) return [{ sound: 'levelup' }];
       if (/Promoted|Promotion|New Capo/i.test(t)) return [{ sound: 'levelup' }, { sound: 'promotion', kind: 'voice-bark' }];
       if (t.includes('Supply Deal Active')) return [{ sound: 'supply_deal' }];
       if (t.includes('Sitdown Accepted')) return [{ sound: 'sitdown_accepted' }];
