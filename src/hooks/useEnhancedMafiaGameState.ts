@@ -259,6 +259,20 @@ export const isLayingLow = (state: EnhancedMafiaGameState): boolean =>
   ((state as any).layLowActiveUntil || 0) >= state.turn;
 export const isLayLowAfterglow = (state: EnhancedMafiaGameState): boolean =>
   ((state as any).layLowAfterglowUntil || 0) >= state.turn;
+
+/**
+ * Hand a block to a new owner. Standing orders and half-finished crew growth
+ * belong to the family that set them, so a change of hands resets both to the
+ * visible default instead of silently inheriting the old boss's orders.
+ */
+export const setTileOwner = (tile: any, family: any): void => {
+  if (!tile) return;
+  if (tile.controllingFamily !== family) {
+    tile.policy = DEFAULT_TILE_POLICY;
+    tile.recruitProgress = 0;
+  }
+  tile.controllingFamily = family;
+};
 export const applyPlayerHeat = (state: EnhancedMafiaGameState, amount: number): void => {
   state.policeHeat = state.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
   const mult = state.difficultyModifiers?.policeHeatMult ?? 1;
