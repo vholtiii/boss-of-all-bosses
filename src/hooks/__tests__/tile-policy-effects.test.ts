@@ -60,4 +60,34 @@ describe('Standing orders have real effects', () => {
   it('AI attacks respect the defending block standing order', () => {
     expect(hookSrc).toMatch(/defPolicyBonus/);
   });
+
+  it('rivals pay the same income, heat and crew consequences for their orders', () => {
+    // income multiplier applied to rival tile income
+    expect(hookSrc).toMatch(/aiPolicyDef\.incomeMult/);
+    // heat multiplier accrued from rival buildings and pushed onto rival heat
+    expect(hookSrc).toMatch(/aiPolicyDef\.heatMult/);
+    expect(hookSrc).toMatch(/aiBuildingHeat > 0/);
+    // crew growth multiplier actually spawns rival soldiers
+    expect(hookSrc).toMatch(/aiPolicyDef\.growthMult/);
+    expect(hookSrc).toMatch(/aiRecruitsSpawned > 0/);
+  });
+
+  it('a captured block reverts to the default standing order', () => {
+    const tile: any = { q: 0, r: 0, s: 0, controllingFamily: 'genovese', policy: 'fortify', recruitProgress: 40 };
+    setTileOwner(tile, 'gambino');
+    expect(tile.controllingFamily).toBe('gambino');
+    expect(tile.policy).toBe(DEFAULT_TILE_POLICY);
+    expect(tile.recruitProgress).toBe(0);
+  });
+
+  it('re-affirming the same owner leaves the standing order alone', () => {
+    const tile: any = { q: 0, r: 0, s: 0, controllingFamily: 'gambino', policy: 'fortify', recruitProgress: 40 };
+    setTileOwner(tile, 'gambino');
+    expect(tile.policy).toBe('fortify');
+    expect(tile.recruitProgress).toBe(40);
+  });
+
+  it('rival HQ blocks also carry a standing order', () => {
+    expect(hookSrc).not.toMatch(/if \(t\.controllingFamily !== fam \|\| t\.isHeadquarters\) return;/);
+  });
 });
