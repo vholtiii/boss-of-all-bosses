@@ -531,6 +531,9 @@ export interface TurnReport {
   warUpdates?: Array<{ families: string; event: 'started' | 'ended' | 'ongoing'; detail: string }>;
   relationshipChanges?: Array<{ family: string; delta: number; reason: string }>;
   aiMotives?: Array<{ family: string; posture: string; motive: string }>;
+  /** Soldiers that joined the family this turn, by source. */
+  recruits?: { total: number; bySource: Partial<Record<'blocks' | 'hired' | 'local' | 'district', number>>; hexes: string[] };
+
 }
 
 export interface EnhancedMafiaGameState {
