@@ -268,6 +268,31 @@ const TurnSummaryModal: React.FC<TurnSummaryModalProps> = ({ report, open, onClo
                   ))}
                 </div>
               </Section>
+
+              {(report.recruits?.total ?? 0) > 0 && (
+                <Section title="Crew" icon={<Shield className="h-3.5 w-3.5" />}>
+                  <div className="space-y-0.5 text-xs">
+                    {Object.entries(report.recruits!.bySource).map(([src, n]) => (
+                      (n ?? 0) > 0 && (
+                        <div key={src} className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            {src === 'blocks' ? 'Came up through the neighborhood'
+                              : src === 'hired' ? 'Hired guns'
+                              : src === 'local' ? 'Loyal locals'
+                              : 'District control'}
+                          </span>
+                          <span className="font-mono text-green-400">+{n}</span>
+                        </div>
+                      )
+                    ))}
+                    <div className="flex justify-between pt-1 mt-1 border-t border-border/30 font-bold">
+                      <span>👥 New soldiers</span>
+                      <span className="font-mono text-green-400">+{report.recruits!.total}</span>
+                    </div>
+                  </div>
+                </Section>
+              )}
+
             </TabsContent>
 
             {/* ═══════════ HEAT & LAW ═══════════ */}
