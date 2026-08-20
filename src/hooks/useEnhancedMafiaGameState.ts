@@ -5593,8 +5593,18 @@ export const useEnhancedMafiaGameState = (
         heat: Math.round(newState.policeHeat.level - prevHeat),
         territories: afterPlayerHexes.size - prevPlayerHexes.size,
       };
-      
+
+      // Fold this turn's recruits into the report, fire the once-per-turn voice line
+      const recruitTally = newState.recruitTally;
+      if (recruitTally && recruitTally.total > 0) {
+        turnReport.recruits = { total: recruitTally.total, bySource: { ...recruitTally.bySource }, hexes: [...recruitTally.hexes] };
+        turnReport.events.push(`👥 ${recruitTally.total} soldier${recruitTally.total === 1 ? '' : 's'} joined the family`);
+        newState._recruitVoice = recruitTally.total;
+      }
+      newState.recruitTally = { total: 0, bySource: {}, hexes: [] };
+
       newState.turnReport = turnReport;
+
       // Rolling history for Game Analysis (last 12 turns)
       newState.turnReportHistory = [
         ...((newState.turnReportHistory || []).filter(r => r.turn !== turnReport.turn)),
