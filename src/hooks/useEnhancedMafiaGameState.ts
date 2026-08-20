@@ -6381,7 +6381,7 @@ export const useEnhancedMafiaGameState = (
         const aiHeatNow = (oppAny.heat ?? oppAny.policeHeat ?? 0) as number;
         const rebuildingCrew = (opponent.resources?.soldiers ?? 0) < 4;
         state.hexMap.forEach(t => {
-          if (t.controllingFamily !== fam || t.isHeadquarters) return;
+          if (t.controllingFamily !== fam) return;
           let next: TilePolicy = 'earn';
           if (posture === 'COOL_OFF' || aiHeatNow >= 60) {
             next = 'lay_low';
