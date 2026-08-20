@@ -19,6 +19,7 @@ Each recruit event is pushed to the Just Happened feed with the same wording and
 
 ### 4. Sound + visual flash
 - New sound cue registered in the sound mapping (a short affirmative "crew" stinger) played on any recruit event, respecting the existing mixer channels and mute settings.
+- **Voice note**: a gravelly noir line plays once per turn when new soldiers join ("Fresh blood at the table, boss."). Batched — one line no matter how many joined that turn — on the voice channel, obeying the existing bark cooldown and volume settings. Lines are AI-generated audio files shipped with the game (a few variants, picked at random; singular vs plural wording).
 - The block that produced the recruit pulses a brief green flash / floating "+1 SOLDIER" text through the existing map effects layer. HQ pulses for hires with no source block.
 
 ## Technical notes
@@ -27,4 +28,5 @@ Each recruit event is pushed to the Just Happened feed with the same wording and
 - Accumulate recruits into the existing turn report structure (alongside income breakdown) so `TurnSummaryModal.tsx` can render the Crew section.
 - Register a `recruit` voice in `src/lib/sound-mapping.ts` and trigger it from the helper.
 - Reuse the floating-text / flash API already used by extort and combat feedback in `MapEffectsLayer.tsx`.
+- Add a `recruit` bark set to `BARKS` in `useSoundSystem.ts` pointing at new `/sounds/barks/recruit-*.mp3` files; generate those clips as noir voice lines and drop them in `public/sounds/barks/`. Fire the bark from the end-of-turn recruit rollup only (once per turn), not per recruit.
 - Player-only notifications; rival recruits stay silent (no change to AI parity logic).
