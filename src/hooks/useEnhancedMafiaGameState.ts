@@ -271,7 +271,7 @@ export const setTileOwner = (tile: any, family: any): void => {
     tile.policy = DEFAULT_TILE_POLICY;
     tile.recruitProgress = 0;
   }
-  setTileOwner(tile, family);
+  tile.controllingFamily = family;
 };
 export const applyPlayerHeat = (state: EnhancedMafiaGameState, amount: number): void => {
   state.policeHeat = state.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
