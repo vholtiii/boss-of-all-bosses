@@ -271,7 +271,7 @@ export const setTileOwner = (tile: any, family: any): void => {
     tile.policy = DEFAULT_TILE_POLICY;
     tile.recruitProgress = 0;
   }
-  tile.controllingFamily = family;
+  setTileOwner(tile, family);
 };
 export const applyPlayerHeat = (state: EnhancedMafiaGameState, amount: number): void => {
   state.policeHeat = state.policeHeat || { level: 0, reductionPerTurn: 2, bribedOfficials: [], arrests: [], rattingRisk: 5 };
@@ -1242,14 +1242,14 @@ export const createInitialGameState = (
     const hqTile = hexMap.find(t => t.q === hq.q && t.r === hq.r && t.s === hq.s);
     if (hqTile) {
       hqTile.isHeadquarters = fam;
-      hqTile.controllingFamily = fam;
+      setTileOwner(hqTile, fam);
       hqTile.anchor = undefined;
     }
     const neighbors = getHexNeighbors(hq.q, hq.r, hq.s);
     neighbors.forEach(n => {
       const tile = hexMap.find(t => t.q === n.q && t.r === n.r && t.s === n.s);
       if (tile && tile.controllingFamily === 'neutral') {
-        tile.controllingFamily = fam;
+        setTileOwner(tile, fam);
       }
   });
 
@@ -1603,7 +1603,7 @@ export const useEnhancedMafiaGameState = (
     if (survivorsAfter < floor) {
       state.subjugatedFamilies = { ...(state.subjugatedFamilies || {}), [victimFamily]: subjugatorFamily };
       state.deployedUnits = state.deployedUnits.filter(u => u.family !== victimFamily);
-      state.hexMap.forEach(t => { if (t.controllingFamily === victimFamily && !t.isHeadquarters) t.controllingFamily = subjugatorFamily as any; });
+      state.hexMap.forEach(t => { if (t.controllingFamily === victimFamily && !t.isHeadquarters) setTileOwner(t, subjugatorFamily as any); });
       state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => f.family !== victimFamily);
       const victimOpp = state.aiOpponents.find(o => o.family === victimFamily);
       if (victimOpp) {
@@ -1629,7 +1629,7 @@ export const useEnhancedMafiaGameState = (
     }
     state.eliminatedFamilies = [...(state.eliminatedFamilies || []), victimFamily];
     state.deployedUnits = state.deployedUnits.filter(u => u.family !== victimFamily);
-    state.hexMap.forEach(t => { if (t.controllingFamily === victimFamily && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
+    state.hexMap.forEach(t => { if (t.controllingFamily === victimFamily && !t.isHeadquarters) setTileOwner(t, 'neutral' as any); });
     state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => f.family !== victimFamily);
     state.aiOpponents = state.aiOpponents.filter(o => o.family !== victimFamily);
     state.flippedSoldiers = (state.flippedSoldiers || []).filter(f => f.family !== victimFamily);
@@ -3684,7 +3684,7 @@ export const useEnhancedMafiaGameState = (
         );
         if (onHex || adjUnit) {
           // Finalize
-          tile.controllingFamily = claimFam as any;
+          setTileOwner(tile, claimFam as any);
           tile.pendingClaim = undefined;
           finalizedByFam[claimFam] = (finalizedByFam[claimFam] || 0) + 1;
           // A4: diminishing returns — count this family's hex total *before* increment so first ones get full reward
@@ -3745,7 +3745,7 @@ export const useEnhancedMafiaGameState = (
           const tile = newState.hexMap.find((t: any) => t.q === contested.q && t.r === contested.r && t.s === contested.s);
           if (tile) {
             const oldFamily = tile.controllingFamily;
-            tile.controllingFamily = contested.occupyingFamily as any;
+            setTileOwner(tile, contested.occupyingFamily as any);
             const isPlayer = contested.occupyingFamily === newState.playerFamily;
             if (isPlayer) {
               newState.pendingNotifications = [...newState.pendingNotifications, {
@@ -4369,7 +4369,7 @@ export const useEnhancedMafiaGameState = (
             type: 'error' as const, title: '☠️ The Bosses Took You Out',
             message: 'All four rival families ordered the hit. With no muscle and no money, there was nothing left to protect the Boss.',
           });
-          newState.hexMap.forEach(t => { if (t.controllingFamily === newState.playerFamily && !t.isHeadquarters) t.controllingFamily = 'neutral'; });
+          newState.hexMap.forEach(t => { if (t.controllingFamily === newState.playerFamily && !t.isHeadquarters) setTileOwner(t, 'neutral'); });
           newState.deployedUnits = newState.deployedUnits.filter(u => u.family !== newState.playerFamily);
           newState.gameOver = { type: 'assassination' as any, turn: newState.turn };
         } else if (debt >= 50000) {
@@ -4379,7 +4379,7 @@ export const useEnhancedMafiaGameState = (
             message: `The family collapsed under $${debt.toLocaleString()} in debt. The other families have divided your territory.`,
           });
           // Game over — player loses all territory
-          newState.hexMap.forEach(t => { if (t.controllingFamily === newState.playerFamily && !t.isHeadquarters) t.controllingFamily = 'neutral'; });
+          newState.hexMap.forEach(t => { if (t.controllingFamily === newState.playerFamily && !t.isHeadquarters) setTileOwner(t, 'neutral'); });
           newState.deployedUnits = newState.deployedUnits.filter(u => u.family !== newState.playerFamily);
           newState.gameOver = { type: 'bankruptcy' as any, turn: newState.turn };
         } else if (debt >= 20000) {
@@ -7280,7 +7280,7 @@ export const useEnhancedMafiaGameState = (
                       title: '🛡️ Business Defended!',
                       message: `Your built business in ${tile.district || 'unknown territory'} repelled a ${fam} takeover — only a Capo can seize player-built businesses.`,
                     });
-                    tile.controllingFamily = 'neutral' as any;
+                    setTileOwner(tile, 'neutral' as any);
                   } else {
                     if (isPlayerBuiltBiz) {
                       applyBuiltBusinessSeizure(state, tile, fam, prevOwner);
@@ -7290,7 +7290,7 @@ export const useEnhancedMafiaGameState = (
                         message: `The ${fam} Capo seized your built business in ${tile.district || 'unknown territory'}! Only Capos can take player-built businesses.`,
                       });
                     }
-                    tile.controllingFamily = 'neutral' as any;
+                    setTileOwner(tile, 'neutral' as any);
                   }
                   // Destroy fortification on captured hex
                   state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === target.q && f.r === target.r && f.s === target.s));
@@ -7391,7 +7391,7 @@ export const useEnhancedMafiaGameState = (
                   } else if (isPushOutEligible && aiActionsRemaining > 0) {
                     // ===== B2: Push Out — low-heat takeover of empty rival hex (mirrors player Push Out) =====
                     aiActionsRemaining--;
-                    tile.controllingFamily = fam;
+                    setTileOwner(tile, fam);
                     // (Push Out keeps the AI on the hex; heat applied below.)
                     // Uncontested Push Out heat (parity with player +2 uncontested)
                     applyAIHeat(state, fam, 1, 'scouted'); // small heat tick via existing helper
@@ -7437,7 +7437,7 @@ export const useEnhancedMafiaGameState = (
                           message: `The ${fam} Capo seized your built business in ${tile.district || 'unknown territory'}! Only Capos can take player-built businesses.`,
                         });
                       }
-                      tile.controllingFamily = fam;
+                      setTileOwner(tile, fam);
                       applyAIHeat(state, fam, 1, 'scouted');
                       applyAIDiplomacyPenalties(state, fam, prevOwner as string, turnReport);
                       addPairTension(state, fam, prevOwner as string, TENSION_TERRITORY_HIT);
@@ -7491,7 +7491,7 @@ export const useEnhancedMafiaGameState = (
         if (tile.controllingFamily === 'neutral' && tile.anchor && 
             true) {
           // Extort neutral business: claim territory + collect payout
-          tile.controllingFamily = fam;
+          setTileOwner(tile, fam);
           const basePayout = tile.anchor.isLegal ? 1500 : 3000;
           const respectMult = 0.5 + (opponent.resources.influence || 50) / 100;
           const payout = Math.round(basePayout * respectMult);
@@ -8650,7 +8650,7 @@ export const useEnhancedMafiaGameState = (
             if (turnRng() < chance) {
               state.eliminatedFamilies = [...(state.eliminatedFamilies || []), victimFamily];
               state.deployedUnits = state.deployedUnits.filter(u => u.family !== victimFamily);
-              state.hexMap.forEach(t => { if (t.controllingFamily === victimFamily && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
+              state.hexMap.forEach(t => { if (t.controllingFamily === victimFamily && !t.isHeadquarters) setTileOwner(t, 'neutral' as any); });
               state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => f.family !== victimFamily);
               state.aiOpponents = state.aiOpponents.filter(o => o.family !== victimFamily);
               opponent.resources.money += 25000;
@@ -8866,7 +8866,7 @@ export const useEnhancedMafiaGameState = (
             // Eliminate AI family — mirrors HQ-fall path
             state.eliminatedFamilies = [...(state.eliminatedFamilies || []), fam];
             state.deployedUnits = state.deployedUnits.filter(u => u.family !== fam);
-            state.hexMap.forEach(t => { if (t.controllingFamily === fam && !t.isHeadquarters) t.controllingFamily = 'neutral' as any; });
+            state.hexMap.forEach(t => { if (t.controllingFamily === fam && !t.isHeadquarters) setTileOwner(t, 'neutral' as any); });
             state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => f.family !== fam);
             state.aiOpponents = state.aiOpponents.filter(o => o.family !== fam);
             state.pendingNotifications.push({
@@ -9860,7 +9860,7 @@ export const useEnhancedMafiaGameState = (
                 t.controllingFamily === action.targetFamily && t.anchor && !t.isHeadquarters
               );
               if (rivalHex) {
-                rivalHex.controllingFamily = 'neutral';
+                setTileOwner(rivalHex, 'neutral');
               }
             }
             
@@ -11040,7 +11040,7 @@ export const useEnhancedMafiaGameState = (
             if (summary) abandonTransferNote = ` Safehouse dismantled — ${summary}.`;
           }
           // Abandon the hex
-          hex.controllingFamily = 'neutral';
+          setTileOwner(hex, 'neutral');
           (newState as any).abandonedThisTurn = abandonedCount + 1;
           newState.combatLog = [...(newState.combatLog || []), `🏳️ Abandoned territory at (${hex.q},${hex.r}).`];
           newState.pendingNotifications.push({
@@ -11723,7 +11723,7 @@ export const useEnhancedMafiaGameState = (
         }
         // Only clear hex control if the tile actually belonged to the target family (skip for plan hits on neutral/player hexes)
         if (tile.controllingFamily && tile.controllingFamily !== 'neutral' && tile.controllingFamily !== state.playerFamily && !tile.isHeadquarters) {
-          tile.controllingFamily = 'neutral'; // Hit clears enemy control — player must Claim next turn
+          setTileOwner(tile, 'neutral'); // Hit clears enemy control — player must Claim next turn
         }
         // Tension: territory hit on rival hex
         addPairTension(state, state.playerFamily, targetFamily, TENSION_TERRITORY_HIT);
@@ -12154,7 +12154,7 @@ export const useEnhancedMafiaGameState = (
 
     // ---- BRANCH A: Undefended — auto-success ----
     if (enemyUnits.length === 0) {
-      tile.controllingFamily = 'neutral';
+      setTileOwner(tile, 'neutral');
       (tile as any).pendingClaim = undefined;
       state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === targetQ && f.r === targetR && f.s === targetS));
       addPairTension(state, state.playerFamily, targetFamily, TENSION_TERRITORY_HIT);
@@ -12222,7 +12222,7 @@ export const useEnhancedMafiaGameState = (
         if (idx !== -1) state.deployedUnits.splice(idx, 1);
       });
 
-      tile.controllingFamily = 'neutral';
+      setTileOwner(tile, 'neutral');
       (tile as any).pendingClaim = undefined;
       state.fortifiedHexes = (state.fortifiedHexes || []).filter(f => !(f.q === targetQ && f.r === targetR && f.s === targetS));
       addPairTension(state, state.playerFamily, targetFamily, TENSION_TERRITORY_HIT);
@@ -12343,7 +12343,7 @@ export const useEnhancedMafiaGameState = (
 
       if (Math.random() < chance) {
         if (isNeutral) {
-          tile.controllingFamily = state.playerFamily;
+          setTileOwner(tile, state.playerFamily);
           if (tile.anchor) tile.anchor.isExtorted = true;
         }
         const baseMoneyGain = isEnemy ? (tile.anchor?.tribute || 2000) : 3000;
@@ -12660,7 +12660,7 @@ export const useEnhancedMafiaGameState = (
           const idx = state.deployedUnits.indexOf(eu);
           if (idx !== -1) state.deployedUnits.splice(idx, 1);
         });
-        tile.controllingFamily = state.playerFamily;
+        setTileOwner(tile, state.playerFamily);
         // Tension reduction
         addPairTension(state, state.playerFamily, enemyFamily, -TENSION_REDUCE_BRIBE_TERRITORY);
         state.tensionCooldowns[getTensionPairKey(state.playerFamily, enemyFamily)] = 1;
@@ -12907,7 +12907,7 @@ export const useEnhancedMafiaGameState = (
           if (hex.erosionCounter >= EROSION_THRESHOLD) {
             // Flip to neutral
             const districtName = hex.district;
-            hex.controllingFamily = 'neutral';
+            setTileOwner(hex, 'neutral');
             hex.erosionCounter = 0;
             hex.expansionCounter = 0;
             hex.expansionInfluencer = undefined;
@@ -12956,7 +12956,7 @@ export const useEnhancedMafiaGameState = (
         if (hex.expansionCounter >= EXPANSION_THRESHOLD) {
           // Absorb hex
           const districtName = hex.district;
-          hex.controllingFamily = influencer as any;
+          setTileOwner(hex, influencer as any);
           hex.expansionCounter = 0;
           hex.expansionInfluencer = undefined;
           hex.erosionCounter = 0;
