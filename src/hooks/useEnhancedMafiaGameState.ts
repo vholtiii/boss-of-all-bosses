@@ -787,12 +787,58 @@ export interface EnhancedMafiaGameState {
   }>;
   /** Transient: set when a capo escorts soldiers into a new hex, so the UI can play the escort movement sound. Cleared by UI. */
   _escortMoved?: boolean;
+  /** Transient: number of soldiers that joined this turn — drives the one-per-turn recruit voice line. Cleared by UI. */
+  _recruitVoice?: number;
+  /** Running tally of soldiers recruited during the current turn, folded into the turn report at end of turn. */
+  recruitTally?: RecruitTally;
 }
+
+export type RecruitSource = 'blocks' | 'hired' | 'local' | 'district';
+
+export interface RecruitTally {
+  total: number;
+  bySource: Partial<Record<RecruitSource, number>>;
+  hexes: string[];
+}
+
+const RECRUIT_SOURCE_LABEL: Record<RecruitSource, string> = {
+  blocks: 'Came up through the neighborhood',
+  hired: 'Hired guns',
+  local: 'Loyal locals',
+  district: 'District control',
+};
+
+/**
+ * Single entry point for every soldier that joins the family.
+ * Pushes one unified notification, tallies the recruit for the turn report,
+ * and marks the hex for the map flash.
+ */
+const recordRecruit = (
+  state: EnhancedMafiaGameState,
+  opts: { count: number; source: RecruitSource; message: string; hex?: { q: number; r: number; s: number } | null }
+) => {
+  const count = Math.max(0, Math.floor(opts.count));
+  if (count <= 0) return;
+  const tally: RecruitTally = state.recruitTally || { total: 0, bySource: {}, hexes: [] };
+  tally.total += count;
+  tally.bySource[opts.source] = (tally.bySource[opts.source] || 0) + count;
+  if (opts.hex) {
+    const key = `${opts.hex.q},${opts.hex.r},${opts.hex.s}`;
+    if (!tally.hexes.includes(key)) tally.hexes.push(key);
+  }
+  state.recruitTally = tally;
+  state.pendingNotifications = [...(state.pendingNotifications || []), {
+    type: 'success' as const,
+    title: count === 1 ? '👥 New Soldier' : `👥 ${count} New Soldiers`,
+    message: opts.message,
+  }];
+};
 
 
 // ============ HEX MATH ============
 const hexDistance = (a: {q:number;r:number;s:number}, b: {q:number;r:number;s:number}) =>
   (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(a.s - b.s)) / 2;
+
 
 const hexNeighborDirections = [
   {q:1,r:0,s:-1},{q:1,r:-1,s:0},{q:0,r:-1,s:1},
