@@ -13424,6 +13424,7 @@ export const useEnhancedMafiaGameState = (
     setGameState(prev => {
       const next = { ...prev };
       delete (next as Partial<EnhancedMafiaGameState> & { _escortMoved?: boolean })._escortMoved;
+      delete (next as Partial<EnhancedMafiaGameState> & { _recruitVoice?: number })._recruitVoice;
       return next;
     });
   }, []);
