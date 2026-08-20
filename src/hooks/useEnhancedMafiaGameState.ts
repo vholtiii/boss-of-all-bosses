@@ -6593,13 +6593,28 @@ export const useEnhancedMafiaGameState = (
           }
         }
 
+        // ── Standing order on this rival block (same source of truth as the player) ──
+        const aiPolicyDef = TILE_POLICIES[(tile.policy || DEFAULT_TILE_POLICY) as TilePolicy];
+        const aiTotals = tileBuildingTotals(tile.buildings);
+        if (aiTotals.heat > 0) aiBuildingHeat += aiTotals.heat * aiPolicyDef.heatMult;
+        if (aiTotals.infra > 0) {
+          const aiGrowth = aiTotals.infra * RECRUIT_PROGRESS_PER_INFRA * aiPolicyDef.growthMult;
+          const aiProgress = (tile.recruitProgress || 0) + aiGrowth;
+          if (aiProgress >= RECRUIT_PROGRESS_GOAL) {
+            tile.recruitProgress = aiProgress - RECRUIT_PROGRESS_GOAL;
+            aiRecruitsSpawned += 1;
+          } else {
+            tile.recruitProgress = aiProgress;
+          }
+        }
+
         const aiTileEarn = tileEarnPotential(tile);
         if (aiTileEarn > 0) {
           let tileInc = 0;
           const hasCapo = state.deployedUnits.some(u => u.family === fam && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
           const soldiersHere = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
           const hasSoldier = soldiersHere > 0;
-          tileInc = Math.floor(aiTileEarn * garrisonShare(hasCapo, soldiersHere));
+          tileInc = Math.floor(aiTileEarn * garrisonShare(hasCapo, soldiersHere) * aiPolicyDef.incomeMult);
           // Seized player-built business runs at 50% during penalty period
           if (tile.seizurePenaltyTurns && tile.seizurePenaltyTurns > 0) {
             tileInc = Math.floor(tileInc * BUILT_BIZ_SEIZURE_INCOME_PENALTY);
