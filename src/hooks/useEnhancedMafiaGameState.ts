@@ -6649,6 +6649,13 @@ export const useEnhancedMafiaGameState = (
           }
         }
       });
+      // Standing-order consequences for rivals: building heat and crew growth
+      if (aiBuildingHeat > 0) {
+        opponent.resources.heat = Math.min(100, (opponent.resources.heat || 0) + Math.round(aiBuildingHeat));
+      }
+      if (aiRecruitsSpawned > 0) {
+        opponent.resources.soldiers = (opponent.resources.soldiers || 0) + aiRecruitsSpawned;
+      }
       // District control bonus: Manhattan +25% income for AI
       if (hasFamilyDistrictBonus(state, fam, 'income')) {
         aiIncome = Math.floor(aiIncome * 1.25);
