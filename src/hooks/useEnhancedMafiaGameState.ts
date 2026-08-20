@@ -4057,10 +4057,11 @@ export const useEnhancedMafiaGameState = (
           };
           // NOTE: do NOT bump resources.soldiers — the recruit was deployed directly to HQ,
           // so it must not also be added to the undeployed reserve pool.
-          newState.pendingNotifications.push({
-            type: 'success' as const,
-            title: '🏠 Bronx Free Recruit',
-            message: 'A local from the Bronx has joined the family for free (district control bonus).',
+          recordRecruit(newState, {
+            count: 1,
+            source: 'district',
+            message: 'A local from the Bronx joined the family for free (district control bonus). He is waiting at HQ.',
+            hex: hq ? { q: hq.q, r: hq.r, s: hq.s } : null,
           });
           turnReport.events.push('🏠 Free soldier recruited from Bronx district control.');
           devLog('[spawn] bronx free recruit', { turn: newState.turn, bronxPlayerCount, bronxTotal: bronxHexes.length });
@@ -5957,11 +5958,11 @@ export const useEnhancedMafiaGameState = (
     }
     if (recruitsSpawned > 0) {
       state.resources.soldiers += recruitsSpawned;
-      state.pendingNotifications = [...(state.pendingNotifications || []), {
-        type: 'success' as const,
-        title: `👥 ${recruitsSpawned} New ${recruitsSpawned === 1 ? 'Recruit' : 'Recruits'}`,
+      recordRecruit(state, {
+        count: recruitsSpawned,
+        source: 'blocks',
         message: `Your blocks turned out ${recruitsSpawned} fresh ${recruitsSpawned === 1 ? 'soldier' : 'soldiers'} this month. Deploy them from the HQ.`,
-      }];
+      });
       if (turnReport) turnReport.events.push(`👥 ${recruitsSpawned} soldier(s) came up through the neighborhood`);
     }
 
@@ -9568,11 +9569,12 @@ export const useEnhancedMafiaGameState = (
                 extortedHexTurns: 0,
               };
             }
-            newState.pendingNotifications = [...newState.pendingNotifications, {
-              type: 'info' as const,
-              title: '💰 Mercenary Hired',
+            recordRecruit(newState, {
+              count: 1,
+              source: 'hired',
+              hex: hq ? { q: hq.q, r: hq.r, s: hq.s } : null,
               message: `A hired gun joins the family for $${finalCost.toLocaleString()}. Family loyalty -10 (outsider).${bronxDiscount > 0 ? ' (Bronx discount applied)' : ''}${respectDiscount > 0.01 ? ` Respect saved $${(Math.floor(SOLDIER_COST * (1 - discount)) - cost).toLocaleString()}.` : ''}`,
-            }];
+            });
           }
           return newState;
         }
@@ -9617,11 +9619,12 @@ export const useEnhancedMafiaGameState = (
                 extortedHexTurns: 0,
               };
             }
-            newState.pendingNotifications = [...newState.pendingNotifications, {
-              type: 'success' as const,
-              title: '🏘️ Local Recruited',
+            recordRecruit(newState, {
+              count: 1,
+              source: 'local',
+              hex: hq ? { q: hq.q, r: hq.r, s: hq.s } : null,
               message: `A loyal local joins the family for $${finalCost2.toLocaleString()}. Loyalty +2.${bronxDiscount2 > 0 ? ' (Bronx discount applied)' : ''}`,
-            }];
+            });
           }
           return newState;
         }
