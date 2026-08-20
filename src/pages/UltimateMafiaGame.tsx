@@ -214,6 +214,19 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const lastCombatFxRef = useRef<number | null>(null);
   const resolvedReportTurnRef = useRef<number | null>(null);
 
+  // Recruit voice line + map flash — fires once per turn when fresh soldiers join
+  useEffect(() => {
+    if (gameState._recruitVoice && gameState._recruitVoice > 0) {
+      playBark('recruit');
+      const hexes = gameState.turnReport?.recruits?.hexes || [];
+      if (hexes.length) {
+        hexFxRef.current?.spawnTerritoryFlashes(hexes.map(hex => ({ hex, change: 'gained' as const, to: gameState.playerFamily })));
+      }
+      clearSoundFlags();
+    }
+  }, [gameState._recruitVoice, gameState.turnReport, gameState.playerFamily, playBark, clearSoundFlags]);
+
+
   const triggerCombatFeedback = useCallback(() => {
     setMapShake(true);
     setShowVignette(true);

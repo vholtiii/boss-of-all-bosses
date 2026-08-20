@@ -87,6 +87,7 @@ const BARKS: Record<string, string[]> = {
   arrest: ['/sounds/barks/arrest-1.mp3', '/sounds/barks/arrest-2.mp3'],
   promotion: ['/sounds/barks/promotion-1.mp3', '/sounds/barks/promotion-2.mp3'],
   war: ['/sounds/barks/war-1.mp3', '/sounds/barks/war-2.mp3'],
+  recruit: ['/sounds/barks/recruit-1.mp3', '/sounds/barks/recruit-2.mp3', '/sounds/barks/recruit-3.mp3'],
 };
 const BARK_COOLDOWN_MS = 4000;
 
