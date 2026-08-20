@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { computeHitCore, tilePolicyDefenseBonus } from '@/lib/action-formulas';
-import { TILE_POLICIES } from '@/types/game-mechanics';
+import { TILE_POLICIES, DEFAULT_TILE_POLICY } from '@/types/game-mechanics';
+import { setTileOwner } from '@/hooks/useEnhancedMafiaGameState';
 
 const hookSrc = fs.readFileSync(
   path.resolve(__dirname, '../useEnhancedMafiaGameState.ts'),
