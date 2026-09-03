@@ -2481,7 +2481,16 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
               return (
                 <foreignObject x={x - menuWidth / 2} y={y - menuHeight - baseHexRadius} width={menuWidth} height={menuHeight}>
                   <div className="bg-background/95 backdrop-blur-sm border border-destructive/50 rounded-lg p-2 shadow-xl">
-                    <div className="text-xs font-bold text-destructive text-center mb-1.5">🎯 Select Target</div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="text-xs font-bold text-destructive text-center flex-1">🎯 Select Target</div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setPlanHitUnitMenu(null); }}
+                        className="text-[10px] leading-none text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted/40 transition-colors"
+                        title="Close"
+                      >
+                        ✕
+                      </button>
+                    </div>
                     {planHitUnitMenu.enemyUnits.map(unit => (
                       <button
                         key={unit.id}
