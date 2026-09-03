@@ -588,6 +588,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     soundConfig,
     ambience: ambienceSignals,
     active: !isWinner && !gameState.gameOver,
+    stingers: computeAmbienceStingers(ambienceSignals),
   });
 
   // ---- Turn start beat + income shimmer ----
