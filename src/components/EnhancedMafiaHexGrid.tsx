@@ -161,6 +161,20 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
     if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
   }, []);
 
+  // Escape key dismisses any open hex menu/picker
+  useEffect(() => {
+    if (!actionMenu && !planHitUnitMenu && !flipTargetMenu) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActionMenu(null);
+        setPlanHitUnitMenu(null);
+        setFlipTargetMenu(null);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [actionMenu, planHitUnitMenu, flipTargetMenu]);
+
   const baseHexRadius = 22;
   const hexWidth = baseHexRadius * 2;
   const hexHeight = Math.sqrt(3) * baseHexRadius;
