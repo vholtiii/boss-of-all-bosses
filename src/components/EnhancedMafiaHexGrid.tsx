@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useImperativeHandle, forwardRef, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import { FAMILY_COLORS, FAMILY_INK_WASH, TERRAIN_FILLS } from '@/lib/period-them
 export interface HexGridFxHandle {
   spawnIncomeFloats: (entries: Array<{ hex: string; amount: number }>) => void;
   spawnTerritoryFlashes: (changes: Array<{ hex: string; change: 'gained' | 'lost'; to?: string }>) => void;
+  panToHex: (q: number, r: number, s: number, opts?: { zoom?: number; durationMs?: number }) => void;
 }
 
 interface EnhancedMafiaHexGridProps {
@@ -71,6 +72,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
 }, ref) => {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [cameraMoving, setCameraMoving] = useState(false);
   const svgRef = React.useRef<SVGSVGElement | null>(null);
   const panStateRef = React.useRef<{
     active: boolean;
@@ -85,6 +87,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
   const suppressBgClickRef = React.useRef(false);
 
   const beginPan = (clientX: number, clientY: number) => {
+    setCameraMoving(false);
     const svg = svgRef.current;
     let sx = 1, sy = 1;
     if (svg) {
@@ -176,13 +179,6 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
     playerFamily,
   });
 
-  useImperativeHandle(ref, () => ({
-    spawnIncomeFloats: (entries) => {
-      const hq = hexMap.find(t => t.isHeadquarters === playerFamily);
-      spawnIncomeFloats(entries, hq ? { q: hq.q, r: hq.r, s: hq.s } : null);
-    },
-    spawnTerritoryFlashes,
-  }), [spawnIncomeFloats, spawnTerritoryFlashes, hexMap, playerFamily]);
 
   // Strategic overlays (war fronts, vulnerability, supply support, district ownership…)
   const overlays: MapOverlays | null = useMemo(
@@ -801,6 +797,24 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
     return `${minX - pad} ${minY - pad} ${maxX - minX + pad*2} ${maxY - minY + pad*2}`;
   }, [hexMap]);
 
+  useImperativeHandle(ref, () => ({
+    spawnIncomeFloats: (entries) => {
+      const hq = hexMap.find(t => t.isHeadquarters === playerFamily);
+      spawnIncomeFloats(entries, hq ? { q: hq.q, r: hq.r, s: hq.s } : null);
+    },
+    spawnTerritoryFlashes,
+    panToHex: (q, r, s, opts) => {
+      const pos = getHexPosition(q, r);
+      const [vx, vy, vw, vh] = viewBox.split(' ').map(Number);
+      const targetZoom = Math.max(0.3, Math.min(2.5, opts?.zoom ?? zoom));
+      const nextPan = { x: vx + vw / 2 - targetZoom * pos.x, y: vy + vh / 2 - targetZoom * pos.y };
+      setCameraMoving(true);
+      setZoom(targetZoom);
+      setPan(nextPan);
+      window.setTimeout(() => setCameraMoving(false), opts?.durationMs ?? 850);
+    },
+  }), [spawnIncomeFloats, spawnTerritoryFlashes, hexMap, playerFamily, viewBox, zoom]);
+
   return (
     <div
       className="relative w-full h-full overflow-hidden"
@@ -944,7 +958,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
           </defs>
           {/* Invisible background rect to capture clicks on empty area */}
           <rect x={viewBox.split(' ').map(Number)[0]} y={viewBox.split(' ').map(Number)[1]} width={viewBox.split(' ').map(Number)[2]} height={viewBox.split(' ').map(Number)[3]} fill="transparent" onClick={() => { if (suppressBgClickRef.current) { suppressBgClickRef.current = false; return; } onClearHighlight?.(); setPinnedHex(null); }} />
-          <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
+          <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`} style={{ transition: cameraMoving ? 'transform 0.85s cubic-bezier(0.22, 1, 0.36, 1)' : 'none' }}>
             {/* Compute supply route hex set for tint overlay */}
             {(() => {
               const sNodes: SupplyNode[] = gameState?.supplyNodes || [];

@@ -29,6 +29,7 @@ import AlertsLogPanel from '@/components/AlertsLogPanel';
 import TurnSummaryModal from '@/components/TurnSummaryModal';
 import TurnResolutionOverlay from '@/components/TurnResolutionOverlay';
 import HitSpotlight from '@/components/HitSpotlight';
+import TurnSpotlight, { type RivalMove } from '@/components/TurnSpotlight';
 import CommissionVoteModal from '@/components/CommissionVoteModal';
 import WarDeclarationModal from '@/components/WarDeclarationModal';
 import FamilySelectionScreen from '@/components/FamilySelectionScreen';
@@ -209,10 +210,12 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
 
   const hexFxRef = useRef<HexGridFxHandle | null>(null);
   const [showTurnResolution, setShowTurnResolution] = useState(false);
+  const [showTurnSpotlight, setShowTurnSpotlight] = useState(false);
   const [mapShake, setMapShake] = useState(false);
   const [showVignette, setShowVignette] = useState(false);
   const lastCombatFxRef = useRef<number | null>(null);
   const resolvedReportTurnRef = useRef<number | null>(null);
+  const spotlightedTurnRef = useRef<number | null>(null);
 
   // Recruit voice line + map flash — fires once per turn when fresh soldiers join
   useEffect(() => {
@@ -276,6 +279,80 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       setShowTurnResolution(true);
     }
   }, [gameState.turnReport, gameState.turn]);
+
+  // Cinematic turn-start spotlight: opens after the resolution overlay closes
+  useEffect(() => {
+    if (!gameState.turnReport || gameState.turnReport.turn !== gameState.turn) return;
+    if (showTurnResolution) return;
+    if (spotlightedTurnRef.current === gameState.turn) return;
+    spotlightedTurnRef.current = gameState.turn;
+    setShowTurnSpotlight(true);
+  }, [gameState.turnReport, gameState.turn, showTurnResolution]);
+
+  // Derive cinematic rival recap from the most recent turn report
+  const { spotlightMoves, leadingFamily } = useMemo(() => {
+    const report = gameState.turnReport;
+    const moves: { family: string; type: RivalMove['type']; district?: string; q?: number; r?: number; s?: number; message: string; severity: 'low' | 'medium' | 'high' }[] = [];
+
+    // Territory changes are the most concrete rival moves
+    (report?.territoryChanges || []).forEach((change: any) => {
+      if (change.to === gameState.playerFamily || change.to === 'neutral') return;
+      const [q, r, s] = change.hex.split(',').map(Number);
+      moves.push({
+        family: change.to,
+        type: 'claim',
+        district: change.district,
+        q, r, s,
+        message: `Took ${change.district || 'territory'} from ${change.from === 'neutral' ? 'the street' : change.from}.`,
+        severity: change.from === gameState.playerFamily ? 'high' : 'medium',
+      });
+    });
+
+    // AI action log fills in attacks, builds, diplomacy, and special plays
+    (report?.aiActions || []).forEach((action: any) => {
+      if (action.family === gameState.playerFamily) return;
+      const detail = action.detail || '';
+      const type: RivalMove['type'] =
+        /hit|attack/i.test(action.action) ? 'hit' :
+        /push_out|capture/i.test(action.action) ? 'pressure' :
+        /build_business|build/i.test(action.action) ? 'build' :
+        /war|assault_hq|assassination/i.test(action.action) ? 'war' :
+        /sitdown|diplomacy|supply_deal/i.test(action.action) ? 'sitdown' :
+        /scout|wiretap|sweep/i.test(action.action) ? 'scout' :
+        'extort';
+      const severity: RivalMove['severity'] = /high|war|assault|assassination|hit/i.test(action.action) ? 'high' : 'medium';
+      const district = detail.match(/in ([^()]+?)(?: for | \(|$)/)?.[1]?.trim() || undefined;
+      // Try to locate a matching territory change for coordinate focus
+      const coordMatch = detail.match(/(-?\d+),(-?\d+),(-?\d+)/);
+      const relatedChange = (report?.territoryChanges || []).find((c: any) => c.to === action.family && (!district || c.district === district));
+      let q: number | undefined, r: number | undefined, s: number | undefined;
+      if (coordMatch) {
+        [q, r, s] = coordMatch.slice(1).map(Number);
+      } else if (relatedChange) {
+        [q, r, s] = relatedChange.hex.split(',').map(Number);
+      }
+      moves.push({ family: action.family, type, district, q, r, s, message: detail, severity });
+    });
+
+    // Deduplicate by family+message
+    const seen = new Set<string>();
+    const unique = moves.filter(m => {
+      const key = `${m.family}|${m.type}|${m.message}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // Leading family by controlled hex count
+    const counts: Record<string, number> = {};
+    (gameState.hexMap || []).forEach((t: any) => {
+      if (!t.controllingFamily || t.controllingFamily === 'neutral') return;
+      counts[t.controllingFamily] = (counts[t.controllingFamily] || 0) + 1;
+    });
+    const leading = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+    return { spotlightMoves: unique.slice(0, 4), leadingFamily: leading };
+  }, [gameState.turnReport, gameState.playerFamily, gameState.hexMap]);
 
   // Negotiation dialog state
   const [negotiationState, setNegotiationState] = useState<{
@@ -2050,6 +2127,17 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       </ResponsiveLayout>
 
       <HitSpotlight result={gameState.lastCombatResult} gameState={gameState} />
+
+      <TurnSpotlight
+        open={showTurnSpotlight}
+        turn={gameState.turn}
+        gamePhase={gameState.gamePhase}
+        playerFamily={gameState.playerFamily}
+        rivalMoves={spotlightMoves}
+        leadingFamily={leadingFamily}
+        onClose={() => setShowTurnSpotlight(false)}
+        onFocus={(q, r, s) => hexFxRef.current?.panToHex(q, r, s, { zoom: 1.4, durationMs: 900 })}
+      />
 
       {/* Headquarters Info Panel */}
       {selectedHeadquarters && (() => {
