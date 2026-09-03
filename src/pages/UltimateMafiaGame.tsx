@@ -18,7 +18,7 @@ import { getBusinessSupplyDecayMultiplier } from '@/lib/supply-flow';
 import { useSoundSystem } from '@/hooks/useSoundSystem';
 import { getSoundsForNotification } from '@/lib/sound-mapping';
 import { useAmbience } from '@/hooks/useAmbience';
-import { computeProsperity } from '@/lib/ambience-state';
+import { computeProsperity, computeDistrictIdentity, computeAmbienceStingers } from '@/lib/ambience-state';
 
 import SaveLoadDialog from '@/components/SaveLoadDialog';
 import { useGameSaveLoad } from '@/hooks/useGameSaveLoad';
@@ -537,6 +537,21 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       if (!key.includes(gs.playerFamily)) return max;
       return Math.max(max, Number(val) || 0);
     }, 0);
+
+    // Territory / recruitment signals — updated once per turn via the turnReport.
+    const playerUnits = gs.units?.[gs.playerFamily]?.soldiers || [];
+    const soldierCount = playerUnits.length;
+    const recruitedThisTurn = gs.turnReport?.recruits?.total ?? 0;
+    const territoryChanges = gs.turnReport?.territoryChanges || [];
+    const lostTerritoryThisTurn = territoryChanges.some(
+      (c: any) => c.from === gs.playerFamily && c.to !== gs.playerFamily
+    );
+    const warDeclaredThisTurn = (gs.turnReport?.aiActions || []).some(
+      (a: any) =>
+        (a.family === gs.playerFamily || a.targetFamily === gs.playerFamily) &&
+        /war|assault_hq/i.test(a.action)
+    );
+
     return {
       heat: gs.policeHeat?.level ?? 0,
       atWar,
@@ -549,6 +564,12 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
       }),
       phase: gs.gamePhase || 1,
       ricoActive: (gs.ricoTimer || 0) > 0,
+      playerTerritoryRatio: totalClaimedHexes > 0 ? playerHexes / totalClaimedHexes : 0,
+      soldierCount,
+      recruitedThisTurn,
+      districtIdentity: computeDistrictIdentity(gs.hexMap, gs.playerFamily),
+      lostTerritoryThisTurn,
+      warDeclaredThisTurn,
     };
   }, [
     gameState.turn,
@@ -559,12 +580,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     (gameState as any).familyTensions,
     gameState.hexMap,
     gameState.resources.money,
+    (gameState as any).units,
+    (gameState as any).turnReport,
   ]);
 
   useAmbience({
     soundConfig,
     ambience: ambienceSignals,
     active: !isWinner && !gameState.gameOver,
+    stingers: computeAmbienceStingers(ambienceSignals),
   });
 
   // ---- Turn start beat + income shimmer ----

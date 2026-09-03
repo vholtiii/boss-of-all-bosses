@@ -3,6 +3,8 @@
  * Kept side-effect free so they can be unit tested without any audio context.
  */
 
+export type DistrictIdentity = 'industrial' | 'commercial' | 'residential' | 'docks' | 'neutral';
+
 export interface AmbienceState {
   /** 0-100 police heat */
   heat: number;
@@ -16,6 +18,18 @@ export interface AmbienceState {
   phase: number;
   /** RICO clock running */
   ricoActive: boolean;
+  /** Player hexes / total claimed hexes (0-1) */
+  playerTerritoryRatio: number;
+  /** Live player soldiers on board + in HQ */
+  soldierCount: number;
+  /** Soldiers recruited last turn; drives a short crowd swell */
+  recruitedThisTurn: number;
+  /** Dominant flavor among player-controlled districts */
+  districtIdentity: DistrictIdentity;
+  /** Player lost territory last turn */
+  lostTerritoryThisTurn: boolean;
+  /** Player declared or joined a war this turn */
+  warDeclaredThisTurn: boolean;
 }
 
 export const NEUTRAL_AMBIENCE: AmbienceState = {
@@ -25,6 +39,12 @@ export const NEUTRAL_AMBIENCE: AmbienceState = {
   prosperity: 0.35,
   phase: 1,
   ricoActive: false,
+  playerTerritoryRatio: 0.2,
+  soldierCount: 0,
+  recruitedThisTurn: 0,
+  districtIdentity: 'neutral',
+  lostTerritoryThisTurn: false,
+  warDeclaredThisTurn: false,
 };
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, Number.isFinite(n) ? n : 0));
@@ -52,6 +72,45 @@ export const computeProsperity = (opts: {
   return clamp01((turfScore * 0.6 + incomeScore * 0.4) * brokePenalty);
 };
 
+/**
+ * Classify a district code into an ambience identity.
+ */
+export const classifyDistrict = (district?: string): DistrictIdentity => {
+  const d = (district || '').toLowerCase();
+  if (d.includes('dock') || d.includes('port') || d.includes('harbor') || d.includes('waterfront')) return 'docks';
+  if (d.includes('industrial') || d.includes('factory') || d.includes('manufacturing') || d.includes('warehouse')) return 'industrial';
+  if (d.includes('commercial') || d.includes('business') || d.includes('financial') || d.includes('midtown')) return 'commercial';
+  if (d.includes('residential') || d.includes('suburb') || d.includes('neighborhood')) return 'residential';
+  return 'neutral';
+};
+
+/**
+ * Pick the dominant district identity among player hexes.
+ */
+export const computeDistrictIdentity = (hexMap: any[], playerFamily: string): DistrictIdentity => {
+  const counts: Record<DistrictIdentity, number> = {
+    industrial: 0,
+    commercial: 0,
+    residential: 0,
+    docks: 0,
+    neutral: 0,
+  };
+  hexMap.forEach((h: any) => {
+    if (h.controllingFamily !== playerFamily) return;
+    const id = classifyDistrict(h.district);
+    counts[id]++;
+  });
+  let best: DistrictIdentity = 'neutral';
+  let bestCount = 0;
+  (Object.keys(counts) as DistrictIdentity[]).forEach((k) => {
+    if (counts[k] > bestCount) {
+      bestCount = counts[k];
+      best = k;
+    }
+  });
+  return best;
+};
+
 export interface AmbienceMix {
   /** Filtered noise "rain"/street hiss */
   hiss: number;
@@ -73,6 +132,10 @@ export interface AmbienceMix {
   gunfire: number;
   /** Gap in ms between gunfire bursts (Infinity = never) */
   gunfireGapMs: number;
+  /** Industrial / dock clang layer */
+  industrial: number;
+  /** Gangster chatter / racket buzz layer */
+  chatter: number;
 }
 
 /**
@@ -86,19 +149,59 @@ export const computeAmbienceMix = (s: AmbienceState): AmbienceMix => {
   const phase = Math.max(1, Math.min(4, s.phase));
   // Phase 1 = sleepy backstreet, phase 4 = busy city
   const density = (phase - 1) / 3;
+  const turf = clamp01(s.playerTerritoryRatio);
+  const soldiers = Math.max(0, s.soldierCount);
+  const soldierDensity = clamp01(soldiers / 25); // 25+ soldiers reads as "crowded"
+  const recruitBoost = Math.min(1, s.recruitedThisTurn / 3); // 3+ recruits = full swell
 
   const conflict = Math.max(s.atWar ? 0.7 : 0, tension * 0.8);
+
+  // Territory and soldiers make the city feel populated; losing ground makes it cold.
+  const crowdBase = prosperity * (0.18 + density * 0.22);
+  const turfCrowd = turf * 0.18;
+  const soldierCrowd = soldierDensity * 0.18;
+  const crowd = Math.min(0.75, crowdBase + turfCrowd + soldierCrowd + recruitBoost * 0.22);
+
+  const wind = (1 - prosperity) * 0.22 + (1 - turf) * 0.12;
+
+  // Industrial clang only when player controls industrial/dock territory.
+  const isIndustrial = s.districtIdentity === 'industrial' || s.districtIdentity === 'docks';
+  const industrial = isIndustrial ? 0.08 + turf * 0.18 + soldierDensity * 0.08 : 0;
+
+  // Chatter / racket buzz rises with owned territory and soldiers.
+  const chatter = turf * 0.12 + soldierDensity * 0.18 + recruitBoost * 0.12;
 
   return {
     hiss: 0.28 + density * 0.14,
     rumble: 0.08 + density * 0.1 + prosperity * 0.05,
-    crowd: prosperity * (0.18 + density * 0.22),
-    wind: (1 - prosperity) * 0.22,
+    crowd,
+    wind,
     drone: tension * 0.16 + (s.atWar ? 0.1 : 0),
     policePulse: s.ricoActive ? 0.2 : heat >= 0.8 ? 0.14 : heat >= 0.6 ? 0.06 : 0,
     siren: 0.25 + heat * 0.75,
     sirenGapMs: 55000 - heat * 41000,
     gunfire: conflict > 0.15 ? 0.1 + conflict * 0.25 : 0,
     gunfireGapMs: conflict > 0.15 ? 45000 - conflict * 28000 : Infinity,
+    industrial,
+    chatter,
   };
 };
+
+/**
+ * Stinger triggers for one-shot ambience accents at turn start.
+ */
+export interface AmbienceStingers {
+  warDeclared: boolean;
+  territoryLost: boolean;
+  recruitWave: boolean;
+  heatCritical: boolean;
+  ricoStarted: boolean;
+}
+
+export const computeAmbienceStingers = (state: AmbienceState): AmbienceStingers => ({
+  warDeclared: state.warDeclaredThisTurn,
+  territoryLost: state.lostTerritoryThisTurn,
+  recruitWave: state.recruitedThisTurn >= 3,
+  heatCritical: state.heat >= 80,
+  ricoStarted: state.ricoActive,
+});
