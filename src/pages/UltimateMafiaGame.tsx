@@ -218,11 +218,15 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   useEffect(() => {
     if (gameState._recruitVoice && gameState._recruitVoice > 0) {
       playBark('recruit');
+      // Follow-up line naming the family the soldier was sworn into.
+      const family = gameState.playerFamily;
+      const t = setTimeout(() => playBark(`joined_${family}`), 4300);
       const hexes = gameState.turnReport?.recruits?.hexes || [];
       if (hexes.length) {
         hexFxRef.current?.spawnTerritoryFlashes(hexes.map(hex => ({ hex, change: 'gained' as const, to: gameState.playerFamily })));
       }
       clearSoundFlags();
+      return () => clearTimeout(t);
     }
   }, [gameState._recruitVoice, gameState.turnReport, gameState.playerFamily, playBark, clearSoundFlags]);
 
