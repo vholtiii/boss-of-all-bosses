@@ -957,7 +957,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
             </pattern>
           </defs>
           {/* Invisible background rect to capture clicks on empty area */}
-          <rect x={viewBox.split(' ').map(Number)[0]} y={viewBox.split(' ').map(Number)[1]} width={viewBox.split(' ').map(Number)[2]} height={viewBox.split(' ').map(Number)[3]} fill="transparent" onClick={() => { if (suppressBgClickRef.current) { suppressBgClickRef.current = false; return; } onClearHighlight?.(); setPinnedHex(null); }} />
+          <rect x={viewBox.split(' ').map(Number)[0]} y={viewBox.split(' ').map(Number)[1]} width={viewBox.split(' ').map(Number)[2]} height={viewBox.split(' ').map(Number)[3]} fill="transparent" onClick={() => { if (suppressBgClickRef.current) { suppressBgClickRef.current = false; return; } onClearHighlight?.(); setPinnedHex(null); setActionMenu(null); setPlanHitUnitMenu(null); setFlipTargetMenu(null); }} />
           <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`} style={{ transition: cameraMoving ? 'transform 0.85s cubic-bezier(0.22, 1, 0.36, 1)' : 'none' }}>
             {/* Compute supply route hex set for tint overlay */}
             {(() => {
