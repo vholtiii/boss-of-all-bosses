@@ -88,6 +88,11 @@ const BARKS: Record<string, string[]> = {
   promotion: ['/sounds/barks/promotion-1.mp3', '/sounds/barks/promotion-2.mp3'],
   war: ['/sounds/barks/war-1.mp3', '/sounds/barks/war-2.mp3'],
   recruit: ['/sounds/barks/recruit-1.mp3', '/sounds/barks/recruit-2.mp3', '/sounds/barks/recruit-3.mp3'],
+  joined_gambino: ['/sounds/barks/joined-gambino-1.mp3', '/sounds/barks/joined-gambino-2.mp3'],
+  joined_genovese: ['/sounds/barks/joined-genovese-1.mp3', '/sounds/barks/joined-genovese-2.mp3'],
+  joined_lucchese: ['/sounds/barks/joined-lucchese-1.mp3', '/sounds/barks/joined-lucchese-2.mp3'],
+  joined_bonanno: ['/sounds/barks/joined-bonanno-1.mp3', '/sounds/barks/joined-bonanno-2.mp3'],
+  joined_colombo: ['/sounds/barks/joined-colombo-1.mp3', '/sounds/barks/joined-colombo-2.mp3'],
 };
 const BARK_COOLDOWN_MS = 4000;
 
