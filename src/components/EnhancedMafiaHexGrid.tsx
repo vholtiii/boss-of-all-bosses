@@ -161,6 +161,20 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
     if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
   }, []);
 
+  // Escape key dismisses any open hex menu/picker
+  useEffect(() => {
+    if (!actionMenu && !planHitUnitMenu && !flipTargetMenu) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActionMenu(null);
+        setPlanHitUnitMenu(null);
+        setFlipTargetMenu(null);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [actionMenu, planHitUnitMenu, flipTargetMenu]);
+
   const baseHexRadius = 22;
   const hexWidth = baseHexRadius * 2;
   const hexHeight = Math.sqrt(3) * baseHexRadius;
@@ -957,7 +971,7 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
             </pattern>
           </defs>
           {/* Invisible background rect to capture clicks on empty area */}
-          <rect x={viewBox.split(' ').map(Number)[0]} y={viewBox.split(' ').map(Number)[1]} width={viewBox.split(' ').map(Number)[2]} height={viewBox.split(' ').map(Number)[3]} fill="transparent" onClick={() => { if (suppressBgClickRef.current) { suppressBgClickRef.current = false; return; } onClearHighlight?.(); setPinnedHex(null); }} />
+          <rect x={viewBox.split(' ').map(Number)[0]} y={viewBox.split(' ').map(Number)[1]} width={viewBox.split(' ').map(Number)[2]} height={viewBox.split(' ').map(Number)[3]} fill="transparent" onClick={() => { if (suppressBgClickRef.current) { suppressBgClickRef.current = false; return; } onClearHighlight?.(); setPinnedHex(null); setActionMenu(null); setPlanHitUnitMenu(null); setFlipTargetMenu(null); }} />
           <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`} style={{ transition: cameraMoving ? 'transform 0.85s cubic-bezier(0.22, 1, 0.36, 1)' : 'none' }}>
             {/* Compute supply route hex set for tint overlay */}
             {(() => {
@@ -2195,20 +2209,29 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                   height={menuHeight + 30}
                   className="overflow-visible"
                 >
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <span className="text-[9px] font-bold text-muted-foreground">⚔️</span>
-                    {Array.from({ length: am }).map((_, i) => (
-                      <span
-                        key={i}
-                        className={cn(
-                          "w-1.5 h-1.5 rounded-full transition-colors",
-                          i < ar ? "bg-primary shadow-[0_0_4px_hsl(var(--primary))]" : "bg-muted-foreground/25",
-                          i === ar - 1 && "animate-pulse"
-                        )}
-                      />
-                    ))}
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <div className="flex items-center justify-center gap-1">
+                      <span className="text-[9px] font-bold text-muted-foreground">⚔️</span>
+                      {Array.from({ length: am }).map((_, i) => (
+                        <span
+                          key={i}
+                          className={cn(
+                            "w-1.5 h-1.5 rounded-full transition-colors",
+                            i < ar ? "bg-primary shadow-[0_0_4px_hsl(var(--primary))]" : "bg-muted-foreground/25",
+                            i === ar - 1 && "animate-pulse"
+                          )}
+                        />
+                      ))}
 
-                    <span className="text-[9px] font-bold text-muted-foreground ml-0.5">{ar}/{am}</span>
+                      <span className="text-[9px] font-bold text-muted-foreground ml-0.5">{ar}/{am}</span>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setActionMenu(null); }}
+                      className="text-[10px] leading-none text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted/40 transition-colors"
+                      title="Close menu"
+                    >
+                      ✕
+                    </button>
                   </div>
                   {recArr.length > 0 && (
                     <div className="text-[8px] font-bold uppercase tracking-wider text-primary/80 text-center mb-0.5">
@@ -2458,7 +2481,16 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
               return (
                 <foreignObject x={x - menuWidth / 2} y={y - menuHeight - baseHexRadius} width={menuWidth} height={menuHeight}>
                   <div className="bg-background/95 backdrop-blur-sm border border-destructive/50 rounded-lg p-2 shadow-xl">
-                    <div className="text-xs font-bold text-destructive text-center mb-1.5">🎯 Select Target</div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="text-xs font-bold text-destructive text-center flex-1">🎯 Select Target</div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setPlanHitUnitMenu(null); }}
+                        className="text-[10px] leading-none text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted/40 transition-colors"
+                        title="Close"
+                      >
+                        ✕
+                      </button>
+                    </div>
                     {planHitUnitMenu.enemyUnits.map(unit => (
                       <button
                         key={unit.id}
@@ -2484,7 +2516,16 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
               return (
                 <foreignObject x={x - menuWidth / 2} y={y - menuHeight - baseHexRadius} width={menuWidth} height={menuHeight}>
                   <div className="bg-background/95 backdrop-blur-sm border border-muted-foreground/30 rounded-lg p-2 shadow-xl">
-                    <div className="text-xs font-bold text-foreground text-center mb-1.5">🐀 Select Target to Flip</div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="text-xs font-bold text-foreground text-center flex-1">🐀 Select Target to Flip</div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setFlipTargetMenu(null); }}
+                        className="text-[10px] leading-none text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted/40 transition-colors"
+                        title="Close"
+                      >
+                        ✕
+                      </button>
+                    </div>
                     {flipTargetMenu.targets.map(({ unit, loyalty, chance, cost }) => (
                       <button
                         key={unit.id}
