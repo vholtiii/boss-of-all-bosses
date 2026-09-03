@@ -2484,7 +2484,17 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
       <TurnSummaryModal
         report={gameState.turnReport}
         open={showTurnSummary}
-        onClose={() => setShowTurnSummary(false)}
+        onClose={() => {
+          setShowTurnSummary(false);
+          // Strict sequence: the rival-recap spotlight only opens once the
+          // Tribune has been dismissed, once per turn, and only if there is
+          // something to show.
+          const report = gameState.turnReport;
+          if (!report || report.turn !== gameState.turn) return;
+          if (spotlightedTurnRef.current === gameState.turn) return;
+          spotlightedTurnRef.current = gameState.turn;
+          if (spotlightMoves.length > 0) setShowTurnSpotlight(true);
+        }}
       />
 
       
