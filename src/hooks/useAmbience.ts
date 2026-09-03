@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react';
 import type { SoundConfig } from './useSoundSystem';
 import {
   computeAmbienceMix,
+  computeAmbienceStingers,
   NEUTRAL_AMBIENCE,
   type AmbienceState,
   type AmbienceMix,
+  type AmbienceStingers,
 } from '@/lib/ambience-state';
 
 interface UseAmbienceOptions {
@@ -13,16 +15,19 @@ interface UseAmbienceOptions {
   ambience?: Partial<AmbienceState>;
   /** Set false to fade the bed out (e.g. game over / back to menu) */
   active?: boolean;
+  /** Optional stinger flags for one-shot turn-start accents */
+  stingers?: Partial<AmbienceStingers>;
 }
 
 /**
  * Procedural city ambience bed. Fully synthesized (no assets), it loops
  * seamlessly and continuously re-mixes itself from the live game state:
  * heat drives sirens and a police throb, war/tension add distant gunfire and a
- * sub drone, prosperity swaps cold wind for crowd murmur, and the progression
- * phase scales overall city density.
+ * sub drone, prosperity swaps cold wind for crowd murmur, territory and
+ * soldiers add crowd density / racket chatter, and industrial/dock districts
+ * add a metallic clang layer.
  */
-export const useAmbience = ({ soundConfig, ambience, active = true }: UseAmbienceOptions) => {
+export const useAmbience = ({ soundConfig, ambience, active = true, stingers = {} }: UseAmbienceOptions) => {
   const ctxRef = useRef<AudioContext | null>(null);
   const masterRef = useRef<GainNode | null>(null);
   const startedRef = useRef(false);
@@ -31,6 +36,7 @@ export const useAmbience = ({ soundConfig, ambience, active = true }: UseAmbienc
   const gainsRef = useRef<Record<string, GainNode | null>>({});
   const sirenTimerRef = useRef<number | null>(null);
   const gunTimerRef = useRef<number | null>(null);
+  const clangTimerRef = useRef<number | null>(null);
 
   const level = soundConfig.enabled && active ? (soundConfig.ambienceVolume ?? 0) : 0;
   const levelRef = useRef(level);
@@ -115,7 +121,7 @@ export const useAmbience = ({ soundConfig, ambience, active = true }: UseAmbienc
       rumble.start(); lfo.start();
       gains.rumble = rumbleGain;
 
-      // --- Crowd murmur / distant radio (prosperity)
+      // --- Crowd murmur / distant radio (prosperity + turf + soldiers)
       const crowdSrc = makeNoise(ctx, false);
       const crowdFilter = ctx.createBiquadFilter();
       crowdFilter.type = 'bandpass';
@@ -199,6 +205,34 @@ export const useAmbience = ({ soundConfig, ambience, active = true }: UseAmbienc
       gunBus.connect(gunFilter); gunFilter.connect(master);
       gains.gunfire = gunBus;
 
+      // --- Industrial clang (factories / docks)
+      const clangBus = ctx.createGain();
+      clangBus.gain.value = m.industrial;
+      const clangFilter = ctx.createBiquadFilter();
+      clangFilter.type = 'bandpass';
+      clangFilter.frequency.value = 2400;
+      clangFilter.Q.value = 1.2;
+      clangBus.connect(clangFilter); clangFilter.connect(master);
+      gains.industrial = clangBus;
+
+      // --- Gangster chatter / racket buzz (owned territory + soldiers)
+      const chatterSrc = makeNoise(ctx, false);
+      const chatterFilter = ctx.createBiquadFilter();
+      chatterFilter.type = 'bandpass';
+      chatterFilter.frequency.value = 680;
+      chatterFilter.Q.value = 2.8;
+      const chatterWobble = ctx.createOscillator();
+      chatterWobble.type = 'sine';
+      chatterWobble.frequency.value = 0.31;
+      const chatterWobbleGain = ctx.createGain();
+      chatterWobbleGain.gain.value = 90;
+      chatterWobble.connect(chatterWobbleGain); chatterWobbleGain.connect(chatterFilter.frequency);
+      const chatterGain = ctx.createGain();
+      chatterGain.gain.value = m.chatter;
+      chatterSrc.connect(chatterFilter); chatterFilter.connect(chatterGain); chatterGain.connect(master);
+      chatterSrc.start(); chatterWobble.start();
+      gains.chatter = chatterGain;
+
       gainsRef.current = gains;
 
       const wailOnce = () => {
@@ -236,6 +270,26 @@ export const useAmbience = ({ soundConfig, ambience, active = true }: UseAmbienc
         }
       };
 
+      const clangOnce = () => {
+        const c = ctxRef.current;
+        if (!c || disposed) return;
+        const t = c.currentTime;
+        const fundamental = 180 + Math.random() * 90;
+        const clang = c.createOscillator();
+        clang.type = 'sawtooth';
+        clang.frequency.setValueAtTime(fundamental, t);
+        const clangG = c.createGain();
+        clangG.gain.setValueAtTime(0, t);
+        clangG.gain.linearRampToValueAtTime(0.12, t + 0.02);
+        clangG.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+        const clangF = c.createBiquadFilter();
+        clangF.type = 'bandpass';
+        clangF.frequency.value = 1200;
+        clangF.Q.value = 2.5;
+        clang.connect(clangF); clangF.connect(clangG); clangG.connect(clangBus);
+        clang.start(t); clang.stop(t + 1.6);
+      };
+
       const scheduleSiren = () => {
         const gap = Math.max(6000, mixRef.current.sirenGapMs);
         sirenTimerRef.current = window.setTimeout(() => {
@@ -257,6 +311,16 @@ export const useAmbience = ({ soundConfig, ambience, active = true }: UseAmbienc
       };
       scheduleGunfire();
 
+      const scheduleClang = () => {
+        const baseGap = 12000;
+        clangTimerRef.current = window.setTimeout(() => {
+          if (disposed) return;
+          if (mixRef.current.industrial > 0.02) clangOnce();
+          scheduleClang();
+        }, baseGap * (0.5 + Math.random() * 1.5));
+      };
+      scheduleClang();
+
       // Fade in
       master.gain.setValueAtTime(0, ctx.currentTime);
       master.gain.linearRampToValueAtTime(levelRef.current * 0.6, ctx.currentTime + 3);
@@ -274,6 +338,7 @@ export const useAmbience = ({ soundConfig, ambience, active = true }: UseAmbienc
       window.removeEventListener('keydown', onInteract);
       if (sirenTimerRef.current) { clearTimeout(sirenTimerRef.current); sirenTimerRef.current = null; }
       if (gunTimerRef.current) { clearTimeout(gunTimerRef.current); gunTimerRef.current = null; }
+      if (clangTimerRef.current) { clearTimeout(clangTimerRef.current); clangTimerRef.current = null; }
       const ctx = ctxRef.current;
       const master = masterRef.current;
       if (ctx && master) {
@@ -327,10 +392,13 @@ export const useAmbience = ({ soundConfig, ambience, active = true }: UseAmbienc
     ramp(gains.policePulse, m.policePulse, 2.5);
     ramp(gains.siren, m.siren, 2);
     ramp(gains.gunfire, m.gunfire, 2);
+    ramp(gains.industrial, m.industrial, 3);
+    ramp(gains.chatter, m.chatter, 3.5);
   }, [mixKey]);
 
   // --- One-shot accents when the environment *changes state* ---
   const prevRef = useRef<AmbienceState | null>(null);
+  const stingerRef = useRef<AmbienceStingers | null>(null);
   const heatTier = (h: number) => (h >= 90 ? 4 : h >= 80 ? 3 : h >= 60 ? 2 : h >= 40 ? 1 : 0);
 
   useEffect(() => {
@@ -400,11 +468,52 @@ export const useAmbience = ({ soundConfig, ambience, active = true }: UseAmbienc
       } catch { /* noop */ }
     };
 
+    /** Metallic scrape when territory is lost */
+    const territoryLostStinger = () => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      const f = ctx.createBiquadFilter();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(420, now);
+      osc.frequency.exponentialRampToValueAtTime(90, now + 1.8);
+      f.type = 'lowpass';
+      f.frequency.value = 1800;
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.linearRampToValueAtTime(0.16, now + 0.08);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 2.2);
+      osc.connect(f); f.connect(g); g.connect(master);
+      osc.start(now); osc.stop(now + 2.4);
+    };
+
+    /** Bottle-clink / brief cheer for a recruit wave */
+    const recruitWaveStinger = () => {
+      const node = gainsRef.current.crowd;
+      if (!node) return;
+      try {
+        const target = mixRef.current.crowd;
+        node.gain.cancelScheduledValues(now);
+        node.gain.setValueAtTime(node.gain.value, now);
+        node.gain.linearRampToValueAtTime(Math.min(0.75, target + 0.35), now + 0.4);
+        node.gain.linearRampToValueAtTime(target, now + 4);
+      } catch { /* noop */ }
+    };
+
     if (heatTier(state.heat) > heatTier(prev.heat)) sirenPass();
     if (state.atWar !== prev.atWar) transitionHit(state.atWar);
     if (state.phase > prev.phase) citySwell();
     if (prev.prosperity - state.prosperity > 0.18) windSurge();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.heat, state.atWar, state.phase, state.prosperity, state.ricoActive]);
-};
 
+    // Turn-start stingers passed from the parent
+    const stingersNow = computeAmbienceStingers(state);
+    const stingersPrev = stingerRef.current;
+    stingerRef.current = stingersNow;
+    if (stingersPrev) {
+      if (stingersNow.warDeclared && !stingersPrev.warDeclared) transitionHit(true);
+      if (stingersNow.territoryLost && !stingersPrev.territoryLost) territoryLostStinger();
+      if (stingersNow.recruitWave && !stingersPrev.recruitWave) recruitWaveStinger();
+      if (stingersNow.heatCritical && !stingersPrev.heatCritical) sirenPass();
+      if (stingersNow.ricoStarted && !stingersPrev.ricoStarted) sirenPass();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.heat, state.atWar, state.phase, state.prosperity, state.ricoActive, state.lostTerritoryThisTurn, state.recruitedThisTurn, state.warDeclaredThisTurn]);
+};
