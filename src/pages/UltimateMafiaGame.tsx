@@ -211,6 +211,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const hexFxRef = useRef<HexGridFxHandle | null>(null);
   const [showTurnResolution, setShowTurnResolution] = useState(false);
   const [showTurnSpotlight, setShowTurnSpotlight] = useState(false);
+  const [showTurnSummary, setShowTurnSummary] = useState(false);
   const [mapShake, setMapShake] = useState(false);
   const [showVignette, setShowVignette] = useState(false);
   const lastCombatFxRef = useRef<number | null>(null);
@@ -280,14 +281,16 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
   }, [gameState.turnReport, gameState.turn]);
 
-  // Cinematic turn-start spotlight: opens after the resolution overlay closes
+  // Cinematic turn-start spotlight: opens after the resolution overlay AND the
+  // turn summary (Five Boroughs Tribune) have closed, so they never stack.
   useEffect(() => {
     if (!gameState.turnReport || gameState.turnReport.turn !== gameState.turn) return;
-    if (showTurnResolution) return;
+    if (showTurnResolution || showTurnSummary) return;
     if (spotlightedTurnRef.current === gameState.turn) return;
     spotlightedTurnRef.current = gameState.turn;
     setShowTurnSpotlight(true);
-  }, [gameState.turnReport, gameState.turn, showTurnResolution]);
+  }, [gameState.turnReport, gameState.turn, showTurnResolution, showTurnSummary]);
+
 
   // Derive cinematic rival recap from the most recent turn report
   const { spotlightMoves, leadingFamily } = useMemo(() => {
@@ -446,7 +449,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const [activeMobileTab, setActiveMobileTab] = useState('map');
   const [showSettings, setShowSettings] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
-  const [showTurnSummary, setShowTurnSummary] = useState(false);
+  
   const [bossHighlightHex, setBossHighlightHex] = useState<{ q: number; r: number; s: number } | null>(null);
   const [highlightedFamily, setHighlightedFamily] = useState<string | null>(null);
   const [selectedHeadquarters, setSelectedHeadquarters] = useState<{
