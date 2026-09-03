@@ -2209,20 +2209,29 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                   height={menuHeight + 30}
                   className="overflow-visible"
                 >
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <span className="text-[9px] font-bold text-muted-foreground">⚔️</span>
-                    {Array.from({ length: am }).map((_, i) => (
-                      <span
-                        key={i}
-                        className={cn(
-                          "w-1.5 h-1.5 rounded-full transition-colors",
-                          i < ar ? "bg-primary shadow-[0_0_4px_hsl(var(--primary))]" : "bg-muted-foreground/25",
-                          i === ar - 1 && "animate-pulse"
-                        )}
-                      />
-                    ))}
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <div className="flex items-center justify-center gap-1">
+                      <span className="text-[9px] font-bold text-muted-foreground">⚔️</span>
+                      {Array.from({ length: am }).map((_, i) => (
+                        <span
+                          key={i}
+                          className={cn(
+                            "w-1.5 h-1.5 rounded-full transition-colors",
+                            i < ar ? "bg-primary shadow-[0_0_4px_hsl(var(--primary))]" : "bg-muted-foreground/25",
+                            i === ar - 1 && "animate-pulse"
+                          )}
+                        />
+                      ))}
 
-                    <span className="text-[9px] font-bold text-muted-foreground ml-0.5">{ar}/{am}</span>
+                      <span className="text-[9px] font-bold text-muted-foreground ml-0.5">{ar}/{am}</span>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setActionMenu(null); }}
+                      className="text-[10px] leading-none text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted/40 transition-colors"
+                      title="Close menu"
+                    >
+                      ✕
+                    </button>
                   </div>
                   {recArr.length > 0 && (
                     <div className="text-[8px] font-bold uppercase tracking-wider text-primary/80 text-center mb-0.5">
