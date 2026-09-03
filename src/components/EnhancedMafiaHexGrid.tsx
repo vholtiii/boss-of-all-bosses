@@ -2516,7 +2516,16 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
               return (
                 <foreignObject x={x - menuWidth / 2} y={y - menuHeight - baseHexRadius} width={menuWidth} height={menuHeight}>
                   <div className="bg-background/95 backdrop-blur-sm border border-muted-foreground/30 rounded-lg p-2 shadow-xl">
-                    <div className="text-xs font-bold text-foreground text-center mb-1.5">🐀 Select Target to Flip</div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="text-xs font-bold text-foreground text-center flex-1">🐀 Select Target to Flip</div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setFlipTargetMenu(null); }}
+                        className="text-[10px] leading-none text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted/40 transition-colors"
+                        title="Close"
+                      >
+                        ✕
+                      </button>
+                    </div>
                     {flipTargetMenu.targets.map(({ unit, loyalty, chance, cost }) => (
                       <button
                         key={unit.id}
