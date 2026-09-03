@@ -211,6 +211,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const hexFxRef = useRef<HexGridFxHandle | null>(null);
   const [showTurnResolution, setShowTurnResolution] = useState(false);
   const [showTurnSpotlight, setShowTurnSpotlight] = useState(false);
+  const [showTurnSummary, setShowTurnSummary] = useState(false);
   const [mapShake, setMapShake] = useState(false);
   const [showVignette, setShowVignette] = useState(false);
   const lastCombatFxRef = useRef<number | null>(null);
