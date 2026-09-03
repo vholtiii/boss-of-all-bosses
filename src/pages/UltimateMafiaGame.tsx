@@ -280,14 +280,16 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
     }
   }, [gameState.turnReport, gameState.turn]);
 
-  // Cinematic turn-start spotlight: opens after the resolution overlay closes
+  // Cinematic turn-start spotlight: opens after the resolution overlay AND the
+  // turn summary (Five Boroughs Tribune) have closed, so they never stack.
   useEffect(() => {
     if (!gameState.turnReport || gameState.turnReport.turn !== gameState.turn) return;
-    if (showTurnResolution) return;
+    if (showTurnResolution || showTurnSummary) return;
     if (spotlightedTurnRef.current === gameState.turn) return;
     spotlightedTurnRef.current = gameState.turn;
     setShowTurnSpotlight(true);
-  }, [gameState.turnReport, gameState.turn, showTurnResolution]);
+  }, [gameState.turnReport, gameState.turn, showTurnResolution, showTurnSummary]);
+
 
   // Derive cinematic rival recap from the most recent turn report
   const { spotlightMoves, leadingFamily } = useMemo(() => {
