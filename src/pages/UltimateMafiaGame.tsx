@@ -448,7 +448,7 @@ const GameContent: React.FC<{ config: GameConfig; onExitToMenu: () => void }> = 
   const [activeMobileTab, setActiveMobileTab] = useState('map');
   const [showSettings, setShowSettings] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
-  const [showTurnSummary, setShowTurnSummary] = useState(false);
+  
   const [bossHighlightHex, setBossHighlightHex] = useState<{ q: number; r: number; s: number } | null>(null);
   const [highlightedFamily, setHighlightedFamily] = useState<string | null>(null);
   const [selectedHeadquarters, setSelectedHeadquarters] = useState<{
