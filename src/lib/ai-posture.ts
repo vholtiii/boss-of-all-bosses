@@ -84,10 +84,14 @@ export function computeAIPosture(i: PostureInputs): AIPosture {
   if (!i.strategicOverride && i.heatTier === 'hot' && !i.atWar) return 'COOL_OFF';
 
   // 2. Cash runway crisis — bankruptcy is more dangerous than rivals.
-  // Full crisis at <2.5. Also treat 2.5-3.2 as CONSOLIDATE when heat is warm+
-  // (bleeding cash to bribes on top of thin runway is the real trap).
-  if (i.moneyRunway < 2.5) return 'CONSOLIDATE';
-  if (i.moneyRunway < 3.2 && (i.heatTier === 'warm' || i.heatTier === 'hot')) return 'CONSOLIDATE';
+  // Tightened from <2.5/<3.2: a poor-but-stable AI used to sit in CONSOLIDATE for
+  // 60+ turns, which suppressed the very expansion that would have fixed its cash.
+  // Hysteresis: after 4 straight consolidating turns, only a true emergency
+  // (<1 turn of runway) keeps the family locked down — otherwise it must go earn.
+  const streak = i.consolidateStreak ?? 0;
+  const brokeNow = i.moneyRunway < 2.0
+    || (i.moneyRunway < 2.5 && (i.heatTier === 'warm' || i.heatTier === 'hot'));
+  if (brokeNow && (streak < 4 || i.moneyRunway < 1.0)) return 'CONSOLIDATE';
 
   // 3. Just took heavy losses — turtle to recover
   if (i.hqAssaultedRecently || i.recentCapoLosses >= 2) return 'TURTLE';
