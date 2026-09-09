@@ -7827,9 +7827,14 @@ export const useEnhancedMafiaGameState = (
         const hasAlliance = (state.alliances || []).some(a => a.alliedFamily === fam && a.active);
         const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
         // Check if there's already an incoming sitdown from this family
-        const hasIncoming = (state.incomingSitdowns || []).some(s => s.fromFamily === fam);
-        
+        // Spam guard: one pending request at a time AND a cooldown after the last
+        // one, so a family can't re-ask for the same ceasefire every other turn.
+        const lastAsk = (oppAny._lastSitdownTurn as number) ?? -99;
+        const hasIncoming = (state.incomingSitdowns || []).some(s => s.fromFamily === fam)
+          || (state.turn - lastAsk) < AI_SITDOWN_COOLDOWN;
+
         const pushSitdown = (deal: IncomingSitdown['proposedDeal']) => {
+          oppAny._lastSitdownTurn = state.turn;
           state.incomingSitdowns = state.incomingSitdowns || [];
           state.incomingSitdowns.push({
             id: `sitdown-${fam}-${state.turn}-${Math.random().toString(36).slice(2)}`,
