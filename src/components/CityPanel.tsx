@@ -259,6 +259,9 @@ const CityPanel: React.FC<CityPanelProps> = ({
                   Shake it down first, then you can own it outright.
                 </p>
               )}
+              </>
+              );})()}
+
 
             </div>
           </Section>
