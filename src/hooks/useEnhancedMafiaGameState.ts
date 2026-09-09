@@ -8964,8 +8964,13 @@ export const useEnhancedMafiaGameState = (
 
         }
 
-        // 2. Heat decay — mirrors player decay (state.policeHeat.reductionPerTurn, default 2)
-        const aiDecay = state.policeHeat?.reductionPerTurn ?? 2;
+        // 2. Heat decay — mirrors player decay (state.policeHeat.reductionPerTurn, default 2).
+        //    A family that has actually stood down (lay low / cool-off posture) cools far
+        //    faster; otherwise a big empire's passive heat outran decay forever and every
+        //    rival eventually died to RICO.
+        const baseDecay = state.policeHeat?.reductionPerTurn ?? 2;
+        const standingDown = isAILayingLow(opponent, state.turn) || (oppAny.posture === 'COOL_OFF');
+        const aiDecay = standingDown ? baseDecay + 6 : baseDecay;
         opponent.resources.heat = Math.max(0, (opponent.resources.heat || 0) - aiDecay);
 
         const heatNow = opponent.resources.heat || 0;
