@@ -14,6 +14,7 @@ import {
   type BuildingTier,
   type TilePolicy,
   anchorBuyoutCost,
+  buildingMaxTier,
   BUILD_RANK_REQUIREMENT,
   buildEtaTurns,
   buildProgressRate,
@@ -212,6 +213,22 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
                   ? 'Paying you tribute. Buy it out to own the place, then you can build and upgrade here.'
                   : 'Shake it down for tribute first, then buy it out, then build.'}
               </p>
+              {(() => {
+                const ownedIncome = BUILDING_DEFS[anchor.type].tiers[Math.min(2, buildingMaxTier(anchor.type)) as BuildingTier]?.income ?? anchor.tribute;
+                const ownedMonthly = Math.floor(ownedIncome * share * policyDef.incomeMult);
+                const tributeMonthly = anchor.isExtorted ? Math.floor(anchor.tribute * share * policyDef.incomeMult) : 0;
+                const delta = ownedMonthly - tributeMonthly;
+                const payback = delta > 0 ? Math.ceil(buyoutCost / delta) : null;
+                return (
+                  <p className="mt-1.5 rounded border border-emerald-500/30 bg-emerald-900/20 px-2 py-1 text-[9px] leading-snug text-emerald-200">
+                    Your take: {anchor.isExtorted ? `$${tributeMonthly.toLocaleString()}/mo tribute` : 'nothing yet'} →{' '}
+                    <span className="font-semibold">${ownedMonthly.toLocaleString()}/mo owned</span>
+                    {anchor.isExtorted && delta > 0 && (
+                      <> · <span className="text-emerald-300">+${delta.toLocaleString()}/mo</span>{payback !== null && ` · pays for itself in ~${payback}t`}</>
+                    )}
+                  </p>
+                );
+              })()}
               {anchor.isExtorted && (
                 <>
                   <button
