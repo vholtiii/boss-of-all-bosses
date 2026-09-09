@@ -28,8 +28,9 @@ UPGRADE  -> Tier 3, the top earner
 - Buy-out price is rescaled to sit against the value you get (a little above what it
   would cost to build the place to Tier 2 yourself), so it stays a real decision, and it
   pays back in a handful of months rather than never.
-- The block panel and City Panel show the comparison directly: "Tribute now $X/mo →
-  Owned $Y/mo", so the profit difference is visible before you spend.
+- The block panel and City Panel show the comparison directly, right on the buy-out
+  control: "Tribute now $X/mo → Owned $Y/mo (+$Z/mo · pays for itself in N months)",
+  so the exact new profit is spelled out before you spend a dollar.
 
 **2. Twice as many rackets at the start**
 
