@@ -158,6 +158,11 @@ import {
   supplyHexKey,
 } from '@/lib/supply-flow';
 
+/** Max heat a rival's buildings can add in a single turn (see AI heat lifecycle). */
+const AI_BUILDING_HEAT_CAP = 5;
+/** Turns a rival must wait before proposing another sitdown to the player. */
+const AI_SITDOWN_COOLDOWN = 8;
+
 // ============ SEEDED PRNG (Mulberry32) ============
 function mulberry32(seed: number): () => number {
   return function() {
@@ -6487,7 +6492,14 @@ export const useEnhancedMafiaGameState = (
         strategicOverride,
         myRespect: opponent.resources.respect || 0,
         rivalRespect: rivalRespectArr,
+        consolidateStreak: (oppAny._consolidateStreak as number) || 0,
       });
+
+      // Track how long this family has been stuck in the cash-crisis stance so
+      // computeAIPosture can force it back out to earn instead of idling forever.
+      oppAny._consolidateStreak = posture === 'CONSOLIDATE'
+        ? ((oppAny._consolidateStreak as number) || 0) + 1
+        : 0;
 
       oppAny.posture = posture;
       const policy = posturePolicy(posture);
@@ -6768,9 +6780,13 @@ export const useEnhancedMafiaGameState = (
           }
         }
       });
-      // Standing-order consequences for rivals: building heat and crew growth
+      // Standing-order consequences for rivals: building heat and crew growth.
+      // Capped per turn: uncapped, a large rival empire generated ~10 heat/turn
+      // against a 2/turn cooldown, so every AI drowned in police pressure by
+      // mid-game and permanently switched off offense (or died to RICO).
       if (aiBuildingHeat > 0) {
-        opponent.resources.heat = Math.min(100, (opponent.resources.heat || 0) + Math.round(aiBuildingHeat));
+        opponent.resources.heat = Math.min(100,
+          (opponent.resources.heat || 0) + Math.min(AI_BUILDING_HEAT_CAP, Math.round(aiBuildingHeat)));
       }
       if (aiRecruitsSpawned > 0) {
         opponent.resources.soldiers = (opponent.resources.soldiers || 0) + aiRecruitsSpawned;
@@ -7811,9 +7827,14 @@ export const useEnhancedMafiaGameState = (
         const hasAlliance = (state.alliances || []).some(a => a.alliedFamily === fam && a.active);
         const famLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
         // Check if there's already an incoming sitdown from this family
-        const hasIncoming = (state.incomingSitdowns || []).some(s => s.fromFamily === fam);
-        
+        // Spam guard: one pending request at a time AND a cooldown after the last
+        // one, so a family can't re-ask for the same ceasefire every other turn.
+        const lastAsk = (oppAny._lastSitdownTurn as number) ?? -99;
+        const hasIncoming = (state.incomingSitdowns || []).some(s => s.fromFamily === fam)
+          || (state.turn - lastAsk) < AI_SITDOWN_COOLDOWN;
+
         const pushSitdown = (deal: IncomingSitdown['proposedDeal']) => {
+          oppAny._lastSitdownTurn = state.turn;
           state.incomingSitdowns = state.incomingSitdowns || [];
           state.incomingSitdowns.push({
             id: `sitdown-${fam}-${state.turn}-${Math.random().toString(36).slice(2)}`,
@@ -8982,7 +9003,10 @@ export const useEnhancedMafiaGameState = (
         //    rival eventually died to RICO.
         const baseDecay = state.policeHeat?.reductionPerTurn ?? 2;
         const standingDown = isAILayingLow(opponent, state.turn) || (oppAny.posture === 'COOL_OFF');
-        const aiDecay = standingDown ? baseDecay + 6 : baseDecay;
+        // Pressure-release: the hotter a family runs, the harder its fixers work.
+        // Flat 2/turn decay could never claw back a mid-game empire's heat.
+        const heatBefore = opponent.resources.heat || 0;
+        const aiDecay = (standingDown ? baseDecay + 6 : baseDecay) + Math.floor(heatBefore / 25);
         opponent.resources.heat = Math.max(0, (opponent.resources.heat || 0) - aiDecay);
 
         const heatNow = opponent.resources.heat || 0;
