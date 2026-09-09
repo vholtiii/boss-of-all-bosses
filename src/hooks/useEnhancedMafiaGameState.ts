@@ -6487,7 +6487,14 @@ export const useEnhancedMafiaGameState = (
         strategicOverride,
         myRespect: opponent.resources.respect || 0,
         rivalRespect: rivalRespectArr,
+        consolidateStreak: (oppAny._consolidateStreak as number) || 0,
       });
+
+      // Track how long this family has been stuck in the cash-crisis stance so
+      // computeAIPosture can force it back out to earn instead of idling forever.
+      oppAny._consolidateStreak = posture === 'CONSOLIDATE'
+        ? ((oppAny._consolidateStreak as number) || 0) + 1
+        : 0;
 
       oppAny.posture = posture;
       const policy = posturePolicy(posture);
