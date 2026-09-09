@@ -1312,12 +1312,13 @@ export const createInitialGameState = (
       if (tile && tile.controllingFamily === 'neutral') {
         setTileOwner(tile, fam);
       }
+    });
   });
 
-  // Seed the strategic anchor rackets once HQs and supply nodes are locked in.
+  // Seed the strategic anchor rackets ONCE, after every HQ and supply node is locked in.
+  // (This used to sit inside the per-family loop, so it ran five times with five separate
+  // spacing checks — that is what produced the tight clusters of starting businesses.)
   placeAnchorRackets(hexMap, hqPositions, mapSize, mapSeed);
-
-  });
 
   const deployedUnits: DeployedUnit[] = [];
   const soldierStats: Record<string, SoldierStats> = {};
