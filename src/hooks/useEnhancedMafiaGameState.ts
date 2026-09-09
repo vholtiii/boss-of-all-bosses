@@ -1173,6 +1173,7 @@ const placeAnchorRackets = (
 ) => {
   const rng = mulberry32(seed + 31337);
   const target = ANCHOR_COUNT_BY_MAP_SIZE[mapSize] ?? 10;
+  const minSpacing = ANCHOR_MIN_SPACING_BY_MAP_SIZE[mapSize] ?? ANCHOR_MIN_SPACING;
   const placed: HexTile[] = [];
   const usedNames = new Set<string>();
 
