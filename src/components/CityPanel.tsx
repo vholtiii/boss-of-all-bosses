@@ -164,12 +164,18 @@ const CityPanel: React.FC<CityPanelProps> = ({
 
         {/* Standing order */}
         <Section title="Standing Order" icon={<ShieldCheck className="h-3 w-3" />}>
+          {anchor && (
+            <p className="mb-1.5 rounded border border-noir-light bg-noir-dark/60 px-2 py-1.5 text-[10px] text-muted-foreground">
+              🔒 {anchor.name} still runs this block. Buy the racket out before giving standing orders.
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-1.5">
             {policyPreviews.map(p => (
               <button
                 key={p.id}
                 type="button"
-                title={p.blurb}
+                title={anchor ? 'Buy out the racket first' : p.blurb}
+                disabled={!!anchor}
                 onClick={() => onSetTilePolicy?.(tile.q, tile.r, tile.s, p.id)}
                 className={cn('rounded border px-2 py-2 text-left transition-colors',
                   p.isActive

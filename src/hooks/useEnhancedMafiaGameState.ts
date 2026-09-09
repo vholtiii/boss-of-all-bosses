@@ -13465,6 +13465,9 @@ export const useEnhancedMafiaGameState = (
       const state: EnhancedMafiaGameState = JSON.parse(JSON.stringify(prev));
       const tile = state.hexMap.find(t => t.q === q && t.r === r && t.s === s);
       if (!tile || tile.controllingFamily !== state.playerFamily) return prev;
+      // Standing orders require full ownership — a block still run by an
+      // extorted anchor racket stays on Earn until it is bought out.
+      if (tile.anchor && policy !== 'earn') return prev;
       tile.policy = policy;
       return state;
     });
