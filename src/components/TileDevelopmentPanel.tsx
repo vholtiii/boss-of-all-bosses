@@ -19,6 +19,7 @@ import {
   buildProgressRate,
   buildCrewLabel,
 } from '@/types/game-mechanics';
+import { buildPolicyPreviews, runningOrderSentence } from '@/lib/tile-policy-preview';
 import type { HexTile } from '@/hooks/useEnhancedMafiaGameState';
 
 interface TileDevelopmentPanelProps {
@@ -86,6 +87,15 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
   const buyoutCost = anchor ? (anchor.buyoutCost ?? anchorBuyoutCost(anchor.tribute)) : 0;
   const progressPct = Math.min(100, Math.round(((tile.recruitProgress || 0) / RECRUIT_PROGRESS_GOAL) * 100));
 
+  const previewInputs = {
+    grossIncome: totals.income + anchorTribute,
+    share,
+    infra: totals.infra,
+    recruitProgress: tile.recruitProgress || 0,
+  };
+  const policyPreviews = buildPolicyPreviews(previewInputs, policy);
+  const runningSentence = runningOrderSentence(previewInputs, policy);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -135,32 +145,39 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
       {tab === 'orders' && (
         <div className="space-y-1.5">
           <div className="grid grid-cols-2 gap-1">
-            {POLICY_ORDER.map(id => {
-              const def = TILE_POLICIES[id];
-              const active = policy === id;
-              const heatPct = Math.round((def.heatMult - 1) * 100);
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  title={def.blurb}
-                  onClick={() => onSetTilePolicy?.(tile.q, tile.r, tile.s, id)}
-                  className={cn('rounded border px-2 py-1.5 text-left text-[11px] transition-colors',
-                    active
-                      ? 'border-mafia-gold/70 bg-mafia-gold/10 text-mafia-gold'
-                      : 'border-noir-light text-muted-foreground hover:border-mafia-gold/40 hover:text-white')}
-                >
-                  <span className="block">{def.label}</span>
-                  <span className="mt-0.5 block text-[9px] leading-tight opacity-80">
-                    ${Math.floor((totals.income + anchorTribute) * share * def.incomeMult).toLocaleString()}/mo
-                    {' · '}heat {heatPct === 0 ? 'std' : `${heatPct > 0 ? '+' : ''}${heatPct}%`}
-                    {def.defenseBonus > 0 ? ` · +${def.defenseBonus} def` : ''}
+            {policyPreviews.map(p => (
+              <button
+                key={p.id}
+                type="button"
+                title={p.blurb}
+                onClick={() => onSetTilePolicy?.(tile.q, tile.r, tile.s, p.id)}
+                className={cn('rounded border px-2 py-1.5 text-left text-[11px] transition-colors',
+                  p.isActive
+                    ? 'border-mafia-gold/70 bg-mafia-gold/10 text-mafia-gold'
+                    : 'border-noir-light text-muted-foreground hover:border-mafia-gold/40 hover:text-white')}
+              >
+                <span className="flex items-center justify-between gap-1">
+                  <span>{p.label}</span>
+                  {p.isActive && <span className="text-[8px] uppercase tracking-wider opacity-80">Running now</span>}
+                </span>
+                <span className="mt-0.5 block text-[9px] leading-tight opacity-90">
+                  <span className="block">
+                    ${p.income.toLocaleString()}/mo
+                    {!p.isActive && p.incomeDelta !== 0 && (
+                      <span className={p.incomeDelta > 0 ? ' text-emerald-400' : ' text-red-400'}>
+                        {' '}{p.incomeDelta > 0 ? '+' : '-'}${Math.abs(p.incomeDelta).toLocaleString()}
+                      </span>
+                    )}
                   </span>
-                </button>
-              );
-            })}
+                  <span className="block">{p.heatText}</span>
+                  <span className="block">{p.crewText}</span>
+                  {p.defenseText && <span className="block text-emerald-400">{p.defenseText}</span>}
+                </span>
+              </button>
+            ))}
           </div>
-          <p className="text-[10px] leading-snug text-muted-foreground">{policyDef.blurb}</p>
+          <p className="text-[10px] leading-snug text-muted-foreground">{runningSentence}</p>
+
 
           <div className="flex items-center justify-between text-[10px] text-muted-foreground">
             <span>Garrison share</span>

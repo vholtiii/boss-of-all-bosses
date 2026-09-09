@@ -1289,6 +1289,29 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
                             </text>
                           </>
                         )}
+                        {/* Standing order badge — only when the block runs something other than Earn */}
+                        {isPlayerTerritory && tile.policy && tile.policy !== 'earn' && (() => {
+                          const p = tile.policy as 'muscle' | 'lay_low' | 'fortify';
+                          const icon = p === 'muscle' ? '👥' : p === 'lay_low' ? '🤫' : '🛡️';
+                          const label = p === 'muscle' ? 'Standing order: Muscle Up' : p === 'lay_low' ? 'Standing order: Lay Low' : 'Standing order: Fortify Up';
+                          return (
+                            <g className="pointer-events-none">
+                              <title>{label}</title>
+                              {p === 'lay_low' && (
+                                <polygon
+                                  points={getHexPoints(x, y, baseHexRadius * 0.9)}
+                                  fill="#0B0B0F"
+                                  fillOpacity={0.28}
+                                  stroke="none"
+                                />
+                              )}
+                              <circle cx={x + baseHexRadius * 0.55} cy={y + baseHexRadius * 0.52} r={7} fill="#12121A" fillOpacity={0.85} stroke="#FBBF24" strokeWidth={0.8} />
+                              <text x={x + baseHexRadius * 0.55} y={y + baseHexRadius * 0.52 + 3} textAnchor="middle" fontSize="8" className="select-none">
+                                {icon}
+                              </text>
+                            </g>
+                          );
+                        })()}
                         {/* Seizure penalty badge — rival holds a former player-built business */}
                         {tile.anchor?.seizurePenaltyTurns && tile.anchor.seizurePenaltyTurns > 0 && !isPlayerTerritory && (
                           <text x={x - baseHexRadius * 0.55} y={y - baseHexRadius * 0.45} textAnchor="middle" fontSize="8" className="pointer-events-none select-none">

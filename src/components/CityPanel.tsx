@@ -26,6 +26,7 @@ import {
   type TilePolicy,
   type DistrictUpgradeId,
 } from '@/types/game-mechanics';
+import { buildPolicyPreviews, runningOrderSentence } from '@/lib/tile-policy-preview';
 import type { HexTile } from '@/hooks/useEnhancedMafiaGameState';
 
 interface CityPanelProps {
@@ -87,6 +88,15 @@ const CityPanel: React.FC<CityPanelProps> = ({
   const progressPct = Math.min(100, Math.round((progress / RECRUIT_PROGRESS_GOAL) * 100));
   const perMonth = totals.infra * RECRUIT_PROGRESS_PER_INFRA * (policyDef.growthMult ?? 1);
   const etaMonths = perMonth > 0 ? Math.ceil((RECRUIT_PROGRESS_GOAL - progress) / perMonth) : null;
+
+  const previewInputs = {
+    grossIncome: totals.income + anchorTribute,
+    share,
+    infra: totals.infra,
+    recruitProgress: progress,
+  };
+  const policyPreviews = buildPolicyPreviews(previewInputs, policy);
+  const runningSentence = runningOrderSentence(previewInputs, policy);
 
   const ownedUpgrades: string[] = gameState?.districtUpgrades || [];
   const hexes = gameState?.hexMap || [];
@@ -155,44 +165,39 @@ const CityPanel: React.FC<CityPanelProps> = ({
         {/* Standing order */}
         <Section title="Standing Order" icon={<ShieldCheck className="h-3 w-3" />}>
           <div className="grid grid-cols-2 gap-1.5">
-            {POLICY_ORDER.map(id => {
-              const def = TILE_POLICIES[id];
-              const active = policy === id;
-              const gross = totals.income + anchorTribute;
-              const inc = Math.floor(gross * share * def.incomeMult);
-              const growth = totals.infra * RECRUIT_PROGRESS_PER_INFRA * (def.growthMult ?? 1);
-              const eta = growth > 0
-                ? Math.max(1, Math.ceil((RECRUIT_PROGRESS_GOAL - (tile.recruitProgress || 0)) / growth))
-                : null;
-              const heatPct = Math.round((def.heatMult - 1) * 100);
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => onSetTilePolicy?.(tile.q, tile.r, tile.s, id)}
-                  className={cn('rounded border px-2 py-2 text-left transition-colors',
-                    active
-                      ? 'border-mafia-gold/70 bg-mafia-gold/10 text-mafia-gold'
-                      : 'border-noir-light text-muted-foreground hover:border-mafia-gold/40 hover:text-white')}
-                >
-                  <span className="block text-[11px] font-semibold">{def.label}</span>
-                  <span className="mt-1 block space-y-0.5 text-[9px] leading-tight">
-                    <span className="block">${inc.toLocaleString()}/mo</span>
-                    <span className="block">
-                      heat {heatPct === 0 ? 'normal' : `${heatPct > 0 ? '+' : ''}${heatPct}%`}
-                    </span>
-                    <span className="block">
-                      {totals.infra > 0 ? (eta ? `crew ~${eta} mo` : 'no crew growth') : 'no crew growth'}
-                    </span>
-                    {def.defenseBonus > 0 && (
-                      <span className="block text-emerald-400">+{def.defenseBonus} defence</span>
+            {policyPreviews.map(p => (
+              <button
+                key={p.id}
+                type="button"
+                title={p.blurb}
+                onClick={() => onSetTilePolicy?.(tile.q, tile.r, tile.s, p.id)}
+                className={cn('rounded border px-2 py-2 text-left transition-colors',
+                  p.isActive
+                    ? 'border-mafia-gold/70 bg-mafia-gold/10 text-mafia-gold'
+                    : 'border-noir-light text-muted-foreground hover:border-mafia-gold/40 hover:text-white')}
+              >
+                <span className="flex items-center justify-between gap-1 text-[11px] font-semibold">
+                  {p.label}
+                  {p.isActive && <span className="text-[8px] font-normal uppercase tracking-wider opacity-80">Running now</span>}
+                </span>
+                <span className="mt-1 block space-y-0.5 text-[9px] leading-tight">
+                  <span className="block">
+                    ${p.income.toLocaleString()}/mo
+                    {!p.isActive && p.incomeDelta !== 0 && (
+                      <span className={p.incomeDelta > 0 ? ' text-emerald-400' : ' text-red-400'}>
+                        {' '}{p.incomeDelta > 0 ? '+' : '-'}${Math.abs(p.incomeDelta).toLocaleString()}
+                      </span>
                     )}
                   </span>
-                </button>
-              );
-            })}
+                  <span className="block">{p.heatText}</span>
+                  <span className="block">{p.crewText}</span>
+                  {p.defenseText && <span className="block text-emerald-400">{p.defenseText}</span>}
+                </span>
+              </button>
+            ))}
           </div>
-          <p className="mt-1.5 text-[9px] leading-snug text-muted-foreground">{policyDef.blurb}</p>
+          <p className="mt-1.5 text-[10px] leading-snug text-white/80">{runningSentence}</p>
+
 
         </Section>
 

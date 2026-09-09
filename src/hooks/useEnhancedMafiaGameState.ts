@@ -491,6 +491,8 @@ export interface TurnReportIncomeBreakdown {
   illegalGross: number;
   /** Recurring tribute from extorted anchor rackets; already included in legal/illegal gross. */
   racketTribute?: number;
+  /** Plain-words summary of what non-default standing orders did this month. */
+  standingOrders?: string;
   shareProfits: number;
   /** One-off shakedown payouts collected during the turn (capo auto-extort + soldier extort). */
   shakedowns?: number;
@@ -5888,6 +5890,11 @@ export const useEnhancedMafiaGameState = (
     let buildingIncome = 0;
     let buildingHeat = 0;
     let recruitsSpawned = 0;
+    const standingOrderTally: Record<'muscle' | 'lay_low' | 'fortify', { blocks: number; incomeDelta: number; heatDelta: number }> = {
+      muscle: { blocks: 0, incomeDelta: 0, heatDelta: 0 },
+      lay_low: { blocks: 0, incomeDelta: 0, heatDelta: 0 },
+      fortify: { blocks: 0, incomeDelta: 0, heatDelta: 0 },
+    };
 
     (state.hexMap || []).forEach(tile => {
       if (tile.controllingFamily !== state.playerFamily) return;
@@ -5930,7 +5937,8 @@ export const useEnhancedMafiaGameState = (
       const totals = tileBuildingTotals(tile.buildings);
       if (totals.income === 0 && totals.infra === 0) return;
 
-      const policyDef = TILE_POLICIES[(tile.policy || DEFAULT_TILE_POLICY) as TilePolicy];
+      const activePolicy = (tile.policy || DEFAULT_TILE_POLICY) as TilePolicy;
+      const policyDef = TILE_POLICIES[activePolicy];
       const capoHere = units.some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
       const soldierCount = units.filter(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
 
@@ -5939,6 +5947,16 @@ export const useEnhancedMafiaGameState = (
       if (hasSupplyRoutes) earned = Math.floor(earned * 1.1);
       buildingIncome += earned;
       buildingHeat += totals.heat * policyDef.heatMult;
+
+      // Standing-order tally for the turn report (vs. running everything on Earn)
+      if (activePolicy !== 'earn') {
+        let baseline = Math.floor(totals.income * garrisonShare(capoHere, soldierCount) * TILE_POLICIES.earn.incomeMult);
+        if (hasSupplyRoutes) baseline = Math.floor(baseline * 1.1);
+        const tally = standingOrderTally[activePolicy];
+        tally.blocks += 1;
+        tally.incomeDelta += earned - baseline;
+        tally.heatDelta += totals.heat * (policyDef.heatMult - 1);
+      }
 
       // 3) crew growth
       let growth = totals.infra * RECRUIT_PROGRESS_PER_INFRA * policyDef.growthMult;
@@ -6148,6 +6166,15 @@ export const useEnhancedMafiaGameState = (
         legalGross: grossLegalIncome,
         illegalGross: grossIllegalIncome,
         racketTribute: racketTributeIncome,
+        standingOrders: (() => {
+          const parts: string[] = [];
+          const money = (n: number) => `${n > 0 ? '+' : '-'}$${Math.abs(Math.round(n)).toLocaleString()}`;
+          const t = standingOrderTally;
+          if (t.lay_low.blocks > 0) parts.push(`${t.lay_low.blocks} block${t.lay_low.blocks === 1 ? '' : 's'} laid low (${money(t.lay_low.incomeDelta)}, heat held down)`);
+          if (t.muscle.blocks > 0) parts.push(`${t.muscle.blocks} block${t.muscle.blocks === 1 ? '' : 's'} on Muscle Up (${money(t.muscle.incomeDelta)}, crew growing faster)`);
+          if (t.fortify.blocks > 0) parts.push(`${t.fortify.blocks} block${t.fortify.blocks === 1 ? '' : 's'} fortified (${money(t.fortify.incomeDelta)}, harder to take)`);
+          return parts.length ? parts.join(' · ') : undefined;
+        })(),
         shareProfits: shareProfitsIncome,
         shakedowns: state.shakedownIncomeThisTurn || 0,
         penalties,
