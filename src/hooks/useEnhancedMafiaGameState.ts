@@ -6775,9 +6775,13 @@ export const useEnhancedMafiaGameState = (
           }
         }
       });
-      // Standing-order consequences for rivals: building heat and crew growth
+      // Standing-order consequences for rivals: building heat and crew growth.
+      // Capped per turn: uncapped, a large rival empire generated ~10 heat/turn
+      // against a 2/turn cooldown, so every AI drowned in police pressure by
+      // mid-game and permanently switched off offense (or died to RICO).
       if (aiBuildingHeat > 0) {
-        opponent.resources.heat = Math.min(100, (opponent.resources.heat || 0) + Math.round(aiBuildingHeat));
+        opponent.resources.heat = Math.min(100,
+          (opponent.resources.heat || 0) + Math.min(AI_BUILDING_HEAT_CAP, Math.round(aiBuildingHeat)));
       }
       if (aiRecruitsSpawned > 0) {
         opponent.resources.soldiers = (opponent.resources.soldiers || 0) + aiRecruitsSpawned;
