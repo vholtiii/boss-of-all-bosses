@@ -159,6 +159,8 @@ export interface ScoreHexInputs {
   isLeaderHex?: boolean;
   /** Leader's progress toward the territory-victory target (0..1). Scales the pile-on bonus. */
   leaderProgress?: number;
+  /** True when the treasury is thin (low runway) — makes upkeep-only empty land unattractive. */
+  upkeepPressure?: boolean;
 }
 
 export function scoreHexForAI(i: ScoreHexInputs): number {
@@ -173,7 +175,7 @@ export function scoreHexForAI(i: ScoreHexInputs): number {
   const expandMul = i.expandMul ?? 1;
   if (i.defenderCount === 0) add(6 * expandMul);
   else if (i.defenderCount === 1) add(1);
-  else add(-4);
+  else add(-9); // a full stack is a real fight — don't walk into it for a small bonus
   // Family identity: focus districts
   if (i.isInFocusDistrict) add(4);
   // Don't overextend
@@ -184,12 +186,15 @@ export function scoreHexForAI(i: ScoreHexInputs): number {
     const base = i.mood === 'desperate' || i.mood === 'cautious' ? 5 : 2;
     add(base * econMul);
   }
-  // Avoid fortified / safehouses without intel
-  if (i.isFortified) add(-5);
+  // Avoid fortified / safehouses without intel. Fortification compounds with defenders:
+  // a fortified 2-stack is the worst attack on the board, not a mild -5.
+  if (i.isFortified) add(-5 - i.defenderCount * 3);
   if (i.isSafehouse && !i.hasScoutIntel) add(-4);
   if (i.isSafehouse && i.hasScoutIntel) add(3); // bounty + intel target
-  // War prioritization
-  if (i.isWarTarget) add(10 * (i.warTargetMul ?? 1));
+  // Upkeep pressure: when the treasury is thin, empty land is a liability, not a prize.
+  if (i.upkeepPressure && i.hexIncome <= 0) add(-6);
+  // War prioritization — capped so a war flag can't outweigh every tactical signal.
+  if (i.isWarTarget) add(Math.min(14, 10 * (i.warTargetMul ?? 1)));
   // Supply-line targeting: cut rival supply nodes within striking distance of own HQ/safehouse.
   // Posture multiplier drives intensity (WAR 1.5, PRESSURE_LEADER 1.4, COOL_OFF 0).
   if (i.isSupplyNodeTarget) {

@@ -6440,11 +6440,15 @@ export const useEnhancedMafiaGameState = (
       const leaderIsRival = boardLeader.family !== fam;
       const boardLeaderProgress = Math.min(1, boardLeader.count / TERRITORY_TARGET_AI);
       const atWarNow = (state.activeWars || []).some(w => w.family1 === fam || w.family2 === fam);
+      // Safety valve: no strategic goal is worth a RICO takedown. Above 78 heat the
+      // override is switched off so heat precautions (bribe / lay low / cool-off) fire.
       const strategicOverride =
-        myTerritoryNow >= TERRITORY_TARGET_AI - 2 // endgame closing move
-        || (aiPhase >= 4 && (oppAny.hqAssaultReady || false))
-        || (basePersonality === 'aggressive' && isTopTerritory)
-        || (atWarNow && basePersonality === 'opportunistic');
+        aiHeat < 78 && (
+          myTerritoryNow >= TERRITORY_TARGET_AI - 2 // endgame closing move
+          || (aiPhase >= 4 && (oppAny.hqAssaultReady || false))
+          || (basePersonality === 'aggressive' && isTopTerritory)
+          || (atWarNow && basePersonality === 'opportunistic')
+        );
       oppAny.aiHeatCaution = strategicOverride ? 'override' : heatTier;
 
       // ── STRATEGIC POSTURE (single high-level choice this turn) ──
@@ -6570,14 +6574,16 @@ export const useEnhancedMafiaGameState = (
       // ── HEAT-PRECAUTION SPEND + ESCALATION ──
       // Skip when overriding (AI is willing to push toward RICO for strategic gain).
       const bribeOnCD = (oppAny.bribeCooldownUntil || 0) > state.turn;
-      if (!strategicOverride && !bribeOnCD) {
-        let spendChance = heatTier === 'critical' || heatTier === 'rico' ? 0.95
-          : heatTier === 'hot' ? Math.min(0.95, 0.55 * personalityMult)
-          : heatTier === 'warm' ? Math.min(0.95, 0.30 * personalityMult)
+      if ((!strategicOverride || heatTier === 'rico' || heatTier === 'critical') && !bribeOnCD) {
+        let spendChance = heatTier === 'critical' || heatTier === 'rico' ? 1
+          : heatTier === 'hot' ? Math.min(0.95, 0.85 * personalityMult)
+          : heatTier === 'warm' ? Math.min(0.95, 0.45 * personalityMult)
           : 0;
         // Posture override: COOL_OFF forces an aggressive bribe even at low heat.
-        if (policy.forceBribe && aiHeat >= 30) spendChance = Math.max(spendChance, 0.9);
-        const heatDrop = heatTier === 'rico' || heatTier === 'critical' ? 18 : heatTier === 'hot' ? 15 : 12;
+        if (policy.forceBribe && aiHeat >= 30) spendChance = Math.max(spendChance, 0.95);
+        // Bigger drops: heat climbs ~10-20/turn from a normal action slate, so a 12-18
+        // point bribe could never out-run it and families died to RICO around turn 30.
+        const heatDrop = heatTier === 'rico' || heatTier === 'critical' ? 32 : heatTier === 'hot' ? 24 : 16;
         // Parity tuning: warm/hot get a 1-turn cooldown (player can also bribe ~every turn via tactical step).
         // Critical/rico keep the 2-turn cooldown to prevent runaway free spend.
         const cdTurns = (heatTier === 'warm' || heatTier === 'hot') ? 1 : 2;
@@ -6786,6 +6792,35 @@ export const useEnhancedMafiaGameState = (
       opponent.resources.money = Math.max(0, opponent.resources.money + aiNetIncome);
       opponent.resources.lastTurnIncome = aiNetIncome; // Track for phase calculation
 
+      // ── CREW TRIMMING: a broke family lets soldiers go instead of bleeding out ──
+      // Without this, rivals kept an unaffordable crew, sat at $0 forever, and could
+      // never afford the bribes that keep them out of a RICO takedown.
+      if (aiNetIncome < 0 && opponent.resources.money < aiSoldierMaintenance) {
+        const affordableCrew = Math.max(3, Math.floor((aiIncome * 0.7) / SOLDIER_MAINTENANCE));
+        let toRelease = Math.max(0, aiDeployedSoldiers + opponent.resources.soldiers - affordableCrew);
+        // Reserve pool first (cheapest to cut, no board impact)
+        const fromReserve = Math.min(toRelease, opponent.resources.soldiers);
+        opponent.resources.soldiers -= fromReserve;
+        toRelease -= fromReserve;
+        if (toRelease > 0) {
+          // Then deployed soldiers furthest from HQ (least useful defensively)
+          const cutList = state.deployedUnits
+            .filter(u => u.family === fam && u.type === 'soldier')
+            .sort((a, b) => hexDistance(b, hq) - hexDistance(a, hq))
+            .slice(0, toRelease)
+            .map(u => u.id);
+          if (cutList.length > 0) {
+            const cutSet = new Set(cutList);
+            state.deployedUnits = state.deployedUnits.filter(u => !cutSet.has(u.id));
+          }
+          toRelease -= cutList.length;
+        }
+        const released = fromReserve + (aiDeployedSoldiers + opponent.resources.soldiers >= 0 ? 0 : 0);
+        if (turnReport && (released > 0 || fromReserve > 0)) {
+          turnReport.aiActions.push({ family: fam, action: 'crew_trim', detail: `Cut crew to stay solvent` });
+        }
+      }
+
       // ── SUPPLY ROYALTY DIVERSION ──
       // For each active supply pact where this AI is the buyer and the player
       // is the supplier, divert royaltyRate * supply-dependent income to the
@@ -6837,7 +6872,10 @@ export const useEnhancedMafiaGameState = (
       const alertBonus = isAlerted ? 1 : 0;
       const capScale = state.mapSize === 'small' ? -2 : state.mapSize === 'large' ? 4 : 0;
       const baseCap = Math.min(Math.max(8, 3 + Math.floor(state.turn / 2)), 18);
-      const soldierCap = baseCap + alertBonus + diffMods.aiRecruitCapBonus + capScale + atWarBonus;
+      const rawSoldierCap = baseCap + alertBonus + diffMods.aiRecruitCapBonus + capScale + atWarBonus;
+      // Affordability cap: never field a crew whose upkeep eats more than ~60% of gross income.
+      const sustainableCrew = Math.max(4, Math.floor((aiIncome * 0.6) / SOLDIER_MAINTENANCE));
+      const soldierCap = Math.min(rawSoldierCap, sustainableCrew);
       const currentDeployed = state.deployedUnits.filter(u => u.family === fam && u.type === 'soldier').length;
       const totalSoldiers = opponent.resources.soldiers + currentDeployed;
       const wantToRecruit = Math.max(0, soldierCap - totalSoldiers);
@@ -6849,7 +6887,15 @@ export const useEnhancedMafiaGameState = (
       if (wantToRecruit > 0) {
         // District control bonus: Bronx $750 recruit discount for AI
         const aiRecruitCost = hasFamilyDistrictBonus(state, fam, 'recruit_discount') ? Math.max(100, SOLDIER_COST - 750) : SOLDIER_COST;
-        const canAfford = Math.floor(opponent.resources.money / aiRecruitCost);
+        // Keep a war chest for heat precautions once police pressure is real — an AI that
+        // spends its last dollar on soldiers can't bribe and dies to RICO. Also keep a
+        // couple of turns of soldier upkeep in the bank so recruiting can't bankrupt it.
+        const bribeReserve = (opponent.resources.heat || 0) >= 40
+          ? Math.floor(10000 * (state.difficultyModifiers?.eventCostMult ?? 1))
+          : 0;
+        const upkeepReserve = Math.floor(upkeepForRunway * 2);
+        const spendableCash = Math.max(0, opponent.resources.money - bribeReserve - upkeepReserve);
+        const canAfford = Math.floor(spendableCash / aiRecruitCost);
         // Personality-driven recruitment batch size
         const personalityRecruitBonus = (opponent.personality === 'aggressive') ? 1
           : (opponent.personality === 'defensive' || opponent.personality === 'diplomatic') ? -1
@@ -7221,6 +7267,7 @@ export const useEnhancedMafiaGameState = (
               isVulnerableRivalHex: isVulnerable,
               isLeaderHex: leaderIsRival && tile?.controllingFamily === boardLeader.family,
               leaderProgress: boardLeaderProgress,
+              upkeepPressure: moneyRunway < 5,
             });
           });
           const pickIdx = softmaxPick(scores, turnRng, 4, difficultySoftmaxTemperature(state.difficulty || 'normal'));
