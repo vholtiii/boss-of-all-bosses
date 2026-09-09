@@ -1181,19 +1181,28 @@ const placeAnchorRackets = (
     !t.isHeadquarters && !t.supplyNode && !t.anchor &&
     !hqPositions.some(hq => hexDistance(hq, t) <= ANCHOR_HQ_EXCLUSION);
 
-  const eligible = (t: HexTile, spacing = ANCHOR_MIN_SPACING) =>
+  const eligible = (t: HexTile, spacing = minSpacing) =>
     baseEligible(t) && !placed.some(p => hexDistance(p, t) < spacing);
+
+  /** Distance to the nearest anchor already on the board (Infinity for the first one). */
+  const spread = (t: HexTile) =>
+    placed.length ? Math.min(...placed.map(p => hexDistance(p, t))) : Infinity;
 
   for (let i = 0; i < target; i++) {
     const arch = ANCHOR_ARCHETYPES[i % ANCHOR_ARCHETYPES.length];
     let pool = tiles.filter(t => eligible(t) && arch.districts.includes(t.district as any));
     if (!pool.length) pool = tiles.filter(t => eligible(t));
     // Relax spacing progressively rather than dropping an anchor entirely.
-    for (let sp = ANCHOR_MIN_SPACING - 1; !pool.length && sp >= 2; sp--) {
+    for (let sp = minSpacing - 1; !pool.length && sp >= 2; sp--) {
       pool = tiles.filter(t => eligible(t, sp));
     }
     if (!pool.length) break;
-    const tile = pool[Math.floor(rng() * pool.length)];
+    // Farthest-point bias: among the legal spots, keep only the most isolated
+    // quarter, then pick randomly inside it. Still seed-random every map, but
+    // anchors can no longer bunch up in one corner of the board.
+    const ranked = [...pool].sort((a, b) => spread(b) - spread(a));
+    const shortlist = ranked.slice(0, Math.max(1, Math.ceil(ranked.length * 0.25)));
+    const tile = shortlist[Math.floor(rng() * shortlist.length)];
     const names = arch.names.filter(n => !usedNames.has(n));
     const name = (names.length ? names : arch.names)[Math.floor(rng() * Math.max(1, names.length))] || arch.names[0];
     usedNames.add(name);
