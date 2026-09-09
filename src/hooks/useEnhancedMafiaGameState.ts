@@ -491,6 +491,8 @@ export interface TurnReportIncomeBreakdown {
   illegalGross: number;
   /** Recurring tribute from extorted anchor rackets; already included in legal/illegal gross. */
   racketTribute?: number;
+  /** Plain-words summary of what non-default standing orders did this month. */
+  standingOrders?: string;
   shareProfits: number;
   /** One-off shakedown payouts collected during the turn (capo auto-extort + soldier extort). */
   shakedowns?: number;
@@ -6164,6 +6166,15 @@ export const useEnhancedMafiaGameState = (
         legalGross: grossLegalIncome,
         illegalGross: grossIllegalIncome,
         racketTribute: racketTributeIncome,
+        standingOrders: (() => {
+          const parts: string[] = [];
+          const money = (n: number) => `${n > 0 ? '+' : '-'}$${Math.abs(Math.round(n)).toLocaleString()}`;
+          const t = standingOrderTally;
+          if (t.lay_low.blocks > 0) parts.push(`${t.lay_low.blocks} block${t.lay_low.blocks === 1 ? '' : 's'} laid low (${money(t.lay_low.incomeDelta)}, heat held down)`);
+          if (t.muscle.blocks > 0) parts.push(`${t.muscle.blocks} block${t.muscle.blocks === 1 ? '' : 's'} on Muscle Up (${money(t.muscle.incomeDelta)}, crew growing faster)`);
+          if (t.fortify.blocks > 0) parts.push(`${t.fortify.blocks} block${t.fortify.blocks === 1 ? '' : 's'} fortified (${money(t.fortify.incomeDelta)}, harder to take)`);
+          return parts.length ? parts.join(' · ') : undefined;
+        })(),
         shareProfits: shareProfitsIncome,
         shakedowns: state.shakedownIncomeThisTurn || 0,
         penalties,
