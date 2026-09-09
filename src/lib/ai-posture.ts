@@ -140,12 +140,15 @@ export function posturePolicy(p: AIPosture): PosturePolicy {
         offensiveHitMul: 0.1,
       };
     case 'CONSOLIDATE':
+      // Cash crisis no longer means paralysis: grabbing cheap neutral ground and
+      // shaking down rackets is how a broke family earns its way out. Expensive
+      // offense (hits, contracts) stays throttled.
       return {
-        heatCeiling: 40, suppressOffense: true, suppressExpansion: true,
+        heatCeiling: 40, suppressOffense: false, suppressExpansion: false,
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: true, refuseNewWars: true,
         warTargetMul: 0, economyFocusMul: 2.0, supplyNodeMul: 0,
-        offensiveHitMul: 0.2,
+        offensiveHitMul: 0.35,
       };
     case 'TURTLE':
       return {
