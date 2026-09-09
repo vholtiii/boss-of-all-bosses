@@ -158,6 +158,11 @@ import {
   supplyHexKey,
 } from '@/lib/supply-flow';
 
+/** Max heat a rival's buildings can add in a single turn (see AI heat lifecycle). */
+const AI_BUILDING_HEAT_CAP = 5;
+/** Turns a rival must wait before proposing another sitdown to the player. */
+const AI_SITDOWN_COOLDOWN = 8;
+
 // ============ SEEDED PRNG (Mulberry32) ============
 function mulberry32(seed: number): () => number {
   return function() {
