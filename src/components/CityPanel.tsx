@@ -26,6 +26,7 @@ import {
   type TilePolicy,
   type DistrictUpgradeId,
 } from '@/types/game-mechanics';
+import { buildPolicyPreviews, runningOrderSentence } from '@/lib/tile-policy-preview';
 import type { HexTile } from '@/hooks/useEnhancedMafiaGameState';
 
 interface CityPanelProps {
@@ -87,6 +88,15 @@ const CityPanel: React.FC<CityPanelProps> = ({
   const progressPct = Math.min(100, Math.round((progress / RECRUIT_PROGRESS_GOAL) * 100));
   const perMonth = totals.infra * RECRUIT_PROGRESS_PER_INFRA * (policyDef.growthMult ?? 1);
   const etaMonths = perMonth > 0 ? Math.ceil((RECRUIT_PROGRESS_GOAL - progress) / perMonth) : null;
+
+  const previewInputs = {
+    grossIncome: totals.income + anchorTribute,
+    share,
+    infra: totals.infra,
+    recruitProgress: progress,
+  };
+  const policyPreviews = buildPolicyPreviews(previewInputs, policy);
+  const runningSentence = runningOrderSentence(previewInputs, policy);
 
   const ownedUpgrades: string[] = gameState?.districtUpgrades || [];
   const hexes = gameState?.hexMap || [];
