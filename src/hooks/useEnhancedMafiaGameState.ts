@@ -9006,7 +9006,7 @@ export const useEnhancedMafiaGameState = (
         // Pressure-release: the hotter a family runs, the harder its fixers work.
         // Flat 2/turn decay could never claw back a mid-game empire's heat.
         const heatBefore = opponent.resources.heat || 0;
-        const aiDecay = (standingDown ? baseDecay + 6 : baseDecay) + Math.floor(heatBefore / 25);
+        const aiDecay = (standingDown ? baseDecay + 6 : baseDecay) + Math.floor(heatBefore / 15);
         opponent.resources.heat = Math.max(0, (opponent.resources.heat || 0) - aiDecay);
 
         const heatNow = opponent.resources.heat || 0;
