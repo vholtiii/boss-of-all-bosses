@@ -5930,7 +5930,8 @@ export const useEnhancedMafiaGameState = (
       const totals = tileBuildingTotals(tile.buildings);
       if (totals.income === 0 && totals.infra === 0) return;
 
-      const policyDef = TILE_POLICIES[(tile.policy || DEFAULT_TILE_POLICY) as TilePolicy];
+      const activePolicy = (tile.policy || DEFAULT_TILE_POLICY) as TilePolicy;
+      const policyDef = TILE_POLICIES[activePolicy];
       const capoHere = units.some(u => u.family === state.playerFamily && u.type === 'capo' && u.q === tile.q && u.r === tile.r && u.s === tile.s);
       const soldierCount = units.filter(u => u.family === state.playerFamily && u.type === 'soldier' && u.q === tile.q && u.r === tile.r && u.s === tile.s).length;
 
@@ -5939,6 +5940,16 @@ export const useEnhancedMafiaGameState = (
       if (hasSupplyRoutes) earned = Math.floor(earned * 1.1);
       buildingIncome += earned;
       buildingHeat += totals.heat * policyDef.heatMult;
+
+      // Standing-order tally for the turn report (vs. running everything on Earn)
+      if (activePolicy !== 'earn') {
+        let baseline = Math.floor(totals.income * garrisonShare(capoHere, soldierCount) * TILE_POLICIES.earn.incomeMult);
+        if (hasSupplyRoutes) baseline = Math.floor(baseline * 1.1);
+        const tally = standingOrderTally[activePolicy];
+        tally.blocks += 1;
+        tally.incomeDelta += earned - baseline;
+        tally.heatDelta += totals.heat * (policyDef.heatMult - 1);
+      }
 
       // 3) crew growth
       let growth = totals.infra * RECRUIT_PROGRESS_PER_INFRA * policyDef.growthMult;
