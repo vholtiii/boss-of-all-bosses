@@ -211,15 +211,30 @@ const CityPanel: React.FC<CityPanelProps> = ({
                   ${anchor.tribute.toLocaleString()}/mo
                 </span>
               </div>
+              {(() => {
+                const ownedIncome = BUILDING_DEFS[anchor.type].tiers[Math.min(2, buildingMaxTier(anchor.type)) as BuildingTier]?.income ?? anchor.tribute;
+                const ownedMonthly = Math.floor(ownedIncome * share * policyDef.incomeMult);
+                const tributeMonthly = anchor.isExtorted ? Math.floor(anchor.tribute * share * policyDef.incomeMult) : 0;
+                const delta = ownedMonthly - tributeMonthly;
+                const payback = delta > 0 ? Math.ceil(buyoutCost / delta) : null;
+                return (
+              <>
               <ol className="mt-2 space-y-1 text-[10px]">
                 <li className={anchor.isExtorted ? 'text-emerald-300' : 'text-white'}>
                   {anchor.isExtorted ? '✓' : '1.'} Shake it down — collects ${anchor.tribute.toLocaleString()}/mo tribute
                 </li>
                 <li className={anchor.isExtorted ? 'text-white' : 'text-muted-foreground'}>
-                  2. Buy it out — ${buyoutCost.toLocaleString()}, makes the place yours (Tier 1)
+                  2. Buy it out — ${buyoutCost.toLocaleString()}, makes the place yours (Tier 2)
                 </li>
-                <li className="text-muted-foreground">3. Build &amp; upgrade it T1 → T3 like any block you own</li>
+                <li className="text-muted-foreground">3. Build &amp; upgrade it T2 → T3 like any block you own</li>
               </ol>
+              <p className="mt-2 rounded border border-emerald-500/30 bg-emerald-900/20 px-2 py-1.5 text-[10px] leading-snug text-emerald-200">
+                Your take: {anchor.isExtorted ? `$${tributeMonthly.toLocaleString()}/mo tribute` : 'nothing yet'} →{' '}
+                <span className="font-semibold">${ownedMonthly.toLocaleString()}/mo owned</span>
+                {anchor.isExtorted && delta > 0 && (
+                  <> · <span className="text-emerald-300">+${delta.toLocaleString()}/mo</span>{payback !== null && ` · pays for itself in ~${payback} month${payback === 1 ? '' : 's'}`}</>
+                )}
+              </p>
               {anchor.isExtorted ? (
                 <>
                   <button
