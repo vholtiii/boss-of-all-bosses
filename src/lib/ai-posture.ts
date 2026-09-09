@@ -39,6 +39,8 @@ export interface PostureInputs {
   /** Player's respect at this moment (0-100). Optional for back-compat. */
   myRespect?: number;
   rivalRespect?: number[];
+  /** How many consecutive turns this family has already been in CONSOLIDATE. */
+  consolidateStreak?: number;
 }
 
 export interface PosturePolicy {
