@@ -71,10 +71,15 @@ export interface PosturePolicy {
 }
 
 export function computeAIPosture(i: PostureInputs): AIPosture {
-  // 1. Heat emergency wins outright unless strategic override (CLOSE_OUT-style push)
-  if (!i.strategicOverride && (i.heatTier === 'rico' || i.heatTier === 'critical')) {
-    return 'COOL_OFF';
-  }
+  // 1. Heat emergency.
+  //    RICO tier is a hard stop — no strategic override may push through it, because
+  //    3 consecutive turns at critical heat deletes the family outright.
+  if (i.heatTier === 'rico') return 'COOL_OFF';
+  if (!i.strategicOverride && i.heatTier === 'critical') return 'COOL_OFF';
+  // 1b. Proactive cool-off: react at 'hot' (60+) instead of waiting for 80+.
+  //     Heat climbs far faster than the 2/turn decay, so waiting for critical means
+  //     the AI can never recover before the RICO timer fires. Wars still push on.
+  if (!i.strategicOverride && i.heatTier === 'hot' && !i.atWar) return 'COOL_OFF';
 
   // 2. Cash runway crisis — bankruptcy is more dangerous than rivals.
   // Full crisis at <2.5. Also treat 2.5-3.2 as CONSOLIDATE when heat is warm+
@@ -146,7 +151,7 @@ export function posturePolicy(p: AIPosture): PosturePolicy {
       };
     case 'WAR':
       return {
-        heatCeiling: 80, suppressOffense: false, suppressExpansion: true,
+        heatCeiling: 70, suppressOffense: false, suppressExpansion: true,
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: false, refuseNewWars: false,
         warTargetMul: 2.0, economyFocusMul: 0.5, supplyNodeMul: 1.5,
@@ -154,7 +159,7 @@ export function posturePolicy(p: AIPosture): PosturePolicy {
       };
     case 'CLOSE_OUT':
       return {
-        heatCeiling: 85, suppressOffense: false, suppressExpansion: false,
+        heatCeiling: 78, suppressOffense: false, suppressExpansion: false,
         forceBribe: false, preferLayLow: false, preferMattresses: false,
         acceptSitdownsForCash: false, refuseNewWars: true,
         warTargetMul: 1.0, economyFocusMul: 0.8, supplyNodeMul: 1.3,
