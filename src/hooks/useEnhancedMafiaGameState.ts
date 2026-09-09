@@ -6443,7 +6443,7 @@ export const useEnhancedMafiaGameState = (
       // Safety valve: no strategic goal is worth a RICO takedown. Above 78 heat the
       // override is switched off so heat precautions (bribe / lay low / cool-off) fire.
       const strategicOverride =
-        aiHeat < 78 && (
+        aiHeat < 62 && (
           myTerritoryNow >= TERRITORY_TARGET_AI - 2 // endgame closing move
           || (aiPhase >= 4 && (oppAny.hqAssaultReady || false))
           || (basePersonality === 'aggressive' && isTopTerritory)
@@ -6620,7 +6620,8 @@ export const useEnhancedMafiaGameState = (
       // Posture-driven offense suppression: prevents the "always in heat trouble" loop
       // by stopping new offense once heat crosses the posture's ceiling.
       const postureBlocksOffense = !strategicOverride && (policy.suppressOffense || aiHeat >= policy.heatCeiling);
-      const aiOffenseDisabled = isAILayingLow(opponent, state.turn) || isAIAtMattresses(opponent, state.turn) || aiHeatRicoFreeze || postureBlocksOffense;
+      // Hard heat brake: above 75 nothing new gets started, override or not.
+      const aiOffenseDisabled = isAILayingLow(opponent, state.turn) || isAIAtMattresses(opponent, state.turn) || aiHeatRicoFreeze || postureBlocksOffense || aiHeat >= 75;
 
       // ── DIFFICULTY-SCALED OFFENSIVE AGGRESSION ──
       // Single source of truth for "how aggressive should new AI offensive trees feel?"
