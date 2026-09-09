@@ -6815,8 +6815,7 @@ export const useEnhancedMafiaGameState = (
           }
           toRelease -= cutList.length;
         }
-        const released = fromReserve + (aiDeployedSoldiers + opponent.resources.soldiers >= 0 ? 0 : 0);
-        if (turnReport && (released > 0 || fromReserve > 0)) {
+        if (turnReport) {
           turnReport.aiActions.push({ family: fam, action: 'crew_trim', detail: `Cut crew to stay solvent` });
         }
       }
