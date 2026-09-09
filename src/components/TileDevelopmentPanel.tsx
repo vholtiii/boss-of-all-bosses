@@ -145,17 +145,25 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
 
       {tab === 'orders' && (
         <div className="space-y-1.5">
+          {tile.anchor && (
+            <p className="rounded border border-noir-light bg-noir-dark/60 px-2 py-1.5 text-[10px] text-muted-foreground">
+              🔒 {tile.anchor.name} still runs this block. Buy the racket out before giving standing orders.
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-1">
             {policyPreviews.map(p => (
               <button
                 key={p.id}
                 type="button"
-                title={p.blurb}
+                title={tile.anchor ? 'Buy out the racket first' : p.blurb}
+                disabled={!!tile.anchor}
                 onClick={() => onSetTilePolicy?.(tile.q, tile.r, tile.s, p.id)}
                 className={cn('rounded border px-2 py-1.5 text-left text-[11px] transition-colors',
-                  p.isActive
-                    ? 'border-mafia-gold/70 bg-mafia-gold/10 text-mafia-gold'
-                    : 'border-noir-light text-muted-foreground hover:border-mafia-gold/40 hover:text-white')}
+                  tile.anchor
+                    ? 'cursor-not-allowed border-noir-light/60 opacity-50'
+                    : p.isActive
+                      ? 'border-mafia-gold/70 bg-mafia-gold/10 text-mafia-gold'
+                      : 'border-noir-light text-muted-foreground hover:border-mafia-gold/40 hover:text-white')}
               >
                 <span className="flex items-center justify-between gap-1">
                   <span>{p.label}</span>
