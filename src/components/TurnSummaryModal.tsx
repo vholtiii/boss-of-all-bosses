@@ -216,6 +216,9 @@ const TurnSummaryModal: React.FC<TurnSummaryModalProps> = ({ report, open, onClo
                     {(ib.racketTribute ?? 0) > 0 && (
                       <div className="flex justify-between pl-2 text-[11px]"><span className="text-muted-foreground">↳ Racket tribute (included above)</span><span className="font-mono text-green-400">+${(ib.racketTribute ?? 0).toLocaleString()}</span></div>
                     )}
+                    {ib.standingOrders && (
+                      <div className="pl-2 text-[11px] text-amber-300/80">Standing orders: {ib.standingOrders}</div>
+                    )}
                     {ib.shareProfits > 0 && (
                       <div className="flex justify-between"><span className="text-muted-foreground">Share-profits pacts</span><span className="font-mono text-green-400">+${ib.shareProfits.toLocaleString()}</span></div>
                     )}
