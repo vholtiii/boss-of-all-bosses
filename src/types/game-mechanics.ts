@@ -1388,58 +1388,64 @@ export interface AnchorArchetype {
   blurb: string;
 }
 
+// Tribute is deliberately ~45–55% of the type's Tier 2 income: extorting means
+// taking a cut of someone else's place. Buying it out (which converts it to a
+// Tier 2 building) roughly doubles the monthly take, on top of crew growth,
+// laundering, cover, and the Tier 3 upgrade path.
 export const ANCHOR_ARCHETYPES: AnchorArchetype[] = [
   {
     type: 'gambling_den',
-    names: ['The Bowery Card Room', 'The Vesuvio Club', 'The Copper Rail Casino', 'The Nightingale Room'],
-    tribute: 2600, heatLevel: 5, launderingCapacity: 30,
+    names: ['The Bowery Card Room', 'The Vesuvio Club', 'The Copper Rail Casino', 'The Nightingale Room', 'The Dove & Dice', 'Sala Fortuna'],
+    tribute: 1400, heatLevel: 5, launderingCapacity: 30,
     districts: ['Manhattan', 'Little Italy', 'Brooklyn'],
     blurb: 'A running game with real money on the table every night.',
   },
   {
     type: 'loan_sharking',
-    names: ['Delancey Finance', 'The Garment Row Desk', 'Anselmi & Sons Loans', 'The Kingsbridge Vig'],
-    tribute: 2300, heatLevel: 3, launderingCapacity: 20,
+    names: ['Delancey Finance', 'The Garment Row Desk', 'Anselmi & Sons Loans', 'The Kingsbridge Vig', 'Mott Street Credit', 'The Usher Desk'],
+    tribute: 1000, heatLevel: 3, launderingCapacity: 20,
     districts: ['Manhattan', 'Brooklyn', 'Bronx'],
     blurb: 'Half the block already owes them. You just collect the collector.',
   },
   {
     type: 'brothel',
-    names: ['The Mulberry Parlor', 'The Grand Concourse House', 'The Rosewood Rooms', 'The Astoria Parlor'],
-    tribute: 2100, heatLevel: 6, launderingCapacity: 10,
+    names: ['The Mulberry Parlor', 'The Grand Concourse House', 'The Rosewood Rooms', 'The Astoria Parlor', 'The Velvet Lamp', 'Casa Miramare'],
+    tribute: 1200, heatLevel: 6, launderingCapacity: 10,
     districts: ['Little Italy', 'Bronx', 'Queens'],
     blurb: 'Loud money, loud trouble. The vice squad knows the address.',
   },
   {
     type: 'store_front',
-    names: ['The Fulton Fish Market', 'Red Hook Import Co.', 'The Arthur Avenue Market', 'Richmond Freight & Storage'],
-    tribute: 1800, heatLevel: 1, launderingCapacity: 50,
+    names: ['The Fulton Fish Market', 'Red Hook Import Co.', 'The Arthur Avenue Market', 'Richmond Freight & Storage', 'Corona Cold Storage', 'Gowanus Trading Post'],
+    tribute: 800, heatLevel: 1, launderingCapacity: 50,
     districts: ['Brooklyn', 'Queens', 'Staten Island'],
     blurb: 'Clean paper, steady cut, and a truck bay nobody looks in.',
   },
 ];
 
-/** How many anchors get placed, by map size. Deliberately scarce — the map is
- *  meant to be built up from bare ground, not inherited. */
+/** How many anchors get placed, by map size. Enough to fight over in the opening,
+ *  while the rest of the map is still built up from bare ground. */
 export const ANCHOR_COUNT_BY_MAP_SIZE: Record<string, number> = {
-  small: 3,
-  medium: 4,
-  large: 5,
+  small: 6,
+  medium: 8,
+  large: 10,
 };
 
-/** Buy-out price = tribute x this multiplier. */
-export const ANCHOR_BUYOUT_MULTIPLIER = 6;
+/** Buy-out price = tribute x this multiplier. Tuned so the price sits a little
+ *  above what building the same place to Tier 2 yourself would cost, and the
+ *  income jump pays it back rather than never. */
+export const ANCHOR_BUYOUT_MULTIPLIER = 13;
 
-/** Minimum hex distance between two anchors, by map size. Anchors are scarce, so
- *  they should read as separate opportunities across the board, never a cluster. */
+/** Minimum hex distance between two anchors, by map size. Tight enough to fit
+ *  twice as many rackets while still reading as separate opportunities. */
 export const ANCHOR_MIN_SPACING_BY_MAP_SIZE: Record<string, number> = {
-  small: 6,
-  medium: 9,
-  large: 12,
+  small: 4,
+  medium: 6,
+  large: 8,
 };
 
 /** Fallback minimum hex distance between two anchors. */
-export const ANCHOR_MIN_SPACING = 9;
+export const ANCHOR_MIN_SPACING = 6;
 
 
 /** No anchor may spawn within this many hexes of any family HQ. */

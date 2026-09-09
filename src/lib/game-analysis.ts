@@ -422,7 +422,7 @@ export function analyzeMissedOpportunities(state: EnhancedMafiaGameState): Analy
       severity: 'note',
       turn,
       title: `You can buy out ${h.anchor!.name}`,
-      causes: [`${money(h.anchor!.buyoutCost)} converts it to a Tier 1 ${BUILDING_DEFS[h.anchor!.type].label} you can develop.`],
+      causes: [`${money(h.anchor!.buyoutCost)} converts it to a Tier 2 ${BUILDING_DEFS[h.anchor!.type].label} you can develop — roughly double the tribute, plus crew growth and cover.`],
       advice: 'Own it outright — extortion tribute is capped, developed rackets are not.',
       hexRef: { q: h.q, r: h.r, s: h.s },
     });
