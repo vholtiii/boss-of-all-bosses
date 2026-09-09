@@ -28,7 +28,7 @@ import {
   RECRUIT_PROGRESS_GOAL, RECRUIT_PROGRESS_PER_INFRA, DISTRICT_UPGRADES,
   TURF_TAX_PER_HEX, EMPTY_BLOCK_OVERHEAD, garrisonShare, tileBuildingTotals,
   BUILD_RANK_REQUIREMENT, buildProgressRate, buildEtaTurns,
-  AnchorRacket, ANCHOR_ARCHETYPES, ANCHOR_COUNT_BY_MAP_SIZE, ANCHOR_MIN_SPACING, ANCHOR_HQ_EXCLUSION,
+  AnchorRacket, ANCHOR_ARCHETYPES, ANCHOR_COUNT_BY_MAP_SIZE, ANCHOR_MIN_SPACING, ANCHOR_MIN_SPACING_BY_MAP_SIZE, ANCHOR_HQ_EXCLUSION,
   ANCHOR_EXTORT_RESPECT, ANCHOR_BUYOUT_INFLUENCE, anchorBuyoutCost, tileHasBuildings, tileEarnPotential,
 
   FORTIFY_DEFENSE_BONUS, FORTIFY_CASUALTY_REDUCTION, FORTIFY_ABANDON_TURNS, MAX_FORTIFICATIONS, FortifiedHex, SCOUT_DURATION, SCOUT_INTEL_BONUS, SCOUT_STALE_BONUS, SCOUT_DETECTION_CHANCE, SAFEHOUSE_DURATION, MAX_ESCORT_SOLDIERS,
@@ -1173,6 +1173,7 @@ const placeAnchorRackets = (
 ) => {
   const rng = mulberry32(seed + 31337);
   const target = ANCHOR_COUNT_BY_MAP_SIZE[mapSize] ?? 10;
+  const minSpacing = ANCHOR_MIN_SPACING_BY_MAP_SIZE[mapSize] ?? ANCHOR_MIN_SPACING;
   const placed: HexTile[] = [];
   const usedNames = new Set<string>();
 
@@ -1180,19 +1181,28 @@ const placeAnchorRackets = (
     !t.isHeadquarters && !t.supplyNode && !t.anchor &&
     !hqPositions.some(hq => hexDistance(hq, t) <= ANCHOR_HQ_EXCLUSION);
 
-  const eligible = (t: HexTile, spacing = ANCHOR_MIN_SPACING) =>
+  const eligible = (t: HexTile, spacing = minSpacing) =>
     baseEligible(t) && !placed.some(p => hexDistance(p, t) < spacing);
+
+  /** Distance to the nearest anchor already on the board (Infinity for the first one). */
+  const spread = (t: HexTile) =>
+    placed.length ? Math.min(...placed.map(p => hexDistance(p, t))) : Infinity;
 
   for (let i = 0; i < target; i++) {
     const arch = ANCHOR_ARCHETYPES[i % ANCHOR_ARCHETYPES.length];
     let pool = tiles.filter(t => eligible(t) && arch.districts.includes(t.district as any));
     if (!pool.length) pool = tiles.filter(t => eligible(t));
     // Relax spacing progressively rather than dropping an anchor entirely.
-    for (let sp = ANCHOR_MIN_SPACING - 1; !pool.length && sp >= 2; sp--) {
+    for (let sp = minSpacing - 1; !pool.length && sp >= 2; sp--) {
       pool = tiles.filter(t => eligible(t, sp));
     }
     if (!pool.length) break;
-    const tile = pool[Math.floor(rng() * pool.length)];
+    // Farthest-point bias: among the legal spots, keep only the most isolated
+    // quarter, then pick randomly inside it. Still seed-random every map, but
+    // anchors can no longer bunch up in one corner of the board.
+    const ranked = [...pool].sort((a, b) => spread(b) - spread(a));
+    const shortlist = ranked.slice(0, Math.max(1, Math.ceil(ranked.length * 0.25)));
+    const tile = shortlist[Math.floor(rng() * shortlist.length)];
     const names = arch.names.filter(n => !usedNames.has(n));
     const name = (names.length ? names : arch.names)[Math.floor(rng() * Math.max(1, names.length))] || arch.names[0];
     usedNames.add(name);
@@ -1302,12 +1312,13 @@ export const createInitialGameState = (
       if (tile && tile.controllingFamily === 'neutral') {
         setTileOwner(tile, fam);
       }
+    });
   });
 
-  // Seed the strategic anchor rackets once HQs and supply nodes are locked in.
+  // Seed the strategic anchor rackets ONCE, after every HQ and supply node is locked in.
+  // (This used to sit inside the per-family loop, so it ran five times with five separate
+  // spacing checks — that is what produced the tight clusters of starting businesses.)
   placeAnchorRackets(hexMap, hqPositions, mapSize, mapSeed);
-
-  });
 
   const deployedUnits: DeployedUnit[] = [];
   const soldierStats: Record<string, SoldierStats> = {};

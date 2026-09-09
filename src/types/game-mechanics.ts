@@ -1430,8 +1430,16 @@ export const ANCHOR_COUNT_BY_MAP_SIZE: Record<string, number> = {
 /** Buy-out price = tribute x this multiplier. */
 export const ANCHOR_BUYOUT_MULTIPLIER = 6;
 
-/** Minimum hex distance between two anchors. */
-export const ANCHOR_MIN_SPACING = 5;
+/** Minimum hex distance between two anchors, by map size. Anchors are scarce, so
+ *  they should read as separate opportunities across the board, never a cluster. */
+export const ANCHOR_MIN_SPACING_BY_MAP_SIZE: Record<string, number> = {
+  small: 6,
+  medium: 9,
+  large: 12,
+};
+
+/** Fallback minimum hex distance between two anchors. */
+export const ANCHOR_MIN_SPACING = 9;
 
 
 /** No anchor may spawn within this many hexes of any family HQ. */
