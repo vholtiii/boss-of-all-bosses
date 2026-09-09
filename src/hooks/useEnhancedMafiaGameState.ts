@@ -5888,6 +5888,11 @@ export const useEnhancedMafiaGameState = (
     let buildingIncome = 0;
     let buildingHeat = 0;
     let recruitsSpawned = 0;
+    const standingOrderTally: Record<'muscle' | 'lay_low' | 'fortify', { blocks: number; incomeDelta: number; heatDelta: number }> = {
+      muscle: { blocks: 0, incomeDelta: 0, heatDelta: 0 },
+      lay_low: { blocks: 0, incomeDelta: 0, heatDelta: 0 },
+      fortify: { blocks: 0, incomeDelta: 0, heatDelta: 0 },
+    };
 
     (state.hexMap || []).forEach(tile => {
       if (tile.controllingFamily !== state.playerFamily) return;
