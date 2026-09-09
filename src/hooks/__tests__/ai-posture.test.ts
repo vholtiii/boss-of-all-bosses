@@ -28,8 +28,15 @@ describe('computeAIPosture', () => {
       .not.toBe('COOL_OFF');
   });
 
-  it('CONSOLIDATE when cash runway < 3 turns', () => {
-    expect(computeAIPosture({ ...baseInputs, moneyRunway: 2 })).toBe('CONSOLIDATE');
+  it('CONSOLIDATE when cash runway is under 2 turns', () => {
+    expect(computeAIPosture({ ...baseInputs, moneyRunway: 1.5 })).toBe('CONSOLIDATE');
+  });
+
+  it('breaks out of CONSOLIDATE after 4 straight turns unless truly broke', () => {
+    expect(computeAIPosture({ ...baseInputs, moneyRunway: 1.5, consolidateStreak: 5 }))
+      .not.toBe('CONSOLIDATE');
+    expect(computeAIPosture({ ...baseInputs, moneyRunway: 0.5, consolidateStreak: 5 }))
+      .toBe('CONSOLIDATE');
   });
 
   it('TURTLE after HQ assault or 2+ capo losses', () => {
@@ -111,6 +118,13 @@ describe('posturePolicy', () => {
     expect(p.suppressExpansion).toBe(false);
     expect(p.suppressOffense).toBe(false);
     expect(p.economyFocusMul).toBeGreaterThan(1);
+  });
+
+  it('CONSOLIDATE still lets a broke family earn its way out', () => {
+    const p = posturePolicy('CONSOLIDATE');
+    expect(p.suppressOffense).toBe(false);
+    expect(p.suppressExpansion).toBe(false);
+    expect(p.offensiveHitMul).toBeLessThan(1);
   });
 
   it('WAR allows higher heat and weights war targets', () => {
