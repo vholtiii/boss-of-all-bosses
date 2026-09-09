@@ -13445,12 +13445,15 @@ export const useEnhancedMafiaGameState = (
       const existing = (tile.buildings || {})[track] || 0;
       state.resources.money -= cost;
       state.actionsRemaining = Math.max(0, state.actionsRemaining - 1);
-      tile.buildings = { ...(tile.buildings || {}), [track]: Math.max(1, existing) as BuildingTier };
+      // Buy-out converts the racket straight to a Tier 2 building — owning it
+      // must be a clear profit step up from tribute, never a downgrade.
+      const targetTier = Math.max(2, existing) as BuildingTier;
+      tile.buildings = { ...(tile.buildings || {}), [track]: targetTier };
       const name = tile.anchor.name;
       tile.anchor = undefined;
       state.resources.influence = Math.min(100, (state.resources.influence || 0) + ANCHOR_BUYOUT_INFLUENCE);
       state.reputation.streetInfluence = Math.round(state.resources.influence);
-      notify('📜 On The Books', `${name} is yours outright — now a tier 1 ${BUILDING_DEFS[track].label} you can upgrade. +${ANCHOR_BUYOUT_INFLUENCE} influence.`, 'success');
+      notify('📜 On The Books', `${name} is yours outright — now a tier ${targetTier} ${BUILDING_DEFS[track].label} you can upgrade. +${ANCHOR_BUYOUT_INFLUENCE} influence.`, 'success');
       return state;
     });
   }, []);
