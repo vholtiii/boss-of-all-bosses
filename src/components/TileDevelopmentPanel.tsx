@@ -19,6 +19,7 @@ import {
   buildProgressRate,
   buildCrewLabel,
 } from '@/types/game-mechanics';
+import { buildPolicyPreviews, runningOrderSentence } from '@/lib/tile-policy-preview';
 import type { HexTile } from '@/hooks/useEnhancedMafiaGameState';
 
 interface TileDevelopmentPanelProps {
@@ -85,6 +86,15 @@ const TileDevelopmentPanel: React.FC<TileDevelopmentPanelProps> = ({
   const monthly = Math.floor((totals.income + anchorTribute) * share * policyDef.incomeMult);
   const buyoutCost = anchor ? (anchor.buyoutCost ?? anchorBuyoutCost(anchor.tribute)) : 0;
   const progressPct = Math.min(100, Math.round(((tile.recruitProgress || 0) / RECRUIT_PROGRESS_GOAL) * 100));
+
+  const previewInputs = {
+    grossIncome: totals.income + anchorTribute,
+    share,
+    infra: totals.infra,
+    recruitProgress: tile.recruitProgress || 0,
+  };
+  const policyPreviews = buildPolicyPreviews(previewInputs, policy);
+  const runningSentence = runningOrderSentence(previewInputs, policy);
 
   return (
     <motion.div
