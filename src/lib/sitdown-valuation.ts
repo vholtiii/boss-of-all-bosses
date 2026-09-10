@@ -214,6 +214,9 @@ export function settleBasket(basket: Basket): BasketSettlement {
   const cash = basket.chips
     .filter(c => c.from === 'player' && c.kind === 'cash')
     .reduce((s, c) => s + Math.max(0, Math.floor(c.amount || 0)), 0);
+  const theirCash = theirChips
+    .filter(c => c.kind === 'cash')
+    .reduce((s, c) => s + Math.max(0, Math.floor(c.amount || 0)), 0);
 
   const favorChip = basket.chips.find(c => c.kind === 'favor');
   const intelChip = basket.chips.find(c => c.kind === 'intel');
@@ -221,6 +224,9 @@ export function settleBasket(basket: Basket): BasketSettlement {
   return {
     dealType,
     cash,
+    theirCash,
+    // No pact type on the table, but cash / intel / favors still change hands.
+    sideDeal: dealType === null && theirChips.length > 0,
     // A favor GIVEN by them is owed TO the player.
     favorTo: favorChip ? (favorChip.from === 'them' ? 'player' : 'them') : undefined,
     intelTo: intelChip ? (intelChip.from === 'them' ? 'player' : 'them') : undefined,
