@@ -112,6 +112,10 @@ export interface DiplomaticFavor {
 export interface BasketSettlement {
   dealType: NegotiationType | null;
   cash: number;
+  /** Cash they put up for the player. */
+  theirCash?: number;
+  /** No pact type on the table, but cash / intel / favors still change hands. */
+  sideDeal?: boolean;
   favorTo?: ChipSide;
   intelTo?: ChipSide;
 }

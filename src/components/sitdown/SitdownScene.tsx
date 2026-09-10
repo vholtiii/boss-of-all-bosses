@@ -38,6 +38,8 @@ export interface SitdownSession {
 export interface SitdownSubmitPayload {
   dealType: string | null;
   cash: number;
+  theirCash: number;
+  sideDeal: boolean;
   accepted: boolean;
   extras: { favorTo?: ChipSide; intelTo?: ChipSide };
   basket: Basket;
