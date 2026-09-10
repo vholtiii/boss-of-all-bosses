@@ -2583,14 +2583,15 @@ export const useEnhancedMafiaGameState = (
       let remainingMoves = unit.movesRemaining - moveCost;
 
 
-      // FIX #5: Zone of control applies even on free moves — free movement skips COST but not ZoC
-      // Territorial ZoC: Phase 3+ only — soldiers stop near enemy units OR rival-claimed territory
-      if (unit.type === 'soldier' && (prev.gamePhase || 1) >= 3) {
+      // Zone of control: stops a soldier's outward advance, but never a free reposition
+      // inside your own HQ-linked turf. Phase 3+ only.
+      if (!isFreeMove && unit.type === 'soldier' && (prev.gamePhase || 1) >= 3) {
         if (isAdjacentToEnemy(targetLocation.q, targetLocation.r, targetLocation.s, prev.hexMap, prev.deployedUnits, prev.playerFamily) ||
             isAdjacentToEnemyTerritory(targetLocation.q, targetLocation.r, targetLocation.s, prev.hexMap, prev.playerFamily)) {
           remainingMoves = 0;
         }
       }
+
 
       const updatedUnit = { ...unit, q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: remainingMoves };
       newUnits[unitIdx] = updatedUnit;
