@@ -13027,45 +13027,7 @@ export const useEnhancedMafiaGameState = (
     }
 
     // ── Sitdown chip extras: favors and intel handed across the table ──
-    const extras = action.sitdownExtras;
-    if (extras) {
-      if (extras.favorTo === 'player' || extras.favorTo === 'them') {
-        state.owedFavors = [...(state.owedFavors || []), {
-          id: `favor-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          family: enemyFamily,
-          direction: extras.favorTo === 'player' ? 'they_owe' : 'you_owe',
-          turnsRemaining: FAVOR_DURATION,
-          turnGranted: state.turn,
-        }];
-      }
-      if (extras.favorRedeemedId) {
-        state.owedFavors = (state.owedFavors || []).filter(f => f.id !== extras.favorRedeemedId);
-      }
-      if (extras.intelTo === 'player') {
-        const theirHexes = state.hexMap.filter(t => t.controllingFamily === enemyFamily);
-        const existingKeys = new Set((state.scoutedHexes || []).map(sh => `${sh.q},${sh.r},${sh.s}`));
-        const entries = theirHexes
-          .filter(h => !existingKeys.has(`${h.q},${h.r},${h.s}`))
-          .map(h => ({
-            q: h.q, r: h.r, s: h.s,
-            scoutedTurn: state.turn,
-            turnsRemaining: 3,
-            freshUntilTurn: state.turn + 1,
-            enemySoldierCount: state.deployedUnits.filter(u => u.family === enemyFamily && u.q === h.q && u.r === h.r && u.s === h.s).length,
-            enemyFamily,
-            businessType: h.anchor?.type,
-            businessIncome: h.anchor?.tribute,
-            isFortified: (state.fortifiedHexes || []).some(f => f.q === h.q && f.r === h.r && f.s === h.s && f.family === enemyFamily) || undefined,
-          }));
-        state.scoutedHexes = [...(state.scoutedHexes || []), ...entries];
-        if (entries.length > 0) {
-          state.pendingNotifications = [...state.pendingNotifications, {
-            type: 'info', title: '🔎 Intel Handed Over',
-            message: `${enemyFamily.charAt(0).toUpperCase() + enemyFamily.slice(1)} opened their books — ${entries.length} block(s) revealed for 3 turns.`,
-          }];
-        }
-      }
-    }
+    applySitdownExtras(state, enemyFamily, action.sitdownExtras);
 
     syncLegacyUnits(state);
     return state;
