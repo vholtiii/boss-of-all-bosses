@@ -2431,8 +2431,9 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
                 theyAskedForThis: !!incomingSitdownId,
                 playerIsRunawayLeader: playerIsRunawayLeaderNeg,
                 cooldown: ((gameState as any).bossNegotiationCooldown || 0) > 0,
+                cooldownTurns: (gameState as any).bossNegotiationCooldown || 0,
               }}
-              onSubmit={({ dealType, cash, accepted, extras }) => {
+              onSubmit={({ dealType, cash, theirCash, sideDeal, accepted, extras }) => {
                 if (dealType) {
                   if (incomingSitdownId) {
                     performAction({
@@ -2453,6 +2454,14 @@ negotiationUsedThisTurn={((gameState as any).bossNegotiationCooldown || 0) > 0}
                       sitdownExtras: extras,
                     });
                   }
+                } else if (sideDeal && accepted) {
+                  performAction({
+                    type: 'sitdown_side_deal',
+                    targetFamily: targetFam,
+                    cash,
+                    theirCash,
+                    sitdownExtras: extras,
+                  });
                 }
                 setNegotiationState(null);
               }}
