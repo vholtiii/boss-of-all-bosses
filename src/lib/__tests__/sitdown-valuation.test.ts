@@ -176,3 +176,26 @@ describe('standing agreements', () => {
     })).toHaveLength(0);
   });
 });
+
+describe('side-deal settlement', () => {
+  it('marks a favor/intel-only basket as a side deal and carries their cash', () => {
+    const basket = {
+      chips: [
+        newChip({ kind: 'intel', from: 'them' }),
+        newChip({ kind: 'cash', from: 'them', amount: 3000 }),
+        newChip({ kind: 'cash', from: 'player', amount: 1500 }),
+      ],
+    };
+    const settled = settleBasket(basket as any);
+    expect(settled.dealType).toBeNull();
+    expect(settled.sideDeal).toBe(true);
+    expect(settled.theirCash).toBe(3000);
+    expect(settled.cash).toBe(1500);
+    expect(settled.intelTo).toBe('player');
+  });
+
+  it('is not a side deal when nothing is asked of them', () => {
+    const settled = settleBasket({ chips: [newChip({ kind: 'cash', from: 'player', amount: 1000 })] } as any);
+    expect(settled.sideDeal).toBe(false);
+  });
+});

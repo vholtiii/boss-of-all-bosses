@@ -33,11 +33,14 @@ export interface SitdownSession {
   theyAskedForThis?: boolean;
   playerIsRunawayLeader?: boolean;
   cooldown?: boolean;
+  cooldownTurns?: number;
 }
 
 export interface SitdownSubmitPayload {
   dealType: string | null;
   cash: number;
+  theirCash: number;
+  sideDeal: boolean;
   accepted: boolean;
   extras: { favorTo?: ChipSide; intelTo?: ChipSide };
   basket: Basket;
@@ -125,11 +128,18 @@ const SitdownScene: React.FC<SitdownSceneProps> = ({ open, session, gameState, o
     setChips(prev => prev.map(c => (c.id === id ? { ...c, ...patch } : c)));
   const removeChip = (id: string) => setChips(prev => prev.filter(c => c.id !== id));
 
+  const neededCash = useMemo(
+    () => aiCounterCash(basket, leverage, leverageInput),
+    [basket, leverage, leverageInput],
+  );
+  const shortBy = Math.max(0, neededCash - playerMoney);
+
   const meetTheirNumber = () => {
-    const needed = aiCounterCash(basket, leverage, leverageInput);
+    // Never fill in a number the player can't cover.
+    const offer = Math.min(neededCash, playerMoney);
     setChips(prev => {
       const withoutCash = prev.filter(c => !(c.from === 'player' && c.kind === 'cash'));
-      return needed > 0 ? [...withoutCash, newChip({ kind: 'cash', from: 'player', amount: needed })] : withoutCash;
+      return offer > 0 ? [...withoutCash, newChip({ kind: 'cash', from: 'player', amount: offer })] : withoutCash;
     });
   };
 
@@ -147,11 +157,31 @@ const SitdownScene: React.FC<SitdownSceneProps> = ({ open, session, gameState, o
   const canAfford = playerMoney >= cashOffered;
   const canSign = verdict.accepts && theirChips.length > 0 && canAfford && !session.cooldown;
 
+  const cooldownTurns = session.cooldownTurns || 0;
+  const blockReason = (() => {
+    if (session.cooldown) {
+      const who = session.scope === 'family' ? 'Your boss' : 'Your capos';
+      return cooldownTurns > 0
+        ? `${who} can't sign for another ${cooldownTurns} turn${cooldownTurns === 1 ? '' : 's'}.`
+        : `${who} can't sign again this turn.`;
+    }
+    if (theirChips.length === 0) return 'Ask them for something first.';
+    if (!canAfford) return `You're short $${(cashOffered - playerMoney).toLocaleString()} on the cash you put up.`;
+    if (!verdict.accepts) {
+      return shortBy > 0
+        ? `They won't sign at this price — and you're $${shortBy.toLocaleString()} short of their number. Sweeten it with a favor, safe passage, intel or tribute.`
+        : 'They won\'t sign at this price. Sweeten the pot.';
+    }
+    return null;
+  })();
+
   const submit = (accepted: boolean) => {
     const settled = settleBasket(basket);
     onSubmit({
       dealType: settled.dealType,
       cash: settled.cash,
+      theirCash: settled.theirCash || 0,
+      sideDeal: !!settled.sideDeal,
       accepted,
       extras: { favorTo: settled.favorTo, intelTo: settled.intelTo },
       basket,
@@ -197,7 +227,8 @@ const SitdownScene: React.FC<SitdownSceneProps> = ({ open, session, gameState, o
 
           {session.cooldown && (
             <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-xs text-destructive">
-              ⏳ Nobody on your side can sign this turn — the last sitdown is still cooling off.
+              ⏳ You can look, but nobody on your side can sign
+              {cooldownTurns > 0 ? ` for another ${cooldownTurns} turn${cooldownTurns === 1 ? '' : 's'}` : ' this turn'} — the last sitdown is still cooling off.
             </div>
           )}
 
@@ -270,26 +301,38 @@ const SitdownScene: React.FC<SitdownSceneProps> = ({ open, session, gameState, o
           </div>
 
           {/* Footer */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-4 py-3">
-            <Button variant="ghost" size="sm" onClick={onClose} className="gap-1.5">
-              <DoorOpen className="h-4 w-4" /> Walk away
-            </Button>
-            <div className="flex flex-wrap items-center gap-2">
-              {theirChips.length > 0 && !verdict.accepts && (
-                <Button variant="outline" size="sm" onClick={meetTheirNumber}>
-                  Meet their number
-                </Button>
-              )}
-              <Button
-                size="sm"
-                disabled={!canSign}
-                onClick={() => submit(true)}
-                className="gap-1.5"
-                title={!canAfford ? 'You cannot cover that cash' : undefined}
-              >
-                <Handshake className="h-4 w-4" /> Shake on it
+          <div className="border-t border-border/60 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Button variant="ghost" size="sm" onClick={onClose} className="gap-1.5">
+                <DoorOpen className="h-4 w-4" /> Walk away
               </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                {theirChips.length > 0 && !verdict.accepts && !session.cooldown && (
+                  <Button
+                    variant="outline" size="sm"
+                    onClick={meetTheirNumber}
+                    disabled={shortBy > 0 && playerMoney <= 0}
+                    title={shortBy > 0 ? `Their number is $${neededCash.toLocaleString()} — you hold $${playerMoney.toLocaleString()}` : undefined}
+                  >
+                    Meet their number
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  disabled={!canSign}
+                  onClick={() => submit(true)}
+                  className="gap-1.5"
+                  title={blockReason || undefined}
+                >
+                  <Handshake className="h-4 w-4" /> Shake on it
+                </Button>
+              </div>
             </div>
+            {blockReason && (
+              <p className="mt-2 text-right text-[11px] text-muted-foreground" role="status">
+                ⛔ {blockReason}
+              </p>
+            )}
           </div>
         </motion.div>
       </motion.div>
