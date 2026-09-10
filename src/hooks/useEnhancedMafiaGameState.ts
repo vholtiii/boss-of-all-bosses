@@ -2176,8 +2176,24 @@ export const useEnhancedMafiaGameState = (
           }
           return true;
         });
+        // Free movement inside your own HQ-linked turf — no move points, no action.
+        const capoKey = `${unit.q},${unit.r},${unit.s}`;
+        const capoConnected = getConnectedTerritory(prev.hexMap, prev.playerFamily);
+        if (capoConnected.has(capoKey)) {
+          const seen = new Set(validHexes.map(h => `${h.q},${h.r},${h.s}`));
+          capoConnected.forEach(k => {
+            if (k === capoKey || seen.has(k)) return;
+            const [q, r, s] = k.split(',').map(Number);
+            const tile = prev.hexMap.find(t => t.q === q && t.r === r && t.s === s);
+            if (!tile) return;
+            if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return;
+            if (hasEnemySoldierOnHex(q, r, s)) return;
+            validHexes.push({ q, r, s });
+          });
+        }
         return { ...prev, selectedUnitId: unit.id, availableMoveHexes: validHexes, deployMode: null, availableDeployHexes: [] };
       }
+
 
       // Soldier movement: free within connected territory + normal adjacent for venturing out
       const hexKey = (q: number, r: number, s: number) => `${q},${r},${s}`;
@@ -2567,14 +2583,15 @@ export const useEnhancedMafiaGameState = (
       let remainingMoves = unit.movesRemaining - moveCost;
 
 
-      // FIX #5: Zone of control applies even on free moves — free movement skips COST but not ZoC
-      // Territorial ZoC: Phase 3+ only — soldiers stop near enemy units OR rival-claimed territory
-      if (unit.type === 'soldier' && (prev.gamePhase || 1) >= 3) {
+      // Zone of control: stops a soldier's outward advance, but never a free reposition
+      // inside your own HQ-linked turf. Phase 3+ only.
+      if (!isFreeMove && unit.type === 'soldier' && (prev.gamePhase || 1) >= 3) {
         if (isAdjacentToEnemy(targetLocation.q, targetLocation.r, targetLocation.s, prev.hexMap, prev.deployedUnits, prev.playerFamily) ||
             isAdjacentToEnemyTerritory(targetLocation.q, targetLocation.r, targetLocation.s, prev.hexMap, prev.playerFamily)) {
           remainingMoves = 0;
         }
       }
+
 
       const updatedUnit = { ...unit, q: targetLocation.q, r: targetLocation.r, s: targetLocation.s, movesRemaining: remainingMoves };
       newUnits[unitIdx] = updatedUnit;
@@ -2761,7 +2778,22 @@ export const useEnhancedMafiaGameState = (
             if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
             return true;
           });
+          // Free repositioning across your own HQ-linked turf
+          const capoConnectedPost = getConnectedTerritory(newHexMap, prev.playerFamily);
+          const capoKeyPost = hexKey(updatedUnit.q, updatedUnit.r, updatedUnit.s);
+          if (capoConnectedPost.has(capoKeyPost)) {
+            const seenPost = new Set(newAvailableMoves.map(h => hexKey(h.q, h.r, h.s)));
+            capoConnectedPost.forEach(k => {
+              if (k === capoKeyPost || seenPost.has(k)) return;
+              const [q, r, s] = k.split(',').map(Number);
+              const tile = newHexMap.find(t => t.q === q && t.r === r && t.s === s);
+              if (!tile) return;
+              if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return;
+              newAvailableMoves.push({ q, r, s });
+            });
+          }
         } else {
+
           // Soldier: recalculate with connected territory logic
           const connectedSetPost = getConnectedTerritory(newHexMap, prev.playerFamily);
           const updKey = hexKey(updatedUnit.q, updatedUnit.r, updatedUnit.s);
