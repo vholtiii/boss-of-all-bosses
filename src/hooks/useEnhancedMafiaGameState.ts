@@ -2778,7 +2778,22 @@ export const useEnhancedMafiaGameState = (
             if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return false;
             return true;
           });
+          // Free repositioning across your own HQ-linked turf
+          const capoConnectedPost = getConnectedTerritory(newHexMap, prev.playerFamily);
+          const capoKeyPost = hexKey(updatedUnit.q, updatedUnit.r, updatedUnit.s);
+          if (capoConnectedPost.has(capoKeyPost)) {
+            const seenPost = new Set(newAvailableMoves.map(h => hexKey(h.q, h.r, h.s)));
+            capoConnectedPost.forEach(k => {
+              if (k === capoKeyPost || seenPost.has(k)) return;
+              const [q, r, s] = k.split(',').map(Number);
+              const tile = newHexMap.find(t => t.q === q && t.r === r && t.s === s);
+              if (!tile) return;
+              if (tile.isHeadquarters && tile.isHeadquarters !== prev.playerFamily) return;
+              newAvailableMoves.push({ q, r, s });
+            });
+          }
         } else {
+
           // Soldier: recalculate with connected territory logic
           const connectedSetPost = getConnectedTerritory(newHexMap, prev.playerFamily);
           const updKey = hexKey(updatedUnit.q, updatedUnit.r, updatedUnit.s);
