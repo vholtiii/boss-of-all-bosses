@@ -554,7 +554,9 @@ const EnhancedMafiaHexGrid = forwardRef<HexGridFxHandle, EnhancedMafiaHexGridPro
       // that would silently cancel deploy mode and allow moves beyond the deploy ring.
       if (!gameState?.deployMode) {
         const unitsHere = unitsByHex.get(hqKey) || [];
-        const playerUnit = unitsHere.find(u => u.family === playerFamily && (isTacticalMode || u.movesRemaining > 0));
+        // Moves inside your own turf are free, so a unit with no move points can still be picked up.
+        const playerUnit = unitsHere.find(u => u.family === playerFamily);
+
         if (playerUnit && onSelectUnit) {
           onSelectUnit(playerUnit.type, { q: tile.q, r: tile.r, s: tile.s });
         }
