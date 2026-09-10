@@ -10575,6 +10575,41 @@ export const useEnhancedMafiaGameState = (
           newState.pendingBusinessBuild = null;
           return newState;
         }
+        // A sitdown that trades only cash / intel / favors — no pact to sign,
+        // but the handshake still has to mean something.
+        case 'sitdown_side_deal': {
+          const fam = action.targetFamily;
+          if (!fam || fam === newState.playerFamily) return newState;
+          const pay = Math.max(0, Math.floor(action.cash || 0));
+          const receive = Math.max(0, Math.floor(action.theirCash || 0));
+          if (newState.resources.money < pay) {
+            newState.pendingNotifications.push({
+              type: 'warning', title: '💸 Short on Cash',
+              message: `You can't cover $${pay.toLocaleString()} at that table.`,
+            });
+            return newState;
+          }
+          const rivalOpp = newState.aiOpponents.find(o => o.family === fam);
+          newState.resources.money -= pay;
+          if (rivalOpp) {
+            rivalOpp.resources.money += pay;
+            const paidOut = Math.min(receive, rivalOpp.resources.money);
+            rivalOpp.resources.money -= paidOut;
+            newState.resources.money += paidOut;
+          } else {
+            newState.resources.money += receive;
+          }
+          applySitdownExtras(newState, fam, action.sitdownExtras);
+          addPairTension(newState, newState.playerFamily, fam, -1);
+          const sideFamLabel = fam.charAt(0).toUpperCase() + fam.slice(1);
+          newState.pendingNotifications.push({
+            type: 'success', title: '🤝 Understanding Reached',
+            message: `You and the ${sideFamLabel} shook on a side arrangement at the table.`,
+          });
+          newState.actionsRemaining = Math.max(0, newState.actionsRemaining - 1);
+          syncLegacyUnits(newState);
+          return newState;
+        }
         case 'negotiate': {
           const result = processNegotiation(newState, action);
           result.actionsRemaining = Math.max(0, result.actionsRemaining - 1);
