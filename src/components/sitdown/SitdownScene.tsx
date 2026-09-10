@@ -33,6 +33,7 @@ export interface SitdownSession {
   theyAskedForThis?: boolean;
   playerIsRunawayLeader?: boolean;
   cooldown?: boolean;
+  cooldownTurns?: number;
 }
 
 export interface SitdownSubmitPayload {
@@ -127,11 +128,18 @@ const SitdownScene: React.FC<SitdownSceneProps> = ({ open, session, gameState, o
     setChips(prev => prev.map(c => (c.id === id ? { ...c, ...patch } : c)));
   const removeChip = (id: string) => setChips(prev => prev.filter(c => c.id !== id));
 
+  const neededCash = useMemo(
+    () => aiCounterCash(basket, leverage, leverageInput),
+    [basket, leverage, leverageInput],
+  );
+  const shortBy = Math.max(0, neededCash - playerMoney);
+
   const meetTheirNumber = () => {
-    const needed = aiCounterCash(basket, leverage, leverageInput);
+    // Never fill in a number the player can't cover.
+    const offer = Math.min(neededCash, playerMoney);
     setChips(prev => {
       const withoutCash = prev.filter(c => !(c.from === 'player' && c.kind === 'cash'));
-      return needed > 0 ? [...withoutCash, newChip({ kind: 'cash', from: 'player', amount: needed })] : withoutCash;
+      return offer > 0 ? [...withoutCash, newChip({ kind: 'cash', from: 'player', amount: offer })] : withoutCash;
     });
   };
 
@@ -149,11 +157,31 @@ const SitdownScene: React.FC<SitdownSceneProps> = ({ open, session, gameState, o
   const canAfford = playerMoney >= cashOffered;
   const canSign = verdict.accepts && theirChips.length > 0 && canAfford && !session.cooldown;
 
+  const cooldownTurns = session.cooldownTurns || 0;
+  const blockReason = (() => {
+    if (session.cooldown) {
+      const who = session.scope === 'family' ? 'Your boss' : 'Your capos';
+      return cooldownTurns > 0
+        ? `${who} can't sign for another ${cooldownTurns} turn${cooldownTurns === 1 ? '' : 's'}.`
+        : `${who} can't sign again this turn.`;
+    }
+    if (theirChips.length === 0) return 'Ask them for something first.';
+    if (!canAfford) return `You're short $${(cashOffered - playerMoney).toLocaleString()} on the cash you put up.`;
+    if (!verdict.accepts) {
+      return shortBy > 0
+        ? `They won't sign at this price — and you're $${shortBy.toLocaleString()} short of their number. Sweeten it with a favor, safe passage, intel or tribute.`
+        : 'They won\'t sign at this price. Sweeten the pot.';
+    }
+    return null;
+  })();
+
   const submit = (accepted: boolean) => {
     const settled = settleBasket(basket);
     onSubmit({
       dealType: settled.dealType,
       cash: settled.cash,
+      theirCash: settled.theirCash || 0,
+      sideDeal: !!settled.sideDeal,
       accepted,
       extras: { favorTo: settled.favorTo, intelTo: settled.intelTo },
       basket,
